@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.147
+// @version      1.7.148
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -9839,6 +9839,36 @@ ${buildCbreBody(current)}`;
     style: "werkia-vertretungen-style"
   };
   var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
+  var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
+  var COPIED_STYLES = [
+    "color",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "letterSpacing",
+    "textTransform",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderRadius",
+    "minWidth",
+    "minHeight"
+  ];
+  function nativeLookFrom(sample, view = sample?.ownerDocument?.defaultView) {
+    if (!sample || !view) return null;
+    const computed = view.getComputedStyle(sample);
+    const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
+    const icon = sample.querySelector("svg");
+    const iconStyle = icon ? view.getComputedStyle(icon) : null;
+    const iconBox = icon?.parentElement && icon.parentElement !== sample ? view.getComputedStyle(icon.parentElement) : null;
+    return {
+      style,
+      iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
+      iconGap: iconBox?.marginRight && iconBox.marginRight !== "0px" ? iconBox.marginRight : "8px"
+    };
+  }
   function findToolbar(root = document) {
     for (const selector of TOOLBAR_SELECTORS) {
       const element = root.querySelector(selector);
@@ -9875,6 +9905,9 @@ ${buildCbreBody(current)}`;
       style.id = IDS4.style;
       style.textContent = `
       #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS4.button}.wv-native { display:inline-flex; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
       #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
       #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
       #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
@@ -10110,8 +10143,24 @@ ${buildCbreBody(current)}`;
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (toolbar) {
         owned(IDS4.bar)?.remove();
-        const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /MuiButton/.test(element.className));
-        vertretungenButton.className = sample ? sample.className : "wv-own";
+        const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
+        const look = nativeLookFrom(sample);
+        if (look) {
+          vertretungenButton.className = "wv-native";
+          Object.assign(vertretungenButton.style, look.style);
+          const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon.setAttribute("viewBox", "0 0 24 24");
+          icon.setAttribute("aria-hidden", "true");
+          icon.style.width = look.iconSize;
+          icon.style.height = look.iconSize;
+          icon.style.marginRight = look.iconGap;
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", PEOPLE_ICON_PATH);
+          icon.append(path);
+          vertretungenButton.prepend(icon);
+        } else {
+          vertretungenButton.className = "wv-own";
+        }
         toolbar.append(vertretungenButton);
         return;
       }

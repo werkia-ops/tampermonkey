@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.149
+// @version      1.9.150
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2456,7 +2456,7 @@
         "Die Auswahl bleibt, bis du die Seite neu lädst."
       ]
     },
-    vertretungenTopic({ page: "CEM › Meine Matches", routes: [ROUTES.cemMyMatches] })
+    vertretungenTopic({ page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates, ROUTES.cemMyMatches] })
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -8351,9 +8351,10 @@
   }
 
   // src/features/vertretungen.js
+  var CEM_VERTRETUNGEN_ROUTES = [ROUTES.cemMyCandidates, ROUTES.cemMyMatches];
   function executeVertretungen2(runtime) {
     executeVertretungen(runtime, {
-      routes: [ROUTES.cemMyMatches],
+      routes: CEM_VERTRETUNGEN_ROUTES,
       getGraphqlAdapter: getCemGraphqlAdapter,
       toolboxName: "CEM-Toolbox",
       helpTip: () => cemHelp.tip("vertretungen"),

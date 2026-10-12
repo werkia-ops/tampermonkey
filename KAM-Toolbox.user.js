@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.148
+// @version      1.7.149
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -9839,6 +9839,7 @@ ${buildCbreBody(current)}`;
     style: "werkia-vertretungen-style"
   };
   var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
+  var CONFIRM_MS = 4e3;
   var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
   var COPIED_STYLES = [
     "color",
@@ -9905,7 +9906,7 @@ ${buildCbreBody(current)}`;
       style.id = IDS4.style;
       style.textContent = `
       #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS4.button}.wv-native { display:inline-flex; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS4.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
       #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
       #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
@@ -9943,6 +9944,24 @@ ${buildCbreBody(current)}`;
     }
     function button2(text, onClick, className = "") {
       return el3("button", { type: "button", textContent: text, className, onclick: onClick });
+    }
+    function confirmButton(label, question, onConfirm) {
+      let armed = false;
+      let timer = null;
+      const element = button2(label, () => {
+        if (!armed) {
+          armed = true;
+          element.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element.textContent = label;
+          }, CONFIRM_MS);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, "wv-danger");
+      return element;
     }
     async function loadMyId() {
       if (myId) return myId;
@@ -10005,10 +10024,7 @@ ${buildCbreBody(current)}`;
           editing = entry;
           render();
         }, "wv-secondary"),
-        button2("Löschen", () => {
-          if (!window.confirm(`Vertretung ${entry.abwesendName} → ${entry.vertretungName} (${formatRange(entry.von, entry.bis)}) löschen?`)) return;
-          run({ action: "loeschen", id: entry.id }, "Gelöscht.");
-        }, "wv-danger")
+        confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
       const row = el3("li", {}, [who, when, badge, ...actions]);
       if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
@@ -10054,10 +10070,7 @@ ${buildCbreBody(current)}`;
       const admins = state.admins || [];
       const list = el3("ul");
       admins.forEach((admin) => {
-        const remove = ich.darfAlles && admin.id ? button2("Entfernen", () => {
-          if (!window.confirm(`${admin.name} die Admin-Rechte für Vertretungen entziehen?`)) return;
-          run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.");
-        }, "wv-danger") : null;
+        const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
         list.append(el3("li", {}, [el3("span", { className: "wv-who", textContent: admin.name }), remove]));
       });
       const parts = [
@@ -10135,7 +10148,7 @@ ${buildCbreBody(current)}`;
       ensureStyle();
       const toolbar = findToolbar(document);
       const existing = owned(IDS4.button);
-      if (existing && (toolbar ? existing.parentElement === toolbar : existing.parentElement?.id === IDS4.bar)) return;
+      if (existing && (toolbar ? existing.parentElement === toolbar && toolbar.firstElementChild === existing : existing.parentElement?.id === IDS4.bar)) return;
       existing?.remove();
       const vertretungenButton = button2("Vertretungen", openDialog);
       vertretungenButton.id = IDS4.button;
@@ -10161,7 +10174,7 @@ ${buildCbreBody(current)}`;
         } else {
           vertretungenButton.className = "wv-own";
         }
-        toolbar.append(vertretungenButton);
+        toolbar.prepend(vertretungenButton);
         return;
       }
       vertretungenButton.className = "wv-own";

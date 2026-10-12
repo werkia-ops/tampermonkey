@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.145
+// @version      1.9.146
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -7722,11 +7722,15 @@
       const style = document.createElement("style");
       style.id = STYLE_ID4;
       style.textContent = `
-      .${BAR_CLASS2} { display:flex; flex-direction:column; gap:4px; margin:4px 0 6px; font:400 12px/1.3 Arial,sans-serif; }
+      /* pointer-events/z-index: in der Filterzeile kam live kein Klick an
+         (Text-Cursor, Text markierbar), 2026-10-12. pointer-events wird
+         vererbt, ein Vorfahr mit "none" schaltet sonst die Knoepfe ab. */
+      .${BAR_CLASS2} { position:relative; z-index:2; pointer-events:auto; display:flex; flex-direction:column; gap:4px; margin:4px 0 6px; font:400 12px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS2} * { pointer-events:auto; }
       .${BAR_CLASS2}[data-placement="filter-form"] { align-self:flex-end; flex:1 1 320px; margin:0 0 4px 16px; }
       .${BAR_CLASS2}-head { display:flex; align-items:center; gap:4px; font-size:0.75rem; color:rgba(0,0,0,.6); }
       .${BAR_CLASS2}-chips { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
-      .${BAR_CLASS2} button { min-height:22px; padding:2px 8px; border:1px solid #c8ccdd; border-radius:11px; background:#fff; color:#1f2933; cursor:pointer; font:400 11px/1 Arial,sans-serif; }
+      .${BAR_CLASS2} button { min-height:22px; padding:2px 8px; border:1px solid #c8ccdd; border-radius:11px; background:#fff; color:#1f2933; cursor:pointer !important; user-select:none; font:400 11px/1 Arial,sans-serif; }
       .${BAR_CLASS2} button:hover { border-color:#4956df; }
       .${BAR_CLASS2} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
       .${BAR_CLASS2} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }

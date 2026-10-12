@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.133
+// @version      1.7.142
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2199,6 +2199,19 @@
       notes: ["Ein Klick auf den Namen kopiert ihn in die Zwischenablage, zum Beispiel für Slack."]
     },
     {
+      id: "cem-status-filter",
+      title: "Nach CEM-Status filtern",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "Über der Liste steht eine Leiste mit allen CEM-Status. Ein Klick auf einen Status zeigt nur noch Matches mit diesem CEM-Status, mehrere Status lassen sich kombinieren.",
+      notes: [
+        "Der Filter gilt für die ganze Liste, nicht nur für die sichtbare Seite, und lässt sich mit den übrigen Filtern kombinieren.",
+        "Noch mal klicken nimmt den Status wieder heraus, „alle“ entfernt den CEM-Status-Filter ganz.",
+        "Filtervorlagen speichern den CEM-Status-Filter mit."
+      ]
+    },
+    {
       id: "candidate-file-popup",
       title: "Kandidatenansicht als Popup",
       page: MY_MATCHES,
@@ -2836,7 +2849,7 @@
     runtime.registerSource(sourcePath);
     const {
       team,
-      isTargetPage: isTargetPage9,
+      isTargetPage: isTargetPage10,
       getRequest,
       ids: IDS4,
       fields,
@@ -3368,7 +3381,7 @@
       });
     }
     function installHeaderButtons() {
-      if (!isTargetPage9()) return;
+      if (!isTargetPage10()) return;
       kit.injectStyle();
       installButton(columns.followUp, IDS4.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
       installButton(columns.status, IDS4.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
@@ -3381,7 +3394,7 @@
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage9()) {
+        if (!isTargetPage10()) {
           kit.discard();
           return;
         }
@@ -4077,10 +4090,541 @@
     scheduleLines();
   }
 
+  // ../../shared/js/list-filter-presets/core.js
+  var STORAGE_KEY = "werkia_list_filter_presets_v1";
+  var STORE_VERSION = 1;
+  function parseJsonObject(value, fallback) {
+    if (!value) return fallback;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function safeCall(callback) {
+    if (typeof callback !== "function") return "";
+    try {
+      return callback();
+    } catch {
+      return "";
+    }
+  }
+  function routeFromHash(hash = "") {
+    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
+  }
+  function parseListState(hash = "") {
+    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
+    const perPage = Number.parseInt(params.get("perPage") || "", 10);
+    return {
+      route: routeFromHash(hash),
+      filter: parseJsonObject(params.get("filter"), {}),
+      sort: params.get("sort") || "",
+      order: params.get("order") || "",
+      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
+    };
+  }
+  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
+    const params = new URLSearchParams({
+      displayedFilters: JSON.stringify({}),
+      filter: JSON.stringify(filter || {})
+    });
+    if (order) params.set("order", order);
+    params.set("page", "1");
+    if (perPage) params.set("perPage", String(perPage));
+    if (sort) params.set("sort", sort);
+    return `#/${route}?${params}`;
+  }
+  function isTargetRoute(hash, routes = []) {
+    const route = routeFromHash(hash).toLowerCase();
+    return routes.some((candidate) => String(candidate).toLowerCase() === route);
+  }
+  function isEmptyFilterValue(value) {
+    if (value === null || value === void 0 || value === "") return true;
+    return Array.isArray(value) && value.length === 0;
+  }
+  function filterKey(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return JSON.stringify(
+      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
+    );
+  }
+  function filterFields(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
+  }
+  function describePreset(preset) {
+    const fields = filterFields(preset?.filter);
+    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
+  }
+  function createPresetId(now = Date.now(), entropy = Math.random()) {
+    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
+  }
+  function presetFromState(name, state) {
+    return {
+      id: createPresetId(),
+      name: String(name || "").trim(),
+      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
+      sort: state?.sort || "",
+      order: state?.order || "",
+      perPage: state?.perPage || 0
+    };
+  }
+  function applyPresetToState(preset, currentState) {
+    return {
+      route: currentState?.route || "",
+      filter: preset?.filter || {},
+      sort: preset?.sort || currentState?.sort || "",
+      order: preset?.order || currentState?.order || "",
+      perPage: preset?.perPage || currentState?.perPage || 0
+    };
+  }
+  function findActivePresetId(presets, state) {
+    const key = filterKey(state?.filter);
+    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
+  }
+  function emptyStore() {
+    return { version: STORE_VERSION, routes: {} };
+  }
+  function parseStore(raw) {
+    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
+    if (!parsed || typeof parsed !== "object") return emptyStore();
+    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
+    const clean4 = {};
+    Object.keys(routes).forEach((route) => {
+      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+        id: String(preset.id || createPresetId()),
+        name: String(preset.name),
+        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
+        sort: preset.sort || "",
+        order: preset.order || "",
+        perPage: Number.parseInt(preset.perPage, 10) || 0
+      }));
+    });
+    return { version: STORE_VERSION, routes: clean4 };
+  }
+  function presetsForRoute(store, route) {
+    return store?.routes?.[route] ? [...store.routes[route]] : [];
+  }
+  function upsertPreset(store, route, preset) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
+    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+    if (sameName >= 0) kept.splice(sameName, 1, preset);
+    else kept.push(preset);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function removePreset(store, route, id) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function mergeStores(base, incoming) {
+    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
+    const routes = incoming?.routes || {};
+    Object.keys(routes).forEach((route) => {
+      routes[route].forEach((preset) => {
+        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
+      });
+    });
+    return result;
+  }
+  function createPresetStorage({ read, write, backupRead, backupWrite }) {
+    return {
+      load() {
+        const primary = parseStore(safeCall(read));
+        if (Object.keys(primary.routes).length) return primary;
+        const backup = parseStore(safeCall(backupRead));
+        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
+        return backup;
+      },
+      save(store) {
+        const serialized = JSON.stringify(store);
+        safeCall(() => write(serialized));
+        safeCall(() => backupWrite(serialized));
+      }
+    };
+  }
+
+  // ../../shared/js/list-filter-presets/index.js
+  var IDS2 = {
+    bar: "werkia-filter-presets-bar",
+    select: "werkia-filter-presets-select",
+    style: "werkia-filter-presets-style",
+    dialog: "werkia-filter-presets-dialog"
+  };
+  var LIST_ANCHOR_SELECTORS = [
+    ".RaList-content",
+    ".RaList-main",
+    "table.RaDataTable-table",
+    "main table"
+  ];
+  function findListAnchor(root = document) {
+    for (const selector of LIST_ANCHOR_SELECTORS) {
+      const element = root.querySelector(selector);
+      if (element) return element;
+    }
+    return null;
+  }
+  function executeListFilterPresets(runtime, {
+    routes = [],
+    sourcePath,
+    label = "Filtervorlagen",
+    builtInPresets = [],
+    storage,
+    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
+    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
+    helpTip
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const presetStorage = storage || createPresetStorage({
+      read: () => localStorage.getItem(STORAGE_KEY),
+      write: (value) => localStorage.setItem(STORAGE_KEY, value),
+      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
+      backupWrite: (value) => {
+        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
+      }
+    });
+    const owner = sourcePath || routes.join(",");
+    const ownElement = (id) => {
+      const element = document.getElementById(id);
+      return element?.dataset.werkiaPresetsOwner === owner ? element : null;
+    };
+    const isTargetPage10 = () => isTargetRoute(location.hash, routes);
+    const currentRoute = () => routeFromHash(location.hash);
+    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
+    function ensureStyle() {
+      if (document.getElementById(IDS2.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS2.style;
+      style.textContent = `
+      #${IDS2.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS2.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      #${IDS2.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS2.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.bar} button:hover { background:#3643c7; }
+      #${IDS2.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS2.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
+      #${IDS2.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS2.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS2.dialog} h2 { margin:0 0 12px; font-size:15px; }
+      #${IDS2.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS2.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
+      #${IDS2.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS2.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
+      #${IDS2.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
+      #${IDS2.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
+      #${IDS2.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS2.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function applyPreset(preset) {
+      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
+    }
+    function saveCurrentFilter() {
+      const state = parseListState(location.hash);
+      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
+      const name = window.prompt("Name der Vorlage:", "");
+      if (!name || !name.trim()) return;
+      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
+      render();
+    }
+    function closeDialog() {
+      ownElement(IDS2.dialog)?.remove();
+    }
+    function renderManager() {
+      closeDialog();
+      const route = currentRoute();
+      const overlay = document.createElement("div");
+      overlay.id = IDS2.dialog;
+      overlay.dataset.werkiaPresetsOwner = owner;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const card = document.createElement("div");
+      card.className = "werkia-filter-presets-card";
+      const heading = document.createElement("h2");
+      heading.textContent = `Filtervorlagen verwalten – ${route}`;
+      card.appendChild(heading);
+      const list = document.createElement("ul");
+      const presets = ownPresets();
+      if (!presets.length) {
+        const empty = document.createElement("li");
+        empty.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
+        list.appendChild(empty);
+      }
+      presets.forEach((preset) => {
+        const row = document.createElement("li");
+        const name = document.createElement("span");
+        name.className = "werkia-filter-presets-name";
+        name.textContent = preset.name;
+        const fields = document.createElement("span");
+        fields.className = "werkia-filter-presets-fields";
+        fields.textContent = describePreset(preset);
+        const rename = document.createElement("button");
+        rename.type = "button";
+        rename.className = "werkia-filter-presets-secondary";
+        rename.textContent = "Umbenennen";
+        rename.addEventListener("click", () => {
+          const next = window.prompt("Neuer Name:", preset.name);
+          if (!next || !next.trim()) return;
+          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
+          renderManager();
+          render();
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "werkia-filter-presets-danger";
+        remove.textContent = "Loeschen";
+        remove.addEventListener("click", () => {
+          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
+          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
+          renderManager();
+          render();
+        });
+        row.append(name, fields, rename, remove);
+        list.appendChild(row);
+      });
+      card.appendChild(list);
+      const hint = document.createElement("p");
+      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
+      card.appendChild(hint);
+      const transfer = document.createElement("textarea");
+      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
+      transfer.spellcheck = false;
+      card.appendChild(transfer);
+      const importButton = document.createElement("button");
+      importButton.type = "button";
+      importButton.textContent = "Aus Textfeld importieren";
+      importButton.addEventListener("click", () => {
+        const incoming = parseStore(transfer.value);
+        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
+        presetStorage.save(mergeStores(presetStorage.load(), incoming));
+        renderManager();
+        render();
+      });
+      const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "werkia-filter-presets-secondary";
+      closeButton.textContent = "Schliessen";
+      closeButton.addEventListener("click", closeDialog);
+      card.append(importButton, closeButton);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.id = IDS2.bar;
+      bar.dataset.werkiaPresetsOwner = owner;
+      const title = document.createElement("strong");
+      title.textContent = label;
+      const select = document.createElement("select");
+      select.id = IDS2.select;
+      select.addEventListener("change", () => {
+        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
+        if (preset) applyPreset(preset);
+      });
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.textContent = "Aktuellen Filter speichern";
+      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
+      saveButton.addEventListener("click", saveCurrentFilter);
+      const manageButton = document.createElement("button");
+      manageButton.type = "button";
+      manageButton.className = "werkia-filter-presets-secondary";
+      manageButton.textContent = "Verwalten";
+      manageButton.addEventListener("click", renderManager);
+      const resetButton = document.createElement("button");
+      resetButton.type = "button";
+      resetButton.className = "werkia-filter-presets-secondary";
+      resetButton.textContent = "Filter zuruecksetzen";
+      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
+      const tip = helpTip?.();
+      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
+      return bar;
+    }
+    const optionSignatures = /* @__PURE__ */ new WeakMap();
+    function fillSelect(select) {
+      if (!select) return;
+      const own = ownPresets();
+      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
+      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
+      if (optionSignatures.get(select) === signature) {
+        if (select.value !== active) select.value = active;
+        return;
+      }
+      optionSignatures.set(select, signature);
+      select.textContent = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
+      select.appendChild(placeholder);
+      const addGroup = (groupLabel, groupPresets) => {
+        if (!groupPresets.length) return;
+        const group = document.createElement("optgroup");
+        group.label = groupLabel;
+        groupPresets.forEach((preset) => {
+          const option = document.createElement("option");
+          option.value = preset.id;
+          option.textContent = preset.name;
+          option.title = describePreset(preset);
+          group.appendChild(option);
+        });
+        select.appendChild(group);
+      };
+      addGroup("Team-Vorlagen", builtInPresets);
+      addGroup("Eigene Vorlagen", own);
+      select.value = active;
+    }
+    function render() {
+      if (!isTargetPage10()) {
+        ownElement(IDS2.bar)?.remove();
+        closeDialog();
+        return;
+      }
+      ensureStyle();
+      let bar = document.getElementById(IDS2.bar);
+      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
+      if (!bar) {
+        const anchor = findListAnchor(document);
+        if (!anchor?.parentElement) return;
+        bar = buildBar();
+        anchor.parentElement.insertBefore(bar, anchor);
+      }
+      fillSelect(bar.querySelector(`#${IDS2.select}`));
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // src/features/kam-suite/cem-status-filter.js
+  var FILTER_FIELD = "cemStatuses";
+  var BAR_ID = "werkia-kam-cem-status-filter";
+  var STYLE_ID4 = "werkia-kam-cem-status-filter-style";
+  var CEM_STATUS_OPTIONS = Object.entries(CEM_STATUS_LABELS).map(([value, label]) => ({ value, label }));
+  function isTargetPage5(hash = location.hash) {
+    return /^#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
+  }
+  function selectedCemStatuses(filter) {
+    const value = filter?.[FILTER_FIELD];
+    return Array.isArray(value) ? value.filter(Boolean).map(String) : [];
+  }
+  function withCemStatuses(filter, statuses) {
+    const next = { ...filter || {} };
+    const clean4 = [...new Set(statuses)].filter(Boolean);
+    if (clean4.length) next[FILTER_FIELD] = clean4;
+    else delete next[FILTER_FIELD];
+    return next;
+  }
+  function toggleCemStatus(filter, value) {
+    const current = selectedCemStatuses(filter);
+    return withCemStatuses(filter, current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]);
+  }
+  function hashWithFilter(hash, filter) {
+    return buildListHash({ ...parseListState(hash), filter });
+  }
+  function executeCemStatusFilter(runtime) {
+    runtime.registerSource("kam/toolbox/src/features/kam-suite/cem-status-filter.js");
+    function ensureStyle() {
+      if (document.getElementById(STYLE_ID4)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID4;
+      style.textContent = `
+      #${BAR_ID} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      #${BAR_ID} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      #${BAR_ID} button { min-height:26px; padding:4px 10px; border:1px solid #c8ccdd; border-radius:13px; background:#fff; color:#1f2933; cursor:pointer; font:400 12px/1 Arial,sans-serif; }
+      #${BAR_ID} button:hover { border-color:#4956df; }
+      #${BAR_ID} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
+      #${BAR_ID} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
+      #${BAR_ID} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
+      #${BAR_ID} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
+      #${BAR_ID} button.werkia-kam-cem-status-filter-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
+    `;
+      document.head.appendChild(style);
+    }
+    function applyFilter(filter) {
+      location.hash = hashWithFilter(location.hash, filter);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.id = BAR_ID;
+      const title = document.createElement("strong");
+      title.textContent = "CEM-Status";
+      const chips = CEM_STATUS_OPTIONS.map((option) => {
+        const button2 = document.createElement("button");
+        button2.type = "button";
+        button2.dataset.value = option.value;
+        button2.textContent = option.label;
+        const tone = cemStatusTone(option.value);
+        if (tone) button2.dataset.tone = tone;
+        button2.addEventListener("click", () => {
+          applyFilter(toggleCemStatus(parseListState(location.hash).filter, option.value));
+        });
+        return button2;
+      });
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "werkia-kam-cem-status-filter-reset";
+      reset.textContent = "alle";
+      reset.title = "CEM-Status-Filter entfernen, die übrigen Filter bleiben";
+      reset.addEventListener("click", () => applyFilter(withCemStatuses(parseListState(location.hash).filter, [])));
+      const tip = kamHelp.tip("cem-status-filter");
+      bar.append(...[title, tip, ...chips, reset].filter(Boolean));
+      return bar;
+    }
+    function syncBar(bar) {
+      const selected = selectedCemStatuses(parseListState(location.hash).filter);
+      bar.querySelectorAll("button[data-value]").forEach((button2) => {
+        const pressed = String(selected.includes(button2.dataset.value));
+        if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
+      });
+      const reset = bar.querySelector(".werkia-kam-cem-status-filter-reset");
+      if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
+    }
+    function render() {
+      let bar = document.getElementById(BAR_ID);
+      if (!isTargetPage5()) {
+        bar?.remove();
+        return;
+      }
+      ensureStyle();
+      if (!bar) {
+        const anchor = findListAnchor(document);
+        if (!anchor?.parentElement) return;
+        bar = buildBar();
+        anchor.parentElement.insertBefore(bar, anchor);
+      }
+      syncBar(bar);
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
   // src/features/kam-suite/questionnaire-context.js
   var QUESTIONNAIRE_CONTEXT_KEY = "__werkiaKamQuestionnaireContext";
   var EMPTY_CONTEXT = Object.freeze({ key: "", candidateId: "", jobId: "", candidateUrl: "", jobPositionUrl: "" });
-  function isTargetPage5(hash = location.hash) {
+  function isTargetPage6(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function questionnaireResourceIdFromRow(row, resource) {
@@ -4114,7 +4658,7 @@
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-context.js");
     const context = getQuestionnaireContext();
     function captureContext(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       const row = button2.closest("tr");
@@ -4366,7 +4910,7 @@
       document.body.appendChild(panel);
     }
     async function handleQuestionnaireButtonClick(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       const row = button2.closest("tr");
@@ -4395,7 +4939,7 @@
     }, true);
     let questionnaireWasOpen = false;
     function cleanupIfDialogClosed() {
-      if (!isTargetPage5()) {
+      if (!isTargetPage6()) {
         removeVacancyPanel();
         questionnaireWasOpen = false;
         return;
@@ -5199,7 +5743,7 @@
       document.getElementById(OM_NOTES_ID)?.remove();
     }
     function runQuestionnaireFeatures() {
-      if (!isTargetPage5()) {
+      if (!isTargetPage6()) {
         resetQuestionnaireFeatures();
         return;
       }
@@ -5788,7 +6332,7 @@
     }
     function updateRouteBox() {
       const dialog = questionnaireDialog();
-      if (!isTargetPage5() || !dialog) {
+      if (!isTargetPage6() || !dialog) {
         document.getElementById(ROUTE_BOX_ID)?.remove();
         return;
       }
@@ -5826,7 +6370,7 @@
       }, 200);
     }
     function waitForQuestionnaireDialog(routeKey, attempt = 0) {
-      if (context.key !== routeKey || !isTargetPage5()) return;
+      if (context.key !== routeKey || !isTargetPage6()) return;
       const dialog = questionnaireDialog();
       if (dialog) {
         scheduleUpdate();
@@ -5836,7 +6380,7 @@
       runtime.setTimeout(() => waitForQuestionnaireDialog(routeKey, attempt + 1), 125);
     }
     function captureQuestionnaireClick(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button2 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       if (!context.key) return;
@@ -5861,7 +6405,7 @@
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
   var BULK_DIALOG_ID = "werkia-kam-wvl-bulk-dialog";
-  function isTargetPage6(hash = location.hash) {
+  function isTargetPage7(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function executeCandidateFilePopup(runtime) {
@@ -5945,7 +6489,7 @@
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage6()) return;
+        if (!isTargetPage7()) return;
         injectStyle();
         installCandidateFileHooks();
         installCandidatePopupButton();
@@ -6934,7 +7478,7 @@
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var EXPORTS_SELECTOR = ".werkia-slack-exports";
-  var STYLE_ID4 = "werkia-slack-exports-style";
+  var STYLE_ID5 = "werkia-slack-exports-style";
   var SENT_STORE_KEY = "werkia_vt_slack_exports_sent_v1";
   var APPOINTMENT_DATE_RE = /\b\d{1,2}\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mär(?:z)?|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|dez(?:ember)?)\.?\s+\d{4}\s+\d{1,2}:\d{2}\b/i;
   var APPOINTMENT_DATE_ALL_RE = new RegExp(APPOINTMENT_DATE_RE.source, "gi");
@@ -6978,7 +7522,7 @@
   }
   employees: allEmployees(filter: {}) { id firstName lastName slackId __typename }
 }`;
-  function isTargetPage7(hash = location.hash, role) {
+  function isTargetPage8(hash = location.hash, role) {
     return new RegExp(`#/${role}/MyMatches(?:[/?]|$)`, "i").test(hash);
   }
   function matchIdFromHref(href) {
@@ -7056,9 +7600,9 @@
       }
     }
     function ensureStyle() {
-      if (document.getElementById(STYLE_ID4)) return;
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .werkia-slack-exports { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .werkia-slack-export { min-height:24px; padding:3px 8px; border:0; border-radius:5px; background:#4956df; color:#fff; cursor:pointer; font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
@@ -7184,7 +7728,7 @@
       document.querySelectorAll(EXPORTS_SELECTOR).forEach((element) => element.remove());
     }
     function syncExports() {
-      if (!isTargetPage7(location.hash, role)) {
+      if (!isTargetPage8(location.hash, role)) {
         removeExports();
         return;
       }
@@ -7203,7 +7747,7 @@
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       removeExports();
-      document.getElementById(STYLE_ID4)?.remove();
+      document.getElementById(STYLE_ID5)?.remove();
     });
     scheduleSync();
   }
@@ -7254,12 +7798,12 @@
   var VT_BLOCK_SELECTOR = ".werkia-slack-exports";
   var VT_BUTTON_SELECTOR = ".werkia-slack-export";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID5 = "werkia-kam-match-actions-style";
+  var STYLE_ID6 = "werkia-kam-match-actions-style";
   var STORE_KEY = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
   var PENDING_TIMEOUT_MS = 20 * 60 * 1e3;
-  function isTargetPage8(hash = location.hash) {
+  function isTargetPage9(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function jobPositionIdFromHref(href) {
@@ -7358,9 +7902,9 @@
       return [...new Set(rows().map((row) => rowIds(row).jobPositionId).filter(Boolean))];
     }
     function ensureStyle() {
-      if (document.getElementById(STYLE_ID5)) return;
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS} { display:contents; }
@@ -7524,7 +8068,7 @@
       if (pollTimer !== null) return;
       pollTimer = runtime.setTimeout(async () => {
         pollTimer = null;
-        if (!isTargetPage8()) return;
+        if (!isTargetPage9()) return;
         const ids = openPendingIds();
         if (!ids.length) return;
         await loadUrgency(ids);
@@ -7535,7 +8079,7 @@
       document.querySelectorAll(`.${BAR_CLASS}, .${FALLBACK_BLOCK_CLASS}`).forEach((element) => element.remove());
     }
     function sync() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         removeBars();
         return;
       }
@@ -7554,13 +8098,13 @@
     runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleSync);
     runtime.setInterval(() => {
-      if (isTargetPage8()) loadUrgency(visibleJobPositionIds());
+      if (isTargetPage9()) loadUrgency(visibleJobPositionIds());
     }, REFRESH_INTERVAL_MS4);
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID5)?.remove();
+      document.getElementById(STYLE_ID6)?.remove();
     });
     scheduleSync();
   }
@@ -7961,7 +8505,7 @@
   function readMailContext() {
     return { subjects: readSubjectsFromReadingPane(), bodyText: readMailBodyText() };
   }
-  var IDS2 = {
+  var IDS3 = {
     launcher: "werkia-outen-launcher",
     popover: "werkia-outen-popover",
     dialog: "werkia-outen-dialog",
@@ -8273,10 +8817,10 @@
       });
     }
     function ensureLauncher() {
-      let launcher = document.getElementById(IDS2.launcher);
+      let launcher = document.getElementById(IDS3.launcher);
       if (!launcher) {
         launcher = document.createElement("button");
-        launcher.id = IDS2.launcher;
+        launcher.id = IDS3.launcher;
         launcher.type = "button";
         launcher.textContent = "KAM";
         launcher.title = "KAM-Toolbox: Bewerbungsmail erkannt";
@@ -8304,22 +8848,22 @@
       return launcher;
     }
     function closePopover() {
-      document.getElementById(IDS2.popover)?.remove();
-      document.getElementById(IDS2.launcher)?.setAttribute("aria-expanded", "false");
+      document.getElementById(IDS3.popover)?.remove();
+      document.getElementById(IDS3.launcher)?.setAttribute("aria-expanded", "false");
     }
     function removeLauncher() {
       closePopover();
-      document.getElementById(IDS2.launcher)?.remove();
+      document.getElementById(IDS3.launcher)?.remove();
     }
     function togglePopover() {
-      if (document.getElementById(IDS2.popover)) closePopover();
+      if (document.getElementById(IDS3.popover)) closePopover();
       else renderPopover();
     }
     function renderPopover() {
-      let popover = document.getElementById(IDS2.popover);
+      let popover = document.getElementById(IDS3.popover);
       if (!popover) {
         popover = document.createElement("div");
-        popover.id = IDS2.popover;
+        popover.id = IDS3.popover;
         popover.setAttribute("role", "dialog");
         popover.setAttribute("aria-label", "KAM-Toolbox");
         styled2(popover, {
@@ -8337,7 +8881,7 @@
         });
         document.body.appendChild(popover);
       }
-      document.getElementById(IDS2.launcher)?.setAttribute("aria-expanded", "true");
+      document.getElementById(IDS3.launcher)?.setAttribute("aria-expanded", "true");
       const summary = applicationSummary(readMailContext());
       popover.dataset.summary = JSON.stringify(summary);
       const line = (label, value) => {
@@ -8981,9 +9525,9 @@ ${buildCbreBody(current)}`;
       }
     }
     function showCbreToast({ text, tone }) {
-      document.getElementById(IDS2.toast)?.remove();
+      document.getElementById(IDS3.toast)?.remove();
       const toast = document.createElement("div");
-      toast.id = IDS2.toast;
+      toast.id = IDS3.toast;
       toast.setAttribute("role", "status");
       toast.title = "Klicken zum Schließen";
       toast.textContent = text;
@@ -9079,9 +9623,9 @@ ${buildCbreBody(current)}`;
       }).catch((error) => renderCaughtError(dialog, error));
     }
     function openWizard(context, { mode = "outen" } = {}) {
-      document.getElementById(IDS2.dialog)?.remove();
+      document.getElementById(IDS3.dialog)?.remove();
       const dialog = document.createElement("dialog");
-      dialog.id = IDS2.dialog;
+      dialog.id = IDS3.dialog;
       styleDialogFrame(dialog);
       document.body.appendChild(dialog);
       const resolved = resolveApplicationSubject(context);
@@ -9130,14 +9674,14 @@ ${buildCbreBody(current)}`;
           return;
         }
         ensureLauncher();
-        const popover = document.getElementById(IDS2.popover);
+        const popover = document.getElementById(IDS3.popover);
         if (popover && popover.dataset.summary !== JSON.stringify(applicationSummary(readMailContext()))) renderPopover();
       }, 400);
     }
     runtime.createMutationObserver(scheduleCheck).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addCleanup(() => {
       removeLauncher();
-      document.getElementById(IDS2.dialog)?.remove();
+      document.getElementById(IDS3.dialog)?.remove();
     });
     scheduleCheck();
   }
@@ -9151,424 +9695,6 @@ ${buildCbreBody(current)}`;
   function selectFeaturesForHost(features, hostname) {
     if (!isOutlookHost(hostname)) return features;
     return features.filter(({ id }) => OUTLOOK_FEATURE_IDS.includes(id));
-  }
-
-  // ../../shared/js/list-filter-presets/core.js
-  var STORAGE_KEY = "werkia_list_filter_presets_v1";
-  var STORE_VERSION = 1;
-  function parseJsonObject(value, fallback) {
-    if (!value) return fallback;
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
-    } catch {
-      return fallback;
-    }
-  }
-  function safeCall(callback) {
-    if (typeof callback !== "function") return "";
-    try {
-      return callback();
-    } catch {
-      return "";
-    }
-  }
-  function routeFromHash(hash = "") {
-    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
-  }
-  function parseListState(hash = "") {
-    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
-    const perPage = Number.parseInt(params.get("perPage") || "", 10);
-    return {
-      route: routeFromHash(hash),
-      filter: parseJsonObject(params.get("filter"), {}),
-      sort: params.get("sort") || "",
-      order: params.get("order") || "",
-      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
-    };
-  }
-  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
-    const params = new URLSearchParams({
-      displayedFilters: JSON.stringify({}),
-      filter: JSON.stringify(filter || {})
-    });
-    if (order) params.set("order", order);
-    params.set("page", "1");
-    if (perPage) params.set("perPage", String(perPage));
-    if (sort) params.set("sort", sort);
-    return `#/${route}?${params}`;
-  }
-  function isTargetRoute(hash, routes = []) {
-    const route = routeFromHash(hash).toLowerCase();
-    return routes.some((candidate) => String(candidate).toLowerCase() === route);
-  }
-  function isEmptyFilterValue(value) {
-    if (value === null || value === void 0 || value === "") return true;
-    return Array.isArray(value) && value.length === 0;
-  }
-  function filterKey(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return JSON.stringify(
-      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
-    );
-  }
-  function filterFields(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
-  }
-  function describePreset(preset) {
-    const fields = filterFields(preset?.filter);
-    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
-  }
-  function createPresetId(now = Date.now(), entropy = Math.random()) {
-    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
-  }
-  function presetFromState(name, state) {
-    return {
-      id: createPresetId(),
-      name: String(name || "").trim(),
-      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
-      sort: state?.sort || "",
-      order: state?.order || "",
-      perPage: state?.perPage || 0
-    };
-  }
-  function applyPresetToState(preset, currentState) {
-    return {
-      route: currentState?.route || "",
-      filter: preset?.filter || {},
-      sort: preset?.sort || currentState?.sort || "",
-      order: preset?.order || currentState?.order || "",
-      perPage: preset?.perPage || currentState?.perPage || 0
-    };
-  }
-  function findActivePresetId(presets, state) {
-    const key = filterKey(state?.filter);
-    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
-  }
-  function emptyStore() {
-    return { version: STORE_VERSION, routes: {} };
-  }
-  function parseStore(raw) {
-    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
-    if (!parsed || typeof parsed !== "object") return emptyStore();
-    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean4 = {};
-    Object.keys(routes).forEach((route) => {
-      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
-        id: String(preset.id || createPresetId()),
-        name: String(preset.name),
-        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
-        sort: preset.sort || "",
-        order: preset.order || "",
-        perPage: Number.parseInt(preset.perPage, 10) || 0
-      }));
-    });
-    return { version: STORE_VERSION, routes: clean4 };
-  }
-  function presetsForRoute(store, route) {
-    return store?.routes?.[route] ? [...store.routes[route]] : [];
-  }
-  function upsertPreset(store, route, preset) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
-    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-    if (sameName >= 0) kept.splice(sameName, 1, preset);
-    else kept.push(preset);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function removePreset(store, route, id) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function mergeStores(base, incoming) {
-    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
-    const routes = incoming?.routes || {};
-    Object.keys(routes).forEach((route) => {
-      routes[route].forEach((preset) => {
-        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
-      });
-    });
-    return result;
-  }
-  function createPresetStorage({ read, write, backupRead, backupWrite }) {
-    return {
-      load() {
-        const primary = parseStore(safeCall(read));
-        if (Object.keys(primary.routes).length) return primary;
-        const backup = parseStore(safeCall(backupRead));
-        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
-        return backup;
-      },
-      save(store) {
-        const serialized = JSON.stringify(store);
-        safeCall(() => write(serialized));
-        safeCall(() => backupWrite(serialized));
-      }
-    };
-  }
-
-  // ../../shared/js/list-filter-presets/index.js
-  var IDS3 = {
-    bar: "werkia-filter-presets-bar",
-    select: "werkia-filter-presets-select",
-    style: "werkia-filter-presets-style",
-    dialog: "werkia-filter-presets-dialog"
-  };
-  var LIST_ANCHOR_SELECTORS = [
-    ".RaList-content",
-    ".RaList-main",
-    "table.RaDataTable-table",
-    "main table"
-  ];
-  function findListAnchor(root = document) {
-    for (const selector of LIST_ANCHOR_SELECTORS) {
-      const element = root.querySelector(selector);
-      if (element) return element;
-    }
-    return null;
-  }
-  function executeListFilterPresets(runtime, {
-    routes = [],
-    sourcePath,
-    label = "Filtervorlagen",
-    builtInPresets = [],
-    storage,
-    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
-    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
-    helpTip
-  } = {}) {
-    runtime.registerSource(sourcePath);
-    const presetStorage = storage || createPresetStorage({
-      read: () => localStorage.getItem(STORAGE_KEY),
-      write: (value) => localStorage.setItem(STORAGE_KEY, value),
-      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
-      backupWrite: (value) => {
-        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
-      }
-    });
-    const owner = sourcePath || routes.join(",");
-    const ownElement = (id) => {
-      const element = document.getElementById(id);
-      return element?.dataset.werkiaPresetsOwner === owner ? element : null;
-    };
-    const isTargetPage9 = () => isTargetRoute(location.hash, routes);
-    const currentRoute = () => routeFromHash(location.hash);
-    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle() {
-      if (document.getElementById(IDS3.style)) return;
-      const style = document.createElement("style");
-      style.id = IDS3.style;
-      style.textContent = `
-      #${IDS3.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS3.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
-      #${IDS3.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS3.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS3.bar} button:hover { background:#3643c7; }
-      #${IDS3.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS3.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
-      #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS3.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS3.dialog} h2 { margin:0 0 12px; font-size:15px; }
-      #${IDS3.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS3.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
-      #${IDS3.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS3.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
-      #${IDS3.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
-      #${IDS3.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
-      #${IDS3.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS3.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS3.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
-    `;
-      document.head.appendChild(style);
-    }
-    function applyPreset(preset) {
-      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
-    }
-    function saveCurrentFilter() {
-      const state = parseListState(location.hash);
-      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
-      const name = window.prompt("Name der Vorlage:", "");
-      if (!name || !name.trim()) return;
-      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
-      render();
-    }
-    function closeDialog() {
-      ownElement(IDS3.dialog)?.remove();
-    }
-    function renderManager() {
-      closeDialog();
-      const route = currentRoute();
-      const overlay = document.createElement("div");
-      overlay.id = IDS3.dialog;
-      overlay.dataset.werkiaPresetsOwner = owner;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDialog();
-      });
-      const card = document.createElement("div");
-      card.className = "werkia-filter-presets-card";
-      const heading = document.createElement("h2");
-      heading.textContent = `Filtervorlagen verwalten – ${route}`;
-      card.appendChild(heading);
-      const list = document.createElement("ul");
-      const presets = ownPresets();
-      if (!presets.length) {
-        const empty = document.createElement("li");
-        empty.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
-        list.appendChild(empty);
-      }
-      presets.forEach((preset) => {
-        const row = document.createElement("li");
-        const name = document.createElement("span");
-        name.className = "werkia-filter-presets-name";
-        name.textContent = preset.name;
-        const fields = document.createElement("span");
-        fields.className = "werkia-filter-presets-fields";
-        fields.textContent = describePreset(preset);
-        const rename = document.createElement("button");
-        rename.type = "button";
-        rename.className = "werkia-filter-presets-secondary";
-        rename.textContent = "Umbenennen";
-        rename.addEventListener("click", () => {
-          const next = window.prompt("Neuer Name:", preset.name);
-          if (!next || !next.trim()) return;
-          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
-          renderManager();
-          render();
-        });
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "werkia-filter-presets-danger";
-        remove.textContent = "Loeschen";
-        remove.addEventListener("click", () => {
-          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
-          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
-          renderManager();
-          render();
-        });
-        row.append(name, fields, rename, remove);
-        list.appendChild(row);
-      });
-      card.appendChild(list);
-      const hint = document.createElement("p");
-      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
-      card.appendChild(hint);
-      const transfer = document.createElement("textarea");
-      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
-      transfer.spellcheck = false;
-      card.appendChild(transfer);
-      const importButton = document.createElement("button");
-      importButton.type = "button";
-      importButton.textContent = "Aus Textfeld importieren";
-      importButton.addEventListener("click", () => {
-        const incoming = parseStore(transfer.value);
-        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
-        presetStorage.save(mergeStores(presetStorage.load(), incoming));
-        renderManager();
-        render();
-      });
-      const closeButton = document.createElement("button");
-      closeButton.type = "button";
-      closeButton.className = "werkia-filter-presets-secondary";
-      closeButton.textContent = "Schliessen";
-      closeButton.addEventListener("click", closeDialog);
-      card.append(importButton, closeButton);
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-    }
-    function buildBar() {
-      const bar = document.createElement("div");
-      bar.id = IDS3.bar;
-      bar.dataset.werkiaPresetsOwner = owner;
-      const title = document.createElement("strong");
-      title.textContent = label;
-      const select = document.createElement("select");
-      select.id = IDS3.select;
-      select.addEventListener("change", () => {
-        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
-        if (preset) applyPreset(preset);
-      });
-      const saveButton = document.createElement("button");
-      saveButton.type = "button";
-      saveButton.textContent = "Aktuellen Filter speichern";
-      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
-      saveButton.addEventListener("click", saveCurrentFilter);
-      const manageButton = document.createElement("button");
-      manageButton.type = "button";
-      manageButton.className = "werkia-filter-presets-secondary";
-      manageButton.textContent = "Verwalten";
-      manageButton.addEventListener("click", renderManager);
-      const resetButton = document.createElement("button");
-      resetButton.type = "button";
-      resetButton.className = "werkia-filter-presets-secondary";
-      resetButton.textContent = "Filter zuruecksetzen";
-      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
-      const tip = helpTip?.();
-      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
-      return bar;
-    }
-    const optionSignatures = /* @__PURE__ */ new WeakMap();
-    function fillSelect(select) {
-      if (!select) return;
-      const own = ownPresets();
-      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
-      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
-      if (optionSignatures.get(select) === signature) {
-        if (select.value !== active) select.value = active;
-        return;
-      }
-      optionSignatures.set(select, signature);
-      select.textContent = "";
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
-      select.appendChild(placeholder);
-      const addGroup = (groupLabel, groupPresets) => {
-        if (!groupPresets.length) return;
-        const group = document.createElement("optgroup");
-        group.label = groupLabel;
-        groupPresets.forEach((preset) => {
-          const option = document.createElement("option");
-          option.value = preset.id;
-          option.textContent = preset.name;
-          option.title = describePreset(preset);
-          group.appendChild(option);
-        });
-        select.appendChild(group);
-      };
-      addGroup("Team-Vorlagen", builtInPresets);
-      addGroup("Eigene Vorlagen", own);
-      select.value = active;
-    }
-    function render() {
-      if (!isTargetPage9()) {
-        ownElement(IDS3.bar)?.remove();
-        closeDialog();
-        return;
-      }
-      ensureStyle();
-      let bar = document.getElementById(IDS3.bar);
-      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
-      if (!bar) {
-        const anchor = findListAnchor(document);
-        if (!anchor?.parentElement) return;
-        bar = buildBar();
-        anchor.parentElement.insertBefore(bar, anchor);
-      }
-      fillSelect(bar.querySelector(`#${IDS3.select}`));
-    }
-    let scheduled = false;
-    const scheduleRender = () => {
-      if (scheduled) return;
-      scheduled = true;
-      runtime.setTimeout(() => {
-        scheduled = false;
-        render();
-      }, 150);
-    };
-    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", scheduleRender);
-    scheduleRender();
   }
 
   // src/features/filter-presets.js
@@ -10012,7 +10138,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID6 = "werkia-om-notes-template-style";
+  var STYLE_ID7 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -10081,11 +10207,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID6)) {
+    if (document.getElementById(STYLE_ID7)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID6;
+    style.id = STYLE_ID7;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -10319,7 +10445,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID6)?.remove();
+      document.getElementById(STYLE_ID7)?.remove();
     });
     renderToolbar();
   }
@@ -10339,7 +10465,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID7 = "werkia-urgent-vacancy-style";
+      const STYLE_ID8 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -10478,9 +10604,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID7)) return;
+        if (document.getElementById(STYLE_ID8)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID7;
+        style.id = STYLE_ID8;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -10573,6 +10699,7 @@ ${next}`;
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
     { id: "kam-suite-vacancy-city-badges", execute: executeVacancyCityBadges },
     { id: "kam-suite-cem-status-line", execute: executeCemStatusLine },
+    { id: "kam-suite-cem-status-filter", execute: executeCemStatusFilter },
     // questionnaire-context must run before route-calculation: both listen
     // for the same "OM Fragebogen" click in the capturing phase, and
     // route-calculation reads the context that questionnaire-context just

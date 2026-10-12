@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.150
+// @version      1.9.151
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -8017,6 +8017,18 @@
     }
     return null;
   }
+  function findSlot(root = document) {
+    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /^filter hinzuf/i.test(element.textContent.trim()));
+    if (filterButton) {
+      let before = filterButton;
+      while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
+      return { parent: before.parentElement, before, sample: filterButton };
+    }
+    const toolbar = findToolbar(root);
+    if (!toolbar) return null;
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
+    return { parent: toolbar, before: toolbar.firstElementChild, sample };
+  }
   function executeVertretungen(runtime, {
     routes = [],
     getGraphqlAdapter,
@@ -8286,18 +8298,17 @@
         return;
       }
       ensureStyle();
-      const toolbar = findToolbar(document);
+      const slot = findSlot(document);
       const existing = owned(IDS4.button);
-      if (existing && (toolbar ? existing.parentElement === toolbar && toolbar.firstElementChild === existing : existing.parentElement?.id === IDS4.bar)) return;
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
       existing?.remove();
       const vertretungenButton = button2("Vertretungen", openDialog);
       vertretungenButton.id = IDS4.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
-      if (toolbar) {
+      if (slot) {
         owned(IDS4.bar)?.remove();
-        const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
-        const look = nativeLookFrom(sample);
+        const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
           Object.assign(vertretungenButton.style, look.style);
@@ -8314,7 +8325,7 @@
         } else {
           vertretungenButton.className = "wv-own";
         }
-        toolbar.prepend(vertretungenButton);
+        slot.parent.insertBefore(vertretungenButton, slot.before);
         return;
       }
       vertretungenButton.className = "wv-own";

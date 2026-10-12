@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.151
+// @version      1.7.152
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -9924,7 +9924,9 @@ ${buildCbreBody(current)}`;
       #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
       #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
       #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS4.dialog} .wv-card { width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS4.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS4.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS4.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
       #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
       #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
       #${IDS4.dialog} .wv-admins { margin-top:16px; }
@@ -9996,7 +9998,7 @@ ${buildCbreBody(current)}`;
       status.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS4.dialog)?.querySelectorAll("button, select, input").forEach((element) => {
+      owned(IDS4.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
         element.disabled = busy;
       });
     }
@@ -10109,7 +10111,7 @@ ${buildCbreBody(current)}`;
       return details;
     }
     function card() {
-      return owned(IDS4.dialog)?.querySelector(".wv-card");
+      return owned(IDS4.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
@@ -10138,11 +10140,14 @@ ${buildCbreBody(current)}`;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const target = el3("div", { className: "wv-card" }, [
+      const close = button2("×", closeDialog, "wv-close");
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el3("div", { className: "wv-body" }, [
         el3("h2", { textContent: "Vertretungen" }),
         el3("div", { className: "wv-status", textContent: "Lädt …" })
       ]);
-      overlay.append(target);
+      overlay.append(el3("div", { className: "wv-card" }, [close, target]));
       document.body.appendChild(overlay);
       try {
         await refresh();
@@ -10196,6 +10201,11 @@ ${buildCbreBody(current)}`;
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS4.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
     if (typeof GM_registerMenuCommand === "function") {
       try {
         GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());

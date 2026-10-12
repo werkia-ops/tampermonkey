@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.142
+// @version      1.7.143
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1910,6 +1910,21 @@
     potentialMatches: "Kandidat › Potenzielle Matches",
     questionnaire: "OM-Fragebogen (Potenzielle Matches)"
   };
+  function matchStatusFilterTopic({ id, team, page, routes }) {
+    return {
+      id,
+      title: `Nach ${team}-Status filtern`,
+      page,
+      routes,
+      kind: "view",
+      summary: `Über der Liste steht eine Leiste mit allen ${team}-Status. Ein Klick auf einen Status zeigt nur noch Matches mit diesem ${team}-Status, mehrere Status lassen sich kombinieren.`,
+      notes: [
+        "Der Filter gilt für die ganze Liste, nicht nur für die sichtbare Seite, und lässt sich mit den übrigen Filtern kombinieren.",
+        `Noch mal klicken nimmt den Status wieder heraus, „alle“ entfernt den ${team}-Status-Filter ganz.`,
+        `Filtervorlagen speichern den ${team}-Status-Filter mit.`
+      ]
+    };
+  }
   function filterPresetsTopic({ page, routes }) {
     return {
       id: "filter-presets",
@@ -2198,19 +2213,7 @@
       summary: "Unter dem KAM Status steht der CEM Status des Matches und wer auf CEM-Seite zuständig ist.",
       notes: ["Ein Klick auf den Namen kopiert ihn in die Zwischenablage, zum Beispiel für Slack."]
     },
-    {
-      id: "cem-status-filter",
-      title: "Nach CEM-Status filtern",
-      page: MY_MATCHES,
-      routes: onMyMatches,
-      kind: "view",
-      summary: "Über der Liste steht eine Leiste mit allen CEM-Status. Ein Klick auf einen Status zeigt nur noch Matches mit diesem CEM-Status, mehrere Status lassen sich kombinieren.",
-      notes: [
-        "Der Filter gilt für die ganze Liste, nicht nur für die sichtbare Seite, und lässt sich mit den übrigen Filtern kombinieren.",
-        "Noch mal klicken nimmt den Status wieder heraus, „alle“ entfernt den CEM-Status-Filter ganz.",
-        "Filtervorlagen speichern den CEM-Status-Filter mit."
-      ]
-    },
+    matchStatusFilterTopic({ id: "cem-status-filter", team: "CEM", page: MY_MATCHES, routes: onMyMatches }),
     {
       id: "candidate-file-popup",
       title: "Kandidatenansicht als Popup",
@@ -2849,7 +2852,7 @@
     runtime.registerSource(sourcePath);
     const {
       team,
-      isTargetPage: isTargetPage10,
+      isTargetPage: isTargetPage9,
       getRequest,
       ids: IDS4,
       fields,
@@ -3381,7 +3384,7 @@
       });
     }
     function installHeaderButtons() {
-      if (!isTargetPage10()) return;
+      if (!isTargetPage9()) return;
       kit.injectStyle();
       installButton(columns.followUp, IDS4.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
       installButton(columns.status, IDS4.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
@@ -3394,7 +3397,7 @@
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage10()) {
+        if (!isTargetPage9()) {
           kit.discard();
           return;
         }
@@ -4289,7 +4292,7 @@
       const element = document.getElementById(id);
       return element?.dataset.werkiaPresetsOwner === owner ? element : null;
     };
-    const isTargetPage10 = () => isTargetRoute(location.hash, routes);
+    const isTargetPage9 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
     function ensureStyle() {
@@ -4478,7 +4481,7 @@
       select.value = active;
     }
     function render() {
-      if (!isTargetPage10()) {
+      if (!isTargetPage9()) {
         ownElement(IDS2.bar)?.remove();
         closeDialog();
         return;
@@ -4508,93 +4511,111 @@
     scheduleRender();
   }
 
-  // src/features/kam-suite/cem-status-filter.js
-  var FILTER_FIELD = "cemStatuses";
-  var BAR_ID = "werkia-kam-cem-status-filter";
-  var STYLE_ID4 = "werkia-kam-cem-status-filter-style";
-  var CEM_STATUS_OPTIONS = Object.entries(CEM_STATUS_LABELS).map(([value, label]) => ({ value, label }));
-  function isTargetPage5(hash = location.hash) {
-    return /^#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
+  // ../../shared/js/match-status-filter/core.js
+  function optionsFromLabels(labels) {
+    return Object.entries(labels || {}).map(([value, label]) => ({ value, label }));
   }
-  function selectedCemStatuses(filter) {
-    const value = filter?.[FILTER_FIELD];
+  function statusTone(value) {
+    if (value === "out") return "error";
+    if (value === "hired") return "success";
+    if (value === "hot_case" || value === "hot_hot_case") return "warning";
+    return "";
+  }
+  function selectedStatuses(filter, field) {
+    const value = filter?.[field];
     return Array.isArray(value) ? value.filter(Boolean).map(String) : [];
   }
-  function withCemStatuses(filter, statuses) {
+  function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
     const clean4 = [...new Set(statuses)].filter(Boolean);
-    if (clean4.length) next[FILTER_FIELD] = clean4;
-    else delete next[FILTER_FIELD];
+    if (clean4.length) next[field] = clean4;
+    else delete next[field];
     return next;
   }
-  function toggleCemStatus(filter, value) {
-    const current = selectedCemStatuses(filter);
-    return withCemStatuses(filter, current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]);
+  function toggleStatus(filter, field, value) {
+    const current = selectedStatuses(filter, field);
+    return withStatuses(filter, field, current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]);
   }
   function hashWithFilter(hash, filter) {
     return buildListHash({ ...parseListState(hash), filter });
   }
-  function executeCemStatusFilter(runtime) {
-    runtime.registerSource("kam/toolbox/src/features/kam-suite/cem-status-filter.js");
+
+  // ../../shared/js/match-status-filter/index.js
+  var STYLE_ID4 = "werkia-match-status-filter-style";
+  var BAR_CLASS = "werkia-match-status-filter";
+  function executeMatchStatusFilter(runtime, {
+    sourcePath,
+    // RegExp auf location.hash
+    route,
+    // Listenfeld in MatchFilter, z. B. 'cemStatuses'
+    field,
+    // [{ value, label }] in Anzeige-Reihenfolge
+    options = [],
+    label = "Status",
+    tone = statusTone,
+    helpTip
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const barId = `werkia-match-status-filter-${field}`;
+    const isTargetPage9 = () => route.test(location.hash);
     function ensureStyle() {
       if (document.getElementById(STYLE_ID4)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID4;
       style.textContent = `
-      #${BAR_ID} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
-      #${BAR_ID} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
-      #${BAR_ID} button { min-height:26px; padding:4px 10px; border:1px solid #c8ccdd; border-radius:13px; background:#fff; color:#1f2933; cursor:pointer; font:400 12px/1 Arial,sans-serif; }
-      #${BAR_ID} button:hover { border-color:#4956df; }
-      #${BAR_ID} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
-      #${BAR_ID} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
-      #${BAR_ID} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
-      #${BAR_ID} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
-      #${BAR_ID} button.werkia-kam-cem-status-filter-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
+      .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      .${BAR_CLASS} button { min-height:26px; padding:4px 10px; border:1px solid #c8ccdd; border-radius:13px; background:#fff; color:#1f2933; cursor:pointer; font:400 12px/1 Arial,sans-serif; }
+      .${BAR_CLASS} button:hover { border-color:#4956df; }
+      .${BAR_CLASS} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
+      .${BAR_CLASS} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
+      .${BAR_CLASS} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
+      .${BAR_CLASS} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
+      .${BAR_CLASS} button.${BAR_CLASS}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
     `;
       document.head.appendChild(style);
     }
+    const currentFilter = () => parseListState(location.hash).filter;
     function applyFilter(filter) {
       location.hash = hashWithFilter(location.hash, filter);
     }
     function buildBar() {
       const bar = document.createElement("div");
-      bar.id = BAR_ID;
+      bar.id = barId;
+      bar.className = BAR_CLASS;
       const title = document.createElement("strong");
-      title.textContent = "CEM-Status";
-      const chips = CEM_STATUS_OPTIONS.map((option) => {
+      title.textContent = label;
+      const chips = options.map((option) => {
         const button2 = document.createElement("button");
         button2.type = "button";
         button2.dataset.value = option.value;
         button2.textContent = option.label;
-        const tone = cemStatusTone(option.value);
-        if (tone) button2.dataset.tone = tone;
-        button2.addEventListener("click", () => {
-          applyFilter(toggleCemStatus(parseListState(location.hash).filter, option.value));
-        });
+        const chipTone = tone(option.value);
+        if (chipTone) button2.dataset.tone = chipTone;
+        button2.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
         return button2;
       });
       const reset = document.createElement("button");
       reset.type = "button";
-      reset.className = "werkia-kam-cem-status-filter-reset";
+      reset.className = `${BAR_CLASS}-reset`;
       reset.textContent = "alle";
-      reset.title = "CEM-Status-Filter entfernen, die übrigen Filter bleiben";
-      reset.addEventListener("click", () => applyFilter(withCemStatuses(parseListState(location.hash).filter, [])));
-      const tip = kamHelp.tip("cem-status-filter");
-      bar.append(...[title, tip, ...chips, reset].filter(Boolean));
+      reset.title = `${label}-Filter entfernen, die übrigen Filter bleiben`;
+      reset.addEventListener("click", () => applyFilter(withStatuses(currentFilter(), field, [])));
+      bar.append(...[title, helpTip?.(), ...chips, reset].filter(Boolean));
       return bar;
     }
     function syncBar(bar) {
-      const selected = selectedCemStatuses(parseListState(location.hash).filter);
+      const selected = selectedStatuses(currentFilter(), field);
       bar.querySelectorAll("button[data-value]").forEach((button2) => {
         const pressed = String(selected.includes(button2.dataset.value));
         if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
       });
-      const reset = bar.querySelector(".werkia-kam-cem-status-filter-reset");
+      const reset = bar.querySelector(`.${BAR_CLASS}-reset`);
       if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
     }
     function render() {
-      let bar = document.getElementById(BAR_ID);
-      if (!isTargetPage5()) {
+      let bar = document.getElementById(barId);
+      if (!isTargetPage9()) {
         bar?.remove();
         return;
       }
@@ -4621,10 +4642,23 @@
     scheduleRender();
   }
 
+  // src/features/kam-suite/cem-status-filter.js
+  function executeCemStatusFilter(runtime) {
+    executeMatchStatusFilter(runtime, {
+      sourcePath: "kam/toolbox/src/features/kam-suite/cem-status-filter.js",
+      route: ROUTES.kamMyMatches,
+      field: "cemStatuses",
+      // Reihenfolge wie im CEM-Status-Dropdown des Adminpanels.
+      options: optionsFromLabels(CEM_STATUS_LABELS),
+      label: "CEM-Status",
+      helpTip: () => kamHelp.tip("cem-status-filter")
+    });
+  }
+
   // src/features/kam-suite/questionnaire-context.js
   var QUESTIONNAIRE_CONTEXT_KEY = "__werkiaKamQuestionnaireContext";
   var EMPTY_CONTEXT = Object.freeze({ key: "", candidateId: "", jobId: "", candidateUrl: "", jobPositionUrl: "" });
-  function isTargetPage6(hash = location.hash) {
+  function isTargetPage5(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function questionnaireResourceIdFromRow(row, resource) {
@@ -4658,7 +4692,7 @@
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-context.js");
     const context = getQuestionnaireContext();
     function captureContext(event) {
-      if (!isTargetPage6()) return;
+      if (!isTargetPage5()) return;
       const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       const row = button2.closest("tr");
@@ -4910,7 +4944,7 @@
       document.body.appendChild(panel);
     }
     async function handleQuestionnaireButtonClick(event) {
-      if (!isTargetPage6()) return;
+      if (!isTargetPage5()) return;
       const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       const row = button2.closest("tr");
@@ -4939,7 +4973,7 @@
     }, true);
     let questionnaireWasOpen = false;
     function cleanupIfDialogClosed() {
-      if (!isTargetPage6()) {
+      if (!isTargetPage5()) {
         removeVacancyPanel();
         questionnaireWasOpen = false;
         return;
@@ -5743,7 +5777,7 @@
       document.getElementById(OM_NOTES_ID)?.remove();
     }
     function runQuestionnaireFeatures() {
-      if (!isTargetPage6()) {
+      if (!isTargetPage5()) {
         resetQuestionnaireFeatures();
         return;
       }
@@ -6332,7 +6366,7 @@
     }
     function updateRouteBox() {
       const dialog = questionnaireDialog();
-      if (!isTargetPage6() || !dialog) {
+      if (!isTargetPage5() || !dialog) {
         document.getElementById(ROUTE_BOX_ID)?.remove();
         return;
       }
@@ -6370,7 +6404,7 @@
       }, 200);
     }
     function waitForQuestionnaireDialog(routeKey, attempt = 0) {
-      if (context.key !== routeKey || !isTargetPage6()) return;
+      if (context.key !== routeKey || !isTargetPage5()) return;
       const dialog = questionnaireDialog();
       if (dialog) {
         scheduleUpdate();
@@ -6380,7 +6414,7 @@
       runtime.setTimeout(() => waitForQuestionnaireDialog(routeKey, attempt + 1), 125);
     }
     function captureQuestionnaireClick(event) {
-      if (!isTargetPage6()) return;
+      if (!isTargetPage5()) return;
       const button2 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
       if (!button2) return;
       if (!context.key) return;
@@ -6405,7 +6439,7 @@
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
   var BULK_DIALOG_ID = "werkia-kam-wvl-bulk-dialog";
-  function isTargetPage7(hash = location.hash) {
+  function isTargetPage6(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function executeCandidateFilePopup(runtime) {
@@ -6489,7 +6523,7 @@
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage7()) return;
+        if (!isTargetPage6()) return;
         injectStyle();
         installCandidateFileHooks();
         installCandidatePopupButton();
@@ -7522,7 +7556,7 @@
   }
   employees: allEmployees(filter: {}) { id firstName lastName slackId __typename }
 }`;
-  function isTargetPage8(hash = location.hash, role) {
+  function isTargetPage7(hash = location.hash, role) {
     return new RegExp(`#/${role}/MyMatches(?:[/?]|$)`, "i").test(hash);
   }
   function matchIdFromHref(href) {
@@ -7728,7 +7762,7 @@
       document.querySelectorAll(EXPORTS_SELECTOR).forEach((element) => element.remove());
     }
     function syncExports() {
-      if (!isTargetPage8(location.hash, role)) {
+      if (!isTargetPage7(location.hash, role)) {
         removeExports();
         return;
       }
@@ -7793,7 +7827,7 @@
   var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
-  var BAR_CLASS = "werkia-kam-match-actions";
+  var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var VT_BLOCK_SELECTOR = ".werkia-slack-exports";
   var VT_BUTTON_SELECTOR = ".werkia-slack-export";
@@ -7803,7 +7837,7 @@
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
   var PENDING_TIMEOUT_MS = 20 * 60 * 1e3;
-  function isTargetPage9(hash = location.hash) {
+  function isTargetPage8(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function jobPositionIdFromHref(href) {
@@ -7907,18 +7941,18 @@
       style.id = STYLE_ID6;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
-      .${BAR_CLASS} { display:contents; }
-      .${BAR_CLASS} button { min-height:24px; padding:3px 8px; border:1px solid #4956df; border-radius:5px; background:#4956df; color:#fff; cursor:pointer; font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
-      .${BAR_CLASS} button:hover:not(:disabled) { background:#3643c7; }
-      .${BAR_CLASS} button:disabled { cursor:default; opacity:.6; }
-      .${BAR_CLASS} button[data-action="urgent"][data-state="off"],
-      .${BAR_CLASS} button[data-action="urgent"][data-state="loading"] { border-color:#dc2626; background:#fff; color:#dc2626; }
-      .${BAR_CLASS} button[data-action="urgent"][data-state="off"]:hover:not(:disabled) { background:#fef2f2; }
-      .${BAR_CLASS} button[data-state="on"] { border-color:#dc2626; background:#dc2626; color:#fff; opacity:1; }
-      .${BAR_CLASS} button[data-state="on"]:hover { background:#b91c1c; }
-      .${BAR_CLASS} button[data-state="pending"] { border-color:#d97706; background:#fef3c7; color:#92400e; opacity:1; }
-      .${BAR_CLASS} button[data-state="sent"] { background:#fff; color:#4956df; }
-      .${BAR_CLASS} button[data-state="sent"]:hover:not(:disabled) { background:#eef0fd; }
+      .${BAR_CLASS2} { display:contents; }
+      .${BAR_CLASS2} button { min-height:24px; padding:3px 8px; border:1px solid #4956df; border-radius:5px; background:#4956df; color:#fff; cursor:pointer; font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
+      .${BAR_CLASS2} button:hover:not(:disabled) { background:#3643c7; }
+      .${BAR_CLASS2} button:disabled { cursor:default; opacity:.6; }
+      .${BAR_CLASS2} button[data-action="urgent"][data-state="off"],
+      .${BAR_CLASS2} button[data-action="urgent"][data-state="loading"] { border-color:#dc2626; background:#fff; color:#dc2626; }
+      .${BAR_CLASS2} button[data-action="urgent"][data-state="off"]:hover:not(:disabled) { background:#fef2f2; }
+      .${BAR_CLASS2} button[data-state="on"] { border-color:#dc2626; background:#dc2626; color:#fff; opacity:1; }
+      .${BAR_CLASS2} button[data-state="on"]:hover { background:#b91c1c; }
+      .${BAR_CLASS2} button[data-state="pending"] { border-color:#d97706; background:#fef3c7; color:#92400e; opacity:1; }
+      .${BAR_CLASS2} button[data-state="sent"] { background:#fff; color:#4956df; }
+      .${BAR_CLASS2} button[data-state="sent"]:hover:not(:disabled) { background:#eef0fd; }
     `;
       document.head.appendChild(style);
     }
@@ -7998,14 +8032,14 @@
     function ensureBar(row) {
       const { jobPositionId, matchId } = rowIds(row);
       if (!jobPositionId) return null;
-      let bar = row.querySelector(`.${BAR_CLASS}`);
+      let bar = row.querySelector(`.${BAR_CLASS2}`);
       if (bar && bar.dataset.jobPositionId === jobPositionId) {
         placeBar(row, bar);
         return bar;
       }
       bar?.remove();
       bar = document.createElement("div");
-      bar.className = BAR_CLASS;
+      bar.className = BAR_CLASS2;
       bar.dataset.jobPositionId = jobPositionId;
       bar.addEventListener("click", (event) => event.stopPropagation());
       const urgent = document.createElement("button");
@@ -8068,7 +8102,7 @@
       if (pollTimer !== null) return;
       pollTimer = runtime.setTimeout(async () => {
         pollTimer = null;
-        if (!isTargetPage9()) return;
+        if (!isTargetPage8()) return;
         const ids = openPendingIds();
         if (!ids.length) return;
         await loadUrgency(ids);
@@ -8076,10 +8110,10 @@
       }, PENDING_POLL_MS);
     }
     function removeBars() {
-      document.querySelectorAll(`.${BAR_CLASS}, .${FALLBACK_BLOCK_CLASS}`).forEach((element) => element.remove());
+      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element) => element.remove());
     }
     function sync() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         removeBars();
         return;
       }
@@ -8098,7 +8132,7 @@
     runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleSync);
     runtime.setInterval(() => {
-      if (isTargetPage9()) loadUrgency(visibleJobPositionIds());
+      if (isTargetPage8()) loadUrgency(visibleJobPositionIds());
     }, REFRESH_INTERVAL_MS4);
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.145
+// @version      1.7.147
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1932,7 +1932,7 @@
       page,
       routes,
       kind: "external",
-      summary: "Der Knopf „Vertretungen“ in der Filterleiste (auch im Tampermonkey-Menü) trägt ein, wer wen vertritt. Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis die Vertretung zusätzlich zur abwesenden Person.",
+      summary: "Der Knopf „Vertretungen“ oben rechts neben den Filter- und Export-Knöpfen (auch im Tampermonkey-Menü) trägt ein, wer wen vertritt. Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis die Vertretung zusätzlich zur abwesenden Person.",
       steps: [
         "„Vertretungen“ klicken.",
         "Abwesende Person, Vertretung und den Zeitraum wählen. „Bis“ zählt mit.",
@@ -9838,7 +9838,14 @@ ${buildCbreBody(current)}`;
     dialog: "werkia-vertretungen-dialog",
     style: "werkia-vertretungen-style"
   };
-  var PRESETS_BAR_ID = "werkia-filter-presets-bar";
+  var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
+  function findToolbar(root = document) {
+    for (const selector of TOOLBAR_SELECTORS) {
+      const element = root.querySelector(selector);
+      if (element) return element;
+    }
+    return null;
+  }
   function executeVertretungen(runtime, {
     routes = [],
     getGraphqlAdapter,
@@ -9868,8 +9875,8 @@ ${buildCbreBody(current)}`;
       style.id = IDS4.style;
       style.textContent = `
       #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS4.button} { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.button}:hover { background:#d7dbf0; }
+      #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
       #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
       #${IDS4.dialog} .wv-card { width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
       #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
@@ -9946,10 +9953,10 @@ ${buildCbreBody(current)}`;
         setStatus(error.message || String(error), true);
       }
     }
-    function personSelect(value, { onlyMe = false } = {}) {
+    function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
       const select = el3("select");
       select.append(el3("option", { value: "", textContent: "Bitte wählen …" }));
-      for (const person of state.mitarbeiter) {
+      for (const person of people) {
         select.append(el3("option", { value: person.id, textContent: person.name }));
       }
       select.value = value || "";
@@ -10026,7 +10033,7 @@ ${buildCbreBody(current)}`;
         list
       ];
       if (ich.darfAlles) {
-        const candidate = personSelect("");
+        const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
         const add = button2("Als Admin eintragen", () => {
           if (!candidate.value) {
             setStatus("Bitte auswählen, wer Admin werden soll.", true);
@@ -10093,19 +10100,23 @@ ${buildCbreBody(current)}`;
         return;
       }
       ensureStyle();
-      const presetsBar = document.getElementById(PRESETS_BAR_ID);
+      const toolbar = findToolbar(document);
       const existing = owned(IDS4.button);
-      if (existing && (existing.parentElement === presetsBar || !presetsBar && existing.parentElement?.id === IDS4.bar)) return;
+      if (existing && (toolbar ? existing.parentElement === toolbar : existing.parentElement?.id === IDS4.bar)) return;
       existing?.remove();
       const vertretungenButton = button2("Vertretungen", openDialog);
       vertretungenButton.id = IDS4.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
-      if (presetsBar) {
+      if (toolbar) {
         owned(IDS4.bar)?.remove();
-        presetsBar.append(vertretungenButton);
+        const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /MuiButton/.test(element.className));
+        vertretungenButton.className = sample ? sample.className : "wv-own";
+        toolbar.append(vertretungenButton);
         return;
       }
+      vertretungenButton.className = "wv-own";
+      owned(IDS4.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
       const bar = el3("div", { id: IDS4.bar }, [vertretungenButton]);

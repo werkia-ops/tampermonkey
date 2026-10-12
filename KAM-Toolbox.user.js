@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.143
+// @version      1.7.144
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2847,6 +2847,7 @@
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR = 'a[href*="#/Match/"]';
+  var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
     runtime.registerSource(sourcePath);
@@ -2898,7 +2899,7 @@
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR) && !row.querySelector("tr"));
+      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element) {
       if (!element.isConnected || element.closest("[hidden]")) return false;

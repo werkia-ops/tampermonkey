@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.143
+// @version      1.9.144
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2421,7 +2421,21 @@
     routeCalculationTopic({ routes: onPotentialMatches, commute: true }),
     commuteBadgesTopic(),
     filterPresetsTopic({ page: "CEM › Meine Matches", routes: [ROUTES.cemMyMatches] }),
-    matchStatusFilterTopic({ id: "kam-status-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches })
+    matchStatusFilterTopic({ id: "kam-status-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
+    {
+      id: "kam-status-filter-expanded",
+      title: "Aufgeklappte Matches nach KAM-Status filtern",
+      page: "CEM › Meine Kandidaten (aufgeklappte Matches)",
+      routes: [ROUTES.cemMyCandidates],
+      kind: "view",
+      summary: "Über jeder aufgeklappten Match-Tabelle steht eine schmale Leiste „KAM-Status“. Ein Klick zeigt nur noch die Matches dieses Kandidaten mit diesem KAM-Status, mehrere Status lassen sich kombinieren.",
+      notes: [
+        "Der Filter gilt nur für den einen Kandidaten. Die Kandidatenliste selbst lässt sich nicht nach KAM-Status filtern, weil der KAM-Status am Match hängt und nicht am Kandidaten.",
+        "Neben den Knöpfen steht, wie viele Matches gerade zu sehen sind. „alle“ zeigt wieder alles.",
+        "Ausgeblendete Matches nehmen die „Alle ändern“-Dialoge nicht mit.",
+        "Die Auswahl bleibt, bis du die Seite neu lädst."
+      ]
+    }
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -2444,7 +2458,7 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID4 = "werkia-urgent-vacancy-style";
+      const STYLE_ID5 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_CLASS3 = "werkia-cem-match-present-row";
@@ -2583,9 +2597,9 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID4)) return;
+        if (document.getElementById(STYLE_ID5)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID4;
+        style.id = STYLE_ID5;
         style.textContent = `
       .${ROW_CLASS2} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background: #fff3cd !important; }
@@ -4698,7 +4712,7 @@
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID4 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID5 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
@@ -4708,9 +4722,9 @@
     let working = false;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID4)) return;
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -4999,12 +5013,12 @@
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID4 = `${SCRIPT_ID}-style`;
+    const STYLE_ID5 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID4)) return;
+      if (document2.getElementById(STYLE_ID5)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -6267,6 +6281,7 @@
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
+  var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
     runtime.registerSource(sourcePath);
@@ -6318,7 +6333,7 @@
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR2) && !row.querySelector("tr"));
+      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR2) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element) {
       if (!element.isConnected || element.closest("[hidden]")) return false;
@@ -7648,6 +7663,222 @@
     });
   }
 
+  // src/features/kam-status-filter-expanded.js
+  var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
+  var STYLE_ID4 = "werkia-cem-expanded-kam-filter-style";
+  var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
+  var CACHE_TTL_MS2 = 5 * 60 * 1e3;
+  var BATCH_SIZE2 = 25;
+  var OPTIONS = optionsFromLabels(KAM_STATUS_LABELS);
+  var MATCH_KAM_STATUS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
+  items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
+    id
+    kamStatus
+    __typename
+  }
+}`;
+  function matchIdFromHref(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function isMatchShown(kamStatus, selected) {
+    if (!selected?.size) return true;
+    return selected.has(kamStatus || "");
+  }
+  function countLabel(shown, total) {
+    return `${shown} von ${total} ${total === 1 ? "Match" : "Matches"}`;
+  }
+  function executeKamStatusFilterExpanded(runtime) {
+    runtime.registerSource("cem/toolbox/src/features/kam-status-filter-expanded.js");
+    const statusCache = /* @__PURE__ */ new Map();
+    const failed = /* @__PURE__ */ new Set();
+    const selections = /* @__PURE__ */ new Map();
+    let loading = null;
+    const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash);
+    function ensureStyle() {
+      if (document.getElementById(STYLE_ID4)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID4;
+      style.textContent = `
+      .${BAR_CLASS2} { display:flex; flex-direction:column; gap:4px; margin:4px 0 6px; font:400 12px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS2}[data-placement="filter-form"] { align-self:flex-end; flex:1 1 320px; margin:0 0 4px 16px; }
+      .${BAR_CLASS2}-head { display:flex; align-items:center; gap:4px; font-size:0.75rem; color:rgba(0,0,0,.6); }
+      .${BAR_CLASS2}-chips { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+      .${BAR_CLASS2} button { min-height:22px; padding:2px 8px; border:1px solid #c8ccdd; border-radius:11px; background:#fff; color:#1f2933; cursor:pointer; font:400 11px/1 Arial,sans-serif; }
+      .${BAR_CLASS2} button:hover { border-color:#4956df; }
+      .${BAR_CLASS2} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
+      .${BAR_CLASS2} button.${BAR_CLASS2}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
+      .${BAR_CLASS2}-info { margin-left:4px; color:#6b7280; font-size:11px; }
+      tr[${FILTERED_OUT_ATTRIBUTE}] { display:none !important; }
+    `;
+      document.head.appendChild(style);
+    }
+    function matchRows(table) {
+      return [...table.querySelectorAll(MATCH_ROW_SELECTOR)].filter((row) => row.closest("table") === table && row.querySelector(MATCH_LINK_SELECTOR3));
+    }
+    function expandedTables() {
+      return [...document.querySelectorAll("tr table")].filter((table) => matchRows(table).length);
+    }
+    function candidateKey(table) {
+      const expandRow = table.closest("tr");
+      const candidateHref = expandRow?.previousElementSibling?.querySelector(CANDIDATE_LINK_SELECTOR3)?.getAttribute("href");
+      return candidateHref || expandRow?.id || "";
+    }
+    function filterFormFor(table) {
+      const expandRow = table.closest("tr");
+      const forms = [...expandRow?.querySelectorAll(".RaFilterForm-root, form") || []].filter((form) => form.closest("tr") === expandRow && !table.contains(form));
+      return forms.find((form) => form.classList.contains("RaFilterForm-root")) || forms[0] || null;
+    }
+    const tableByBar = /* @__PURE__ */ new WeakMap();
+    const rowMatchId = (row) => matchIdFromHref(row.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+    function freshStatus(matchId) {
+      const entry = statusCache.get(matchId);
+      return entry && Date.now() - entry.at < CACHE_TTL_MS2 ? entry : null;
+    }
+    async function loadStatuses(matchIds, { force = false } = {}) {
+      if (loading) await loading;
+      const ids = [...new Set(matchIds)].filter((id) => force || !freshStatus(id) && !failed.has(id));
+      if (!ids.length) return;
+      loading = (async () => {
+        const { request } = getCemGraphqlAdapter();
+        for (let index = 0; index < ids.length; index += BATCH_SIZE2) {
+          const batch = ids.slice(index, index + BATCH_SIZE2);
+          try {
+            const result = await request(MATCH_KAM_STATUS_QUERY, { filter: { ids: batch }, page: 0, perPage: batch.length });
+            const now = Date.now();
+            const found = /* @__PURE__ */ new Set();
+            for (const item of result?.items || []) {
+              if (!item?.id) continue;
+              statusCache.set(item.id, { status: item.kamStatus || "", at: now });
+              failed.delete(item.id);
+              found.add(item.id);
+            }
+            batch.filter((id) => !found.has(id)).forEach((id) => failed.add(id));
+          } catch (error) {
+            batch.forEach((id) => failed.add(id));
+            console.warn("[Werkia CEM KAM-Status-Filter]", error);
+          }
+        }
+      })();
+      try {
+        await loading;
+      } finally {
+        loading = null;
+        render();
+      }
+    }
+    function buildBar(key) {
+      const bar = document.createElement("div");
+      bar.className = BAR_CLASS2;
+      bar.dataset.candidateKey = key;
+      const head = document.createElement("div");
+      head.className = `${BAR_CLASS2}-head`;
+      const title = document.createElement("span");
+      title.textContent = "KAM Status";
+      const chips = OPTIONS.map((option) => {
+        const button2 = document.createElement("button");
+        button2.type = "button";
+        button2.dataset.value = option.value;
+        button2.textContent = option.label;
+        const tone = statusTone(option.value);
+        if (tone) button2.dataset.tone = tone;
+        button2.addEventListener("click", () => {
+          const selected = new Set(selections.get(bar.dataset.candidateKey) || []);
+          if (selected.has(option.value)) selected.delete(option.value);
+          else selected.add(option.value);
+          selections.set(bar.dataset.candidateKey, selected);
+          render();
+          const table = tableByBar.get(bar);
+          if (table?.isConnected) loadStatuses(matchRows(table).map(rowMatchId), { force: true });
+        });
+        return button2;
+      });
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = `${BAR_CLASS2}-reset`;
+      reset.textContent = "alle";
+      reset.title = "Alle Matches dieses Kandidaten wieder zeigen";
+      reset.addEventListener("click", () => {
+        selections.delete(bar.dataset.candidateKey);
+        render();
+      });
+      const info = document.createElement("span");
+      info.className = `${BAR_CLASS2}-info`;
+      head.append(...[title, cemHelp.tip("kam-status-filter-expanded"), info].filter(Boolean));
+      const chipRow = document.createElement("div");
+      chipRow.className = `${BAR_CLASS2}-chips`;
+      chipRow.append(...chips, reset);
+      bar.append(head, chipRow);
+      return bar;
+    }
+    function setText(element, text) {
+      if (element && element.textContent !== text) element.textContent = text;
+    }
+    function syncTable(table) {
+      const key = candidateKey(table);
+      const expandRow = table.closest("tr");
+      let bar = expandRow?.querySelector(`.${BAR_CLASS2}`);
+      if (!bar) {
+        bar = buildBar(key);
+        const form = filterFormFor(table);
+        if (form) {
+          bar.dataset.placement = "filter-form";
+          form.appendChild(bar);
+        } else {
+          table.parentElement.insertBefore(bar, table);
+        }
+      }
+      tableByBar.set(bar, table);
+      if (bar.dataset.candidateKey !== key) bar.dataset.candidateKey = key;
+      const selected = selections.get(key) || /* @__PURE__ */ new Set();
+      bar.querySelectorAll("button[data-value]").forEach((button2) => {
+        const pressed = String(selected.has(button2.dataset.value));
+        if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
+      });
+      const reset = bar.querySelector(`.${BAR_CLASS2}-reset`);
+      if (reset.hidden !== !selected.size) reset.hidden = !selected.size;
+      const rows = matchRows(table);
+      const ids = rows.map(rowMatchId);
+      const missing = ids.filter((id) => id && !freshStatus(id) && !failed.has(id));
+      const unknown = ids.filter((id) => !statusCache.has(id));
+      const canFilter = selected.size && !unknown.length;
+      let shown = 0;
+      rows.forEach((row, index) => {
+        const show = !canFilter || isMatchShown(statusCache.get(ids[index])?.status, selected);
+        if (row.hasAttribute(FILTERED_OUT_ATTRIBUTE) === show) row.toggleAttribute(FILTERED_OUT_ATTRIBUTE, !show);
+        if (show) shown += 1;
+      });
+      const info = bar.querySelector(`.${BAR_CLASS2}-info`);
+      if (!selected.size) setText(info, "");
+      else if (unknown.some((id) => failed.has(id))) setText(info, "KAM-Status nicht ladbar");
+      else if (unknown.length) setText(info, "lädt …");
+      else setText(info, countLabel(shown, rows.length));
+      return missing;
+    }
+    function render() {
+      if (!isTargetPage3()) return;
+      ensureStyle();
+      const missing = expandedTables().flatMap(syncTable);
+      if (missing.length && !loading) loadStatuses(missing);
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
   // ../../shared/js/no-go-check/core.js
   var LEGAL_FORM_TOKENS = /* @__PURE__ */ new Set([
     "gmbh",
@@ -7972,7 +8203,7 @@
     const BADGE_CLASS = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS2 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID4 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID5 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -7980,9 +8211,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID4)) return;
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS2} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -9589,6 +9820,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "offline-match-bulk", execute: executeOfflineMatchBulk },
     { id: "filter-presets", execute: executeFilterPresets },
     { id: "kam-status-filter", execute: executeKamStatusFilter },
+    { id: "kam-status-filter-expanded", execute: executeKamStatusFilterExpanded },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule },
     // Last on purpose: this feature tints rows on the same route as
     // reverse-match-kam-status and urgent-vacancy-highlight, and its style

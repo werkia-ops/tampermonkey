@@ -31,6 +31,7 @@ Enthaltene Funktionen:
 - Ueberdeckt in der Vakanzliste die Statusspalte mit einem Dropdown, das den Vakanz-Status direkt speichert. "Alle ändern" im Spaltenkopf setzt den Status fuer die angehakten sichtbaren Vakanzen gemeinsam.
 - Fuegt im Arbeitgeberprofil OM-Flag-Vorlagen direkt am Feld OM Notes ein.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.
+- Knopf "Vertretungen" in der Filterleiste von Meine Matches und im Tampermonkey-Menü: trägt Vertretungen ein, die VT Automatik, VT Bot und VT-Status-Hinweis zusätzlich taggen. Gespeichert im n8n-Workflow Vertretungen.
 - Dropdown ueber der Liste mit gespeicherten Filterkombinationen. "Aktuellen Filter speichern" uebernimmt Filter, Sortierung und Seitengroesse der Ansicht; Vorlagen liegen lokal im Browser und ueberstehen Toolbox-Updates.
 
 ## CEM Toolbox
@@ -55,6 +56,7 @@ Enthaltene Funktionen:
 - Ergaenzt die Kandidatenliste einer Vakanz um Zusatzinfos je Kandidat (Reisebereitschaft, Status, Registrierungsdatum, Telefonnummer) und eine Anruf-Empfehlung.
 - Erlaubt auf Potenzielle Matches die Auswahl mehrerer Arbeitgeber und vorhandener Jobs für ein gemeinsames Offline-Match-Formular. Bei einem Arbeitgeber mit vorhandenem Match ist vor dem Öffnen eine Bestätigung nötig; Terminvorschläge lassen sich gesammelt löschen.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.
+- Knopf "Vertretungen" in der Filterleiste von Meine Matches und im Tampermonkey-Menü: trägt Vertretungen ein, die VT Automatik, VT Bot und VT-Status-Hinweis zusätzlich taggen. Gespeichert im n8n-Workflow Vertretungen.
 - Dropdown ueber der Liste mit gespeicherten Filterkombinationen. "Aktuellen Filter speichern" uebernimmt Filter, Sortierung und Seitengroesse der Ansicht; Vorlagen liegen lokal im Browser und ueberstehen Toolbox-Updates.
 - Warnt auf Potenzielle Matches, wenn ein vorgeschlagener Arbeitgeber bei diesem Kandidaten als No-Go hinterlegt ist - rot bei demselben Arbeitgeberprofil oder derselben Firmengruppe (gleicher Webauftritt), gelb bei einem blossen Namenstreffer, der noch geprueft werden muss.
 - Haken "Prio" im Terminvorschlag-Dialog: schreibt #prio in die Notizen des Termins, die VT Automatik postet VTA/VTV/VTS des Matches dann mit :alert11:.

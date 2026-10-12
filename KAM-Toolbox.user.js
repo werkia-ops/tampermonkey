@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.144
+// @version      1.7.145
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1925,6 +1925,25 @@
       ]
     };
   }
+  function vertretungenTopic({ page, routes }) {
+    return {
+      id: "vertretungen",
+      title: "Vertretungen",
+      page,
+      routes,
+      kind: "external",
+      summary: "Der Knopf „Vertretungen“ in der Filterleiste (auch im Tampermonkey-Menü) trägt ein, wer wen vertritt. Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis die Vertretung zusätzlich zur abwesenden Person.",
+      steps: [
+        "„Vertretungen“ klicken.",
+        "Abwesende Person, Vertretung und den Zeitraum wählen. „Bis“ zählt mit.",
+        "„Vertretung eintragen“ klicken."
+      ],
+      notes: [
+        "Alle sehen alle Einträge. Ändern kannst du nur Einträge, in denen du selbst abwesend oder Vertretung bist. Admins dürfen alles und ernennen im selben Dialog weitere Admins.",
+        "Unter den vt_count_log-Antworten stehen die gerade laufenden Vertretungen."
+      ]
+    };
+  }
   function filterPresetsTopic({ page, routes }) {
     return {
       id: "filter-presets",
@@ -2245,6 +2264,7 @@
     omNotesBoxTopic({ routes: onMyMatches, page: QUESTIONNAIRE }),
     routeCalculationTopic({ routes: onMyMatches, page: QUESTIONNAIRE }),
     filterPresetsTopic({ page: MY_MATCHES, routes: onMyMatches }),
+    vertretungenTopic({ page: MY_MATCHES, routes: onMyMatches }),
     {
       id: "chat-status-banner",
       title: "Status-Banner im Chat",
@@ -2855,7 +2875,7 @@
       team,
       isTargetPage: isTargetPage9,
       getRequest,
-      ids: IDS4,
+      ids: IDS5,
       fields,
       columns,
       statusOptions,
@@ -2935,13 +2955,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS4,
-      buttonIds: [IDS4.button, IDS4.statusButton, IDS4.forwardButton, IDS4.declinePastButton],
+      ids: IDS5,
+      buttonIds: [IDS5.button, IDS5.statusButton, IDS5.forwardButton, IDS5.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS4.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS4.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS5.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS5.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -3081,13 +3101,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS4.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS5.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS4.feedbackShortcuts;
+      shortcuts.id = IDS5.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -3387,10 +3407,10 @@
     function installHeaderButtons() {
       if (!isTargetPage9()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS4.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS4.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS4.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS4.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS5.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS5.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS5.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS5.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -8594,11 +8614,11 @@
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS = 35e3;
+    const REQUEST_TIMEOUT_MS2 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS2);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -9744,6 +9764,391 @@ ${buildCbreBody(current)}`;
     });
   }
 
+  // ../../shared/js/vertretungen/core.js
+  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS = 15e3;
+  var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
+  me: currentEmployee { id __typename }
+}`;
+  function berlinDay(date = /* @__PURE__ */ new Date()) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  }
+  function formatDay(day, withYear = false) {
+    const [year, month, date] = String(day || "").split("-");
+    if (!year || !month || !date) return String(day || "");
+    return withYear ? `${date}.${month}.${year}` : `${date}.${month}.`;
+  }
+  function formatRange(von, bis) {
+    if (von === bis) return formatDay(von, true);
+    const sameYear = String(von).slice(0, 4) === String(bis).slice(0, 4);
+    return `${formatDay(von, !sameYear)} – ${formatDay(bis, true)}`;
+  }
+  function canEditDraft(me, draft) {
+    if (!me) return false;
+    if (me.darfAlles) return true;
+    return draft.abwesendId === me.id || draft.vertretungId === me.id;
+  }
+  function validateDraft(me, draft, today = berlinDay()) {
+    if (!draft.abwesendId) return "Bitte auswählen, wer abwesend ist.";
+    if (!draft.vertretungId) return "Bitte die Vertretung auswählen.";
+    if (draft.abwesendId === draft.vertretungId) return "Niemand kann sich selbst vertreten.";
+    if (!draft.von || !draft.bis) return "Bitte „Von“ und „Bis“ ausfüllen.";
+    if (draft.von > draft.bis) return "„Von“ liegt nach „Bis“.";
+    if (draft.bis < today) return "„Bis“ liegt in der Vergangenheit.";
+    if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
+    return "";
+  }
+  function parseResponse(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+      });
+    });
+  }
+
+  // ../../shared/js/vertretungen/index.js
+  var IDS4 = {
+    button: "werkia-vertretungen-button",
+    bar: "werkia-vertretungen-bar",
+    dialog: "werkia-vertretungen-dialog",
+    style: "werkia-vertretungen-style"
+  };
+  var PRESETS_BAR_ID = "werkia-filter-presets-bar";
+  function executeVertretungen(runtime, {
+    routes = [],
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createVertretungenClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let state = null;
+    let editing = null;
+    let adminsOpen = false;
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const owned = (id) => {
+      const element = document.getElementById(id);
+      return element?.dataset.werkiaVertretungenOwner === sourcePath ? element : null;
+    };
+    function ensureStyle() {
+      if (document.getElementById(IDS4.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS4.style;
+      style.textContent = `
+      #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS4.button} { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS4.button}:hover { background:#d7dbf0; }
+      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS4.dialog} .wv-card { width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS4.dialog} .wv-admins { margin-top:16px; }
+      #${IDS4.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS4.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS4.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS4.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS4.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS4.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS4.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS4.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS4.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS4.dialog} select, #${IDS4.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS4.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS4.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS4.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS4.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS4.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS4.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS4.dialog} .wv-status.wv-error { color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el3(tag, props = {}, children = []) {
+      const element = document.createElement(tag);
+      Object.assign(element, props);
+      element.append(...children.filter((child) => child !== null && child !== void 0));
+      return element;
+    }
+    function button2(text, onClick, className = "") {
+      return el3("button", { type: "button", textContent: text, className, onclick: onClick });
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function closeDialog() {
+      owned(IDS4.dialog)?.remove();
+      editing = null;
+    }
+    function setStatus(text, isError = false) {
+      const status = owned(IDS4.dialog)?.querySelector(".wv-status");
+      if (!status) return;
+      status.textContent = text;
+      status.classList.toggle("wv-error", isError);
+    }
+    function setBusy(busy) {
+      owned(IDS4.dialog)?.querySelectorAll("button, select, input").forEach((element) => {
+        element.disabled = busy;
+      });
+    }
+    async function refresh(message = "") {
+      state = await call({ action: "liste" });
+      render();
+      if (message) setStatus(message);
+    }
+    async function run(action, success) {
+      setBusy(true);
+      setStatus("Speichert …");
+      try {
+        await call(action);
+        editing = null;
+        await refresh(success);
+      } catch (error) {
+        setBusy(false);
+        setStatus(error.message || String(error), true);
+      }
+    }
+    function personSelect(value, { onlyMe = false } = {}) {
+      const select = el3("select");
+      select.append(el3("option", { value: "", textContent: "Bitte wählen …" }));
+      for (const person of state.mitarbeiter) {
+        select.append(el3("option", { value: person.id, textContent: person.name }));
+      }
+      select.value = value || "";
+      if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
+      return select;
+    }
+    function entryRow(entry) {
+      const who = el3("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el3("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el3("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const actions = entry.darfBearbeiten ? [
+        button2("Bearbeiten", () => {
+          editing = entry;
+          render();
+        }, "wv-secondary"),
+        button2("Löschen", () => {
+          if (!window.confirm(`Vertretung ${entry.abwesendName} → ${entry.vertretungName} (${formatRange(entry.von, entry.bis)}) löschen?`)) return;
+          run({ action: "loeschen", id: entry.id }, "Gelöscht.");
+        }, "wv-danger")
+      ] : [];
+      const row = el3("li", {}, [who, when, badge, ...actions]);
+      if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
+      return row;
+    }
+    function form() {
+      const today = berlinDay();
+      const { ich } = state;
+      const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
+      const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
+      const von = el3("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el3("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const save = button2(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+        const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
+        const problem = validateDraft(ich, draft, today);
+        if (problem) {
+          setStatus(problem, true);
+          return;
+        }
+        run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
+      });
+      const cancel = editing ? button2("Abbrechen", () => {
+        editing = null;
+        render();
+      }, "wv-secondary") : null;
+      return [
+        el3("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el3("div", { className: "wv-form" }, [
+          el3("label", { textContent: "Abwesend" }),
+          abwesend,
+          el3("label", { textContent: "Vertretung" }),
+          vertretung,
+          el3("label", { textContent: "Von" }),
+          von,
+          el3("label", { textContent: "Bis (einschließlich)" }),
+          bis
+        ]),
+        el3("div", { className: "wv-actions" }, [save, cancel])
+      ];
+    }
+    function adminSection() {
+      const { ich } = state;
+      const admins = state.admins || [];
+      const list = el3("ul");
+      admins.forEach((admin) => {
+        const remove = ich.darfAlles && admin.id ? button2("Entfernen", () => {
+          if (!window.confirm(`${admin.name} die Admin-Rechte für Vertretungen entziehen?`)) return;
+          run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.");
+        }, "wv-danger") : null;
+        list.append(el3("li", {}, [el3("span", { className: "wv-who", textContent: admin.name }), remove]));
+      });
+      const parts = [
+        el3("summary", { textContent: `Admins (${admins.length})` }),
+        el3("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        list
+      ];
+      if (ich.darfAlles) {
+        const candidate = personSelect("");
+        const add = button2("Als Admin eintragen", () => {
+          if (!candidate.value) {
+            setStatus("Bitte auswählen, wer Admin werden soll.", true);
+            return;
+          }
+          run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
+        }, "wv-secondary");
+        parts.push(el3("div", { className: "wv-actions" }, [candidate, add]));
+      }
+      const details = el3("details", { className: "wv-admins" }, parts);
+      details.open = adminsOpen;
+      details.addEventListener("toggle", () => {
+        adminsOpen = details.open;
+      });
+      return details;
+    }
+    function card() {
+      return owned(IDS4.dialog)?.querySelector(".wv-card");
+    }
+    function render() {
+      const target = card();
+      if (!target) return;
+      target.textContent = "";
+      const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
+      const list = el3("ul");
+      if (!state.eintraege.length) list.append(el3("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      state.eintraege.forEach((entry) => list.append(entryRow(entry)));
+      const tip = helpTip?.();
+      target.append(
+        el3("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el3("p", { textContent: intro }),
+        list,
+        ...form(),
+        adminSection(),
+        el3("div", { className: "wv-status" }),
+        el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
+      );
+    }
+    async function openDialog() {
+      closeDialog();
+      ensureStyle();
+      const overlay = el3("div", { id: IDS4.dialog });
+      overlay.dataset.werkiaVertretungenOwner = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const target = el3("div", { className: "wv-card" }, [
+        el3("h2", { textContent: "Vertretungen" }),
+        el3("div", { className: "wv-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(target);
+      document.body.appendChild(overlay);
+      try {
+        await refresh();
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        target.append(el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
+      }
+    }
+    function placeButton() {
+      if (!isTargetPage9()) {
+        owned(IDS4.button)?.remove();
+        owned(IDS4.bar)?.remove();
+        return;
+      }
+      ensureStyle();
+      const presetsBar = document.getElementById(PRESETS_BAR_ID);
+      const existing = owned(IDS4.button);
+      if (existing && (existing.parentElement === presetsBar || !presetsBar && existing.parentElement?.id === IDS4.bar)) return;
+      existing?.remove();
+      const vertretungenButton = button2("Vertretungen", openDialog);
+      vertretungenButton.id = IDS4.button;
+      vertretungenButton.title = "Vertretungen eintragen und ansehen";
+      vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
+      if (presetsBar) {
+        owned(IDS4.bar)?.remove();
+        presetsBar.append(vertretungenButton);
+        return;
+      }
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return;
+      const bar = el3("div", { id: IDS4.bar }, [vertretungenButton]);
+      bar.dataset.werkiaVertretungenOwner = sourcePath;
+      anchor.parentElement.insertBefore(bar, anchor);
+    }
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());
+      } catch {
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        placeButton();
+      }, 200);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.addCleanup?.(() => {
+      owned(IDS4.button)?.remove();
+      owned(IDS4.bar)?.remove();
+      closeDialog();
+    });
+    schedule();
+  }
+
+  // src/features/kam-suite/vertretungen.js
+  function executeVertretungen2(runtime, options = {}) {
+    executeVertretungen(runtime, {
+      routes: [ROUTES.kamMyMatches],
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      toolboxName: "KAM-Toolbox",
+      helpTip: () => kamHelp.tip("vertretungen"),
+      sourcePath: "kam/toolbox/src/features/kam-suite/vertretungen.js",
+      ...options
+    });
+  }
+
   // ../../shared/js/vacancy-status/core.js
   var VACANCY_STATUS_OPTIONS = [
     { value: "Draft", label: "Entwurf" },
@@ -9818,7 +10223,7 @@ ${buildCbreBody(current)}`;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS4 = {
+    const IDS5 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -9830,9 +10235,9 @@ ${buildCbreBody(current)}`;
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS4.style)) return;
+      if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
-      style.id = IDS4.style;
+      style.id = IDS5.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -10003,8 +10408,8 @@ ${buildCbreBody(current)}`;
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS4.dialog, style: IDS4.dialogStyle, status: IDS4.dialogStatus },
-      buttonIds: [IDS4.bulkButton],
+      ids: { dialog: IDS5.dialog, style: IDS5.dialogStyle, status: IDS5.dialogStatus },
+      buttonIds: [IDS5.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -10079,7 +10484,7 @@ ${buildCbreBody(current)}`;
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS4.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS5.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -10101,8 +10506,8 @@ ${buildCbreBody(current)}`;
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS4.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS4.dialog)?.remove();
+      document.getElementById(IDS5.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS5.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -10117,8 +10522,8 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS4.style)?.remove();
-      document.getElementById(IDS4.dialogStyle)?.remove();
+      document.getElementById(IDS5.style)?.remove();
+      document.getElementById(IDS5.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
@@ -10753,6 +11158,7 @@ ${next}`;
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
     { id: "filter-presets", execute: executeFilterPresets },
+    { id: "vertretungen", execute: executeVertretungen2 },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
     { id: "om-notes-templates", execute: (runtime) => executeOmNotesTemplates(runtime, { helpTip: () => kamHelp.tip("om-notes-templates", { tone: "dark" }) }) },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.152
+// @version      1.9.157
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -9160,7 +9160,9 @@
         `Gute Neuigkeiten, folgender Betrieb möchte Dich gerne *${slot("telefonisch/digital/vor Ort", MODE_ADJECTIVE[ctx.mode])}* kennenlernen:`,
         "",
         `📍 ${slot("Arbeitgeber", ctx.employerName)}`,
-        `🏡 Raum ${slot("PLZ Ort", ctx.region)}`,
+        // Vor Ort die genaue Adresse wie in der Terminbestaetigung, sonst nur
+        // die Gegend (Owner 2026-10-13).
+        ctx.mode === "onsite" ? `🏡 ${slot("Adresse", ctx.address)}` : `🏡 Raum ${slot("PLZ Ort", ctx.region)}`,
         `🛠️ ${slot("Jobtitel", ctx.jobTitle)}`,
         `🛜 ${slot("Link zur Stelle", ctx.jobLink)}`,
         "",

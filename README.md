@@ -61,6 +61,7 @@ Enthaltene Funktionen:
 - Warnt auf Potenzielle Matches, wenn ein vorgeschlagener Arbeitgeber bei diesem Kandidaten als No-Go hinterlegt ist - rot bei demselben Arbeitgeberprofil oder derselben Firmengruppe (gleicher Webauftritt), gelb bei einem blossen Namenstreffer, der noch geprueft werden muss.
 - Haken "Prio" im Terminvorschlag-Dialog: schreibt #prio in die Notizen des Termins, die VT Automatik postet VTA/VTV/VTS des Matches dann mit :alert11:.
 - Knopf "WA" in Meine Matches und Meine Kandidaten: fuellt eine WhatsApp-Vorlage mit Kandidaten- und Matchdaten, laesst sie fuer diese Nachricht bearbeiten und kopiert sie.
+- Zeigt in Meine Matches und Meine Kandidaten unter dem Matchkommentar-Knopf "CEM To Do: 1", wenn OM einen Kommentar mit "CEM To Do:" geschrieben hat, den noch keine "CEM:"-Antwort erledigt. Im Matchkommentar-Dialog ist das To Do rot umrandet; Knoepfe ueber dem Textfeld schreiben die Antwort (ist/sind da mit Match senden oder nicht senden, angefragt, Abhaken).
 
 ## OBC Toolbox
 

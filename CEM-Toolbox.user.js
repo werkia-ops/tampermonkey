@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.9.157
+// @version      1.10.159
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2456,7 +2456,25 @@
         "Die Auswahl bleibt, bis du die Seite neu lädst."
       ]
     },
-    vertretungenTopic({ page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates, ROUTES.cemMyMatches] })
+    vertretungenTopic({ page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates, ROUTES.cemMyMatches] }),
+    {
+      id: "cem-todo",
+      title: "CEM To Do aus den Matchkommentaren",
+      page: "CEM › Meine Matches und Meine Kandidaten",
+      routes: onBulkPages,
+      kind: "view",
+      summary: "OM taggt dich nicht mehr, sondern schreibt einen Matchkommentar, der mit „CEM To Do:“ beginnt, z. B. „CEM To Do: [CV, GB] bitti, dankii“. Solange er offen ist, steht unter dem Matchkommentar-Knopf der Zeile ein rotes „CEM To Do: 1“.",
+      steps: [
+        "Auf „CEM To Do“ oder den Matchkommentar-Knopf klicken. Das offene To Do ist rot umrandet.",
+        "Über dem Textfeld den passenden Knopf wählen: „… ist/sind da, Match senden“ oder „… nicht senden“ taggt die OM-Person, die gefragt hat. „… angefragt“, wenn du gerade beim Kandidaten nachgefragt hast und noch wartest.",
+        "Der Knopf schreibt die Antwort nur ins Textfeld. Bei Bedarf ergänzen und wie immer mit dem Pfeil abschicken."
+      ],
+      notes: [
+        "Jeder Kommentar, der mit „CEM:“ beginnt, erledigt alle To Dos davor. Danach verschwindet die Markierung, auch für alle anderen.",
+        "„Abhaken“ für Sonderfälle schreibt „CEM: To Do erledigt“.",
+        "Die Markierung erscheint nur in Zeilen, die gerade in der Liste stehen. Eine Benachrichtigung gibt es ohne Tag nicht."
+      ]
+    }
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -2479,9 +2497,9 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID5 = "werkia-urgent-vacancy-style";
+      const STYLE_ID6 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
-      const BADGE_CLASS = "werkia-urgent-vacancy-badge";
+      const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_CLASS3 = "werkia-cem-match-present-row";
       const POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
@@ -2618,23 +2636,23 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID5)) return;
+        if (document.getElementById(STYLE_ID6)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID5;
+        style.id = STYLE_ID6;
         style.textContent = `
       .${ROW_CLASS2} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background: #fff3cd !important; }
       .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background: #ffe8a3 !important; }
-      .${BADGE_CLASS} { display: inline-flex; align-items: center; margin: 6px 0 2px 8px; padding: 5px 9px; border: 1px solid #92400e; border-radius: 999px; background: #b45309; color: #fff; font: 800 12px/1.2 Arial, sans-serif; letter-spacing: .15px; vertical-align: middle; white-space: nowrap; }
+      .${BADGE_CLASS2} { display: inline-flex; align-items: center; margin: 6px 0 2px 8px; padding: 5px 9px; border: 1px solid #92400e; border-radius: 999px; background: #b45309; color: #fff; font: 800 12px/1.2 Arial, sans-serif; letter-spacing: .15px; vertical-align: middle; white-space: nowrap; }
     `;
         document.head.appendChild(style);
       }
       function removeHighlight(row) {
         row.classList.remove(ROW_CLASS2);
-        row.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+        row.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       }
       function applyHighlight(row, urgent) {
-        const existingBadge = row.querySelector(`.${BADGE_CLASS}`);
+        const existingBadge = row.querySelector(`.${BADGE_CLASS2}`);
         if (row.classList.contains(MATCH_PRESENT_ROW_CLASS3)) {
           if (row.classList.contains(ROW_CLASS2) || existingBadge) removeHighlight(row);
           return;
@@ -2648,7 +2666,7 @@
         row.classList.add(ROW_CLASS2);
         const target = row.querySelector("td.column-jobPositionId") || row.querySelector("td") || row;
         const badge = document.createElement("span");
-        badge.className = BADGE_CLASS;
+        badge.className = BADGE_CLASS2;
         badge.textContent = "Dringende Suche";
         badge.title = "Der KAM hat diese Vakanz als dringend markiert.";
         target.appendChild(badge);
@@ -4732,8 +4750,8 @@
     const getProvider = options.getProvider;
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
-    const BADGE_CLASS = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID5 = `werkia-${namespace}-commute-style`;
+    const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
+    const STYLE_ID6 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
@@ -4743,28 +4761,28 @@
     let working = false;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID5)) return;
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
-      .${BADGE_CLASS} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
-      ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS}[data-level="${level}"] { ${css} }`).join("\n")}
+      .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
+      ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
       tr[${SKULL_ATTR}] { opacity:.45;filter:grayscale(.6);transition:opacity .15s ease,filter .15s ease; }
       tr[${SKULL_ATTR}]:hover, tr[${SKULL_ATTR}]:focus-within { opacity:1;filter:none; }
     `;
       document.head.appendChild(style);
     }
     function clearAll() {
-      document.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+      document.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       document.querySelectorAll(`tr[${SKULL_ATTR}]`).forEach((row) => row.removeAttribute(SKULL_ATTR));
       queue.length = 0;
       queued.clear();
     }
     function renderBadge(item, view) {
-      let badge = item.row.querySelector(`.${BADGE_CLASS}`);
+      let badge = item.row.querySelector(`.${BADGE_CLASS2}`);
       if (!badge) {
         badge = document.createElement("span");
-        badge.className = BADGE_CLASS;
+        badge.className = BADGE_CLASS2;
         item.host().appendChild(badge);
       }
       if (badge.textContent !== view.text) badge.textContent = view.text;
@@ -4882,8 +4900,8 @@
     }
     runtime.createMutationObserver((mutations) => {
       const foreign = mutations.some((mutation) => {
-        if (mutation.target?.closest?.(`.${BADGE_CLASS}`)) return false;
-        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.classList?.contains(BADGE_CLASS));
+        if (mutation.target?.closest?.(`.${BADGE_CLASS2}`)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.classList?.contains(BADGE_CLASS2));
       });
       if (foreign) scheduleRender();
     }).observe(document.body, { childList: true, subtree: true });
@@ -5034,12 +5052,12 @@
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID5 = `${SCRIPT_ID}-style`;
+    const STYLE_ID6 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID5)) return;
+      if (document2.getElementById(STYLE_ID6)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -8704,10 +8722,10 @@
     const namespace = options.namespace || "werkia";
     const getProvider = options.getProvider;
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
-    const BADGE_CLASS = `werkia-${namespace}-no-go-badge`;
+    const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS2 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID5 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID6 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -8715,9 +8733,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID5)) return;
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS2} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -8727,7 +8745,7 @@
       document.head.appendChild(style);
     }
     function clearRow(row) {
-      row.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+      row.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       row.classList.remove(ROW_CLASS2);
       row.classList.remove(CHECK_ROW_CLASS);
     }
@@ -8741,10 +8759,10 @@
       const style = LEVEL_STYLES2[collision.level];
       row.classList.toggle(ROW_CLASS2, collision.level !== "name");
       row.classList.toggle(CHECK_ROW_CLASS, collision.level === "name");
-      const existing = row.querySelector(`.${BADGE_CLASS}`);
+      const existing = row.querySelector(`.${BADGE_CLASS2}`);
       if (existing && existing.dataset.level === collision.level && existing.title === described.title) return;
       const badge = existing || document.createElement("span");
-      badge.className = BADGE_CLASS;
+      badge.className = BADGE_CLASS2;
       badge.dataset.level = collision.level;
       badge.textContent = described.label;
       badge.title = described.title;
@@ -8810,7 +8828,7 @@
       }
     }
     function cleanup() {
-      document.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+      document.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       document.querySelectorAll(`.${ROW_CLASS2}, .${CHECK_ROW_CLASS}`).forEach((row) => {
         row.classList.remove(ROW_CLASS2);
         row.classList.remove(CHECK_ROW_CLASS);
@@ -10306,6 +10324,402 @@ Trotzdem speichern?`)) return void 0;
     scheduleSync();
   }
 
+  // ../../shared/js/cem-todo/core.js
+  var CEM_RESPONSE_PREFIX = "CEM:";
+  var TODO_PATTERN = /^CEM[\s-]*To[\s-]*Do\s*:/i;
+  var RESPONSE_PATTERN = /^CEM\s*:/i;
+  var MODIFIERS = /* @__PURE__ */ new Set(["ASAP", "WANN"]);
+  function commentPlainText(html) {
+    return String(html || "").replace(/<a\b[^>]*data-type="mention"[^>]*>[\s\S]*?<\/a>/gi, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li)>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&").split("\n").map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
+  }
+  function isCemTodo(html) {
+    return TODO_PATTERN.test(commentPlainText(html));
+  }
+  function isCemResponse(html) {
+    return RESPONSE_PATTERN.test(commentPlainText(html));
+  }
+  function openCemTodos(comments) {
+    const sorted = [...comments || []].filter((comment) => comment && !comment.automated).sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    let open = [];
+    for (const comment of sorted) {
+      if (isCemTodo(comment.text)) open.push(comment);
+      else if (isCemResponse(comment.text)) open = [];
+    }
+    return open;
+  }
+  function todoCodes(todos) {
+    const codes = [];
+    for (const todo of todos || []) {
+      for (const group of commentPlainText(todo?.text).matchAll(/\[([^\]]+)\]/g)) {
+        for (const raw of group[1].split(",")) {
+          const code = raw.trim();
+          if (code && !MODIFIERS.has(code.toUpperCase()) && !codes.includes(code)) codes.push(code);
+        }
+      }
+    }
+    return codes;
+  }
+  function codesLabel(codes) {
+    return codes?.length ? `[${codes.join(", ")}]` : "Angefragtes";
+  }
+  var RESPONSES = {
+    daSenden: "da-senden",
+    daNichtSenden: "da-nicht-senden",
+    angefragt: "angefragt",
+    erledigt: "erledigt"
+  };
+  function responseText(kind, codes) {
+    const label2 = codesLabel(codes);
+    const da = `${label2} ${codes?.length > 1 ? "sind" : "ist"} da`;
+    if (kind === RESPONSES.daSenden) return `${CEM_RESPONSE_PREFIX} ${da}, Match senden`;
+    if (kind === RESPONSES.daNichtSenden) return `${CEM_RESPONSE_PREFIX} ${da}, Match nicht senden`;
+    if (kind === RESPONSES.angefragt) return `${CEM_RESPONSE_PREFIX} ${label2} angefragt`;
+    return `${CEM_RESPONSE_PREFIX} To Do erledigt`;
+  }
+  function responseButtonLabel(kind, codes) {
+    return responseText(kind, codes).slice(CEM_RESPONSE_PREFIX.length).trim();
+  }
+  function responseMentions(kind, todos) {
+    if (kind !== RESPONSES.daSenden && kind !== RESPONSES.daNichtSenden) return [];
+    const seen = /* @__PURE__ */ new Set();
+    const people = [];
+    for (const todo of todos || []) {
+      const employee = todo?.employee;
+      if (!employee?.id || seen.has(employee.id)) continue;
+      seen.add(employee.id);
+      const name = [employee.firstName, employee.lastName].filter(Boolean).join(" ").trim();
+      if (name) people.push({ id: employee.id, name });
+    }
+    return people;
+  }
+  function mentionHtml({ id, name }) {
+    const label2 = escapeHtml(name);
+    return `<a data-type="mention" href="#/Employee/${id}/show" class="mention" data-id="${id}" data-label="${label2}" data-resource="Employee" contenteditable="false">@${label2}</a>`;
+  }
+  function responseHtml(kind, todos) {
+    const mentions = responseMentions(kind, todos).map(mentionHtml);
+    return [...mentions, escapeHtml(responseText(kind, todoCodes(todos)))].join(" ");
+  }
+  function commentKey(html) {
+    return commentPlainText(html).split("\n")[0].slice(0, 40);
+  }
+  function normalizeDomText(text) {
+    return String(text || "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
+  }
+  function inferNewestFirst(domKeys, comments) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const comment of comments || []) {
+      const key = commentKey(comment.text);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const unique = (domKeys || []).filter((key) => counts.get(key) === 1);
+    if (unique.length < 2) return true;
+    const at = (key) => (comments || []).find((comment) => commentKey(comment.text) === key)?.createdAt || "";
+    return at(unique[0]) > at(unique[unique.length - 1]);
+  }
+  function pairByOrder(hits, comments, newestFirst2) {
+    const sorted = [...comments || []].sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    if (newestFirst2) sorted.reverse();
+    return (hits || []).map((hit, index) => ({ hit, comment: sorted[index] || null }));
+  }
+  function badgeLabel(count) {
+    return `CEM To Do: ${count}`;
+  }
+
+  // src/features/cem-todo/index.js
+  var STYLE_ID5 = "werkia-cem-todo-style";
+  var BADGE_CLASS = "werkia-cem-todo-badge";
+  var BAR_CLASS3 = "werkia-cem-todo-bar";
+  var MARK_ATTRIBUTE = "data-werkia-cem-todo";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var COMMENTS_BUTTON_SELECTOR = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"]';
+  var CACHE_TTL_MS3 = 3 * 60 * 1e3;
+  var BATCH_SIZE3 = 25;
+  var MATCH_COMMENTS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
+  items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
+    id
+    matchComments { id text createdAt automated employee { id firstName lastName } }
+  }
+}`;
+  var BUTTONS = [
+    { kind: RESPONSES.daSenden, tone: "primary" },
+    { kind: RESPONSES.daNichtSenden, tone: "plain" },
+    { kind: RESPONSES.angefragt, tone: "plain" },
+    { kind: RESPONSES.erledigt, tone: "link", label: "Abhaken" }
+  ];
+  function matchIdFromHref2(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function executeCemTodo(runtime) {
+    runtime.registerSource("cem/toolbox/src/features/cem-todo/index.js");
+    const cache = /* @__PURE__ */ new Map();
+    const failed = /* @__PURE__ */ new Set();
+    const loadedCount = /* @__PURE__ */ new Map();
+    let loading = null;
+    let dialogMatchId = "";
+    let dialogSeen = false;
+    const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
+    function ensureStyle() {
+      if (document.getElementById(STYLE_ID5)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID5;
+      style.textContent = `
+      .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
+      [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
+      .${BAR_CLASS3} { display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:8px 10px; border:2px solid #d32f2f; border-radius:8px; background:#fff1f0; font:400 12px/1.35 Arial,sans-serif; color:#1f2933; }
+      .${BAR_CLASS3}-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#b71c1c; }
+      .${BAR_CLASS3}-todo { color:#374151; white-space:pre-wrap; }
+      .${BAR_CLASS3}-buttons { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+      .${BAR_CLASS3} button { min-height:24px; padding:3px 10px; border:1px solid #c8ccdd; border-radius:12px; background:#fff; color:#1f2933; cursor:pointer; font:600 12px/1.2 Arial,sans-serif; }
+      .${BAR_CLASS3} button:hover { border-color:#4956df; }
+      .${BAR_CLASS3} button[data-tone="primary"] { border-color:#2e7d32; background:#2e7d32; color:#fff; }
+      .${BAR_CLASS3} button[data-tone="link"] { border:0; background:transparent; color:#3643c7; text-decoration:underline; font-weight:400; }
+    `;
+      document.head.appendChild(style);
+    }
+    const rowMatchId = (row) => matchIdFromHref2(row.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
+    function commentsButtonCount(button2) {
+      const text = button2?.querySelector('.MuiBadge-badge, [class*="MuiBadge-badge"]')?.textContent || "";
+      return text.replace(/\D/g, "");
+    }
+    function fresh(matchId) {
+      const entry = cache.get(matchId);
+      return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
+    }
+    async function load2(matchIds, { force = false } = {}) {
+      if (loading) await loading;
+      const ids = [...new Set(matchIds)].filter((id) => id && (force || !fresh(id) && !failed.has(id)));
+      if (!ids.length) return;
+      loading = (async () => {
+        const { request } = getCemGraphqlAdapter();
+        for (let index = 0; index < ids.length; index += BATCH_SIZE3) {
+          const batch = ids.slice(index, index + BATCH_SIZE3);
+          try {
+            const result = await request(MATCH_COMMENTS_QUERY, { filter: { ids: batch }, page: 0, perPage: batch.length });
+            const now = Date.now();
+            for (const item of result?.items || []) {
+              if (!item?.id) continue;
+              cache.set(item.id, { comments: item.matchComments || [], at: now });
+              failed.delete(item.id);
+            }
+          } catch (error) {
+            batch.forEach((id) => failed.add(id));
+            console.warn("[Werkia CEM To Do]", error);
+          }
+        }
+      })();
+      try {
+        await loading;
+      } finally {
+        loading = null;
+        render();
+      }
+    }
+    const openTodosFor = (matchId) => openCemTodos(cache.get(matchId)?.comments || []);
+    function syncRow(row, wanted) {
+      const matchId = rowMatchId(row);
+      const button2 = row.querySelector(COMMENTS_BUTTON_SELECTOR);
+      if (!matchId || !button2) return;
+      const count = commentsButtonCount(button2);
+      if (cache.has(matchId) && loadedCount.has(matchId) && loadedCount.get(matchId) !== count) {
+        cache.delete(matchId);
+        failed.delete(matchId);
+      }
+      if (!fresh(matchId) && !failed.has(matchId)) {
+        loadedCount.set(matchId, count);
+        wanted.push(matchId);
+      }
+      const open = openTodosFor(matchId).length;
+      let badge = row.querySelector(`.${BADGE_CLASS}`);
+      if (!open) {
+        badge?.remove();
+        return;
+      }
+      if (!badge) {
+        badge = document.createElement("div");
+        badge.className = BADGE_CLASS;
+        badge.title = "Offenes CEM To Do in den Matchkommentaren. Klick öffnet die Kommentare.";
+        badge.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          row.querySelector(COMMENTS_BUTTON_SELECTOR)?.click();
+        });
+      }
+      const label2 = badgeLabel(open);
+      if (badge.textContent !== label2) badge.textContent = label2;
+      if (badge.previousElementSibling !== button2 && button2.parentElement) button2.insertAdjacentElement("afterend", badge);
+    }
+    function findDialog() {
+      const dialogs = [...document.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR));
+      return dialogs[dialogs.length - 1] || null;
+    }
+    function commentHits(dialog, editorBox, comments) {
+      const keys = [...new Set(comments.map((comment) => normalizeDomText(commentKey(comment.text))).filter((key) => key.length >= 3))];
+      const hits = [];
+      for (const element of dialog.querySelectorAll("p, span, div, li")) {
+        if (editorBox.contains(element) || element.closest(`.${BAR_CLASS3}`)) continue;
+        const text = normalizeDomText(element.textContent);
+        const key = keys.find((candidate) => text.includes(candidate));
+        if (!key) continue;
+        if ([...element.children].some((child) => normalizeDomText(child.textContent).includes(key))) continue;
+        hits.push({ element, key });
+      }
+      const all = hits.map((hit) => hit.element);
+      return hits.map(({ element, key }) => {
+        let card = element;
+        while (card.parentElement && card.parentElement !== dialog) {
+          const parent = card.parentElement;
+          if (parent.contains(editorBox) || all.some((other) => other !== element && parent.contains(other))) break;
+          card = parent;
+        }
+        return { card, key };
+      });
+    }
+    function markTodos(dialog, editorBox, comments, open) {
+      const openIds = new Set(open.map((todo) => todo.id));
+      const hits = commentHits(dialog, editorBox, comments);
+      const newestFirst2 = inferNewestFirst(hits.map((hit) => hit.key), comments);
+      const marked = /* @__PURE__ */ new Set();
+      const byKey = /* @__PURE__ */ new Map();
+      hits.forEach((hit) => byKey.set(hit.key, [...byKey.get(hit.key) || [], hit.card]));
+      for (const [key, cards] of byKey) {
+        const sameKey = comments.filter((comment) => normalizeDomText(commentKey(comment.text)) === key);
+        for (const { hit, comment } of pairByOrder(cards, sameKey, newestFirst2)) {
+          if (comment && openIds.has(comment.id)) marked.add(hit);
+        }
+      }
+      dialog.querySelectorAll(`[${MARK_ATTRIBUTE}]`).forEach((element) => {
+        if (!marked.has(element)) element.removeAttribute(MARK_ATTRIBUTE);
+      });
+      marked.forEach((element) => element.setAttribute(MARK_ATTRIBUTE, ""));
+    }
+    function editorBoxFor(editor, dialog) {
+      let box = editor;
+      for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
+        const parent = box.parentElement;
+        if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
+        box = parent;
+      }
+      return editor.parentElement || editor;
+    }
+    function fillEditor(editor, html) {
+      const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+      editor.innerHTML = `<p>${html}</p>`;
+      const InputEventCtor = page.InputEvent || InputEvent;
+      const EventCtor = page.Event || Event;
+      editor.dispatchEvent(new InputEventCtor("input", { bubbles: true, cancelable: true, composed: true, inputType: "insertFromPaste", data: null }));
+      editor.dispatchEvent(new EventCtor("change", { bubbles: true, composed: true }));
+      editor.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.className = BAR_CLASS3;
+      const head = document.createElement("div");
+      head.className = `${BAR_CLASS3}-head`;
+      const title = document.createElement("span");
+      head.append(...[title, cemHelp.tip("cem-todo")].filter(Boolean));
+      const todo = document.createElement("div");
+      todo.className = `${BAR_CLASS3}-todo`;
+      const buttons = document.createElement("div");
+      buttons.className = `${BAR_CLASS3}-buttons`;
+      for (const { kind, tone } of BUTTONS) {
+        const button2 = document.createElement("button");
+        button2.type = "button";
+        button2.dataset.kind = kind;
+        button2.dataset.tone = tone;
+        button2.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const dialog = findDialog();
+          const editor = dialog?.querySelector(EDITOR_SELECTOR);
+          const open = openTodosFor(dialogMatchId);
+          if (editor && open.length) fillEditor(editor, responseHtml(kind, open));
+        });
+        buttons.appendChild(button2);
+      }
+      bar.append(head, todo, buttons);
+      return bar;
+    }
+    function syncDialog() {
+      const dialog = findDialog();
+      if (!dialog) {
+        if (dialogSeen) {
+          cache.delete(dialogMatchId);
+          dialogMatchId = "";
+          dialogSeen = false;
+        }
+        return [];
+      }
+      if (!dialogMatchId) return [];
+      dialogSeen = true;
+      const editor = dialog.querySelector(EDITOR_SELECTOR);
+      const editorBox = editorBoxFor(editor, dialog);
+      const comments = cache.get(dialogMatchId)?.comments || [];
+      const open = openTodosFor(dialogMatchId);
+      markTodos(dialog, editorBox, comments, open);
+      let bar = dialog.querySelector(`.${BAR_CLASS3}`);
+      if (!open.length) {
+        bar?.remove();
+        return fresh(dialogMatchId) || failed.has(dialogMatchId) ? [] : [dialogMatchId];
+      }
+      if (!bar) bar = buildBar();
+      if (bar.nextElementSibling !== editorBox) editorBox.parentElement?.insertBefore(bar, editorBox);
+      const codes = todoCodes(open);
+      const title = open.length > 1 ? `${open.length} offene CEM To Dos` : "Offenes CEM To Do";
+      const titleElement = bar.querySelector(`.${BAR_CLASS3}-head span`);
+      if (titleElement.textContent !== title) titleElement.textContent = title;
+      const todoText = open.map((todo) => {
+        const who = [todo.employee?.firstName, todo.employee?.lastName].filter(Boolean).join(" ");
+        return `${who ? `${who}: ` : ""}${commentPlainText(todo.text)}`;
+      }).join("\n");
+      const todoElement = bar.querySelector(`.${BAR_CLASS3}-todo`);
+      if (todoElement.textContent !== todoText) todoElement.textContent = todoText;
+      bar.querySelectorAll("button[data-kind]").forEach((button2) => {
+        const entry = BUTTONS.find((item) => item.kind === button2.dataset.kind);
+        const label2 = entry.label || responseButtonLabel(entry.kind, codes);
+        if (button2.textContent !== label2) button2.textContent = label2;
+      });
+      return fresh(dialogMatchId) || failed.has(dialogMatchId) ? [] : [dialogMatchId];
+    }
+    function render() {
+      if (!isTargetPage3()) return;
+      ensureStyle();
+      const wanted = [];
+      document.querySelectorAll(ROW_SELECTOR6).forEach((row) => syncRow(row, wanted));
+      wanted.push(...syncDialog());
+      if (wanted.length && !loading) load2(wanted);
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    };
+    runtime.addDocumentListener("click", (event) => {
+      const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      const row = button2?.closest(ROW_SELECTOR6);
+      const matchId = row ? rowMatchId(row) : "";
+      if (!matchId) return;
+      dialogMatchId = matchId;
+      dialogSeen = false;
+      if (isTargetPage3()) load2([matchId], { force: true });
+    }, true);
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
   // src/main.js
   initCemGraphqlAdapter();
   bootstrapToolbox({ label: "CEM", marker: "data-werkia-cem-toolbox-loaded" }, [
@@ -10335,6 +10749,7 @@ Trotzdem speichern?`)) return void 0;
     // overpainted by a less severe highlight.
     { id: "no-go-check", execute: executeNoGoCheck2 },
     { id: "appointment-prio", execute: executeAppointmentPrio2 },
-    { id: "wa-templates", execute: executeWaTemplates }
+    { id: "wa-templates", execute: executeWaTemplates },
+    { id: "cem-todo", execute: executeCemTodo }
   ]);
 })();

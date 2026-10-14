@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.7.152
+// @version      1.8.166
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1940,7 +1940,8 @@
       ],
       notes: [
         "Alle sehen alle Einträge. Ändern kannst du nur Einträge, in denen du selbst abwesend oder Vertretung bist. Admins dürfen alles und ernennen im selben Dialog weitere Admins.",
-        "Unter den vt_count_log-Antworten stehen die gerade laufenden Vertretungen."
+        "Unter den vt_count_log-Antworten stehen die gerade laufenden Vertretungen.",
+        "Erwähnst du in einem Matchkommentar jemanden, der gerade vertreten wird, setzt die Toolbox die Vertretung als Erwähnung direkt dahinter. Löschst du sie, bleibt sie weg. Ohne Toolbox taggt ein Folgekommentar die Vertretung nach."
       ]
     };
   }
@@ -9830,6 +9831,21 @@ ${buildCbreBody(current)}`;
       });
     });
   }
+  function plannedSubstituteMentions(mentions, aktiv, handled = /* @__PURE__ */ new Set()) {
+    const present = new Set(mentions.map((mention) => mention.id));
+    const planned = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const mention of mentions) {
+      for (const entry of aktiv || []) {
+        if (entry.abwesendId !== mention.id || !entry.vertretungId || entry.vertretungId === mention.id) continue;
+        const key = `${entry.abwesendId}|${entry.vertretungId}`;
+        if (present.has(entry.vertretungId) || handled.has(key) || seen.has(entry.vertretungId)) continue;
+        seen.add(entry.vertretungId);
+        planned.push({ key, pos: mention.end, vertretungId: entry.vertretungId, vertretungName: entry.vertretungName || "Vertretung" });
+      }
+    }
+    return planned.sort((a, b) => b.pos - a.pos);
+  }
 
   // ../../shared/js/vertretungen/index.js
   var IDS4 = {
@@ -10240,6 +10256,116 @@ ${buildCbreBody(current)}`;
       helpTip: () => kamHelp.tip("vertretungen"),
       sourcePath: "kam/toolbox/src/features/kam-suite/vertretungen.js",
       ...options
+    });
+  }
+
+  // ../../shared/js/vertretungen/mentions.js
+  var SCAN_MS = 1e3;
+  var REFRESH_MS = 10 * 60 * 1e3;
+  var RETRY_MS = 60 * 1e3;
+  var EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"]';
+  function tiptapOf(element) {
+    try {
+      return element.wrappedJSObject?.editor || element.editor || null;
+    } catch {
+      return null;
+    }
+  }
+  function mentionsIn(editor) {
+    const mentions = [];
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type?.name === "mention" && node.attrs?.id) mentions.push({ id: String(node.attrs.id), end: pos + node.nodeSize });
+    });
+    return mentions;
+  }
+  function executeVertretungMentions(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    if (!request) return;
+    const post = createVertretungenClient({ request });
+    const attached = /* @__PURE__ */ new WeakSet();
+    let myId = "";
+    let cache = { tag: "", at: 0, aktiv: [] };
+    let loading = null;
+    let failedAt = 0;
+    async function loadActive() {
+      const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
+      if (fresh || Date.now() - failedAt < RETRY_MS) return cache.aktiv;
+      if (!loading) {
+        loading = (async () => {
+          try {
+            if (!myId) {
+              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+              myId = String(data2?.me?.id || "");
+            }
+            if (!myId) throw new Error("Eigene Mitarbeiter-ID fehlt.");
+            const data = await post({ action: "heute", employeeId: myId });
+            cache = { tag: data.tag || berlinDay(), at: Date.now(), aktiv: Array.isArray(data.aktiv) ? data.aktiv : [] };
+          } catch (error) {
+            failedAt = Date.now();
+            console.warn("[Vertretungen] Aktive Vertretungen nicht geladen:", error);
+          } finally {
+            loading = null;
+          }
+        })();
+      }
+      await loading;
+      return cache.aktiv;
+    }
+    function attach(element) {
+      const editor = tiptapOf(element);
+      if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
+      attached.add(element);
+      const handled = /* @__PURE__ */ new Set();
+      let pending = false;
+      async function apply() {
+        pending = false;
+        if (editor.isDestroyed) return;
+        const mentions = mentionsIn(editor);
+        if (!mentions.length) {
+          if (editor.isEmpty) handled.clear();
+          return;
+        }
+        const aktiv = await loadActive();
+        if (editor.isDestroyed || !aktiv.length) return;
+        for (const item of plannedSubstituteMentions(mentionsIn(editor), aktiv, handled)) {
+          handled.add(item.key);
+          editor.chain().insertContentAt(item.pos, [
+            { type: "text", text: " " },
+            { type: "mention", attrs: { id: item.vertretungId, label: item.vertretungName, resource: "Employee" } }
+          ], { updateSelection: false }).run();
+        }
+      }
+      const onUpdate = () => {
+        if (pending) return;
+        pending = true;
+        runtime.setTimeout(() => {
+          apply().catch((error) => console.warn("[Vertretungen] Mittaggen fehlgeschlagen:", error));
+        }, 0);
+      };
+      editor.on("update", onUpdate);
+      runtime.addCleanup(() => {
+        try {
+          editor.off("update", onUpdate);
+        } catch {
+        }
+      });
+    }
+    runtime.setInterval(() => {
+      for (const element of document.querySelectorAll(EDITOR_SELECTOR)) {
+        if (!attached.has(element)) attach(element);
+      }
+    }, SCAN_MS);
+  }
+
+  // src/features/kam-suite/vertretung-mittaggen.js
+  function executeVertretungMittaggen(runtime) {
+    executeVertretungMentions(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      sourcePath: "kam/toolbox/src/features/kam-suite/vertretung-mittaggen.js"
     });
   }
 
@@ -11253,6 +11379,7 @@ ${next}`;
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
     { id: "filter-presets", execute: executeFilterPresets },
     { id: "vertretungen", execute: executeVertretungen2 },
+    { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
     { id: "om-notes-templates", execute: (runtime) => executeOmNotesTemplates(runtime, { helpTip: () => kamHelp.tip("om-notes-templates", { tone: "dark" }) }) },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule }

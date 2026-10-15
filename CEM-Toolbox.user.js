@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.11.166
+// @version      1.11.187
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -9263,14 +9263,14 @@
     const cemGender = genderOf(ctx.cem);
     const obcGender = genderOf(ctx.obc);
     const emoji = cemGender === "f" ? "👩🏼‍🔧" : cemGender === "m" ? "👨🏼‍🔧" : "🧑🏼‍🔧";
-    const partner = cemGender === "f" ? "Ansprechpartnerin" : cemGender === "m" ? "Ansprechpartner" : slot("Ansprechpartnerin/Ansprechpartner", "");
+    const partner = cemGender === "f" ? "Deine persönliche Ansprechpartnerin" : cemGender === "m" ? "Dein persönlicher Ansprechpartner" : slot("Deine persönliche Ansprechpartnerin/Dein persönlicher Ansprechpartner", "");
     const colleague = obcGender === "f" ? "meiner Kollegin" : obcGender === "m" ? "meinem Kollegen" : slot("meinem Kollegen/meiner Kollegin", "");
     return [
       `Hallo ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
       "",
       `ich bin ${slot("Vorname CEM", ctx.cem?.firstName)} von werkia.de ${emoji}`,
       "",
-      `Ab heute bin ich Deine persönliche ${partner} für die Jobsuche und versorge Dich mit neuen Stellen und Terminvorschlägen. 😊`,
+      `Ab heute bin ich ${partner} für die Jobsuche und versorge Dich mit neuen Stellen und Terminvorschlägen. 😊`,
       "",
       `Du hattest bereits Kontakt mit ${colleague} ${slot("Vorname OBC", ctx.obc?.firstName)}. Daher liegen mir Deine wichtigsten Suchkriterien bereits vor. 🫱🏻‍🫲🏻`
     ];

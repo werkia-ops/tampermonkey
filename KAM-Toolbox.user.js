@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.8.166
+// @version      1.8.186
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2206,13 +2206,14 @@
     },
     {
       id: "contact-badges",
-      title: "Kontakt-Badges",
+      title: "AG Response Rate",
       page: MY_MATCHES,
       routes: onMyMatches,
-      kind: "view",
-      summary: "Zeigt bei jedem Arbeitgeber, wie direkt der Kontakt zu ihm ist.",
+      kind: "write",
+      summary: "Zeigt bei jedem Arbeitgeber, wie schnell er antwortet. Das Dropdown neben dem Arbeitgeber ändert den Wert direkt im Arbeitgeberprofil.",
       notes: [
-        "Direkter Kontakt (0–1 Tage), Indirekter Kontakt (2–5 Tage), Kein Kontakt (über eine Woche), Keine Antwort. „Leer“ heißt, dass beim Arbeitgeber nichts hinterlegt ist.",
+        "Direkter Kontakt (0–1 Tage), Indirekter Kontakt (2–5 Tage), Kein Kontakt (über eine Woche), Keine Antwort. „Leer“ heißt, dass beim Arbeitgeber nichts hinterlegt ist. Leeren lässt sich der Wert hier nicht.",
+        "Hat derselbe Arbeitgeber mehrere Matches in der Liste, ändern sich alle Zeilen mit. Neben dem Dropdown erscheint kurz ✓, wenn gespeichert wurde. Schlägt das Speichern fehl, springt es auf den alten Wert zurück.",
         "Der Wert kommt aus dem Arbeitgeberprofil und wird alle 5 Minuten nachgeladen."
       ]
     },
@@ -3532,6 +3533,21 @@
     }
     return index;
   }
+  var UPDATE_EMPLOYER_CONTACT_MUTATION = `mutation updateEmployerDirectContact($id: UUID!, $directContact: String) {
+  data: updateEmployer(id: $id, directContact: $directContact) {
+    id
+    directContact
+    __typename
+  }
+}`;
+  async function updateEmployerContact(request, employerId, value) {
+    const result = await request(UPDATE_EMPLOYER_CONTACT_MUTATION, { id: employerId, directContact: value });
+    const saved = result?.data;
+    if (saved?.id !== employerId || normalize3(saved.directContact) !== normalize3(value)) {
+      throw new Error("Speichern wurde von der API nicht bestätigt");
+    }
+    return normalize3(saved.directContact);
+  }
 
   // src/features/kam-suite/contact-badges.js
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
@@ -3546,6 +3562,7 @@
     no_response: { short: "Keine Antwort", full: "Keine Antwort", tone: "response", priority: 1 },
     empty: { short: "Leer", full: "Leer", tone: "empty", priority: null }
   };
+  var WRITABLE_CONTACT_VALUES = ["direct_contact", "indirect_contact", "no_contact", "no_response"];
   function isTargetPage2(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
@@ -3554,6 +3571,13 @@
   }
   function getContactEmployerId(href) {
     return String(href || "").match(/#\/Employer\/([^/]+)\//i)?.[1] || "";
+  }
+  function escapeHtml2(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  }
+  function contactOptionsHtml(value) {
+    const placeholder = WRITABLE_CONTACT_VALUES.includes(value) ? "" : `<option value="${escapeHtml2(value)}" disabled>${escapeHtml2(CONTACT_OPTIONS[value]?.short || value)}</option>`;
+    return placeholder + WRITABLE_CONTACT_VALUES.map((key) => `<option value="${key}">${escapeHtml2(CONTACT_OPTIONS[key].short)}</option>`).join("");
   }
   function executeContactBadges(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/contact-badges.js");
@@ -3593,54 +3617,117 @@
       const style = document.createElement("style");
       style.id = STYLE_ID;
       style.textContent = `
-      .werkia-kam-contact { display: inline-flex; align-items: center; margin: 5px 0 3px 8px; padding: 6px 11px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-      .werkia-kam-contact[data-tone="direct"] { color: #0b5d1e; border-color: #46a35d; background: #dff4e4; }
-      .werkia-kam-contact[data-tone="indirect"] { color: #7a4b00; border-color: #d59b2b; background: #fff1c7; }
-      .werkia-kam-contact[data-tone="no-contact"] { color: #8a3d00; border-color: #e07a1f; background: #ffedd5; }
-      .werkia-kam-contact[data-tone="response"] { color: #8f1d16; border-color: #cf6b63; background: #fde5e3; }
-      .werkia-kam-contact[data-tone="empty"] { color: #4b5563; border-color: #9ca3af; background: #f3f4f6; }
-      .werkia-kam-contact[data-tone="loading"] { color: #555; border-color: #bbb; background: #f5f5f5; }
-      .werkia-kam-contact[data-tone="error"] { color: #7a4b00; border-color: #c6a15b; background: #fff7e6; }
+      .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
+      .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
+      .werkia-kam-contact select:disabled { cursor: wait; opacity: .75; }
+      .werkia-kam-contact select option { color: #1c1a22; background: #fff; font-weight: 600; }
+      .werkia-kam-contact[data-tone="direct"] select { color: #0b5d1e; border-color: #46a35d; background-color: #dff4e4; }
+      .werkia-kam-contact[data-tone="indirect"] select { color: #7a4b00; border-color: #d59b2b; background-color: #fff1c7; }
+      .werkia-kam-contact[data-tone="no-contact"] select { color: #8a3d00; border-color: #e07a1f; background-color: #ffedd5; }
+      .werkia-kam-contact[data-tone="response"] select { color: #8f1d16; border-color: #cf6b63; background-color: #fde5e3; }
+      .werkia-kam-contact[data-tone="empty"] select { color: #4b5563; border-color: #9ca3af; background-color: #f3f4f6; }
+      .werkia-kam-contact[data-tone="loading"] select { color: #555; border-color: #bbb; background-color: #f5f5f5; }
+      .werkia-kam-contact[data-tone="error"] select { color: #7a4b00; border-color: #c6a15b; background-color: #fff7e6; }
+      .werkia-kam-contact [data-state] { min-width: 12px; font: 700 13px/1 Arial,sans-serif; }
+      .werkia-kam-contact [data-state="ok"] { color: #18752b; }
+      .werkia-kam-contact [data-state="error"] { color: #b3261e; }
     `;
       document.head.appendChild(style);
+    }
+    const saving = /* @__PURE__ */ new Map();
+    function wrapsForEmployer(employerId) {
+      return [...document.querySelectorAll(".werkia-kam-contact")].filter((wrap2) => wrap2.dataset.employerId === employerId);
+    }
+    function setMarker(wrap2, state, title = "") {
+      const marker = wrap2.querySelector("[data-state]");
+      if (!marker) return;
+      marker.dataset.state = state;
+      marker.textContent = { ok: "✓", error: "!" }[state] || "";
+      marker.title = title;
+    }
+    async function saveContact(employerId, next) {
+      if (saving.has(employerId)) return;
+      const previous = contactIndex.get(employerId);
+      saving.set(employerId, next);
+      renderContactBadges();
+      try {
+        const saved = await updateEmployerContact(getKamGraphqlAdapter().request, employerId, next);
+        contactStates.delete(employerId);
+        contactIndex.set(employerId, saved);
+        saving.delete(employerId);
+        renderContactBadges();
+        for (const wrap2 of wrapsForEmployer(employerId)) setMarker(wrap2, "ok", `Gespeichert: ${CONTACT_OPTIONS[saved]?.full || saved}`);
+        runtime.setTimeout(() => {
+          for (const wrap2 of wrapsForEmployer(employerId)) if (wrap2.querySelector('[data-state="ok"]')) setMarker(wrap2, "");
+        }, 2500);
+      } catch (error) {
+        saving.delete(employerId);
+        if (previous === void 0) contactIndex.delete(employerId);
+        else contactIndex.set(employerId, previous);
+        renderContactBadges();
+        for (const wrap2 of wrapsForEmployer(employerId)) setMarker(wrap2, "error", error.message);
+        console.warn("[Werkia KAM Kontakt-Badges]", error);
+        window.alert(`Response Rate konnte nicht gespeichert werden: ${error.message}`);
+      }
+    }
+    function buildWrap(employerId) {
+      const wrap2 = document.createElement("span");
+      wrap2.className = "werkia-kam-contact";
+      wrap2.dataset.employerId = employerId;
+      wrap2.innerHTML = '<select aria-label="AG Response Rate"></select><span data-state=""></span>';
+      ["click", "mousedown", "mouseup", "pointerdown", "pointerup", "keydown"].forEach((type) => {
+        wrap2.addEventListener(type, (event) => event.stopPropagation());
+      });
+      const select = wrap2.querySelector("select");
+      select.addEventListener("change", () => {
+        const previous = wrap2.dataset.value || "";
+        const next = select.value;
+        if (!next || next === previous || !WRITABLE_CONTACT_VALUES.includes(next)) return;
+        saveContact(employerId, next);
+      });
+      return wrap2;
+    }
+    function viewForState(state, employerId) {
+      if (saving.has(employerId)) {
+        const value = saving.get(employerId);
+        return { kind: "saving", value, tone: CONTACT_OPTIONS[value].tone, title: "Wird gespeichert …" };
+      }
+      if (state?.status === "ready" && CONTACT_OPTIONS[state.value]) {
+        const option = CONTACT_OPTIONS[state.value];
+        const title = option.priority == null ? option.full : `${option.full} · Priorität ${option.priority}/4`;
+        return { kind: "ready", value: state.value, tone: option.tone, title: `${title} · zum Ändern auswählen` };
+      }
+      if (state?.status === "loading") return { kind: "info", text: "Kontakt wird geladen …", tone: "loading", title: "Kontaktdaten werden geladen" };
+      if (state?.status === "error") return { kind: "info", text: "Kontakt unbekannt", tone: "error", title: state.message || "Kontaktinformation konnte nicht gelesen werden" };
+      return { kind: "info", text: "Kontakt nicht geladen", tone: "loading", title: "Kontaktdaten werden automatisch geladen" };
     }
     function renderContactBadges() {
       getRows().forEach((row) => {
         const employer = employerFromRow(row);
         const link = row.querySelector(EMPLOYER_LINK_SELECTOR2);
         if (!employer || !link) return;
-        let badge = row.querySelector(`.werkia-kam-contact[data-employer-id="${employer.id}"]`);
-        if (!badge) {
-          badge = document.createElement("span");
-          badge.className = "werkia-kam-contact";
-          badge.dataset.employerId = employer.id;
-          link.insertAdjacentElement("afterend", badge);
+        let wrap2 = [...row.querySelectorAll(".werkia-kam-contact")].find((node) => node.dataset.employerId === employer.id);
+        if (!wrap2) {
+          wrap2 = buildWrap(employer.id);
+          link.insertAdjacentElement("afterend", wrap2);
         }
-        const state = contactStateForEmployer(employer.id);
-        let text;
-        let title;
-        let tone;
-        if (state?.status === "ready" && CONTACT_OPTIONS[state.value]) {
-          const option = CONTACT_OPTIONS[state.value];
-          text = option.short;
-          title = option.priority == null ? option.full : `${option.full} · Priorität ${option.priority}/4`;
-          tone = option.tone;
-        } else if (state?.status === "loading") {
-          text = "Kontakt wird geladen …";
-          title = "Kontaktdaten werden geladen";
-          tone = "loading";
-        } else if (state?.status === "error") {
-          text = "Kontakt unbekannt";
-          title = state.message || "Kontaktinformation konnte nicht gelesen werden";
-          tone = "error";
-        } else {
-          text = "Kontakt nicht geladen";
-          title = "Kontaktdaten werden automatisch geladen";
-          tone = "loading";
+        const view = viewForState(contactStateForEmployer(employer.id), employer.id);
+        const key = `${view.kind}|${view.value || view.text}|${view.title}`;
+        const select = wrap2.querySelector("select");
+        if (wrap2.dataset.renderKey === key) return;
+        wrap2.dataset.renderKey = key;
+        wrap2.dataset.tone = view.tone;
+        wrap2.title = view.title;
+        if (view.kind === "info") {
+          wrap2.dataset.value = "";
+          select.innerHTML = `<option value="">${escapeHtml2(view.text)}</option>`;
+          select.disabled = true;
+          return;
         }
-        if (badge.textContent !== text) badge.textContent = text;
-        if (badge.title !== title) badge.title = title;
-        if (badge.dataset.tone !== tone) badge.dataset.tone = tone;
+        wrap2.dataset.value = view.value;
+        select.innerHTML = contactOptionsHtml(view.value);
+        select.value = view.value;
+        select.disabled = view.kind === "saving";
       });
     }
     const RETRY_FAILED_AFTER_MS = 30 * 1e3;
@@ -3653,18 +3740,19 @@
       if (loadPromise) return loadPromise;
       const employerIds = getEmployerChoices().map((choice) => choice.id).filter((id) => force || !contactIndex.has(id) && !isWaitingForRetry(id));
       if (!employerIds.length) return;
-      for (const id of employerIds) contactStates.set(id, { status: "loading" });
+      for (const id of employerIds) if (!saving.has(id) && !contactIndex.has(id)) contactStates.set(id, { status: "loading" });
       renderContactBadges();
       loadPromise = (async () => {
         try {
           const fetched = await fetchEmployerContacts(getKamGraphqlAdapter().request, employerIds);
           for (const id of employerIds) {
+            if (saving.has(id)) continue;
             contactStates.delete(id);
             if (fetched.has(id)) contactIndex.set(id, fetched.get(id));
             else contactStates.set(id, { status: "error", message: "Arbeitgeber-ID wurde nicht gefunden", failedAt: Date.now() });
           }
         } catch (error) {
-          for (const id of employerIds) contactStates.set(id, { status: "error", message: error.message, failedAt: Date.now() });
+          for (const id of employerIds) if (!saving.has(id) && !contactIndex.has(id)) contactStates.set(id, { status: "error", message: error.message, failedAt: Date.now() });
           console.warn("[Werkia KAM Kontakt-Badges]", error);
         } finally {
           renderContactBadges();
@@ -6288,7 +6376,7 @@
     const context = getQuestionnaireContext();
     const calculations = /* @__PURE__ */ new Map();
     let renderTimer = null;
-    const escapeHtml2 = (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const escapeHtml3 = (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const visible = (dialog) => {
       const rect = dialog.getBoundingClientRect();
       const style = window.getComputedStyle(dialog);
@@ -6321,7 +6409,7 @@
         y: clamp(preferAbove || Number(point[1]) > height / 2 ? Number(point[1]) - labelHeight - 12 : Number(point[1]) + 12, 6, height - labelHeight - 6)
       });
       const startLabel = labelPosition(start), endLabel = labelPosition(end, true);
-      return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.78);"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Vorschau der Fahrtroute" style="display:block;width:100%;height:270px;min-height:220px;"><defs><pattern id="werkia-route-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#dbe4ea" stroke-width="1"/></pattern></defs><rect width="${width}" height="${height}" fill="#f8fafb"/><rect width="${width}" height="${height}" fill="url(#werkia-route-grid)"/><polyline points="${points.join(" ")}" fill="none" stroke="#1971c2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${points.join(" ")}" fill="none" stroke="#74c0fc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="9" fill="#2f9e44" stroke="#fff" stroke-width="4"/><circle cx="${end[0]}" cy="${end[1]}" r="9" fill="#e03131" stroke="#fff" stroke-width="4"/><foreignObject x="${startLabel.x}" y="${startLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #2f9e44;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#2b8a3e;margin-bottom:2px;">Kandidat</div><div>${escapeHtml2(candidateAddress)}</div></div></foreignObject><foreignObject x="${endLabel.x}" y="${endLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #e03131;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#c92a2a;margin-bottom:2px;">Vakanz</div><div>${escapeHtml2(jobPositionAddress)}</div></div></foreignObject></svg><div style="padding:5px 8px;font-size:11px;font-weight:600;opacity:.65;text-align:center;">Klicken für die vollständige Karte</div></div>`;
+      return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.78);"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Vorschau der Fahrtroute" style="display:block;width:100%;height:270px;min-height:220px;"><defs><pattern id="werkia-route-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#dbe4ea" stroke-width="1"/></pattern></defs><rect width="${width}" height="${height}" fill="#f8fafb"/><rect width="${width}" height="${height}" fill="url(#werkia-route-grid)"/><polyline points="${points.join(" ")}" fill="none" stroke="#1971c2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${points.join(" ")}" fill="none" stroke="#74c0fc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="9" fill="#2f9e44" stroke="#fff" stroke-width="4"/><circle cx="${end[0]}" cy="${end[1]}" r="9" fill="#e03131" stroke="#fff" stroke-width="4"/><foreignObject x="${startLabel.x}" y="${startLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #2f9e44;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#2b8a3e;margin-bottom:2px;">Kandidat</div><div>${escapeHtml3(candidateAddress)}</div></div></foreignObject><foreignObject x="${endLabel.x}" y="${endLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #e03131;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#c92a2a;margin-bottom:2px;">Vakanz</div><div>${escapeHtml3(jobPositionAddress)}</div></div></foreignObject></svg><div style="padding:5px 8px;font-size:11px;font-weight:600;opacity:.65;text-align:center;">Klicken für die vollständige Karte</div></div>`;
     }
     function positionBox(box, dialog) {
       const dialogRect = dialog.getBoundingClientRect();
@@ -6354,7 +6442,7 @@
         return;
       }
       if (state === "missing") {
-        const reason = escapeHtml2(data.reason || "Kandidatenadresse, Vakanzadresse oder Routenservice nicht verfügbar.");
+        const reason = escapeHtml3(data.reason || "Kandidatenadresse, Vakanzadresse oder Routenservice nicht verfügbar.");
         box.innerHTML = `<strong>🗺️ Distanzrechner</strong><div style="margin-top:4px;font-size:13px;color:#c92a2a;">Route nicht verfügbar</div><div style="margin-top:3px;font-size:12px;line-height:1.35;">${reason}</div>`;
         box.style.background = "#fff5f5";
         box.style.borderColor = "rgba(201,42,42,.35)";
@@ -6362,7 +6450,7 @@
       }
       box.style.background = "#e7f5ff";
       box.style.borderColor = "rgba(25,113,194,.38)";
-      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;">${escapeHtml2(data.displayText)}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
+      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;">${escapeHtml3(data.displayText)}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
       box.disabled = false;
       box.onclick = () => window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&from=${encodeURIComponent(data.candidateAddress)}&to=${encodeURIComponent(data.jobPositionAddress)}`, "_blank", "noopener,noreferrer");

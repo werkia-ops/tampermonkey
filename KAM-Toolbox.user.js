@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.10.203
+// @version      1.10.204
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2360,6 +2360,10 @@
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
 .werkia-agn-panel { position: fixed; z-index: 1400; width: 300px; overflow: auto; padding: 12px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); display: flex; flex-direction: column; gap: 12px; }
+.werkia-agn-dock-toggle { display: none; }
+.werkia-agn-panel[data-dock="true"] .werkia-agn-dock-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; border: 0; background: transparent; padding: 0; cursor: pointer; font: 650 12px/1.2 ${FONT3}; color: #09090b; }
+.werkia-agn-panel[data-dock="true"]:not([data-open="true"]) { width: auto; padding: 8px 12px; border-radius: 999px; }
+.werkia-agn-panel[data-dock="true"]:not([data-open="true"]) > :not(.werkia-agn-dock-toggle) { display: none; }
 .werkia-agn-write { border-top: 1px solid #e4e4e7; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .werkia-agn-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .werkia-agn-toggle { height: 26px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
@@ -2597,18 +2601,22 @@
       ]
     };
   }
+  function panelPlacement(rect, viewWidth = 1200, viewHeight = 800, width = 300, gap = 12) {
+    if (rect.right + gap + width <= viewWidth - 8) {
+      const top = Math.max(16, rect.top);
+      return { mode: "side", left: rect.right + gap, top, maxHeight: viewHeight - top - 16 };
+    }
+    if (rect.left - gap - width >= 8) {
+      const top = Math.max(16, rect.top);
+      return { mode: "side", left: rect.left - gap - width, top, maxHeight: viewHeight - top - 16 };
+    }
+    return { mode: "dock", maxHeight: Math.round(viewHeight * 0.6) };
+  }
   function placePanel(panel, paper, view) {
-    const rect = paper.getBoundingClientRect();
-    const width = 300;
-    const gap = 12;
-    const viewWidth = view?.innerWidth || 1200;
-    const viewHeight = view?.innerHeight || 800;
-    let left = rect.right + gap;
-    if (left + width > viewWidth - 8) left = rect.left - gap - width;
-    if (left < 8) left = Math.max(8, viewWidth - width - 8);
-    const top = Math.max(16, rect.top);
-    const next = { left: `${Math.round(left)}px`, top: `${Math.round(top)}px`, maxHeight: `${Math.round(viewHeight - top - 16)}px` };
+    const place = panelPlacement(paper.getBoundingClientRect(), view?.innerWidth || 1200, view?.innerHeight || 800);
+    const next = place.mode === "side" ? { left: `${Math.round(place.left)}px`, top: `${Math.round(place.top)}px`, right: "", bottom: "", maxHeight: `${Math.round(place.maxHeight)}px` } : { left: "", top: "", right: "16px", bottom: "16px", maxHeight: `${place.maxHeight}px` };
     for (const [key, value] of Object.entries(next)) if (panel.style[key] !== value) panel.style[key] = value;
+    if (panel.dataset.dock !== String(place.mode === "dock")) panel.dataset.dock = String(place.mode === "dock");
   }
   function executeEmployerNotesDialog(runtime, {
     getProvider,
@@ -2700,7 +2708,18 @@
       });
       const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
       write.append(head, tags, button3, element(document, "div", "werkia-agn-status"), hint);
-      panel.append(list.element, write);
+      const dock = element(document, "button", "werkia-agn-dock-toggle");
+      dock.type = "button";
+      const syncDock = () => {
+        dock.textContent = panel.dataset.open === "true" ? "AG-Notizen ▾" : "AG-Notizen ▴";
+      };
+      dock.addEventListener("click", (event) => {
+        event.preventDefault();
+        panel.dataset.open = panel.dataset.open === "true" ? "false" : "true";
+        syncDock();
+      });
+      syncDock();
+      panel.append(dock, list.element, write);
       return { panel, list };
     }
     function teardown() {
@@ -3372,7 +3391,7 @@
       ],
       notes: [
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die CEM-Person, die beim Kandidaten eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
-        "Die Nachricht kommt vom OPS-Bot, aber unter deinem Namen mit KAM-Icon. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
+        "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
         "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht."
       ]
     },

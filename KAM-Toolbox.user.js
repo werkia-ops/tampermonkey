@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.10.204
+// @version      1.10.206
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2359,12 +2359,8 @@
 .werkia-agn-chip b { font-weight: 700; color: #b85400; }
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
-.werkia-agn-panel { position: fixed; z-index: 1400; width: 300px; overflow: auto; padding: 12px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); display: flex; flex-direction: column; gap: 12px; }
-.werkia-agn-dock-toggle { display: none; }
-.werkia-agn-panel[data-dock="true"] .werkia-agn-dock-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; border: 0; background: transparent; padding: 0; cursor: pointer; font: 650 12px/1.2 ${FONT3}; color: #09090b; }
-.werkia-agn-panel[data-dock="true"]:not([data-open="true"]) { width: auto; padding: 8px 12px; border-radius: 999px; }
-.werkia-agn-panel[data-dock="true"]:not([data-open="true"]) > :not(.werkia-agn-dock-toggle) { display: none; }
-.werkia-agn-write { border-top: 1px solid #e4e4e7; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.werkia-agn-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 8px 0; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
+.werkia-agn-write { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .werkia-agn-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .werkia-agn-toggle { height: 26px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
 .werkia-agn-toggle[aria-pressed="true"] { border-color: #ef6c00; background: #fff3e8; color: #b85400; }
@@ -2586,10 +2582,10 @@
       page,
       routes,
       kind: "write",
-      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
+      summary: "Im Matchkommentar-Dialog stehen unter dem Kommentarfeld die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
       steps: [
         "Den Text wie gewohnt ins Kommentarfeld schreiben.",
-        "Wenn gewünscht, rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
+        "Wenn gewünscht, darunter einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
         "„Als AG-Notiz speichern“ klicken. Der Text steht dann am Arbeitgeber; den Matchkommentar schickst du ab oder löschst ihn, wie du willst."
       ],
       notes: [
@@ -2601,22 +2597,20 @@
       ]
     };
   }
-  function panelPlacement(rect, viewWidth = 1200, viewHeight = 800, width = 300, gap = 12) {
-    if (rect.right + gap + width <= viewWidth - 8) {
-      const top = Math.max(16, rect.top);
-      return { mode: "side", left: rect.right + gap, top, maxHeight: viewHeight - top - 16 };
+  function editorBoxFor(editor, dialog) {
+    let box = editor;
+    for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
+      const parent = box.parentElement;
+      if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
+      box = parent;
     }
-    if (rect.left - gap - width >= 8) {
-      const top = Math.max(16, rect.top);
-      return { mode: "side", left: rect.left - gap - width, top, maxHeight: viewHeight - top - 16 };
-    }
-    return { mode: "dock", maxHeight: Math.round(viewHeight * 0.6) };
+    return box;
   }
-  function placePanel(panel, paper, view) {
-    const place = panelPlacement(paper.getBoundingClientRect(), view?.innerWidth || 1200, view?.innerHeight || 800);
-    const next = place.mode === "side" ? { left: `${Math.round(place.left)}px`, top: `${Math.round(place.top)}px`, right: "", bottom: "", maxHeight: `${Math.round(place.maxHeight)}px` } : { left: "", top: "", right: "16px", bottom: "16px", maxHeight: `${place.maxHeight}px` };
-    for (const [key, value] of Object.entries(next)) if (panel.style[key] !== value) panel.style[key] = value;
-    if (panel.dataset.dock !== String(place.mode === "dock")) panel.dataset.dock = String(place.mode === "dock");
+  function placePanel(panel, dialog) {
+    const editor = dialog.querySelector(EDITOR_SELECTOR);
+    if (!editor) return;
+    const box = editorBoxFor(editor, dialog);
+    if (box.nextElementSibling !== panel) box.after(panel);
   }
   function executeEmployerNotesDialog(runtime, {
     getProvider,
@@ -2708,18 +2702,7 @@
       });
       const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
       write.append(head, tags, button3, element(document, "div", "werkia-agn-status"), hint);
-      const dock = element(document, "button", "werkia-agn-dock-toggle");
-      dock.type = "button";
-      const syncDock = () => {
-        dock.textContent = panel.dataset.open === "true" ? "AG-Notizen ▾" : "AG-Notizen ▴";
-      };
-      dock.addEventListener("click", (event) => {
-        event.preventDefault();
-        panel.dataset.open = panel.dataset.open === "true" ? "false" : "true";
-        syncDock();
-      });
-      syncDock();
-      panel.append(dock, list.element, write);
+      panel.append(list.element, write);
       return { panel, list };
     }
     function teardown() {
@@ -2747,7 +2730,7 @@
         }
         return;
       }
-      const host = dialog.closest(".MuiDialog-container") || dialog.parentElement || document.body;
+      const host = dialog;
       const foreign = host.querySelector(`[${PANEL_ATTRIBUTE}]`);
       if (foreign && foreign !== state?.panel) return;
       const target = currentTarget();
@@ -2758,7 +2741,7 @@
         ensureEmployerNotesStyle(document);
         const { panel, list } = buildPanel(notesProvider);
         state = { panel, list, dialog, provider: notesProvider, matchId: target.matchId, employerId: target.employerId, saving: false };
-        host.appendChild(panel);
+        placePanel(panel, dialog);
         if (target.employerId) list.setEmployerId(target.employerId);
         else if (target.matchId) resolveEmployer(state, target.matchId);
         else {
@@ -2767,8 +2750,7 @@
         }
         updateSaveState();
       }
-      if (state.panel.parentElement !== host) host.appendChild(state.panel);
-      placePanel(state.panel, dialog, window);
+      placePanel(state.panel, dialog);
     }
     let scheduled = false;
     const schedule = () => {
@@ -3053,7 +3035,7 @@
       const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR2));
       return dialogs[dialogs.length - 1] || null;
     }
-    function editorBoxFor(editor, dialog) {
+    function editorBoxFor2(editor, dialog) {
       let box = editor;
       for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
         const parent = box.parentElement;
@@ -3270,7 +3252,7 @@
         closePicker();
       }
       const editor = dialog.querySelector(EDITOR_SELECTOR2);
-      const box = editorBoxFor(editor, dialog);
+      const box = editorBoxFor2(editor, dialog);
       const toolbar = toolbarIn(box);
       const matchId = clickedMatchId || matchIdFromHref2(location.hash);
       if (!wrap2) {
@@ -14191,7 +14173,7 @@ ${buildCbreBody(current)}`;
       const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR4));
       return dialogs[dialogs.length - 1] || null;
     }
-    function editorBoxFor(editor, dialog) {
+    function editorBoxFor2(editor, dialog) {
       let box = editor;
       for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
         const parent = box.parentElement;
@@ -14455,7 +14437,7 @@ ${buildCbreBody(current)}`;
         return;
       }
       const editor = dialog.querySelector(EDITOR_SELECTOR4);
-      const box = editorBoxFor(editor, dialog);
+      const box = editorBoxFor2(editor, dialog);
       if (existing && !dialog.contains(existing)) existing.remove();
       let bar = currentBar();
       if (!bar) {

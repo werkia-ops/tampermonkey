@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.12.200
+// @version      1.13.201
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2675,20 +2675,6 @@
     }
     return htmlToText(html || editorElement?.innerHTML || "");
   }
-  function clearEditor(editorElement) {
-    const editor = tiptapOf(editorElement);
-    try {
-      if (editor?.commands?.clearContent) {
-        editor.commands.clearContent(true);
-        return;
-      }
-    } catch {
-    }
-    const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : editorElement.ownerDocument.defaultView;
-    editorElement.innerHTML = "<p></p>";
-    const InputEventCtor = page?.InputEvent || page?.Event;
-    editorElement.dispatchEvent(new InputEventCtor("input", { bubbles: true, cancelable: true }));
-  }
   function employerNotesTopic({
     id = "employer-notes",
     page,
@@ -2702,11 +2688,11 @@
       page,
       routes,
       kind: "write",
-      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld als Arbeitgeberkommentar gespeichert statt als Matchkommentar.",
+      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
       steps: [
         "Den Text wie gewohnt ins Kommentarfeld schreiben.",
-        "Rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
-        "„Als AG-Notiz speichern“ klicken. Der Text landet am Arbeitgeber, das Kommentarfeld wird geleert."
+        "Wenn gewünscht, rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
+        "„Als AG-Notiz speichern“ klicken. Der Text steht dann am Arbeitgeber; den Matchkommentar schickst du ab oder löschst ihn, wie du willst."
       ],
       notes: [
         "Was nur diesen Kandidaten oder CEM betrifft, bleibt ein Matchkommentar und wird wie immer mit dem Pfeil abgeschickt.",
@@ -2759,8 +2745,7 @@
     function updateSaveState() {
       if (!state) return;
       const button2 = state.panel.querySelector(".werkia-agn-save");
-      const anyTag = state.panel.querySelector('.werkia-agn-toggle[aria-pressed="true"]');
-      const disabled = state.saving || !state.employerId || !anyTag;
+      const disabled = state.saving || !state.employerId;
       if (button2.disabled !== disabled) button2.disabled = disabled;
     }
     async function save() {
@@ -2773,10 +2758,6 @@
         setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
         return;
       }
-      if (!tags.length) {
-        setStatus("Mindestens einen Tag wählen.", "error");
-        return;
-      }
       if (!current.employerId) {
         setStatus("Arbeitgeber nicht erkannt, Notiz nicht gespeichert.", "error");
         return;
@@ -2787,9 +2768,8 @@
       try {
         await current.provider.create(current.employerId, tags, text);
         if (state !== current) return;
-        clearEditor(editor);
         current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button2) => button2.setAttribute("aria-pressed", "false"));
-        setStatus(`Als AG-Notiz gespeichert (${tags.join(", ")}).`, "ok");
+        setStatus(tags.length ? `Als AG-Notiz gespeichert (${tags.join(", ")}).` : "Als AG-Notiz gespeichert.", "ok");
       } catch (error) {
         console.warn("[AG-Notizen]", error);
         if (state === current) setStatus(`Nicht gespeichert: ${error.message}`, "error");
@@ -2820,12 +2800,11 @@
       }
       const button2 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
       button2.type = "button";
-      button2.disabled = true;
       button2.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
-      const hint = element(document, "div", "werkia-agn-hint", "Mindestens einen Tag wählen. Nimmt den Text aus dem Kommentarfeld und speichert ihn am Arbeitgeber statt am Match.");
+      const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
       write.append(head, tags, button2, element(document, "div", "werkia-agn-status"), hint);
       panel.append(list.element, write);
       return { panel, list };
@@ -2897,6 +2876,516 @@
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("resize", schedule);
     schedule();
+  }
+
+  // ../../shared/js/match-mention/core.js
+  var AUTOMATION_ROLE = "Automation";
+  var KINDS = {
+    cem: { kind: "cem", short: "CEM", roleName: "CEM", button: "@CEM" },
+    kam: { kind: "kam", short: "KAM", roleName: "Key Account Management", button: "@KAM" }
+  };
+  function kindConfig(kind) {
+    const config = KINDS[kind];
+    if (!config) throw new Error(`Unbekannte Rolle für Erwähnung: ${kind}`);
+    return config;
+  }
+  var MATCH_QUERY2 = `query WerkiaMentionMatch($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
+}`;
+  var CANDIDATE_QUERY = `query WerkiaMentionCandidate($filter: CandidateFilter) {
+  items: allCandidates(filter: $filter) { id cemEmployeeId }
+}`;
+  var JOB_POSITION_QUERY = `query WerkiaMentionJobPosition($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) { id employerId employer { id kamEmployeeId } }
+}`;
+  var EMPLOYEES_QUERY = `query WerkiaMentionEmployees($filter: EmployeeFilter!) {
+  items: allEmployees(filter: $filter) { id firstName lastName roles { name } }
+}`;
+  function matchIdFromHref2(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  var byId = (items, id) => (items || []).find((item) => String(item?.id) === String(id)) || null;
+  async function resolveResponsibleId(request, matchId, kind) {
+    if (!matchId) return "";
+    kindConfig(kind);
+    const matches = await request(MATCH_QUERY2, { filter: { ids: [matchId] }, perPage: 1 });
+    const match = byId(matches?.items, matchId);
+    if (!match) return "";
+    if (kind === "cem") {
+      if (!match.candidateId) return "";
+      const candidates = await request(CANDIDATE_QUERY, { filter: { ids: [match.candidateId] } });
+      return String(byId(candidates?.items, match.candidateId)?.cemEmployeeId || "");
+    }
+    if (!match.jobPositionId) return "";
+    const positions = await request(JOB_POSITION_QUERY, { filter: { ids: [match.jobPositionId] } });
+    return String(byId(positions?.items, match.jobPositionId)?.employer?.kamEmployeeId || "");
+  }
+  function employeeLabel(employee) {
+    return `${employee?.firstName || ""} ${employee?.lastName || ""}`.replace(/\s+/g, " ").trim();
+  }
+  var hasRole = (employee, name) => (employee?.roles || []).some((role) => role?.name === name);
+  function toPeople(items, roleName) {
+    return (items || []).filter((employee) => employee?.id && hasRole(employee, roleName) && !hasRole(employee, AUTOMATION_ROLE)).map((employee) => ({ id: String(employee.id), label: employeeLabel(employee) })).filter((person) => person.label).sort((a, b) => a.label.localeCompare(b.label, "de"));
+  }
+  async function loadPeople(request, kind) {
+    const { roleName } = kindConfig(kind);
+    const data = await request(EMPLOYEES_QUERY, { filter: { roles: [roleName] } });
+    return toPeople(data?.items, roleName);
+  }
+  async function loadPerson(request, id) {
+    if (!id) return null;
+    const data = await request(EMPLOYEES_QUERY, { filter: { ids: [id] } });
+    const employee = byId(data?.items, id);
+    const label2 = employeeLabel(employee);
+    return label2 ? { id: String(id), label: label2 } : null;
+  }
+  function normalize(text) {
+    return String(text || "").toLowerCase().replace(/ß/g, "ss").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  function filterPeople(people, query) {
+    const words = normalize(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return people;
+    return people.filter((person) => {
+      const parts = normalize(person.label).split(/[\s-]+/);
+      return words.every((word) => parts.some((part) => part.startsWith(word)));
+    });
+  }
+  function mentionContent(before, person) {
+    const content = [];
+    if (before && !/\s$/.test(before)) content.push({ type: "text", text: " " });
+    content.push({ type: "mention", attrs: { id: String(person.id), label: person.label, resource: "Employee" } });
+    content.push({ type: "text", text: " " });
+    return content;
+  }
+  function buttonTitle(kind, state, person = null) {
+    const { short } = kindConfig(kind);
+    const other = `Rechtsklick: andere ${short}-Person`;
+    if (state === "ready" && person) return `@${short}: ${person.label} erwähnen · ${other}`;
+    if (state === "loading") return `@${short}: zuständige Person wird gesucht … · ${other}`;
+    if (state === "error") return `@${short}: zuständige Person nicht geladen, Klick öffnet die Auswahl · ${other}`;
+    if (state === "nomatch") return `@${short}: kein Match erkannt, Klick öffnet die Auswahl`;
+    return `@${short}: keine zuständige Person eingetragen, Klick öffnet die Auswahl`;
+  }
+
+  // ../../shared/js/match-mention/index.js
+  var PREFIX = "werkia-mention";
+  var STYLE_ID2 = `${PREFIX}-style`;
+  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
+  var DIALOG_SELECTOR = 'div[role="dialog"], .MuiDialog-paper';
+  var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
+  var TOOLBAR_SELECTOR = '[role="toolbar"], .MuiToolbar-root';
+  var OWN_SELECTOR = '[class*="werkia-"]';
+  var RETRY_MS = 60 * 1e3;
+  function tiptapOf2(element2) {
+    try {
+      return element2?.wrappedJSObject?.editor || element2?.editor || null;
+    } catch {
+      return null;
+    }
+  }
+  function insertMention(editorElement, person) {
+    const editor = tiptapOf2(editorElement);
+    if (!editor?.chain || !editor.state?.selection) return false;
+    if (editor.state.schema?.nodes && !editor.state.schema.nodes.mention) return false;
+    const { $from } = editor.state.selection;
+    const before = $from?.parent?.textBetween ? $from.parent.textBetween(0, $from.parentOffset, null, "￼") : "";
+    return editor.chain().focus().insertContent(mentionContent(before, person)).run() !== false;
+  }
+  function el3(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (value === void 0 || value === null || value === false) continue;
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else if (key === "dataset") Object.assign(node.dataset, value);
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else if (key === "value") node.value = value;
+      else node.setAttribute(key, value === true ? "" : value);
+    }
+    node.append(...children.flat().filter((child) => child !== null && child !== void 0 && child !== false));
+    return node;
+  }
+  var keepFocus = (event) => event.preventDefault();
+  function isDark(element2) {
+    let node = element2;
+    while (node && node.nodeType === 1) {
+      const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
+      if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
+        return (0.2126 * match[1] + 0.7152 * match[2] + 0.0722 * match[3]) / 255 < 0.5;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID2)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID2;
+    style.textContent = `
+    .${PREFIX}-wrap, .${PREFIX}-picker {
+      --wm-surface:#ffffff; --wm-sunken:#f4f4f5; --wm-ink:#09090b; --wm-ink2:#52525b; --wm-muted:#8b8b94;
+      --wm-line:#e4e4e7; --wm-line-strong:#d4d4d8; --wm-accent:#ef6c00; --wm-accent-ink:#b85400; --wm-accent-soft:#fff3e8;
+      --wm-bad:#b52f2f;
+      font-family:"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size:12px; line-height:1.35; color:var(--wm-ink);
+    }
+    .${PREFIX}-wrap[data-mode="dark"], .${PREFIX}-picker[data-mode="dark"] {
+      --wm-surface:#111113; --wm-sunken:#18181b; --wm-ink:#fafafa; --wm-ink2:#a1a1aa; --wm-muted:#71717a;
+      --wm-line:#232326; --wm-line-strong:#303034; --wm-accent:#ff8a33; --wm-accent-ink:#ff9a4d; --wm-accent-soft:#26170b;
+      --wm-bad:#e86a6a;
+    }
+    .${PREFIX}-wrap { display:inline-flex; align-items:center; gap:4px; margin:2px 4px; vertical-align:middle; }
+    .${PREFIX}-wrap button, .${PREFIX}-picker button, .${PREFIX}-picker input { font:inherit; color:inherit; }
+    .${PREFIX}-wrap :focus-visible, .${PREFIX}-picker :focus-visible { outline:2px solid var(--wm-accent); outline-offset:1px; }
+    .${PREFIX}-btn { height:24px; padding:0 8px; border:1px solid var(--wm-line-strong); border-left:3px solid var(--wm-accent); border-radius:6px; background:var(--wm-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
+    .${PREFIX}-btn:hover { background:var(--wm-accent-soft); color:var(--wm-accent-ink); }
+    .${PREFIX}-btn[data-state="loading"] { color:var(--wm-ink2); }
+    .${PREFIX}-btn[data-state="none"], .${PREFIX}-btn[data-state="nomatch"], .${PREFIX}-btn[data-state="error"] { border-left-color:var(--wm-line-strong); }
+    .${PREFIX}-msg { color:var(--wm-bad); }
+    .${PREFIX}-picker { position:fixed; z-index:2000; width:260px; max-height:320px; display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--wm-line); border-radius:8px; background:var(--wm-surface); box-shadow:0 8px 24px rgba(0,0,0,.18); }
+    .${PREFIX}-picker-head { color:var(--wm-ink2); font-weight:600; }
+    .${PREFIX}-picker input { height:26px; padding:0 8px; border:1px solid var(--wm-line-strong); border-radius:6px; background:var(--wm-surface); }
+    .${PREFIX}-list { display:flex; flex-direction:column; gap:1px; overflow-y:auto; min-height:0; }
+    .${PREFIX}-person { text-align:left; padding:4px 8px; border:0; border-radius:6px; background:transparent; cursor:pointer; }
+    .${PREFIX}-person:hover, .${PREFIX}-person[data-active] { background:var(--wm-sunken); }
+    .${PREFIX}-person[data-current] { color:var(--wm-accent-ink); font-weight:600; }
+    .${PREFIX}-status { color:var(--wm-muted); padding:2px 8px; }
+    .${PREFIX}-status[data-kind="error"] { color:var(--wm-bad); }
+  `;
+    document.head.appendChild(style);
+  }
+  function matchMentionTopic({ kind, page, routes, id = "match-mention" }) {
+    const { short } = kindConfig(kind);
+    const who = kind === "cem" ? "die CEM-Person des Kandidaten" : "die KAM-Person des Arbeitgebers";
+    return {
+      id,
+      title: `@${short}: zuständige Person erwähnen`,
+      page,
+      routes,
+      kind: "form",
+      summary: `Im Matchkommentar-Dialog steht beim Kommentarfeld der Knopf „@${short}“. Ein Klick erwähnt ${who} an der Stelle des Cursors.`,
+      steps: [
+        "Den Cursor im Kommentarfeld dorthin setzen, wo die Erwähnung hin soll.",
+        `„@${short}“ klicken. Der Tooltip am Knopf zeigt, wer erwähnt wird.`,
+        `Für eine andere ${short}-Person mit der rechten Maustaste klicken, im Suchfeld den Namen tippen und die Person anklicken (oder Enter für die erste).`,
+        "Den Kommentar wie gewohnt mit dem Pfeil abschicken."
+      ],
+      notes: [
+        `Ist beim Match keine ${short}-Person eingetragen, öffnet der Klick gleich die Auswahl.`,
+        "Wird die erwähnte Person heute vertreten, setzt die Toolbox die Vertretung automatisch dahinter.",
+        "Der Knopf schreibt nur in das Kommentarfeld. Am Match ändert sich nichts."
+      ]
+    };
+  }
+  function executeMatchMention(runtime, {
+    kind,
+    sourcePath,
+    getGraphqlAdapter,
+    helpTip = () => null
+  } = {}) {
+    const config = kindConfig(kind);
+    runtime.registerSource(sourcePath);
+    const wrapSelector = `.${PREFIX}-wrap[data-kind="${config.kind}"]`;
+    const pickerSelector = `.${PREFIX}-picker[data-kind="${config.kind}"]`;
+    let clickedMatchId = "";
+    const responsible = /* @__PURE__ */ new Map();
+    let people = null;
+    let peopleFailedAt = 0;
+    const names = /* @__PURE__ */ new Map();
+    const view = { matchId: "", state: "loading", person: null, message: "" };
+    const request = (query, variables) => getGraphqlAdapter().request(query, variables);
+    function loadPeopleOnce() {
+      if (!people || peopleFailedAt && Date.now() - peopleFailedAt > RETRY_MS) {
+        peopleFailedAt = 0;
+        people = loadPeople(request, config.kind);
+        people.catch(() => {
+          peopleFailedAt = Date.now();
+        });
+      }
+      return people;
+    }
+    function responsibleFor(matchId) {
+      if (!responsible.has(matchId)) {
+        const promise = resolveResponsibleId(request, matchId, config.kind);
+        responsible.set(matchId, promise);
+        promise.catch(() => responsible.delete(matchId));
+      }
+      return responsible.get(matchId);
+    }
+    async function personFor(id) {
+      if (!id) return null;
+      const list = await loadPeopleOnce().catch(() => []);
+      const known = list.find((person) => person.id === id);
+      if (known) return known;
+      if (!names.has(id)) names.set(id, await loadPerson(request, id).catch(() => null));
+      return names.get(id);
+    }
+    async function resolveView(matchId) {
+      if (!matchId) {
+        Object.assign(view, { matchId, state: "nomatch", person: null });
+        return null;
+      }
+      try {
+        const person = await personFor(await responsibleFor(matchId));
+        if (view.matchId !== matchId) return null;
+        Object.assign(view, { state: person ? "ready" : "none", person });
+        return person;
+      } catch {
+        if (view.matchId === matchId) Object.assign(view, { state: "error", person: null });
+        return null;
+      }
+    }
+    function findDialog() {
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR2));
+      return dialogs[dialogs.length - 1] || null;
+    }
+    function editorBoxFor(editor, dialog) {
+      let box = editor;
+      for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
+        const parent = box.parentElement;
+        if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
+        box = parent;
+      }
+      return editor.parentElement || editor;
+    }
+    function toolbarIn(box) {
+      const own = (node) => node.closest(OWN_SELECTOR);
+      const toolbar = [...box.querySelectorAll(TOOLBAR_SELECTOR)].find((node) => !own(node));
+      if (toolbar) return toolbar;
+      const format = [...box.querySelectorAll('button[title*="format" i]')].find((node) => !own(node));
+      return format?.parentElement || null;
+    }
+    const editorElement = () => findDialog()?.querySelector(EDITOR_SELECTOR2) || null;
+    const currentWrap = () => document.querySelector(wrapSelector);
+    const currentPicker = () => document.querySelector(pickerSelector);
+    function updateButton() {
+      const wrap2 = currentWrap();
+      const button2 = wrap2?.querySelector(`.${PREFIX}-btn`);
+      if (!button2) return;
+      const title = buttonTitle(config.kind, view.state, view.person);
+      if (button2.title !== title) button2.title = title;
+      if (button2.dataset.state !== view.state) button2.dataset.state = view.state;
+      const msg = wrap2.querySelector(`.${PREFIX}-msg`);
+      if (view.message && !msg) wrap2.appendChild(el3("span", { class: `${PREFIX}-msg`, role: "status", text: view.message }));
+      else if (msg && !view.message) msg.remove();
+      else if (msg && msg.textContent !== view.message) msg.textContent = view.message;
+    }
+    function mention(person) {
+      const editor = editorElement();
+      const ok = editor ? insertMention(editor, person) : false;
+      view.message = ok ? "" : "Erwähnung nicht möglich: Kommentarfeld nicht erkannt.";
+      updateButton();
+      return ok;
+    }
+    async function onClick(event) {
+      event.preventDefault();
+      if (currentPicker()) {
+        closePicker();
+        return;
+      }
+      const matchId = view.matchId;
+      const person = view.state === "ready" ? view.person : await resolveView(matchId);
+      updateButton();
+      if (view.matchId !== matchId) return;
+      if (person) mention(person);
+      else openPicker();
+    }
+    function onContextMenu(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (currentPicker()) closePicker();
+      else openPicker();
+    }
+    const picker = { query: "", items: [], state: "loading", error: "", active: 0 };
+    function closePicker() {
+      currentPicker()?.remove();
+      document.removeEventListener("mousedown", onOutside, true);
+    }
+    function onOutside(event) {
+      const node = event.target;
+      if (currentPicker()?.contains(node) || currentWrap()?.contains(node)) return;
+      closePicker();
+    }
+    function positionPicker(box, button2) {
+      const rect = button2.getBoundingClientRect();
+      const height = box.offsetHeight || 320;
+      const width = box.offsetWidth || 260;
+      const below = rect.bottom + 4;
+      const top = below + height > window.innerHeight && rect.top - height - 4 > 0 ? rect.top - height - 4 : below;
+      const left = Math.max(4, Math.min(rect.left, window.innerWidth - width - 4));
+      box.style.top = `${Math.round(top)}px`;
+      box.style.left = `${Math.round(left)}px`;
+    }
+    function renderList() {
+      const box = currentPicker();
+      const list = box?.querySelector(`.${PREFIX}-list`);
+      if (!list) return;
+      if (picker.state === "loading") {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, text: `${config.short}-Personen werden geladen …` }));
+        return;
+      }
+      if (picker.state === "error") {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: `Nicht geladen: ${picker.error}` }));
+        return;
+      }
+      const shown = filterPeople(picker.items, picker.query);
+      picker.active = Math.min(picker.active, Math.max(0, shown.length - 1));
+      if (!shown.length) {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, text: "Niemand gefunden." }));
+        return;
+      }
+      list.replaceChildren(...shown.map((person, index) => el3("button", {
+        type: "button",
+        class: `${PREFIX}-person`,
+        text: person.label,
+        title: person.id === view.person?.id ? `${person.label} (zuständig für diesen Match)` : person.label,
+        dataset: { id: person.id, ...index === picker.active ? { active: "" } : {}, ...person.id === view.person?.id ? { current: "" } : {} },
+        onmousedown: keepFocus,
+        onclick: () => choose(person)
+      })));
+    }
+    function choose(person) {
+      closePicker();
+      mention(person);
+    }
+    function onPickerKey(event) {
+      const shown = picker.state === "ok" ? filterPeople(picker.items, picker.query) : [];
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closePicker();
+        editorElement()?.focus?.();
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (shown[picker.active]) choose(shown[picker.active]);
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!shown.length) return;
+        picker.active = (picker.active + (event.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
+        renderList();
+      }
+    }
+    function openPicker() {
+      const wrap2 = currentWrap();
+      const dialog = findDialog();
+      if (!wrap2 || !dialog) return;
+      closePicker();
+      Object.assign(picker, { query: "", active: 0, error: "" });
+      const input = el3("input", {
+        type: "search",
+        placeholder: "Name suchen …",
+        "aria-label": `${config.short}-Person suchen`,
+        oninput: (event) => {
+          picker.query = event.target.value;
+          picker.active = 0;
+          renderList();
+        },
+        onkeydown: onPickerKey
+      });
+      const box = el3(
+        "div",
+        {
+          class: `${PREFIX}-picker`,
+          role: "group",
+          "aria-label": `${config.short}-Person erwähnen`,
+          dataset: { kind: config.kind, mode: wrap2.dataset.mode || "light" }
+        },
+        el3("span", { class: `${PREFIX}-picker-head`, text: `${config.short}-Person erwähnen` }),
+        input,
+        el3("div", { class: `${PREFIX}-list`, role: "listbox" })
+      );
+      dialog.appendChild(box);
+      positionPicker(box, wrap2.querySelector(`.${PREFIX}-btn`));
+      document.addEventListener("mousedown", onOutside, true);
+      input.focus();
+      const list = loadPeopleOnce();
+      picker.state = "loading";
+      renderList();
+      list.then((items) => {
+        picker.items = items;
+        picker.state = "ok";
+        renderList();
+      }, (error) => {
+        picker.state = "error";
+        picker.error = error?.message || String(error);
+        renderList();
+      });
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      if (!button2) return;
+      const row = button2.closest("tr");
+      clickedMatchId = matchIdFromHref2(row?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
+    }, true);
+    function mountWrap(dialog) {
+      ensureStyle();
+      const button2 = el3("button", {
+        type: "button",
+        class: `${PREFIX}-btn`,
+        text: config.button,
+        onmousedown: keepFocus,
+        onclick: onClick,
+        oncontextmenu: onContextMenu
+      });
+      const wrap2 = el3(
+        "span",
+        { class: `${PREFIX}-wrap`, role: "group", "aria-label": `${config.short}-Person erwähnen`, dataset: { kind: config.kind } },
+        button2,
+        helpTip()
+      );
+      wrap2.dataset.mode = isDark(dialog) ? "dark" : "light";
+      return wrap2;
+    }
+    function sync() {
+      const dialog = findDialog();
+      let wrap2 = currentWrap();
+      if (!dialog) {
+        wrap2?.remove();
+        closePicker();
+        return;
+      }
+      if (wrap2 && !dialog.contains(wrap2)) {
+        wrap2.remove();
+        wrap2 = null;
+        closePicker();
+      }
+      const editor = dialog.querySelector(EDITOR_SELECTOR2);
+      const box = editorBoxFor(editor, dialog);
+      const toolbar = toolbarIn(box);
+      const matchId = clickedMatchId || matchIdFromHref2(location.hash);
+      if (!wrap2) {
+        wrap2 = mountWrap(dialog);
+        view.matchId = "";
+      }
+      if (toolbar) {
+        if (wrap2.parentElement !== toolbar) toolbar.appendChild(wrap2);
+      } else if (wrap2.parentElement !== box.parentElement) {
+        box.parentElement?.insertBefore(wrap2, box);
+      }
+      if (view.matchId !== matchId || !view.matchId && view.state !== "nomatch") {
+        Object.assign(view, { matchId, state: matchId ? "loading" : "nomatch", person: null, message: "" });
+        updateButton();
+        if (matchId) resolveView(matchId).then(updateButton);
+      }
+    }
+    let scheduled = false;
+    const scheduleSync = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleSync();
   }
 
   // src/help.js
@@ -3057,7 +3546,8 @@
         "Die Markierung erscheint nur in Zeilen, die gerade in der Liste stehen. Eine Benachrichtigung gibt es ohne Tag nicht."
       ]
     },
-    employerNotesTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages })
+    employerNotesTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
+    matchMentionTopic({ kind: "kam", page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages })
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -3080,7 +3570,7 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID8 = "werkia-urgent-vacancy-style";
+      const STYLE_ID9 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_CLASS3 = "werkia-cem-match-present-row";
@@ -3147,7 +3637,7 @@
       function getFingerprint() {
         return capturedAuth.fingerprint || GM_getValue(FINGERPRINT_STORAGE_KEY2, "") || "";
       }
-      const JOB_POSITION_QUERY = `query allJobPositions($filter: JobPositionFilter) {
+      const JOB_POSITION_QUERY2 = `query allJobPositions($filter: JobPositionFilter) {
     items: allJobPositions(filter: $filter) {
       id
       additionalInformation
@@ -3195,7 +3685,7 @@
         });
       }
       async function fetchUrgentFlags(jobIds) {
-        const result = await werkiaGraphQL(JOB_POSITION_QUERY, { filter: { ids: jobIds } });
+        const result = await werkiaGraphQL(JOB_POSITION_QUERY2, { filter: { ids: jobIds } });
         const flags = /* @__PURE__ */ new Map();
         (result?.items || []).forEach((item) => {
           if (!item?.id) return;
@@ -3219,9 +3709,9 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID8)) return;
+        if (document.getElementById(STYLE_ID9)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID8;
+        style.id = STYLE_ID9;
         style.textContent = `
       .${ROW_CLASS2} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background: #fff3cd !important; }
@@ -3312,7 +3802,7 @@
     __typename
   }
 }`;
-  function normalize(value) {
+  function normalize2(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   async function fetchEmployerContacts(request, employerIds) {
@@ -3320,7 +3810,7 @@
     if (!employerIds.length) return index;
     const result = await request(EMPLOYER_CONTACT_QUERY, { filter: { ids: employerIds } });
     for (const item of result?.items || []) {
-      if (item?.id) index.set(item.id, normalize(item.directContact));
+      if (item?.id) index.set(item.id, normalize2(item.directContact));
     }
     return index;
   }
@@ -3712,7 +4202,7 @@
   // src/features/cem-ofm/company-flag.js
   var FLAG_CLASS = "werkia-cem-company-flag";
   var ROW_CLASS = "werkia-cem-flagged-company-row";
-  var STYLE_ID2 = "werkia-cem-company-style";
+  var STYLE_ID3 = "werkia-cem-company-style";
   var FLAG_TEXT = "[absprache vor ofm]";
   var POTENTIAL_MATCHES_ROUTE2 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   function isFlaggedCompany(value) {
@@ -3736,12 +4226,12 @@
     function removeFlags() {
       document.querySelectorAll(`.${FLAG_CLASS}`).forEach((flag) => flag.remove());
       document.querySelectorAll(`.${ROW_CLASS}`).forEach((row) => row.classList.remove(ROW_CLASS));
-      document.getElementById(STYLE_ID2)?.remove();
+      document.getElementById(STYLE_ID3)?.remove();
     }
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID2)) return;
+      if (document.getElementById(STYLE_ID3)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID2;
+      style.id = STYLE_ID3;
       style.textContent = `.${ROW_CLASS}{outline:3px solid #7950f2 !important;outline-offset:-3px;box-shadow:inset 6px 0 0 #5f3dc4 !important}.${ROW_CLASS} > td,.${ROW_CLASS} > th{background:#e5dbff !important}.${ROW_CLASS}:hover > td,.${ROW_CLASS}:hover > th{background:#d0bfff !important;}`;
       document.head.appendChild(style);
     }
@@ -5334,19 +5824,19 @@
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID8 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID9 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
-    const RETRY_MS2 = 60 * 1e3;
+    const RETRY_MS3 = 60 * 1e3;
     let working = false;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -5468,7 +5958,7 @@
         const entry = job && candidateLocation ? getCachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : null;
         renderBadge(item, describeCommute(commuteClass, entry));
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
+        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS3) {
           enqueue(item.candidateId);
         }
       }
@@ -5635,12 +6125,12 @@
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID8 = `${SCRIPT_ID}-style`;
+    const STYLE_ID9 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID8)) return;
+      if (document2.getElementById(STYLE_ID9)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -5754,7 +6244,7 @@
   }
 
   // src/features/vacancy-candidate-info/graphql-provider.js
-  var CANDIDATE_QUERY = `query Candidate($id: UUID!) {
+  var CANDIDATE_QUERY2 = `query Candidate($id: UUID!) {
   data: Candidate(id: $id) {
     id
     candidateProfileState
@@ -5779,7 +6269,7 @@
     const month = String(date.getUTCMonth() + 1).padStart(2, "0");
     return `GHOST: ${day}-${month}-${date.getUTCFullYear()}`;
   }
-  var EMPLOYEES_QUERY = `query allEmployees($filter: EmployeeFilter!) {
+  var EMPLOYEES_QUERY2 = `query allEmployees($filter: EmployeeFilter!) {
   items: allEmployees(filter: $filter) {
     id
     firstName
@@ -5803,9 +6293,9 @@
   function createGraphqlCandidateInfoProvider({ request }) {
     return {
       async load(candidateId) {
-        const candidateResult = await request(CANDIDATE_QUERY, { id: candidateId });
+        const candidateResult = await request(CANDIDATE_QUERY2, { id: candidateId });
         const candidate = candidateResult?.data;
-        const employeesResult = candidate?.cemEmployeeId ? await request(EMPLOYEES_QUERY, { filter: { ids: [candidate.cemEmployeeId] } }) : { items: [] };
+        const employeesResult = candidate?.cemEmployeeId ? await request(EMPLOYEES_QUERY2, { filter: { ids: [candidate.cemEmployeeId] } }) : { items: [] };
         return mapGraphqlCandidateInfo({
           candidate,
           employees: employeesResult?.items
@@ -6034,12 +6524,12 @@
   // ../../shared/js/offline-match-bulk/index.js
   var CANDIDATE_POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
   var CREATE_OFFLINE_MATCH_ROUTE = /^#\/CreateOfflineMatch(?:[/?]|$)/i;
-  var MATCH_LINK_SELECTOR2 = 'a[aria-label="Offline Match erstellen"], a[href*="CreateOfflineMatch"]';
+  var MATCH_LINK_SELECTOR3 = 'a[aria-label="Offline Match erstellen"], a[href*="CreateOfflineMatch"]';
   var BULK_CHECKBOX_CLASS = "werkia-bulk-ofm-checkbox";
   var CANDIDATE_STATUS_ID = "werkia-bulk-ofm-candidate-status";
   var FORM_CONTROLS_ID = "werkia-bulk-ofm-form-controls";
   var FORM_STATUS_ID = "werkia-bulk-ofm-form-status";
-  var STYLE_ID3 = "werkia-bulk-ofm-style";
+  var STYLE_ID4 = "werkia-bulk-ofm-style";
   var DATE_REMOVE_SELECTOR = 'button.button-remove[class*="button-remove-employers."][class*=".interview.dates-"][aria-label="Entfernen"]';
   var OFFLINE_MATCH_FORM_SELECTOR = '[data-testid="create-offline-match-form"]';
   var MATCH_PRESENT_ROW_CLASS2 = "werkia-cem-match-present-row";
@@ -6114,9 +6604,9 @@
     return [...new Set(matches.filter((match) => match?.hasExistingSentMatch).map((match) => match.employerId))];
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID3)) return;
+    if (document.getElementById(STYLE_ID4)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID3;
+    style.id = STYLE_ID4;
     style.textContent = `
     .${BULK_CHECKBOX_CLASS} { display:inline-flex; align-items:center; margin-right:var(--apt-space-2,8px); color:var(--apt-color-text-muted,#6b6775); font:600 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
     .${BULK_CHECKBOX_CLASS} input { width:18px; height:18px; accent-color:var(--apt-color-primary,#6d4aff); cursor:pointer; }
@@ -6134,7 +6624,7 @@
     document.getElementById(CANDIDATE_STATUS_ID)?.remove();
     document.getElementById(FORM_CONTROLS_ID)?.remove();
     document.getElementById(FORM_STATUS_ID)?.remove();
-    document.getElementById(STYLE_ID3)?.remove();
+    document.getElementById(STYLE_ID4)?.remove();
   }
   function showStatus(id, message, anchor) {
     let status2 = document.getElementById(id);
@@ -6171,7 +6661,7 @@
     header.appendChild(tip);
   }
   function addCandidateCheckboxes(selectedMatches) {
-    document.querySelectorAll(MATCH_LINK_SELECTOR2).forEach((link) => {
+    document.querySelectorAll(MATCH_LINK_SELECTOR3).forEach((link) => {
       const match = selectedMatchFromLink(link);
       if (!match) return;
       const key = matchSelectionKey(match);
@@ -6317,7 +6807,7 @@
         currentCandidateId = candidateId;
         selectedMatches.clear();
       }
-      if (document.querySelector(MATCH_LINK_SELECTOR2)) {
+      if (document.querySelector(MATCH_LINK_SELECTOR3)) {
         ensureStyles();
         addCandidateCheckboxes(selectedMatches);
         if (helpTip) addHeaderHelpTip(helpTip);
@@ -6337,7 +6827,7 @@
       runtime.setTimeout(refresh, 100);
     };
     runtime.addDocumentListener("click", (event) => {
-      const link = event.target.closest?.(MATCH_LINK_SELECTOR2);
+      const link = event.target.closest?.(MATCH_LINK_SELECTOR3);
       if (!link) return;
       const clickedMatch = selectedMatchFromLink(link);
       if (!clickedMatch) {
@@ -6415,7 +6905,7 @@
     </div>
     <div class="wkw-count" data-count>${items.length} von ${items.length} ausgewählt</div>`;
   }
-  var normalize2 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
+  var normalize3 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
   function syncBox(box, children) {
     const checked = children.filter((child) => child.checked).length;
     box.checked = checked === children.length && checked > 0;
@@ -6431,12 +6921,12 @@
     const groups = [...root.querySelectorAll(".wkw-group")].map((group) => ({
       element: group,
       box: group.querySelector("[data-group]"),
-      label: normalize2(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
+      label: normalize3(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
       items: [...group.querySelectorAll('input[name="item"]')]
     }));
     let pristine = true;
     const shown = (list) => list.filter((item) => !isHiddenItem(item));
-    const query = () => normalize2(search?.value).replace(/\s+/g, " ");
+    const query = () => normalize3(search?.value).replace(/\s+/g, " ");
     const sync = () => {
       groups.forEach((group) => syncBox(group.box, shown(group.items)));
       const visible = shown(items);
@@ -6458,7 +6948,7 @@
       const groupOf = new Map(groups.flatMap((group) => group.items.map((item) => [item, group])));
       items.forEach((item) => {
         const group = groupOf.get(item);
-        const haystack = `${group ? `${group.label} ` : ""}${normalize2(item.closest("label").textContent)}`;
+        const haystack = `${group ? `${group.label} ` : ""}${normalize3(item.closest("label").textContent)}`;
         item.closest("label").hidden = !haystack.replace(/\s+/g, " ").includes(text);
       });
       groups.forEach((group) => {
@@ -6807,7 +7297,7 @@
   }
 }`;
   }
-  function normalize3(value) {
+  function normalize4(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   function parseIsoDate(isoDate) {
@@ -6902,7 +7392,7 @@
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
@@ -6955,7 +7445,7 @@
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR3) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR4) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element2) {
       if (!element2.isConnected || element2.closest("[hidden]")) return false;
@@ -6971,23 +7461,23 @@
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
         id: match?.[1] || link.href,
-        name: normalize3(link.textContent) || "Unbekannter Arbeitgeber"
+        name: normalize4(link.textContent) || "Unbekannter Arbeitgeber"
       };
     }
     function candidateNameFromRow(row) {
       const own = row.querySelector(CANDIDATE_LINK_SELECTOR);
-      if (own) return normalize3(own.textContent);
+      if (own) return normalize4(own.textContent);
       const parentRow = row.closest("table")?.closest("tr")?.previousElementSibling;
-      return normalize3(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
+      return normalize4(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
     }
     function labelFromRow(row) {
       const candidate = candidateNameFromRow(row);
-      const vacancy = normalize3(row.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
+      const vacancy = normalize4(row.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
       const label2 = [candidate, vacancy].filter(Boolean).join(" – ");
       return label2.length > 90 ? `${label2.slice(0, 89)}…` : label2;
     }
     function matchIdFromRow2(row) {
-      const link = row.querySelector(MATCH_LINK_SELECTOR3);
+      const link = row.querySelector(MATCH_LINK_SELECTOR4);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
@@ -7345,7 +7835,7 @@
       const targetStatus = statusOptions.find((status2) => status2.value === targetValue);
       const outFeedbackValue = dialog.querySelector('[name="outFeedback"]').value;
       const outFeedback = outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
-      const outFeedbackText = normalize3(dialog.querySelector('[name="outFeedbackText"]').value);
+      const outFeedbackText = normalize4(dialog.querySelector('[name="outFeedbackText"]').value);
       if (!selection.length) return setStatus("Bitte mindestens ein Match anhaken.", "error");
       if (!targetStatus || targetValue === "__choose__") return setStatus(`Bitte einen ${team} Status auswählen.`, "error");
       const isOut = targetStatus.value === "out";
@@ -7585,13 +8075,13 @@
     const kit = createBulkDialogKit({ ids: IDS2, buttonIds: [IDS2.wvlButton, IDS2.statusButton], stopNoun: "Kandidat" });
     const { setStatus } = kit;
     const tip = (id) => cemHelp.tipHtml(id, { tone: "dark" });
-    const normalize5 = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const normalize6 = (value) => String(value || "").replace(/\s+/g, " ").trim();
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
       return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row) => row.querySelector(":scope > td.column-status") && row.querySelector(":scope > td.column-followUpDate")).map((row) => {
         const link = row.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR2}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
-        return id ? { id, name: normalize5(link.textContent) || id } : null;
+        return id ? { id, name: normalize6(link.textContent) || id } : null;
       }).filter((candidate) => candidate && !seen.has(candidate.id) && seen.add(candidate.id));
     }
     function candidateChecklist(candidates) {
@@ -7914,7 +8404,7 @@
     const isTargetPage3 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle2() {
+    function ensureStyle3() {
       if (document.getElementById(IDS3.style)) return;
       const style = document.createElement("style");
       style.id = IDS3.style;
@@ -8105,7 +8595,7 @@
         closeDialog();
         return;
       }
-      ensureStyle2();
+      ensureStyle3();
       let bar = document.getElementById(IDS3.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -8172,7 +8662,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID4 = "werkia-match-status-filter-style";
+  var STYLE_ID5 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -8189,10 +8679,10 @@
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage3 = () => route.test(location.hash);
-    function ensureStyle2() {
-      if (document.getElementById(STYLE_ID4)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -8250,7 +8740,7 @@
         bar?.remove();
         return;
       }
-      ensureStyle2();
+      ensureStyle3();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -8287,9 +8777,9 @@
 
   // src/features/kam-status-filter-expanded.js
   var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
-  var STYLE_ID5 = "werkia-cem-expanded-kam-filter-style";
+  var STYLE_ID6 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
   var CACHE_TTL_MS2 = 5 * 60 * 1e3;
   var BATCH_SIZE2 = 25;
@@ -8301,7 +8791,7 @@
     __typename
   }
 }`;
-  function matchIdFromHref2(href) {
+  function matchIdFromHref3(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function isMatchShown(kamStatus, selected) {
@@ -8318,10 +8808,10 @@
     const selections = /* @__PURE__ */ new Map();
     let loading = null;
     const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash);
-    function ensureStyle2() {
-      if (document.getElementById(STYLE_ID5)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       /* pointer-events/z-index: in der Filterzeile kam live kein Klick an
          (Text-Cursor, Text markierbar), 2026-10-12. pointer-events wird
@@ -8344,7 +8834,7 @@
       document.head.appendChild(style);
     }
     function matchRows(table) {
-      return [...table.querySelectorAll(MATCH_ROW_SELECTOR)].filter((row) => row.closest("table") === table && row.querySelector(MATCH_LINK_SELECTOR4));
+      return [...table.querySelectorAll(MATCH_ROW_SELECTOR)].filter((row) => row.closest("table") === table && row.querySelector(MATCH_LINK_SELECTOR5));
     }
     function expandedTables() {
       return [...document.querySelectorAll("tr table")].filter((table) => matchRows(table).length);
@@ -8360,7 +8850,7 @@
       return forms.find((form) => form.classList.contains("RaFilterForm-root")) || forms[0] || null;
     }
     const tableByBar = /* @__PURE__ */ new WeakMap();
-    const rowMatchId = (row) => matchIdFromHref2(row.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
+    const rowMatchId = (row) => matchIdFromHref3(row.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
     function freshStatus(matchId) {
       const entry = statusCache.get(matchId);
       return entry && Date.now() - entry.at < CACHE_TTL_MS2 ? entry : null;
@@ -8487,7 +8977,7 @@
     }
     function render() {
       if (!isTargetPage3()) return;
-      ensureStyle2();
+      ensureStyle3();
       const missing = expandedTables().flatMap(syncTable);
       if (missing.length && !loading) loadStatuses(missing);
     }
@@ -8668,7 +9158,7 @@
       const element2 = document.getElementById(id);
       return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
     };
-    function ensureStyle2() {
+    function ensureStyle3() {
       if (document.getElementById(IDS4.style)) return;
       const style = document.createElement("style");
       style.id = IDS4.style;
@@ -8706,14 +9196,14 @@
     `;
       document.head.appendChild(style);
     }
-    function el3(tag, props = {}, children = []) {
+    function el4(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       Object.assign(element2, props);
       element2.append(...children.filter((child) => child !== null && child !== void 0));
       return element2;
     }
     function button2(text, onClick, className = "") {
-      return el3("button", { type: "button", textContent: text, className, onclick: onClick });
+      return el4("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function confirmButton(label2, question, onConfirm) {
       let armed = false;
@@ -8776,19 +9266,19 @@
       }
     }
     function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el3("select");
-      select.append(el3("option", { value: "", textContent: "Bitte wählen …" }));
+      const select = el4("select");
+      select.append(el4("option", { value: "", textContent: "Bitte wählen …" }));
       for (const person of people) {
-        select.append(el3("option", { value: person.id, textContent: person.name }));
+        select.append(el4("option", { value: person.id, textContent: person.name }));
       }
       select.value = value || "";
       if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
       return select;
     }
     function entryRow(entry) {
-      const who = el3("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el3("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el3("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const who = el4("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el4("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el4("span", { className: "wv-badge", textContent: "läuft" }) : null;
       const actions = entry.darfBearbeiten ? [
         button2("Bearbeiten", () => {
           editing = entry;
@@ -8796,7 +9286,7 @@
         }, "wv-secondary"),
         confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
-      const row = el3("li", {}, [who, when, badge, ...actions]);
+      const row = el4("li", {}, [who, when, badge, ...actions]);
       if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
       return row;
     }
@@ -8805,8 +9295,8 @@
       const { ich } = state;
       const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
       const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el3("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el3("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const von = el4("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el4("input", { type: "date", value: editing ? editing.bis : today, min: today });
       const save = button2(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
         const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
         const problem = validateDraft(ich, draft, today);
@@ -8821,31 +9311,31 @@
         render();
       }, "wv-secondary") : null;
       return [
-        el3("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el3("div", { className: "wv-form" }, [
-          el3("label", { textContent: "Abwesend" }),
+        el4("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el4("div", { className: "wv-form" }, [
+          el4("label", { textContent: "Abwesend" }),
           abwesend,
-          el3("label", { textContent: "Vertretung" }),
+          el4("label", { textContent: "Vertretung" }),
           vertretung,
-          el3("label", { textContent: "Von" }),
+          el4("label", { textContent: "Von" }),
           von,
-          el3("label", { textContent: "Bis (einschließlich)" }),
+          el4("label", { textContent: "Bis (einschließlich)" }),
           bis
         ]),
-        el3("div", { className: "wv-actions" }, [save, cancel])
+        el4("div", { className: "wv-actions" }, [save, cancel])
       ];
     }
     function adminSection() {
       const { ich } = state;
       const admins = state.admins || [];
-      const list = el3("ul");
+      const list = el4("ul");
       admins.forEach((admin) => {
         const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el3("li", {}, [el3("span", { className: "wv-who", textContent: admin.name }), remove]));
+        list.append(el4("li", {}, [el4("span", { className: "wv-who", textContent: admin.name }), remove]));
       });
       const parts = [
-        el3("summary", { textContent: `Admins (${admins.length})` }),
-        el3("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        el4("summary", { textContent: `Admins (${admins.length})` }),
+        el4("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
         list
       ];
       if (ich.darfAlles) {
@@ -8857,9 +9347,9 @@
           }
           run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
         }, "wv-secondary");
-        parts.push(el3("div", { className: "wv-actions" }, [candidate, add]));
+        parts.push(el4("div", { className: "wv-actions" }, [candidate, add]));
       }
-      const details = el3("details", { className: "wv-admins" }, parts);
+      const details = el4("details", { className: "wv-admins" }, parts);
       details.open = adminsOpen;
       details.addEventListener("toggle", () => {
         adminsOpen = details.open;
@@ -8874,24 +9364,24 @@
       if (!target) return;
       target.textContent = "";
       const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el3("ul");
-      if (!state.eintraege.length) list.append(el3("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      const list = el4("ul");
+      if (!state.eintraege.length) list.append(el4("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
       state.eintraege.forEach((entry) => list.append(entryRow(entry)));
       const tip = helpTip?.();
       target.append(
-        el3("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el3("p", { textContent: intro }),
+        el4("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el4("p", { textContent: intro }),
         list,
         ...form(),
         adminSection(),
-        el3("div", { className: "wv-status" }),
-        el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
+        el4("div", { className: "wv-status" }),
+        el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
       );
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle2();
-      const overlay = el3("div", { id: IDS4.dialog });
+      ensureStyle3();
+      const overlay = el4("div", { id: IDS4.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -8899,17 +9389,17 @@
       const close = button2("×", closeDialog, "wv-close");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const target = el3("div", { className: "wv-body" }, [
-        el3("h2", { textContent: "Vertretungen" }),
-        el3("div", { className: "wv-status", textContent: "Lädt …" })
+      const target = el4("div", { className: "wv-body" }, [
+        el4("h2", { textContent: "Vertretungen" }),
+        el4("div", { className: "wv-status", textContent: "Lädt …" })
       ]);
-      overlay.append(el3("div", { className: "wv-card" }, [close, target]));
+      overlay.append(el4("div", { className: "wv-card" }, [close, target]));
       document.body.appendChild(overlay);
       try {
         await refresh();
       } catch (error) {
         setStatus(error.message || String(error), true);
-        target.append(el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
+        target.append(el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
       }
     }
     function placeButton() {
@@ -8918,7 +9408,7 @@
         owned(IDS4.bar)?.remove();
         return;
       }
-      ensureStyle2();
+      ensureStyle3();
       const slot = findSlot(document);
       const existing = owned(IDS4.button);
       if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
@@ -8953,7 +9443,7 @@
       owned(IDS4.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el3("div", { id: IDS4.bar }, [vertretungenButton]);
+      const bar = el4("div", { id: IDS4.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
@@ -9002,9 +9492,9 @@
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
-  var RETRY_MS = 60 * 1e3;
-  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
-  function tiptapOf2(element2) {
+  var RETRY_MS2 = 60 * 1e3;
+  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
+  function tiptapOf3(element2) {
     try {
       return element2.wrappedJSObject?.editor || element2.editor || null;
     } catch {
@@ -9033,7 +9523,7 @@
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
-      if (fresh || Date.now() - failedAt < RETRY_MS) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS2) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
@@ -9056,7 +9546,7 @@
       return cache.aktiv;
     }
     function attach(element2) {
-      const editor = tiptapOf2(element2);
+      const editor = tiptapOf3(element2);
       if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
       attached.add(element2);
       const handled = /* @__PURE__ */ new Set();
@@ -9095,7 +9585,7 @@
       });
     }
     runtime.setInterval(() => {
-      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR2)) {
+      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR3)) {
         if (!attached.has(element2)) attach(element2);
       }
     }, SCAN_MS);
@@ -9433,7 +9923,7 @@
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS2 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID8 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID9 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -9441,9 +9931,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS2} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -10209,7 +10699,7 @@
   function createTemplateId(now = Date.now(), entropy = Math.random()) {
     return `own-${now.toString(36)}-${Math.floor(entropy * 1e8).toString(36)}`;
   }
-  function normalize4(entry) {
+  function normalize5(entry) {
     if (!entry || typeof entry !== "object") return null;
     const name = String(entry.name || "").trim();
     const text = String(entry.text || "");
@@ -10231,10 +10721,10 @@
       }
     }
     const list = Array.isArray(parsed?.templates) ? parsed.templates : [];
-    return { version: STORE_VERSION2, templates: list.map(normalize4).filter(Boolean) };
+    return { version: STORE_VERSION2, templates: list.map(normalize5).filter(Boolean) };
   }
   function upsertTemplate(store, template) {
-    const clean3 = normalize4(template);
+    const clean3 = normalize5(template);
     if (!clean3) throw new Error("Name und Text dürfen nicht leer sein.");
     const templates = [...store?.templates || []];
     const index = templates.findIndex((entry) => entry.id === clean3.id);
@@ -10368,7 +10858,7 @@
     const cache = /* @__PURE__ */ new Map();
     let syncTimer = null;
     let toastTimer = null;
-    function ensureStyle2() {
+    function ensureStyle3() {
       if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
       style.id = IDS5.style;
@@ -10468,7 +10958,7 @@
         removeAll();
         return;
       }
-      ensureStyle2();
+      ensureStyle3();
       document.querySelectorAll(ROW_SELECTOR5).forEach(addButton);
       widenExpandedPanels();
     }
@@ -11135,14 +11625,14 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/cem-todo/index.js
-  var STYLE_ID6 = "werkia-cem-todo-style";
+  var STYLE_ID7 = "werkia-cem-todo-style";
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
   var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
-  var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
-  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
+  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
+  var COMMENTS_BUTTON_SELECTOR3 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
   var CACHE_TTL_MS3 = 3 * 60 * 1e3;
   var BATCH_SIZE3 = 25;
   var MATCH_COMMENTS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
@@ -11157,7 +11647,7 @@ Trotzdem speichern?`)) return void 0;
     { kind: RESPONSES.angefragt, tone: "plain" },
     { kind: RESPONSES.erledigt, tone: "link", label: "Abhaken" }
   ];
-  function matchIdFromHref3(href) {
+  function matchIdFromHref4(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function executeCemTodo(runtime) {
@@ -11169,10 +11659,10 @@ Trotzdem speichern?`)) return void 0;
     let dialogMatchId = "";
     let dialogSeen = false;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
-    function ensureStyle2() {
-      if (document.getElementById(STYLE_ID6)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID6;
+      style.id = STYLE_ID7;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
       [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
@@ -11187,7 +11677,7 @@ Trotzdem speichern?`)) return void 0;
     `;
       document.head.appendChild(style);
     }
-    const rowMatchId = (row) => matchIdFromHref3(row.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+    const rowMatchId = (row) => matchIdFromHref4(row.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
     function commentsButtonCount(button2) {
       const text = button2?.querySelector('.MuiBadge-badge, [class*="MuiBadge-badge"]')?.textContent || "";
       return text.replace(/\D/g, "");
@@ -11228,7 +11718,7 @@ Trotzdem speichern?`)) return void 0;
     const openTodosFor = (matchId) => openCemTodos(cache.get(matchId)?.comments || []);
     function syncRow(row, wanted) {
       const matchId = rowMatchId(row);
-      const button2 = row.querySelector(COMMENTS_BUTTON_SELECTOR2);
+      const button2 = row.querySelector(COMMENTS_BUTTON_SELECTOR3);
       if (!matchId || !button2) return;
       const count = commentsButtonCount(button2);
       if (cache.has(matchId) && loadedCount.has(matchId) && loadedCount.get(matchId) !== count) {
@@ -11252,7 +11742,7 @@ Trotzdem speichern?`)) return void 0;
         badge.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          row.querySelector(COMMENTS_BUTTON_SELECTOR2)?.click();
+          row.querySelector(COMMENTS_BUTTON_SELECTOR3)?.click();
         });
       }
       const label2 = badgeLabel(open);
@@ -11260,7 +11750,7 @@ Trotzdem speichern?`)) return void 0;
       if (badge.previousElementSibling !== button2 && button2.parentElement) button2.insertAdjacentElement("afterend", badge);
     }
     function findDialog() {
-      const dialogs = [...document.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR3));
+      const dialogs = [...document.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR4));
       return dialogs[dialogs.length - 1] || null;
     }
     function commentHits(dialog, editorBox, comments) {
@@ -11347,7 +11837,7 @@ Trotzdem speichern?`)) return void 0;
           event.preventDefault();
           event.stopPropagation();
           const dialog = findDialog();
-          const editor = dialog?.querySelector(EDITOR_SELECTOR3);
+          const editor = dialog?.querySelector(EDITOR_SELECTOR4);
           const open = openTodosFor(dialogMatchId);
           if (editor && open.length) fillEditor(editor, responseHtml(kind, open));
         });
@@ -11368,7 +11858,7 @@ Trotzdem speichern?`)) return void 0;
       }
       if (!dialogMatchId) return [];
       dialogSeen = true;
-      const editor = dialog.querySelector(EDITOR_SELECTOR3);
+      const editor = dialog.querySelector(EDITOR_SELECTOR4);
       const editorBox = editorBoxFor(editor, dialog);
       const comments = cache.get(dialogMatchId)?.comments || [];
       const open = openTodosFor(dialogMatchId);
@@ -11399,7 +11889,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function render() {
       if (!isTargetPage3()) return;
-      ensureStyle2();
+      ensureStyle3();
       const wanted = [];
       document.querySelectorAll(ROW_SELECTOR6).forEach((row) => syncRow(row, wanted));
       wanted.push(...syncDialog());
@@ -11415,7 +11905,7 @@ Trotzdem speichern?`)) return void 0;
       }, 200);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR3);
       const row = button2?.closest(ROW_SELECTOR6);
       const matchId = row ? rowMatchId(row) : "";
       if (!matchId) return;
@@ -11449,7 +11939,7 @@ Trotzdem speichern?`)) return void 0;
     AN_KAM: { id: "AN_KAM", label: "An KAM", role: "KAM", title: "Match an die KAM-Person des Arbeitgebers schicken (Slack-DM)" }
   };
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref4(href) {
+  function matchIdFromHref5(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
     return UUID_RE.test(id) ? id : "";
   }
@@ -11527,7 +12017,7 @@ Trotzdem speichern?`)) return void 0;
 
   // ../../shared/js/slack-dm/index.js
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
   var IDS6 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
@@ -11584,14 +12074,14 @@ Trotzdem speichern?`)) return void 0;
     let syncTimer = null;
     let closeTimer = null;
     const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle2() {
+    function ensureStyle3() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
       style.id = IDS6.style;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
-    function el3(tag, props = {}, children = []) {
+    function el4(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {
         if (key === "className") element2.className = value;
@@ -11604,8 +12094,8 @@ Trotzdem speichern?`)) return void 0;
     }
     function matchCellOf(row) {
       if (row.querySelector("tr")) return null;
-      const link = [...row.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR6)).find(Boolean);
-      const matchId = matchIdFromHref4(link?.getAttribute("href"));
+      const link = [...row.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
+      const matchId = matchIdFromHref5(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function addButton(row) {
@@ -11614,7 +12104,7 @@ Trotzdem speichern?`)) return void 0;
       const existing = target.cell.querySelector(`.${BUTTON_CLASS2}`);
       if (existing?.dataset.matchId === target.matchId) return;
       existing?.remove();
-      const button2 = el3("button", { type: "button", className: BUTTON_CLASS2, title: config.title, text: config.label });
+      const button2 = el4("button", { type: "button", className: BUTTON_CLASS2, title: config.title, text: config.label });
       button2.dataset.matchId = target.matchId;
       button2.dataset.werkiaSlackDmOwner = sourcePath;
       button2.addEventListener("click", (event) => {
@@ -11651,46 +12141,46 @@ Trotzdem speichern?`)) return void 0;
     function renderPreview(dialog, preview) {
       const details = dialog.querySelector("dl");
       details.replaceChildren();
-      const row = (label2, value) => details.append(el3("dt", { text: label2 }), el3("dd", {}, value));
+      const row = (label2, value) => details.append(el4("dt", { text: label2 }), el4("dd", {}, value));
       row("Kandidat", preview.kandidat || "–");
       row("Vakanz", vacancyLine(preview) || "–");
-      row("Match", el3("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
+      row("Match", el4("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
       const recipients = preview.empfaenger || [];
       const reachable = recipients.filter((entry) => entry.erreichbar);
-      const list = el3("span");
-      if (!recipients.length) list.append(el3("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
+      const list = el4("span");
+      if (!recipients.length) list.append(el4("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
       recipients.forEach((entry, index) => {
         if (index) list.append(document.createTextNode(", "));
-        list.append(el3("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
+        list.append(el4("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
       });
       row("An", list);
       return reachable.length > 0;
     }
     async function openDialog(matchId) {
       closeDialog();
-      ensureStyle2();
-      const comment = el3("textarea", { id: `${IDS6.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
-      const count = el3("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
+      ensureStyle3();
+      const comment = el4("textarea", { id: `${IDS6.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const count = el4("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
       });
-      const sendButton = el3("button", { type: "button", className: "sd-primary", text: "Senden" });
+      const sendButton = el4("button", { type: "button", className: "sd-primary", text: "Senden" });
       sendButton.disabled = true;
       const tip = helpTip ? helpTip() : null;
-      const card = el3("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
-        el3("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
-        el3("div", { className: "sd-head" }, [el3("h2", { text: `${config.label} schicken` }), tip]),
-        el3("dl", {}, [el3("dt", { text: "Match" }), el3("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el3("label", { for: `${IDS6.dialog}-comment`, text: "Kommentar" }),
+      const card = el4("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
+        el4("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
+        el4("div", { className: "sd-head" }, [el4("h2", { text: `${config.label} schicken` }), tip]),
+        el4("dl", {}, [el4("dt", { text: "Match" }), el4("dd", { className: "sd-muted", text: "Wird geladen …" })]),
+        el4("label", { for: `${IDS6.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
-        el3("div", { className: "sd-status" }),
-        el3("div", { className: "sd-foot" }, [
-          el3("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
+        el4("div", { className: "sd-status" }),
+        el4("div", { className: "sd-foot" }, [
+          el4("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
           sendButton
         ])
       ]);
-      const dialog = el3("div", { id: IDS6.dialog }, card);
+      const dialog = el4("div", { id: IDS6.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -11727,7 +12217,7 @@ Trotzdem speichern?`)) return void 0;
         removeButtons();
         return;
       }
-      ensureStyle2();
+      ensureStyle3();
       document.querySelectorAll(ROW_SELECTOR7).forEach(addButton);
     }
     function scheduleSync() {
@@ -11764,14 +12254,17 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/comment-shortcuts/core.js
+  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
+  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
+  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
   var RAW = [
     // Kontakt und Erreichbarkeit
-    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG"],
+    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
     ["kontakt", "te", "AP telefonisch erreicht", "AG"],
     ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
-    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true }],
+    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
     ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
-    ["kontakt", "Mail raus", "Mail verschickt", "AG"],
+    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
     ["kontakt", "WA", "WhatsApp", "AG/M"],
     ["kontakt", "VC", "Videocall", "AG/M"],
     ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
@@ -11790,7 +12283,7 @@ Trotzdem speichern?`)) return void 0;
     ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
     ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
     ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
-    ["termine", "TB", "Terminbestätigung", "M"],
+    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
     // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
     ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
     ["termine", "digi", "digitaler Termin", "M"],
@@ -11841,11 +12334,35 @@ Trotzdem speichern?`)) return void 0;
     text,
     ziel,
     label: extra.label || kuerzel,
+    einfuegen: extra.einfuegen || extra.label || kuerzel,
+    optionen: Object.freeze([...extra.optionen || []]),
     varianten: Object.freeze([...extra.varianten || []]),
     unbestaetigt: Boolean(extra.unbestaetigt),
     hinweis: extra.hinweis || ""
   })));
-  var AG_NOTE_TAGS = Object.freeze(["Matches"]);
+  var PHRASE_RAW = [
+    ["AP tne, SA raus", TNE_OPTIONS],
+    ["Mail raus", MAIL_OPTIONS],
+    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
+    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
+    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
+    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
+    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
+  ];
+  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
+    id: `haeufig:${text}`,
+    gruppe: "haeufig",
+    kuerzel: text,
+    text,
+    ziel: TARGETS.M,
+    label: text,
+    einfuegen: text,
+    optionen: Object.freeze([...optionen]),
+    varianten: Object.freeze([]),
+    unbestaetigt: false,
+    hinweis: "",
+    satz: true
+  })));
   function explainTitle(item, token = item.kuerzel) {
     const parts = [`${token}: ${item.text}`];
     if (item.hinweis) parts.push(item.hinweis);
@@ -11881,7 +12398,7 @@ Trotzdem speichern?`)) return void 0;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID7 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID8 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -11916,10 +12433,10 @@ Trotzdem speichern?`)) return void 0;
       return null;
     }
   }
-  function ensureStyle(doc) {
-    if (doc.getElementById(STYLE_ID7)) return;
+  function ensureStyle2(doc) {
+    if (doc.getElementById(STYLE_ID8)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID7;
+    style.id = STYLE_ID8;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -11943,7 +12460,7 @@ Trotzdem speichern?`)) return void 0;
       const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
       if (shown === key) return;
       shown = key;
-      ensureStyle(document);
+      ensureStyle2(document);
       let tip = document.getElementById(EXPLAIN_ID);
       if (!tip) {
         tip = document.createElement("div");
@@ -11997,6 +12514,16 @@ Trotzdem speichern?`)) return void 0;
     executeShortcutExplainer(runtime, { sourcePath: "cem/toolbox/src/features/shortcut-explainer.js" });
   }
 
+  // src/features/match-mention.js
+  function executeCemMatchMention(runtime) {
+    executeMatchMention(runtime, {
+      kind: "kam",
+      sourcePath: "cem/toolbox/src/features/match-mention.js",
+      getGraphqlAdapter: getCemGraphqlAdapter,
+      helpTip: () => cemHelp.tip("match-mention")
+    });
+  }
+
   // src/main.js
   initCemGraphqlAdapter();
   bootstrapToolbox({ label: "CEM", marker: "data-werkia-cem-toolbox-loaded" }, [
@@ -12031,6 +12558,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "cem-todo", execute: executeCemTodo },
     { id: "employer-notes", execute: executeCemEmployerNotes },
     { id: "slack-dm", execute: executeSlackDm2 },
-    { id: "shortcut-explainer", execute: executeCemShortcutExplainer }
+    { id: "shortcut-explainer", execute: executeCemShortcutExplainer },
+    { id: "match-mention", execute: executeCemMatchMention }
   ]);
 })();

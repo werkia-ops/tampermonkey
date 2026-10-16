@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.9.200
+// @version      1.10.201
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2569,20 +2569,6 @@
     }
     return htmlToText(html || editorElement?.innerHTML || "");
   }
-  function clearEditor(editorElement) {
-    const editor = tiptapOf(editorElement);
-    try {
-      if (editor?.commands?.clearContent) {
-        editor.commands.clearContent(true);
-        return;
-      }
-    } catch {
-    }
-    const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : editorElement.ownerDocument.defaultView;
-    editorElement.innerHTML = "<p></p>";
-    const InputEventCtor = page?.InputEvent || page?.Event;
-    editorElement.dispatchEvent(new InputEventCtor("input", { bubbles: true, cancelable: true }));
-  }
   function employerNotesTopic({
     id = "employer-notes",
     page,
@@ -2596,11 +2582,11 @@
       page,
       routes,
       kind: "write",
-      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld als Arbeitgeberkommentar gespeichert statt als Matchkommentar.",
+      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
       steps: [
         "Den Text wie gewohnt ins Kommentarfeld schreiben.",
-        "Rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
-        "„Als AG-Notiz speichern“ klicken. Der Text landet am Arbeitgeber, das Kommentarfeld wird geleert."
+        "Wenn gewünscht, rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
+        "„Als AG-Notiz speichern“ klicken. Der Text steht dann am Arbeitgeber; den Matchkommentar schickst du ab oder löschst ihn, wie du willst."
       ],
       notes: [
         "Was nur diesen Kandidaten oder CEM betrifft, bleibt ein Matchkommentar und wird wie immer mit dem Pfeil abgeschickt.",
@@ -2653,8 +2639,7 @@
     function updateSaveState() {
       if (!state) return;
       const button3 = state.panel.querySelector(".werkia-agn-save");
-      const anyTag = state.panel.querySelector('.werkia-agn-toggle[aria-pressed="true"]');
-      const disabled = state.saving || !state.employerId || !anyTag;
+      const disabled = state.saving || !state.employerId;
       if (button3.disabled !== disabled) button3.disabled = disabled;
     }
     async function save() {
@@ -2667,10 +2652,6 @@
         setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
         return;
       }
-      if (!tags.length) {
-        setStatus("Mindestens einen Tag wählen.", "error");
-        return;
-      }
       if (!current.employerId) {
         setStatus("Arbeitgeber nicht erkannt, Notiz nicht gespeichert.", "error");
         return;
@@ -2681,9 +2662,8 @@
       try {
         await current.provider.create(current.employerId, tags, text);
         if (state !== current) return;
-        clearEditor(editor);
         current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button3) => button3.setAttribute("aria-pressed", "false"));
-        setStatus(`Als AG-Notiz gespeichert (${tags.join(", ")}).`, "ok");
+        setStatus(tags.length ? `Als AG-Notiz gespeichert (${tags.join(", ")}).` : "Als AG-Notiz gespeichert.", "ok");
       } catch (error) {
         console.warn("[AG-Notizen]", error);
         if (state === current) setStatus(`Nicht gespeichert: ${error.message}`, "error");
@@ -2714,12 +2694,11 @@
       }
       const button3 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
       button3.type = "button";
-      button3.disabled = true;
       button3.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
-      const hint = element(document, "div", "werkia-agn-hint", "Mindestens einen Tag wählen. Nimmt den Text aus dem Kommentarfeld und speichert ihn am Arbeitgeber statt am Match.");
+      const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
       write.append(head, tags, button3, element(document, "div", "werkia-agn-status"), hint);
       panel.append(list.element, write);
       return { panel, list };
@@ -2728,7 +2707,7 @@
       state?.panel.remove();
       state = null;
     }
-    function resolveEmployer2(current, matchId) {
+    function resolveEmployer(current, matchId) {
       current.provider.employerIdForMatch(matchId).then((employerId) => {
         if (state !== current) return;
         current.employerId = employerId;
@@ -2762,7 +2741,7 @@
         state = { panel, list, dialog, provider: notesProvider, matchId: target.matchId, employerId: target.employerId, saving: false };
         host.appendChild(panel);
         if (target.employerId) list.setEmployerId(target.employerId);
-        else if (target.matchId) resolveEmployer2(state, target.matchId);
+        else if (target.matchId) resolveEmployer(state, target.matchId);
         else {
           list.setEmployerId("");
           setStatus("Match nicht erkannt. Den Dialog über den Kommentar-Knopf der Zeile öffnen.", "error");
@@ -2791,6 +2770,516 @@
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("resize", schedule);
     schedule();
+  }
+
+  // ../../shared/js/match-mention/core.js
+  var AUTOMATION_ROLE = "Automation";
+  var KINDS = {
+    cem: { kind: "cem", short: "CEM", roleName: "CEM", button: "@CEM" },
+    kam: { kind: "kam", short: "KAM", roleName: "Key Account Management", button: "@KAM" }
+  };
+  function kindConfig(kind) {
+    const config = KINDS[kind];
+    if (!config) throw new Error(`Unbekannte Rolle für Erwähnung: ${kind}`);
+    return config;
+  }
+  var MATCH_QUERY2 = `query WerkiaMentionMatch($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
+}`;
+  var CANDIDATE_QUERY = `query WerkiaMentionCandidate($filter: CandidateFilter) {
+  items: allCandidates(filter: $filter) { id cemEmployeeId }
+}`;
+  var JOB_POSITION_QUERY = `query WerkiaMentionJobPosition($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) { id employerId employer { id kamEmployeeId } }
+}`;
+  var EMPLOYEES_QUERY = `query WerkiaMentionEmployees($filter: EmployeeFilter!) {
+  items: allEmployees(filter: $filter) { id firstName lastName roles { name } }
+}`;
+  function matchIdFromHref2(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  var byId = (items, id) => (items || []).find((item) => String(item?.id) === String(id)) || null;
+  async function resolveResponsibleId(request, matchId, kind) {
+    if (!matchId) return "";
+    kindConfig(kind);
+    const matches = await request(MATCH_QUERY2, { filter: { ids: [matchId] }, perPage: 1 });
+    const match = byId(matches?.items, matchId);
+    if (!match) return "";
+    if (kind === "cem") {
+      if (!match.candidateId) return "";
+      const candidates = await request(CANDIDATE_QUERY, { filter: { ids: [match.candidateId] } });
+      return String(byId(candidates?.items, match.candidateId)?.cemEmployeeId || "");
+    }
+    if (!match.jobPositionId) return "";
+    const positions = await request(JOB_POSITION_QUERY, { filter: { ids: [match.jobPositionId] } });
+    return String(byId(positions?.items, match.jobPositionId)?.employer?.kamEmployeeId || "");
+  }
+  function employeeLabel(employee) {
+    return `${employee?.firstName || ""} ${employee?.lastName || ""}`.replace(/\s+/g, " ").trim();
+  }
+  var hasRole = (employee, name) => (employee?.roles || []).some((role) => role?.name === name);
+  function toPeople(items, roleName) {
+    return (items || []).filter((employee) => employee?.id && hasRole(employee, roleName) && !hasRole(employee, AUTOMATION_ROLE)).map((employee) => ({ id: String(employee.id), label: employeeLabel(employee) })).filter((person) => person.label).sort((a, b) => a.label.localeCompare(b.label, "de"));
+  }
+  async function loadPeople(request, kind) {
+    const { roleName } = kindConfig(kind);
+    const data = await request(EMPLOYEES_QUERY, { filter: { roles: [roleName] } });
+    return toPeople(data?.items, roleName);
+  }
+  async function loadPerson(request, id) {
+    if (!id) return null;
+    const data = await request(EMPLOYEES_QUERY, { filter: { ids: [id] } });
+    const employee = byId(data?.items, id);
+    const label = employeeLabel(employee);
+    return label ? { id: String(id), label } : null;
+  }
+  function normalize(text) {
+    return String(text || "").toLowerCase().replace(/ß/g, "ss").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  function filterPeople(people, query) {
+    const words = normalize(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return people;
+    return people.filter((person) => {
+      const parts = normalize(person.label).split(/[\s-]+/);
+      return words.every((word) => parts.some((part) => part.startsWith(word)));
+    });
+  }
+  function mentionContent(before, person) {
+    const content = [];
+    if (before && !/\s$/.test(before)) content.push({ type: "text", text: " " });
+    content.push({ type: "mention", attrs: { id: String(person.id), label: person.label, resource: "Employee" } });
+    content.push({ type: "text", text: " " });
+    return content;
+  }
+  function buttonTitle(kind, state, person = null) {
+    const { short } = kindConfig(kind);
+    const other = `Rechtsklick: andere ${short}-Person`;
+    if (state === "ready" && person) return `@${short}: ${person.label} erwähnen · ${other}`;
+    if (state === "loading") return `@${short}: zuständige Person wird gesucht … · ${other}`;
+    if (state === "error") return `@${short}: zuständige Person nicht geladen, Klick öffnet die Auswahl · ${other}`;
+    if (state === "nomatch") return `@${short}: kein Match erkannt, Klick öffnet die Auswahl`;
+    return `@${short}: keine zuständige Person eingetragen, Klick öffnet die Auswahl`;
+  }
+
+  // ../../shared/js/match-mention/index.js
+  var PREFIX = "werkia-mention";
+  var STYLE_ID2 = `${PREFIX}-style`;
+  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
+  var DIALOG_SELECTOR = 'div[role="dialog"], .MuiDialog-paper';
+  var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
+  var TOOLBAR_SELECTOR = '[role="toolbar"], .MuiToolbar-root';
+  var OWN_SELECTOR = '[class*="werkia-"]';
+  var RETRY_MS = 60 * 1e3;
+  function tiptapOf2(element2) {
+    try {
+      return element2?.wrappedJSObject?.editor || element2?.editor || null;
+    } catch {
+      return null;
+    }
+  }
+  function insertMention(editorElement, person) {
+    const editor = tiptapOf2(editorElement);
+    if (!editor?.chain || !editor.state?.selection) return false;
+    if (editor.state.schema?.nodes && !editor.state.schema.nodes.mention) return false;
+    const { $from } = editor.state.selection;
+    const before = $from?.parent?.textBetween ? $from.parent.textBetween(0, $from.parentOffset, null, "￼") : "";
+    return editor.chain().focus().insertContent(mentionContent(before, person)).run() !== false;
+  }
+  function el3(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (value === void 0 || value === null || value === false) continue;
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else if (key === "dataset") Object.assign(node.dataset, value);
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else if (key === "value") node.value = value;
+      else node.setAttribute(key, value === true ? "" : value);
+    }
+    node.append(...children.flat().filter((child) => child !== null && child !== void 0 && child !== false));
+    return node;
+  }
+  var keepFocus = (event) => event.preventDefault();
+  function isDark(element2) {
+    let node = element2;
+    while (node && node.nodeType === 1) {
+      const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
+      if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
+        return (0.2126 * match[1] + 0.7152 * match[2] + 0.0722 * match[3]) / 255 < 0.5;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID2)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID2;
+    style.textContent = `
+    .${PREFIX}-wrap, .${PREFIX}-picker {
+      --wm-surface:#ffffff; --wm-sunken:#f4f4f5; --wm-ink:#09090b; --wm-ink2:#52525b; --wm-muted:#8b8b94;
+      --wm-line:#e4e4e7; --wm-line-strong:#d4d4d8; --wm-accent:#ef6c00; --wm-accent-ink:#b85400; --wm-accent-soft:#fff3e8;
+      --wm-bad:#b52f2f;
+      font-family:"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size:12px; line-height:1.35; color:var(--wm-ink);
+    }
+    .${PREFIX}-wrap[data-mode="dark"], .${PREFIX}-picker[data-mode="dark"] {
+      --wm-surface:#111113; --wm-sunken:#18181b; --wm-ink:#fafafa; --wm-ink2:#a1a1aa; --wm-muted:#71717a;
+      --wm-line:#232326; --wm-line-strong:#303034; --wm-accent:#ff8a33; --wm-accent-ink:#ff9a4d; --wm-accent-soft:#26170b;
+      --wm-bad:#e86a6a;
+    }
+    .${PREFIX}-wrap { display:inline-flex; align-items:center; gap:4px; margin:2px 4px; vertical-align:middle; }
+    .${PREFIX}-wrap button, .${PREFIX}-picker button, .${PREFIX}-picker input { font:inherit; color:inherit; }
+    .${PREFIX}-wrap :focus-visible, .${PREFIX}-picker :focus-visible { outline:2px solid var(--wm-accent); outline-offset:1px; }
+    .${PREFIX}-btn { height:24px; padding:0 8px; border:1px solid var(--wm-line-strong); border-left:3px solid var(--wm-accent); border-radius:6px; background:var(--wm-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
+    .${PREFIX}-btn:hover { background:var(--wm-accent-soft); color:var(--wm-accent-ink); }
+    .${PREFIX}-btn[data-state="loading"] { color:var(--wm-ink2); }
+    .${PREFIX}-btn[data-state="none"], .${PREFIX}-btn[data-state="nomatch"], .${PREFIX}-btn[data-state="error"] { border-left-color:var(--wm-line-strong); }
+    .${PREFIX}-msg { color:var(--wm-bad); }
+    .${PREFIX}-picker { position:fixed; z-index:2000; width:260px; max-height:320px; display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--wm-line); border-radius:8px; background:var(--wm-surface); box-shadow:0 8px 24px rgba(0,0,0,.18); }
+    .${PREFIX}-picker-head { color:var(--wm-ink2); font-weight:600; }
+    .${PREFIX}-picker input { height:26px; padding:0 8px; border:1px solid var(--wm-line-strong); border-radius:6px; background:var(--wm-surface); }
+    .${PREFIX}-list { display:flex; flex-direction:column; gap:1px; overflow-y:auto; min-height:0; }
+    .${PREFIX}-person { text-align:left; padding:4px 8px; border:0; border-radius:6px; background:transparent; cursor:pointer; }
+    .${PREFIX}-person:hover, .${PREFIX}-person[data-active] { background:var(--wm-sunken); }
+    .${PREFIX}-person[data-current] { color:var(--wm-accent-ink); font-weight:600; }
+    .${PREFIX}-status { color:var(--wm-muted); padding:2px 8px; }
+    .${PREFIX}-status[data-kind="error"] { color:var(--wm-bad); }
+  `;
+    document.head.appendChild(style);
+  }
+  function matchMentionTopic({ kind, page, routes, id = "match-mention" }) {
+    const { short } = kindConfig(kind);
+    const who = kind === "cem" ? "die CEM-Person des Kandidaten" : "die KAM-Person des Arbeitgebers";
+    return {
+      id,
+      title: `@${short}: zuständige Person erwähnen`,
+      page,
+      routes,
+      kind: "form",
+      summary: `Im Matchkommentar-Dialog steht beim Kommentarfeld der Knopf „@${short}“. Ein Klick erwähnt ${who} an der Stelle des Cursors.`,
+      steps: [
+        "Den Cursor im Kommentarfeld dorthin setzen, wo die Erwähnung hin soll.",
+        `„@${short}“ klicken. Der Tooltip am Knopf zeigt, wer erwähnt wird.`,
+        `Für eine andere ${short}-Person mit der rechten Maustaste klicken, im Suchfeld den Namen tippen und die Person anklicken (oder Enter für die erste).`,
+        "Den Kommentar wie gewohnt mit dem Pfeil abschicken."
+      ],
+      notes: [
+        `Ist beim Match keine ${short}-Person eingetragen, öffnet der Klick gleich die Auswahl.`,
+        "Wird die erwähnte Person heute vertreten, setzt die Toolbox die Vertretung automatisch dahinter.",
+        "Der Knopf schreibt nur in das Kommentarfeld. Am Match ändert sich nichts."
+      ]
+    };
+  }
+  function executeMatchMention(runtime, {
+    kind,
+    sourcePath,
+    getGraphqlAdapter,
+    helpTip = () => null
+  } = {}) {
+    const config = kindConfig(kind);
+    runtime.registerSource(sourcePath);
+    const wrapSelector = `.${PREFIX}-wrap[data-kind="${config.kind}"]`;
+    const pickerSelector = `.${PREFIX}-picker[data-kind="${config.kind}"]`;
+    let clickedMatchId = "";
+    const responsible = /* @__PURE__ */ new Map();
+    let people = null;
+    let peopleFailedAt = 0;
+    const names = /* @__PURE__ */ new Map();
+    const view = { matchId: "", state: "loading", person: null, message: "" };
+    const request = (query, variables) => getGraphqlAdapter().request(query, variables);
+    function loadPeopleOnce() {
+      if (!people || peopleFailedAt && Date.now() - peopleFailedAt > RETRY_MS) {
+        peopleFailedAt = 0;
+        people = loadPeople(request, config.kind);
+        people.catch(() => {
+          peopleFailedAt = Date.now();
+        });
+      }
+      return people;
+    }
+    function responsibleFor(matchId) {
+      if (!responsible.has(matchId)) {
+        const promise = resolveResponsibleId(request, matchId, config.kind);
+        responsible.set(matchId, promise);
+        promise.catch(() => responsible.delete(matchId));
+      }
+      return responsible.get(matchId);
+    }
+    async function personFor(id) {
+      if (!id) return null;
+      const list = await loadPeopleOnce().catch(() => []);
+      const known = list.find((person) => person.id === id);
+      if (known) return known;
+      if (!names.has(id)) names.set(id, await loadPerson(request, id).catch(() => null));
+      return names.get(id);
+    }
+    async function resolveView(matchId) {
+      if (!matchId) {
+        Object.assign(view, { matchId, state: "nomatch", person: null });
+        return null;
+      }
+      try {
+        const person = await personFor(await responsibleFor(matchId));
+        if (view.matchId !== matchId) return null;
+        Object.assign(view, { state: person ? "ready" : "none", person });
+        return person;
+      } catch {
+        if (view.matchId === matchId) Object.assign(view, { state: "error", person: null });
+        return null;
+      }
+    }
+    function findDialog() {
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR2));
+      return dialogs[dialogs.length - 1] || null;
+    }
+    function editorBoxFor(editor, dialog) {
+      let box = editor;
+      for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
+        const parent = box.parentElement;
+        if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
+        box = parent;
+      }
+      return editor.parentElement || editor;
+    }
+    function toolbarIn(box) {
+      const own = (node) => node.closest(OWN_SELECTOR);
+      const toolbar = [...box.querySelectorAll(TOOLBAR_SELECTOR)].find((node) => !own(node));
+      if (toolbar) return toolbar;
+      const format = [...box.querySelectorAll('button[title*="format" i]')].find((node) => !own(node));
+      return format?.parentElement || null;
+    }
+    const editorElement = () => findDialog()?.querySelector(EDITOR_SELECTOR2) || null;
+    const currentWrap = () => document.querySelector(wrapSelector);
+    const currentPicker = () => document.querySelector(pickerSelector);
+    function updateButton() {
+      const wrap2 = currentWrap();
+      const button3 = wrap2?.querySelector(`.${PREFIX}-btn`);
+      if (!button3) return;
+      const title = buttonTitle(config.kind, view.state, view.person);
+      if (button3.title !== title) button3.title = title;
+      if (button3.dataset.state !== view.state) button3.dataset.state = view.state;
+      const msg = wrap2.querySelector(`.${PREFIX}-msg`);
+      if (view.message && !msg) wrap2.appendChild(el3("span", { class: `${PREFIX}-msg`, role: "status", text: view.message }));
+      else if (msg && !view.message) msg.remove();
+      else if (msg && msg.textContent !== view.message) msg.textContent = view.message;
+    }
+    function mention(person) {
+      const editor = editorElement();
+      const ok = editor ? insertMention(editor, person) : false;
+      view.message = ok ? "" : "Erwähnung nicht möglich: Kommentarfeld nicht erkannt.";
+      updateButton();
+      return ok;
+    }
+    async function onClick(event) {
+      event.preventDefault();
+      if (currentPicker()) {
+        closePicker();
+        return;
+      }
+      const matchId = view.matchId;
+      const person = view.state === "ready" ? view.person : await resolveView(matchId);
+      updateButton();
+      if (view.matchId !== matchId) return;
+      if (person) mention(person);
+      else openPicker();
+    }
+    function onContextMenu(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (currentPicker()) closePicker();
+      else openPicker();
+    }
+    const picker = { query: "", items: [], state: "loading", error: "", active: 0 };
+    function closePicker() {
+      currentPicker()?.remove();
+      document.removeEventListener("mousedown", onOutside, true);
+    }
+    function onOutside(event) {
+      const node = event.target;
+      if (currentPicker()?.contains(node) || currentWrap()?.contains(node)) return;
+      closePicker();
+    }
+    function positionPicker(box, button3) {
+      const rect = button3.getBoundingClientRect();
+      const height = box.offsetHeight || 320;
+      const width = box.offsetWidth || 260;
+      const below = rect.bottom + 4;
+      const top = below + height > window.innerHeight && rect.top - height - 4 > 0 ? rect.top - height - 4 : below;
+      const left = Math.max(4, Math.min(rect.left, window.innerWidth - width - 4));
+      box.style.top = `${Math.round(top)}px`;
+      box.style.left = `${Math.round(left)}px`;
+    }
+    function renderList() {
+      const box = currentPicker();
+      const list = box?.querySelector(`.${PREFIX}-list`);
+      if (!list) return;
+      if (picker.state === "loading") {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, text: `${config.short}-Personen werden geladen …` }));
+        return;
+      }
+      if (picker.state === "error") {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: `Nicht geladen: ${picker.error}` }));
+        return;
+      }
+      const shown = filterPeople(picker.items, picker.query);
+      picker.active = Math.min(picker.active, Math.max(0, shown.length - 1));
+      if (!shown.length) {
+        list.replaceChildren(el3("span", { class: `${PREFIX}-status`, text: "Niemand gefunden." }));
+        return;
+      }
+      list.replaceChildren(...shown.map((person, index) => el3("button", {
+        type: "button",
+        class: `${PREFIX}-person`,
+        text: person.label,
+        title: person.id === view.person?.id ? `${person.label} (zuständig für diesen Match)` : person.label,
+        dataset: { id: person.id, ...index === picker.active ? { active: "" } : {}, ...person.id === view.person?.id ? { current: "" } : {} },
+        onmousedown: keepFocus,
+        onclick: () => choose(person)
+      })));
+    }
+    function choose(person) {
+      closePicker();
+      mention(person);
+    }
+    function onPickerKey(event) {
+      const shown = picker.state === "ok" ? filterPeople(picker.items, picker.query) : [];
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closePicker();
+        editorElement()?.focus?.();
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (shown[picker.active]) choose(shown[picker.active]);
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!shown.length) return;
+        picker.active = (picker.active + (event.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
+        renderList();
+      }
+    }
+    function openPicker() {
+      const wrap2 = currentWrap();
+      const dialog = findDialog();
+      if (!wrap2 || !dialog) return;
+      closePicker();
+      Object.assign(picker, { query: "", active: 0, error: "" });
+      const input = el3("input", {
+        type: "search",
+        placeholder: "Name suchen …",
+        "aria-label": `${config.short}-Person suchen`,
+        oninput: (event) => {
+          picker.query = event.target.value;
+          picker.active = 0;
+          renderList();
+        },
+        onkeydown: onPickerKey
+      });
+      const box = el3(
+        "div",
+        {
+          class: `${PREFIX}-picker`,
+          role: "group",
+          "aria-label": `${config.short}-Person erwähnen`,
+          dataset: { kind: config.kind, mode: wrap2.dataset.mode || "light" }
+        },
+        el3("span", { class: `${PREFIX}-picker-head`, text: `${config.short}-Person erwähnen` }),
+        input,
+        el3("div", { class: `${PREFIX}-list`, role: "listbox" })
+      );
+      dialog.appendChild(box);
+      positionPicker(box, wrap2.querySelector(`.${PREFIX}-btn`));
+      document.addEventListener("mousedown", onOutside, true);
+      input.focus();
+      const list = loadPeopleOnce();
+      picker.state = "loading";
+      renderList();
+      list.then((items) => {
+        picker.items = items;
+        picker.state = "ok";
+        renderList();
+      }, (error) => {
+        picker.state = "error";
+        picker.error = error?.message || String(error);
+        renderList();
+      });
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      if (!button3) return;
+      const row = button3.closest("tr");
+      clickedMatchId = matchIdFromHref2(row?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
+    }, true);
+    function mountWrap(dialog) {
+      ensureStyle();
+      const button3 = el3("button", {
+        type: "button",
+        class: `${PREFIX}-btn`,
+        text: config.button,
+        onmousedown: keepFocus,
+        onclick: onClick,
+        oncontextmenu: onContextMenu
+      });
+      const wrap2 = el3(
+        "span",
+        { class: `${PREFIX}-wrap`, role: "group", "aria-label": `${config.short}-Person erwähnen`, dataset: { kind: config.kind } },
+        button3,
+        helpTip()
+      );
+      wrap2.dataset.mode = isDark(dialog) ? "dark" : "light";
+      return wrap2;
+    }
+    function sync() {
+      const dialog = findDialog();
+      let wrap2 = currentWrap();
+      if (!dialog) {
+        wrap2?.remove();
+        closePicker();
+        return;
+      }
+      if (wrap2 && !dialog.contains(wrap2)) {
+        wrap2.remove();
+        wrap2 = null;
+        closePicker();
+      }
+      const editor = dialog.querySelector(EDITOR_SELECTOR2);
+      const box = editorBoxFor(editor, dialog);
+      const toolbar = toolbarIn(box);
+      const matchId = clickedMatchId || matchIdFromHref2(location.hash);
+      if (!wrap2) {
+        wrap2 = mountWrap(dialog);
+        view.matchId = "";
+      }
+      if (toolbar) {
+        if (wrap2.parentElement !== toolbar) toolbar.appendChild(wrap2);
+      } else if (wrap2.parentElement !== box.parentElement) {
+        box.parentElement?.insertBefore(wrap2, box);
+      }
+      if (view.matchId !== matchId || !view.matchId && view.state !== "nomatch") {
+        Object.assign(view, { matchId, state: matchId ? "loading" : "nomatch", person: null, message: "" });
+        updateButton();
+        if (matchId) resolveView(matchId).then(updateButton);
+      }
+    }
+    let scheduled = false;
+    const scheduleSync = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleSync();
   }
 
   // src/help.js
@@ -2834,17 +3323,13 @@
     },
     appointmentPrioTopic({ team: "KAM", page: "Terminvorschlag-Dialog", routes: onMyMatches }),
     {
-      id: "slack-exports",
-      title: "VTA, VTV, Dringend und Push an Slack",
+      id: "match-slack-actions",
+      title: "Dringend und Push an Slack",
       page: MY_MATCHES,
       routes: onMyMatches,
       kind: "external",
-      summary: "In der Terminspalte stehen „VTA Exportieren“ und „VTV Exportieren“ (nur bei Matches mit Termin) sowie „Dringend“ und „Push“ (immer, für die Vakanz der Zeile). Alle vier posten über n8n in Slack.",
+      summary: "In der Terminspalte stehen „Dringend“ und „Push“ für die Vakanz der Zeile. Beide posten über n8n in Slack. VTA, VTV und VTS postet die VT Automatik von selbst in #termine.",
       notes: [
-        "VTA und VTV erstellen die Nachricht mit Kandidat und Arbeitgeber, bei VTV zusätzlich mit dem Termin, und erwähnen die zuständige CEM-Person.",
-        "Je nach Einrichtung geht die Nachricht über n8n direkt nach Slack oder wird in die Zwischenablage kopiert. Der Tooltip am Knopf sagt, was passiert.",
-        "Nach dem Versand heißt der Knopf „… erneut senden“. Ein zweiter Versand braucht deine Bestätigung.",
-        "VTV nimmt den spätesten Termin aus der Zeile.",
         "„Dringend“ schreibt den Befehl in #dringende_vakanzen. Der Bot setzt innerhalb einer Minute den Tag [dringende Suche] und fragt nach 14 Tagen nach, ob die Suche noch dringend ist. Nur veröffentlichte Vakanzen können dringend werden.",
         "Rot umrandet: nicht dringend. Rot mit Haken: dringend, ein Klick beendet die dringende Suche nach einer Rückfrage. Gelb: angefragt, der Bot hat noch nicht bestätigt.",
         "„Push“ postet eine Push Request in #push-requests. Der Push-Bot pusht sie innerhalb von ein, zwei Minuten und antwortet im Thread. Danach steht „Push ✓“ am Knopf, ein zweiter Versand braucht deine Bestätigung."
@@ -2856,21 +3341,23 @@
       page: "Matchkommentar-Dialog",
       routes: onMyMatches,
       kind: "write",
-      summary: "Über dem Kommentarfeld steht eine Leiste mit den gängigen KAM-Kürzeln, nach Gruppen. Ein Klick schreibt das Kürzel in den Kommentar oder legt eine AG-Notiz am Arbeitgeber an. Fährst du im Dialog mit der Maus über ein Kürzel, steht die Bedeutung daneben. Der Reiter „Vorlagen“ hält deine eigenen längeren Texte.",
+      summary: "Über dem Kommentarfeld steht eine Leiste mit häufigen Sätzen und den gängigen KAM-Kürzeln, nach Gruppen. Ein Klick schreibt den Text in den Matchkommentar, mehr nicht. Fährst du im Dialog mit der Maus über ein Kürzel, steht die Bedeutung daneben. Der Reiter „Vorlagen“ hält deine eigenen längeren Texte.",
       steps: [
-        "Reiter wählen (Kontakt, Termine, Unterlagen) und ein Kürzel anklicken. Ein zweiter Klick auf den Reiter klappt die Knöpfe ein.",
-        "Grau markierte Kürzel kommen in den Kommentar. Blau markierte öffnen eine Zeile „AG-Notiz für …“: Text prüfen, bei Bedarf ändern und „Speichern“ klicken. Orange markierte machen beides.",
+        "Reiter wählen (Häufig, Kontakt, Termine, Unterlagen) und einen Knopf anklicken. Ein zweiter Klick auf den Reiter klappt die Knöpfe ein.",
+        "Rechtsklick auf einen Knopf mit ▾ zeigt Varianten, z. B. bei „tne“: „AP tne“, „AP tne, Mail raus“ … Ein Klick schreibt die übliche Form („AP tne, SA raus“).",
+        "Soll der Text auch am Arbeitgeber stehen: rechts „Als AG-Notiz speichern“ (AG-Notizen).",
         "Was ein Kürzel heißt: mit der Maus darüberfahren, in alten Kommentaren, im Textfeld und in den AG-Notizen.",
         "Vorlagen: „+ Neue Vorlage“ anlegen, ein Klick auf den Titel fügt den Text ein, „Ändern“ bearbeitet oder löscht sie."
       ],
       notes: [
-        "Die AG-Notiz wird erst mit „Speichern“ angelegt, als Arbeitgeberkommentar mit dem Tag [Matches]. Am Match ändert sich nichts, auch nicht die WVL.",
+        "Am Match ändert sich nichts, auch nicht die WVL.",
         "Der Kommentar selbst wird wie gewohnt mit dem Pfeil abgeschickt.",
         "Kürzel mit gestricheltem Rand haben eine Bedeutung, die die KAM noch bestätigen. Sie steht im Tooltip.",
         "Groß- und Kleinschreibung zählt: „te“ heißt telefonisch erreicht, „TE“ Terminerinnerung.",
         "Vorlagen liegen pro Person auf dem Toolbox-Server und sind auf jedem Rechner gleich. Ist der Server nicht erreichbar, steht das im Reiter. Die Kürzel funktionieren trotzdem."
       ]
     },
+    matchMentionTopic({ kind: "cem", page: "Matchkommentar-Dialog", routes: onMyMatches }),
     {
       id: "slack-dm",
       title: "An CEM: Match per Slack-DM schicken",
@@ -2983,7 +3470,7 @@
       page: MY_MATCHES,
       routes: onMyMatches,
       kind: "view",
-      summary: "Arbeitgeber, um die du dich heute zuerst kümmern willst. Der Knopf „Prio-Liste“ oben rechts klappt die Liste auf und zu. Einträge lassen sich abhaken, mit einer kurzen Notiz versehen und wieder entfernen.",
+      summary: "Arbeitgeber, um die du dich heute zuerst kümmern willst. Der Knopf „Prio-Liste“ über der Liste klappt sie auf und zu; eingeklappt öffnet sie auch der Reiter „Prio-Liste“ oben rechts. Einträge lassen sich abhaken, mit einer kurzen Notiz versehen und wieder entfernen.",
       steps: [
         "Auf den Stern vor einem Arbeitgeber in der Liste klicken oder im Panel einen Arbeitgeber dieser Seite wählen und „Hinzufügen“.",
         "Erledigtes abhaken. ✎ bearbeitet die Notiz, × nimmt den Arbeitgeber von der Liste.",
@@ -3143,7 +3630,7 @@
     </div>
     <div class="wkw-count" data-count>${items.length} von ${items.length} ausgewählt</div>`;
   }
-  var normalize = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
+  var normalize2 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
   function syncBox(box, children) {
     const checked = children.filter((child) => child.checked).length;
     box.checked = checked === children.length && checked > 0;
@@ -3159,12 +3646,12 @@
     const groups = [...root.querySelectorAll(".wkw-group")].map((group) => ({
       element: group,
       box: group.querySelector("[data-group]"),
-      label: normalize(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
+      label: normalize2(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
       items: [...group.querySelectorAll('input[name="item"]')]
     }));
     let pristine = true;
     const shown = (list) => list.filter((item) => !isHiddenItem(item));
-    const query = () => normalize(search?.value).replace(/\s+/g, " ");
+    const query = () => normalize2(search?.value).replace(/\s+/g, " ");
     const sync = () => {
       groups.forEach((group) => syncBox(group.box, shown(group.items)));
       const visible = shown(items);
@@ -3186,7 +3673,7 @@
       const groupOf = new Map(groups.flatMap((group) => group.items.map((item) => [item, group])));
       items.forEach((item) => {
         const group = groupOf.get(item);
-        const haystack = `${group ? `${group.label} ` : ""}${normalize(item.closest("label").textContent)}`;
+        const haystack = `${group ? `${group.label} ` : ""}${normalize2(item.closest("label").textContent)}`;
         item.closest("label").hidden = !haystack.replace(/\s+/g, " ").includes(text);
       });
       groups.forEach((group) => {
@@ -3535,7 +4022,7 @@
   }
 }`;
   }
-  function normalize2(value) {
+  function normalize3(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   function parseIsoDate(isoDate) {
@@ -3630,14 +4117,14 @@
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
     runtime.registerSource(sourcePath);
     const {
       team,
-      isTargetPage: isTargetPage9,
+      isTargetPage: isTargetPage8,
       getRequest,
       ids: IDS9,
       fields,
@@ -3683,7 +4170,7 @@
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR2) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR3) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element2) {
       if (!element2.isConnected || element2.closest("[hidden]")) return false;
@@ -3699,23 +4186,23 @@
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
         id: match?.[1] || link.href,
-        name: normalize2(link.textContent) || "Unbekannter Arbeitgeber"
+        name: normalize3(link.textContent) || "Unbekannter Arbeitgeber"
       };
     }
     function candidateNameFromRow(row) {
       const own = row.querySelector(CANDIDATE_LINK_SELECTOR);
-      if (own) return normalize2(own.textContent);
+      if (own) return normalize3(own.textContent);
       const parentRow = row.closest("table")?.closest("tr")?.previousElementSibling;
-      return normalize2(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
+      return normalize3(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
     }
     function labelFromRow(row) {
       const candidate = candidateNameFromRow(row);
-      const vacancy = normalize2(row.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
+      const vacancy = normalize3(row.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
       const label = [candidate, vacancy].filter(Boolean).join(" – ");
       return label.length > 90 ? `${label.slice(0, 89)}…` : label;
     }
     function matchIdFromRow2(row) {
-      const link = row.querySelector(MATCH_LINK_SELECTOR2);
+      const link = row.querySelector(MATCH_LINK_SELECTOR3);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
@@ -4073,7 +4560,7 @@
       const targetStatus = statusOptions.find((status) => status.value === targetValue);
       const outFeedbackValue = dialog.querySelector('[name="outFeedback"]').value;
       const outFeedback = outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
-      const outFeedbackText = normalize2(dialog.querySelector('[name="outFeedbackText"]').value);
+      const outFeedbackText = normalize3(dialog.querySelector('[name="outFeedbackText"]').value);
       if (!selection.length) return setStatus("Bitte mindestens ein Match anhaken.", "error");
       if (!targetStatus || targetValue === "__choose__") return setStatus(`Bitte einen ${team} Status auswählen.`, "error");
       const isOut = targetStatus.value === "out";
@@ -4169,7 +4656,7 @@
       });
     }
     function installHeaderButtons() {
-      if (!isTargetPage9()) return;
+      if (!isTargetPage8()) return;
       kit.injectStyle();
       installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
       installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
@@ -4182,7 +4669,7 @@
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage9()) {
+        if (!isTargetPage8()) {
           kit.discard();
           return;
         }
@@ -4283,7 +4770,7 @@
     __typename
   }
 }`;
-  function normalize3(value) {
+  function normalize4(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   async function fetchEmployerContacts(request, employerIds) {
@@ -4291,7 +4778,7 @@
     if (!employerIds.length) return index;
     const result = await request(EMPLOYER_CONTACT_QUERY, { filter: { ids: employerIds } });
     for (const item of result?.items || []) {
-      if (item?.id) index.set(item.id, normalize3(item.directContact));
+      if (item?.id) index.set(item.id, normalize4(item.directContact));
     }
     return index;
   }
@@ -4305,17 +4792,17 @@
   async function updateEmployerContact(request, employerId, value) {
     const result = await request(UPDATE_EMPLOYER_CONTACT_MUTATION, { id: employerId, directContact: value });
     const saved = result?.data;
-    if (saved?.id !== employerId || normalize3(saved.directContact) !== normalize3(value)) {
+    if (saved?.id !== employerId || normalize4(saved.directContact) !== normalize4(value)) {
       throw new Error("Speichern wurde von der API nicht bestätigt");
     }
-    return normalize3(saved.directContact);
+    return normalize4(saved.directContact);
   }
 
   // src/features/kam-suite/contact-badges.js
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
-  var STYLE_ID2 = "werkia-kam-contact-style";
+  var STYLE_ID3 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
   var CONTACT_OPTIONS = {
     no_contact: { short: "Kein Kontakt", full: "Kein Kontakt (>1 Woche)", tone: "no-contact", priority: 2 },
@@ -4328,7 +4815,7 @@
   function isTargetPage2(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
-  function normalize4(value) {
+  function normalize5(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   function getContactEmployerId(href) {
@@ -4353,7 +4840,7 @@
       const link = row.querySelector(EMPLOYER_LINK_SELECTOR3);
       if (!link) return null;
       const id = getContactEmployerId(link.href) || link.href;
-      return { id, name: normalize4(link.textContent) || "Unbekannter Arbeitgeber" };
+      return { id, name: normalize5(link.textContent) || "Unbekannter Arbeitgeber" };
     }
     function getEmployerChoices() {
       const choices = /* @__PURE__ */ new Map();
@@ -4374,10 +4861,10 @@
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle3() {
-      if (document.getElementById(STYLE_ID2)) return;
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID3)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID2;
+      style.id = STYLE_ID3;
       style.textContent = `
       .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
       .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
@@ -4536,7 +5023,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle3();
+        ensureStyle4();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
       }, 150);
@@ -4633,7 +5120,7 @@
   // src/features/kam-suite/vacancy-city-badges.js
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID3 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID4 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage3(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -4663,10 +5150,10 @@
       });
       return [...ids];
     }
-    function ensureStyle3() {
-      if (document.getElementById(STYLE_ID3)) return;
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID4)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID3;
+      style.id = STYLE_ID4;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -4734,7 +5221,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage3()) return;
-        ensureStyle3();
+        ensureStyle4();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -4795,12 +5282,12 @@
     return matches;
   }
   async function loadById(request, query, ids) {
-    const byId = /* @__PURE__ */ new Map();
+    const byId2 = /* @__PURE__ */ new Map();
     for (const batch of chunks(ids, BATCH_SIZE2)) {
       const result = await request(query, { filter: { ids: batch } });
-      for (const item of result?.items || []) if (item?.id) byId.set(item.id, item);
+      for (const item of result?.items || []) if (item?.id) byId2.set(item.id, item);
     }
-    return byId;
+    return byId2;
   }
   function employeeDisplayName(employee) {
     return [employee?.firstName, employee?.lastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
@@ -4826,9 +5313,9 @@
   // src/features/kam-suite/cem-status-line.js
   var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
-  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID4 = "werkia-kam-cem-line-style";
+  var STYLE_ID5 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
@@ -4854,12 +5341,12 @@
       return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row) => row.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
     function matchIdFromRow2(row) {
-      return getMatchId(row.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+      return getMatchId(row.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
     }
-    function ensureStyle3() {
-      if (document.getElementById(STYLE_ID4)) return;
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -4994,7 +5481,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle3();
+        ensureStyle4();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
@@ -5224,10 +5711,10 @@
       const element2 = document.getElementById(id);
       return element2?.dataset.werkiaPresetsOwner === owner ? element2 : null;
     };
-    const isTargetPage9 = () => isTargetRoute(location.hash, routes);
+    const isTargetPage8 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle3() {
+    function ensureStyle4() {
       if (document.getElementById(IDS2.style)) return;
       const style = document.createElement("style");
       style.id = IDS2.style;
@@ -5413,12 +5900,12 @@
       select.value = active;
     }
     function render() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         ownElement(IDS2.bar)?.remove();
         closeDialog();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       let bar = document.getElementById(IDS2.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -5473,7 +5960,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID5 = "werkia-match-status-filter-style";
+  var STYLE_ID6 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -5489,11 +5976,11 @@
   } = {}) {
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
-    const isTargetPage9 = () => route.test(location.hash);
-    function ensureStyle3() {
-      if (document.getElementById(STYLE_ID5)) return;
+    const isTargetPage8 = () => route.test(location.hash);
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -5547,11 +6034,11 @@
     }
     function render() {
       let bar = document.getElementById(barId);
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         bar?.remove();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -5693,7 +6180,7 @@
       if (/Matchkommentare/i.test(text)) return false;
       if (/Kandidat Dateien/i.test(text)) return false;
       const labels = new Set(
-        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el5) => (el5.innerText || "").trim())
+        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el6) => (el6.innerText || "").trim())
       );
       const count = QUESTIONNAIRE_LABELS.filter((l) => labels.has(l)).length;
       const hasHeader = labels.has("Kandidat") && labels.has("Job");
@@ -6259,7 +6746,7 @@
   var COMPANY_FLAG_TEXT = "[absprache vor ofm]";
 
   // ../../shared/js/werkia-questionnaire/dialog.js
-  function normalize5(value, fold2) {
+  function normalize6(value, fold2) {
     const v = clean(value);
     return fold2 ? asciiFold(v) : v;
   }
@@ -6274,7 +6761,7 @@
   }
   function getDialogLabelTexts(dialog) {
     if (!dialog) return [];
-    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el5) => (el5.innerText || el5.textContent || "").trim()).filter(Boolean);
+    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el6) => (el6.innerText || el6.textContent || "").trim()).filter(Boolean);
   }
   function isQuestionnaireDialog(dialog, { strictMode = true, fold: fold2 = false, labels = QUESTIONNAIRE_LABELS2 } = {}) {
     if (!dialog) return false;
@@ -6283,8 +6770,8 @@
     if (/Kandidat Dateien/i.test(text)) return false;
     if (strictMode && /Kandidatendateien|Zusammenführen|Halb anonym/i.test(text)) return false;
     const rawLabels = getDialogLabelTexts(dialog);
-    const labelSet = new Set(rawLabels.map((l) => normalize5(l, fold2)));
-    const has = (literal) => labelSet.has(normalize5(literal, fold2));
+    const labelSet = new Set(rawLabels.map((l) => normalize6(l, fold2)));
+    const has = (literal) => labelSet.has(normalize6(literal, fold2));
     const count = labels.filter((l) => has(l)).length;
     const hasHeader = has("Kandidat") && has("Job");
     if (!strictMode) return hasHeader && count >= 3;
@@ -6300,10 +6787,10 @@
   }
   function getFieldsByLabel(dialog, labelText, { fold: fold2 = false } = {}) {
     if (!dialog) return [];
-    const wanted = normalize5(labelText, fold2);
+    const wanted = normalize6(labelText, fold2);
     return [...dialog.querySelectorAll("span.ra-field")].filter((field) => {
       const lbl = field.querySelector("p span")?.innerText?.trim() || "";
-      return normalize5(lbl, fold2) === wanted;
+      return normalize6(lbl, fold2) === wanted;
     });
   }
   var VALUE_SELECTOR = "span.MuiTypography-body2, p.MuiTypography-body2, .MuiTypography-body2";
@@ -6311,7 +6798,7 @@
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return null;
     const field = mode === "last" ? fields[fields.length - 1] : fields[0];
-    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el5) => (el5.innerText || el5.textContent || "").trim()) || null;
+    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el6) => (el6.innerText || el6.textContent || "").trim()) || null;
   }
   function findValueAllowEmpty(dialog, labelText, mode = "first", { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
@@ -6329,14 +6816,14 @@
   function getPositionEls(dialog, labelText, { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return [];
-    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el5) => (el5.innerText || el5.textContent || "").trim() && normalize5(el5.innerText || el5.textContent, fold2) !== "berufsausbildung");
+    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el6) => (el6.innerText || el6.textContent || "").trim() && normalize6(el6.innerText || el6.textContent, fold2) !== "berufsausbildung");
   }
   function getQuestionnaireHeaderValue(dialog, labelText, { fold: fold2 = false } = {}) {
     const field = getFieldsByLabel(dialog, labelText, { fold: fold2 })[0];
-    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el5) => el5.textContent?.trim() && normalize5(el5.textContent, fold2) !== normalize5(labelText, fold2)) : null;
+    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el6) => el6.textContent?.trim() && normalize6(el6.textContent, fold2) !== normalize6(labelText, fold2)) : null;
     if (value?.textContent?.trim()) return value.textContent.trim();
     const lines = (dialog.innerText || dialog.textContent || "").split("\n").map((line) => line.trim()).filter(Boolean);
-    const labelIndex = lines.findIndex((line) => normalize5(line, fold2) === normalize5(labelText, fold2));
+    const labelIndex = lines.findIndex((line) => normalize6(line, fold2) === normalize6(labelText, fold2));
     return labelIndex >= 0 ? lines[labelIndex + 1] || "" : "";
   }
 
@@ -6355,7 +6842,7 @@
   function comparisonValue(value, original, options = {}) {
     return original && isOwnMarkedValue(value, original, options) ? original : value;
   }
-  function mark(el5, color, title = "", options = {}) {
+  function mark(el6, color, title = "", options = {}) {
     const {
       markAttr = DEFAULT_MARK_ATTR,
       originalAttr = DEFAULT_ORIGINAL_ATTR,
@@ -6364,24 +6851,24 @@
       prefixByColor = null,
       dedupeAttr = null
     } = options;
-    if (!el5) return;
+    if (!el6) return;
     if (dedupeAttr) {
       const signature = `${color}|${title}`;
-      if (el5.dataset[dedupeAttr] === signature) return;
-      el5.dataset[dedupeAttr] = signature;
+      if (el6.dataset[dedupeAttr] === signature) return;
+      el6.dataset[dedupeAttr] = signature;
     }
-    if (!el5.dataset[originalAttr]) el5.dataset[originalAttr] = el5.innerText || "";
-    el5.dataset[markAttr] = "true";
-    el5.style.background = color;
-    el5.style.color = "#000";
-    el5.style.padding = "4px 6px";
-    el5.style.borderRadius = "4px";
-    el5.style.fontWeight = fontWeight;
-    el5.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
-    if (title) el5.title = title;
-    const original = el5.dataset[originalAttr];
+    if (!el6.dataset[originalAttr]) el6.dataset[originalAttr] = el6.innerText || "";
+    el6.dataset[markAttr] = "true";
+    el6.style.background = color;
+    el6.style.color = "#000";
+    el6.style.padding = "4px 6px";
+    el6.style.borderRadius = "4px";
+    el6.style.fontWeight = fontWeight;
+    el6.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
+    if (title) el6.title = title;
+    const original = el6.dataset[originalAttr];
     const prefix = prefixByColor?.[color];
-    el5.innerText = prefix ? `${prefix}${original}` : original;
+    el6.innerText = prefix ? `${prefix}${original}` : original;
   }
   function clearMarks(root = document, options = {}) {
     const {
@@ -6389,19 +6876,19 @@
       originalAttr = DEFAULT_ORIGINAL_ATTR,
       dedupeAttr = null
     } = options;
-    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el5) => {
-      const original = el5.dataset[originalAttr];
-      if (original && isOwnMarkedValue(el5.innerText || "", original, options)) el5.innerText = original;
-      el5.style.background = "";
-      el5.style.color = "";
-      el5.style.padding = "";
-      el5.style.borderRadius = "";
-      el5.style.fontWeight = "";
-      el5.style.boxShadow = "";
-      el5.title = "";
-      delete el5.dataset[markAttr];
-      delete el5.dataset[originalAttr];
-      if (dedupeAttr) delete el5.dataset[dedupeAttr];
+    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el6) => {
+      const original = el6.dataset[originalAttr];
+      if (original && isOwnMarkedValue(el6.innerText || "", original, options)) el6.innerText = original;
+      el6.style.background = "";
+      el6.style.color = "";
+      el6.style.padding = "";
+      el6.style.borderRadius = "";
+      el6.style.fontWeight = "";
+      el6.style.boxShadow = "";
+      el6.title = "";
+      delete el6.dataset[markAttr];
+      delete el6.dataset[originalAttr];
+      if (dedupeAttr) delete el6.dataset[dedupeAttr];
     });
   }
 
@@ -6436,8 +6923,8 @@
   }
   function executeQuestionnaireEvaluation(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-evaluation.js");
-    function mark2(el5, color, title = "") {
-      mark(el5, color, title, MARK_OPTIONS);
+    function mark2(el6, color, title = "") {
+      mark(el6, color, title, MARK_OPTIONS);
     }
     function clearMarks2() {
       clearMarks(document, MARK_OPTIONS);
@@ -6488,20 +6975,20 @@
       return { status: "send" };
     }
     function compareRecognition(dialog) {
-      const el5 = findValue(dialog, "Recognition status");
-      if (!el5) return { status: "send" };
-      const v = clean(el5.innerText);
+      const el6 = findValue(dialog, "Recognition status");
+      if (!el6) return { status: "send" };
+      const v = clean(el6.innerText);
       if (v.includes("ja, ist anerkannt")) {
-        mark2(el5, GREEN, "Anerkennung: Ja");
+        mark2(el6, GREEN, "Anerkennung: Ja");
         return { status: "send" };
       }
       if (v.includes("in anerkennung")) {
-        mark2(el5, YELLOW, "In Anerkennung");
-        return { status: "unclear", detail: `Recognition status: ${el5.innerText}` };
+        mark2(el6, YELLOW, "In Anerkennung");
+        return { status: "unclear", detail: `Recognition status: ${el6.innerText}` };
       }
       if (v.includes("noch nicht beantragt")) {
-        mark2(el5, RED, "Noch nicht beantragt");
-        return { status: "no-send", detail: `Recognition status: ${el5.innerText}` };
+        mark2(el6, RED, "Noch nicht beantragt");
+        return { status: "no-send", detail: `Recognition status: ${el6.innerText}` };
       }
       return { status: "send" };
     }
@@ -6550,8 +7037,8 @@
       return { status: "send" };
     }
     function comparePositions(dialog) {
-      const empEls = getPositionEls(dialog, "Position").map((el5) => ({ el: el5, value: clean(el5.innerText) }));
-      const candEls = getPositionEls(dialog, "Positionen").map((el5) => ({ el: el5, value: clean(el5.innerText) }));
+      const empEls = getPositionEls(dialog, "Position").map((el6) => ({ el: el6, value: clean(el6.innerText) }));
+      const candEls = getPositionEls(dialog, "Positionen").map((el6) => ({ el: el6, value: clean(el6.innerText) }));
       if (!empEls.length) return { status: "send" };
       if (!candEls.length) return { status: "unclear", detail: `Positionen: ${empEls.map((p) => p.value).join(", ")} → leer` };
       let anyGreen = false;
@@ -6711,7 +7198,7 @@
     function currentFieldSignature(dialog) {
       return [...dialog.querySelectorAll("span.ra-field")].map((field) => {
         const label = field.querySelector("p span")?.innerText?.trim() || "";
-        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el5) => comparisonValue2(el5.innerText ?? el5.textContent ?? "", el5.dataset[ORIGINAL_TEXT])).join("|");
+        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el6) => comparisonValue2(el6.innerText ?? el6.textContent ?? "", el6.dataset[ORIGINAL_TEXT])).join("|");
         return `${label}=${values}`;
       }).join(";");
     }
@@ -7482,16 +7969,16 @@
 
   // src/features/kam-suite/status-effects.js
   var STATUS_SELECTOR = ".MuiSelect-root";
-  function getSelectData(el5) {
-    const input = el5.querySelector("input.MuiSelect-nativeInput");
-    const combo = el5.querySelector('[role="combobox"]');
+  function getSelectData(el6) {
+    const input = el6.querySelector("input.MuiSelect-nativeInput");
+    const combo = el6.querySelector('[role="combobox"]');
     return {
       value: input?.value || "",
       text: combo?.textContent?.trim() || ""
     };
   }
-  function getState(el5) {
-    const { value, text } = getSelectData(el5);
+  function getState(el6) {
+    const { value, text } = getSelectData(el6);
     if (value === "process" || text === "Senden") return "process";
     if (value === "hired" || text === "Hired") return "hired";
     return value || text || "empty";
@@ -7501,23 +7988,23 @@
     const lastStates = /* @__PURE__ */ new WeakMap();
     let initialized = false;
     function initSelectStates() {
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el5) => {
-        lastStates.set(el5, getState(el5));
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el6) => {
+        lastStates.set(el6, getState(el6));
       });
       initialized = true;
     }
-    function flashGreen(el5) {
-      const inner = el5.querySelector('[role="combobox"]') || el5;
-      el5.style.transition = "all 0.2s ease";
-      el5.style.backgroundColor = "#bbf7d0";
-      el5.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
+    function flashGreen(el6) {
+      const inner = el6.querySelector('[role="combobox"]') || el6;
+      el6.style.transition = "all 0.2s ease";
+      el6.style.backgroundColor = "#bbf7d0";
+      el6.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
       inner.style.transition = "all 0.2s ease";
       inner.style.backgroundColor = "#bbf7d0";
       inner.style.color = "#14532d";
       inner.style.fontWeight = "700";
       runtime.setTimeout(() => {
-        el5.style.backgroundColor = "";
-        el5.style.boxShadow = "";
+        el6.style.backgroundColor = "";
+        el6.style.boxShadow = "";
         inner.style.backgroundColor = "";
         inner.style.color = "";
         inner.style.fontWeight = "";
@@ -7690,24 +8177,24 @@
     }
     function checkSelects() {
       if (!initialized) return;
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el5) => {
-        const currentState = getState(el5);
-        if (!lastStates.has(el5)) {
-          lastStates.set(el5, currentState);
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el6) => {
+        const currentState = getState(el6);
+        if (!lastStates.has(el6)) {
+          lastStates.set(el6, currentState);
           return;
         }
-        const lastState = lastStates.get(el5);
+        const lastState = lastStates.get(el6);
         if (currentState !== lastState) {
           if (currentState === "process") {
-            flashGreen(el5);
+            flashGreen(el6);
             showAnotherOneText();
             fireConfetti();
           }
           if (currentState === "hired") {
-            flashGreen(el5);
+            flashGreen(el6);
             showHiredCelebration();
           }
-          lastStates.set(el5, currentState);
+          lastStates.set(el6, currentState);
         }
       });
     }
@@ -7804,7 +8291,7 @@
       const candidate = rightLinks[0];
       if (!candidate) return null;
       const row = candidate.closest("div") || candidate.parentElement;
-      const prio = [...row.querySelectorAll("span, div, button")].find((el5) => /^[A-F]\d*$/i.test((el5.innerText || "").trim()));
+      const prio = [...row.querySelectorAll("span, div, button")].find((el6) => /^[A-F]\d*$/i.test((el6.innerText || "").trim()));
       return prio || candidate;
     }
     function ensureBox() {
@@ -7927,10 +8414,10 @@
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
   var ROW_SELECTOR7 = "tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row) {
-    const link = row?.querySelector(MATCH_LINK_SELECTOR4);
+    const link = row?.querySelector(MATCH_LINK_SELECTOR5);
     return link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
   }
   function getEmployerIdFromChatRow(row) {
@@ -8100,7 +8587,7 @@
     location: { names: ["location", "locationId", "appointmentLocation"], label: "Standort", fallbackIndex: 2 }
   };
   function getAppointments(root = document) {
-    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el5) => el5.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
+    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el6) => el6.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
   }
   function hasAppointmentFields(dialog) {
     return Boolean(dialog?.querySelector?.(APPOINTMENT_INPUT_SELECTOR));
@@ -8159,9 +8646,9 @@
       }
     }
     function termToast(text) {
-      const el5 = document.createElement("div");
-      el5.textContent = text;
-      el5.style.cssText = `
+      const el6 = document.createElement("div");
+      el6.textContent = text;
+      el6.style.cssText = `
       position: fixed;
       bottom: 24px;
       right: 24px;
@@ -8172,22 +8659,22 @@
       z-index: 99999999;
       font-size: 14px;
     `;
-      document.body.appendChild(el5);
-      runtime.setTimeout(() => el5.remove(), 2200);
+      document.body.appendChild(el6);
+      runtime.setTimeout(() => el6.remove(), 2200);
     }
-    function setValue(el5, value) {
-      el5.focus();
+    function setValue(el6, value) {
+      el6.focus();
       const inputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
       const textareaSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-      if (el5.tagName === "TEXTAREA") {
-        textareaSetter?.call(el5, value);
+      if (el6.tagName === "TEXTAREA") {
+        textareaSetter?.call(el6, value);
       } else {
-        inputSetter?.call(el5, value);
+        inputSetter?.call(el6, value);
       }
-      el5.dispatchEvent(new Event("input", { bubbles: true }));
-      el5.dispatchEvent(new Event("change", { bubbles: true }));
-      el5.dispatchEvent(new Event("blur", { bubbles: true }));
-      el5.blur();
+      el6.dispatchEvent(new Event("input", { bubbles: true }));
+      el6.dispatchEvent(new Event("change", { bubbles: true }));
+      el6.dispatchEvent(new Event("blur", { bubbles: true }));
+      el6.blur();
     }
     function setPicker(root, value) {
       const values = parseAppointmentValue(value);
@@ -8454,296 +8941,6 @@
     });
   }
 
-  // ../../shared/js/slack-exports/index.js
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
-  var EXPORTS_SELECTOR = ".werkia-slack-exports";
-  var STYLE_ID6 = "werkia-slack-exports-style";
-  var SENT_STORE_KEY = "werkia_vt_slack_exports_sent_v1";
-  var APPOINTMENT_DATE_RE = /\b\d{1,2}\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mär(?:z)?|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|dez(?:ember)?)\.?\s+\d{4}\s+\d{1,2}:\d{2}\b/i;
-  var APPOINTMENT_DATE_ALL_RE = new RegExp(APPOINTMENT_DATE_RE.source, "gi");
-  var GERMAN_MONTHS = {
-    jan: 0,
-    januar: 0,
-    feb: 1,
-    februar: 1,
-    mär: 2,
-    märz: 2,
-    apr: 3,
-    april: 3,
-    mai: 4,
-    jun: 5,
-    juni: 5,
-    jul: 6,
-    juli: 6,
-    aug: 7,
-    august: 7,
-    sep: 8,
-    september: 8,
-    okt: 9,
-    oktober: 9,
-    nov: 10,
-    november: 10,
-    dez: 11,
-    dezember: 11
-  };
-  var MATCH_EXPORT_QUERY = `query Match($id: UUID!) {
-  data: Match(id: $id) {
-    id
-    candidate { id firstName lastName cemEmployeeId __typename }
-    jobPosition {
-      id
-      mainTitle
-      subTitle
-      employer { id name kamEmployeeId __typename }
-      __typename
-    }
-    __typename
-  }
-  employees: allEmployees(filter: {}) { id firstName lastName slackId __typename }
-}`;
-  function isTargetPage7(hash = location.hash, role) {
-    return new RegExp(`#/${role}/MyMatches(?:[/?]|$)`, "i").test(hash);
-  }
-  function matchIdFromHref2(href) {
-    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
-  }
-  function hasAppointmentDate(text) {
-    return APPOINTMENT_DATE_RE.test(String(text || ""));
-  }
-  function latestAppointmentDate(text) {
-    const matches = String(text || "").match(APPOINTMENT_DATE_ALL_RE) || [];
-    const candidates = matches.map((value) => {
-      const parts = value.match(/(\d{1,2})\.\s*([a-zä]+)\.?\s+(\d{4})\s+(\d{1,2}):(\d{2})/i);
-      const month = GERMAN_MONTHS[String(parts?.[2] || "").toLocaleLowerCase("de-DE")];
-      const timestamp = parts && month !== void 0 ? new Date(Number(parts[3]), month, Number(parts[1]), Number(parts[4]), Number(parts[5])).getTime() : Number.NaN;
-      return { value, timestamp };
-    }).filter((candidate) => Number.isFinite(candidate.timestamp));
-    return candidates.sort((a, b) => b.timestamp - a.timestamp)[0]?.value || "";
-  }
-  function employeeMention(employee, firstNameIsUnique = false) {
-    const firstName = String(employee?.firstName || "").trim();
-    if (firstName && firstNameIsUnique) return `@${firstName}`;
-    const name = [employee?.firstName, employee?.lastName].filter(Boolean).join(" ");
-    return name ? `@${name}` : "";
-  }
-  function buildSlackText(type, { candidateName, employerName, appointmentAt, kam, cem, kamFirstNameIsUnique, cemFirstNameIsUnique }, taggedRole) {
-    const employee = taggedRole === "kam" ? kam : cem;
-    const tag = employeeMention(employee, taggedRole === "kam" ? kamFirstNameIsUnique : cemFirstNameIsUnique);
-    if (type === "VTA") return [candidateName, employerName, tag].join("\n");
-    return [candidateName, employerName, appointmentAt, tag].join("\n");
-  }
-  function buildSlackApiText(type, data, taggedRole, appointmentAt = "") {
-    const primaryEmployee = taggedRole === "kam" ? data.kam : data.cem;
-    const primarySlackId = String(primaryEmployee?.slackId || "").trim();
-    const kamSlackId = String(data.kam?.slackId || "").trim();
-    if (!primarySlackId || !kamSlackId) throw new Error("Für die Slack-Erwähnung fehlt eine Mitarbeiter-ID.");
-    const tags = [`<@${primarySlackId}>`, `<@${kamSlackId}>`].join(" ");
-    if (type === "VTA") return [data.candidateName, data.employerName, tags].join("\n");
-    if (!appointmentAt) throw new Error("Für VTV fehlt Datum und Uhrzeit des Termins.");
-    return [data.candidateName, data.employerName, appointmentAt, tags].join("\n");
-  }
-  function formatSentAt(iso) {
-    return new Date(iso).toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
-  }
-  function exportButtonLabel(type, sentAt) {
-    return sentAt ? `${type} erneut senden` : `${type} Exportieren`;
-  }
-  function exportButtonTitle(type, webhookUrl2, sentAt) {
-    const base = webhookUrl2 ? `${type} direkt nach Slack senden` : `${type}-Text für Slack kopieren`;
-    return sentAt ? `${base} — bereits gesendet am ${formatSentAt(sentAt)}` : base;
-  }
-  function resendConfirmText(type, sentAt) {
-    return `${type} wurde für dieses Match bereits am ${formatSentAt(sentAt)} gesendet. Trotzdem erneut senden?`;
-  }
-  function executeSlackExports(runtime, { role, getGraphqlAdapter, sourcePath, webhookUrl: webhookUrl2 = "", helpTip }) {
-    runtime.registerSource(sourcePath);
-    const matchDataCache = /* @__PURE__ */ new Map();
-    const taggedRole = String(role).toLowerCase() === "kam" ? "cem" : "kam";
-    let syncTimer = null;
-    function loadSentStore() {
-      try {
-        return JSON.parse(localStorage.getItem(SENT_STORE_KEY) || "{}");
-      } catch {
-        return {};
-      }
-    }
-    function sentAt(matchId, type) {
-      return loadSentStore()[`${matchId}:${type}`] || "";
-    }
-    function markSent(matchId, type) {
-      const store = loadSentStore();
-      store[`${matchId}:${type}`] = (/* @__PURE__ */ new Date()).toISOString();
-      try {
-        localStorage.setItem(SENT_STORE_KEY, JSON.stringify(store));
-      } catch {
-      }
-    }
-    function ensureStyle3() {
-      if (document.getElementById(STYLE_ID6)) return;
-      const style = document.createElement("style");
-      style.id = STYLE_ID6;
-      style.textContent = `
-      .werkia-slack-exports { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
-      .werkia-slack-export { min-height:24px; padding:3px 8px; border:0; border-radius:5px; background:#4956df; color:#fff; cursor:pointer; font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
-      .werkia-slack-export:hover { background:#3643c7; }
-      .werkia-slack-export:disabled { cursor:wait; opacity:.72; }
-    `;
-      document.head.appendChild(style);
-    }
-    function appointmentCell(row) {
-      return [...row.querySelectorAll("td")].find((cell) => hasAppointmentDate(cell.innerText));
-    }
-    function matchIdFromRow2(row) {
-      return matchIdFromHref2(row.querySelector(MATCH_LINK_SELECTOR5)?.href);
-    }
-    async function loadMatchData(matchId) {
-      if (matchDataCache.has(matchId)) return matchDataCache.get(matchId);
-      const promise = (async () => {
-        const { request } = getGraphqlAdapter();
-        const result = await request(MATCH_EXPORT_QUERY, { id: matchId });
-        const match = result?.data;
-        const candidate = match?.candidate;
-        const jobPosition = match?.jobPosition;
-        const employer = jobPosition?.employer;
-        if (!candidate?.id || !jobPosition?.id || !employer?.id) throw new Error("Matchdaten konnten nicht vollständig geladen werden.");
-        const employees = (result?.employees || []).filter((employee) => employee?.id);
-        const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
-        const firstNameCounts = /* @__PURE__ */ new Map();
-        employees.forEach((employee) => {
-          const firstName = String(employee.firstName || "").trim().toLocaleLowerCase("de-DE");
-          if (firstName) firstNameCounts.set(firstName, (firstNameCounts.get(firstName) || 0) + 1);
-        });
-        const hasUniqueFirstName = (employee) => {
-          const firstName = String(employee?.firstName || "").trim().toLocaleLowerCase("de-DE");
-          return Boolean(firstName) && firstNameCounts.get(firstName) === 1;
-        };
-        const kam = employeesById.get(employer.kamEmployeeId);
-        const cem = employeesById.get(candidate.cemEmployeeId);
-        return {
-          candidateName: [candidate.firstName, candidate.lastName].filter(Boolean).join(" ") || "Unbekannter Kandidat",
-          employerName: employer.name || "Unbekannter Arbeitgeber",
-          jobTitle: [jobPosition.mainTitle, jobPosition.subTitle].filter(Boolean).join(" ") || "Unbekannte Vakanz",
-          kam,
-          cem,
-          kamFirstNameIsUnique: hasUniqueFirstName(kam),
-          cemFirstNameIsUnique: hasUniqueFirstName(cem)
-        };
-      })();
-      matchDataCache.set(matchId, promise);
-      try {
-        return await promise;
-      } catch (error) {
-        matchDataCache.delete(matchId);
-        throw error;
-      }
-    }
-    async function copyText(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        textarea.remove();
-      }
-    }
-    async function copyExport(button3, type) {
-      const row = button3.closest("tr");
-      const matchId = row && matchIdFromRow2(row);
-      if (!matchId) return;
-      const previousSentAt = sentAt(matchId, type);
-      if (previousSentAt && !window.confirm(resendConfirmText(type, previousSentAt))) return;
-      button3.disabled = true;
-      button3.textContent = "Lädt …";
-      try {
-        const data = await loadMatchData(matchId);
-        const appointmentAt = latestAppointmentDate(appointmentCell(row)?.innerText);
-        if (webhookUrl2) {
-          await new Promise((resolve, reject) => GM_xmlhttpRequest({ method: "POST", url: webhookUrl2, headers: { "Content-Type": "application/json" }, data: JSON.stringify({ matchId, type, slackText: buildSlackApiText(type, data, taggedRole, appointmentAt) }), onload: (response) => response.status >= 200 && response.status < 300 ? resolve() : reject(new Error(`Webhook HTTP ${response.status}`)), onerror: reject }));
-          markSent(matchId, type);
-          button3.textContent = "Gesendet";
-        } else {
-          await copyText(buildSlackText(type, { ...data, appointmentAt }, taggedRole));
-          markSent(matchId, type);
-          button3.textContent = "Kopiert";
-        }
-      } catch (error) {
-        console.warn("[Slack-Export] Kopieren fehlgeschlagen.", error);
-        button3.textContent = "Fehler";
-      } finally {
-        runtime.setTimeout(() => {
-          if (!button3.isConnected) return;
-          button3.disabled = false;
-          button3.textContent = exportButtonLabel(type, sentAt(matchId, type));
-          button3.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
-        }, 1200);
-      }
-    }
-    function addExports(row) {
-      const cell = appointmentCell(row);
-      const matchId = matchIdFromRow2(row);
-      if (!cell || !matchId || cell.querySelector(EXPORTS_SELECTOR)) return;
-      const exports = document.createElement("div");
-      exports.className = EXPORTS_SELECTOR.slice(1);
-      ["VTA", "VTV"].forEach((type) => {
-        const button3 = document.createElement("button");
-        button3.type = "button";
-        button3.className = "werkia-slack-export";
-        button3.textContent = exportButtonLabel(type, sentAt(matchId, type));
-        button3.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
-        button3.addEventListener("click", () => copyExport(button3, type));
-        exports.appendChild(button3);
-      });
-      const tip = helpTip?.();
-      if (tip) {
-        tip.style.alignSelf = "center";
-        exports.appendChild(tip);
-      }
-      cell.appendChild(exports);
-    }
-    function removeExports() {
-      document.querySelectorAll(EXPORTS_SELECTOR).forEach((element2) => element2.remove());
-    }
-    function syncExports() {
-      if (!isTargetPage7(location.hash, role)) {
-        removeExports();
-        return;
-      }
-      ensureStyle3();
-      document.querySelectorAll(ROW_SELECTOR8).forEach(addExports);
-    }
-    function scheduleSync() {
-      if (syncTimer !== null) return;
-      syncTimer = runtime.setTimeout(() => {
-        syncTimer = null;
-        syncExports();
-      }, 120);
-    }
-    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", scheduleSync);
-    runtime.addCleanup?.(() => {
-      if (syncTimer !== null) runtime.clearTimeout(syncTimer);
-      removeExports();
-      document.getElementById(STYLE_ID6)?.remove();
-    });
-    scheduleSync();
-  }
-
-  // src/features/kam-suite/slack-exports.js
-  var webhookUrl = true ? "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/vt/5d8e2f14-3a6b-4c9d-8e1f-2b7a9c4d6e03" : "";
-  function executeSlackExports2(runtime) {
-    executeSlackExports(runtime, {
-      role: "KAM",
-      getGraphqlAdapter: getKamGraphqlAdapter,
-      webhookUrl,
-      helpTip: () => kamHelp.tip("slack-exports"),
-      sourcePath: "kam/toolbox/src/features/kam-suite/slack-exports.js"
-    });
-  }
-
   // ../../shared/js/werkia-graphql/job-position-urgency-provider.js
   var URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
   var JOB_POSITION_URGENCY_QUERY = `query allJobPositions($filter: JobPositionFilter) {
@@ -8770,20 +8967,18 @@
 
   // src/features/kam-suite/match-slack-actions.js
   var defaultWebhookUrl = true ? "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
-  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
-  var VT_BLOCK_SELECTOR = ".werkia-slack-exports";
-  var VT_BUTTON_SELECTOR = ".werkia-slack-export";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
   var STYLE_ID7 = "werkia-kam-match-actions-style";
   var STORE_KEY = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
   var PENDING_TIMEOUT_MS = 20 * 60 * 1e3;
-  function isTargetPage8(hash = location.hash) {
+  function isTargetPage7(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function jobPositionIdFromHref(href) {
@@ -8839,12 +9034,12 @@
     }));
   }
   function executeMatchSlackActions(runtime, {
-    webhookUrl: webhookUrl2 = defaultWebhookUrl,
+    webhookUrl = defaultWebhookUrl,
     request = (...args) => getKamGraphqlAdapter().request(...args),
     post: postJson = gmPost
   } = {}) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/match-slack-actions.js");
-    if (!webhookUrl2) return;
+    if (!webhookUrl) return;
     const urgencyIndex = /* @__PURE__ */ new Map();
     const requested = /* @__PURE__ */ new Set();
     let loadPromise = null;
@@ -8870,7 +9065,7 @@
       saveStore(store);
     }
     function rows() {
-      return [...document.querySelectorAll(ROW_SELECTOR9)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR2));
     }
     function rowIds(row) {
       return {
@@ -8881,7 +9076,7 @@
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row) => rowIds(row).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle3() {
+    function ensureStyle4() {
       if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID7;
@@ -8902,7 +9097,7 @@
     `;
       document.head.appendChild(style);
     }
-    const post = (payload) => postJson(webhookUrl2, payload);
+    const post = (payload) => postJson(webhookUrl, payload);
     function applyState(button3, { state, label, title, disabled = false }) {
       if (button3.dataset.busy === "true") return;
       if (button3.textContent !== label) button3.textContent = label;
@@ -8953,18 +9148,6 @@
       }
     }
     function placeBar(row, bar) {
-      const vtBlock = row.querySelector(VT_BLOCK_SELECTOR);
-      const ownTip = bar.querySelector("[data-werkia-match-actions-tip]");
-      if (ownTip) ownTip.style.display = vtBlock ? "none" : "";
-      if (vtBlock) {
-        if (bar.parentElement !== vtBlock) {
-          const lastVtButton = [...vtBlock.querySelectorAll(VT_BUTTON_SELECTOR)].pop();
-          if (lastVtButton) lastVtButton.after(bar);
-          else vtBlock.appendChild(bar);
-        }
-        row.querySelectorAll(`.${FALLBACK_BLOCK_CLASS}`).forEach((block) => block.remove());
-        return;
-      }
       let fallback = row.querySelector(`.${FALLBACK_BLOCK_CLASS}`);
       if (!fallback) {
         const cell = row.querySelector(INTERVIEW_CELL_SELECTOR) || row.querySelector(".column-jobPositionId");
@@ -8997,7 +9180,7 @@
       push.dataset.action = "push";
       push.addEventListener("click", () => onPushClick(push, jobPositionId, matchId));
       bar.append(urgent, push);
-      const tip = kamHelp.tip("slack-exports");
+      const tip = kamHelp.tip("match-slack-actions");
       if (tip) {
         tip.dataset.werkiaMatchActionsTip = "true";
         bar.appendChild(tip);
@@ -9048,7 +9231,7 @@
       if (pollTimer !== null) return;
       pollTimer = runtime.setTimeout(async () => {
         pollTimer = null;
-        if (!isTargetPage8()) return;
+        if (!isTargetPage7()) return;
         const ids = openPendingIds();
         if (!ids.length) return;
         await loadUrgency(ids);
@@ -9059,11 +9242,11 @@
       document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element2) => element2.remove());
     }
     function sync() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage7()) {
         removeBars();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -9078,7 +9261,7 @@
     runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleSync);
     runtime.setInterval(() => {
-      if (isTargetPage8()) loadUrgency(visibleJobPositionIds());
+      if (isTargetPage7()) loadUrgency(visibleJobPositionIds());
     }, REFRESH_INTERVAL_MS4);
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
@@ -9177,7 +9360,7 @@
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS = "werkia-slack-dm-button";
   var IDS3 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
@@ -9234,15 +9417,15 @@
     });
     let syncTimer = null;
     let closeTimer = null;
-    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle3() {
+    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    function ensureStyle4() {
       if (document.getElementById(IDS3.style)) return;
       const style = document.createElement("style");
       style.id = IDS3.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
-    function el5(tag, props = {}, children = []) {
+    function el6(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {
         if (key === "className") element2.className = value;
@@ -9265,7 +9448,7 @@
       const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
       if (existing?.dataset.matchId === target.matchId) return;
       existing?.remove();
-      const button3 = el5("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
+      const button3 = el6("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
       button3.dataset.matchId = target.matchId;
       button3.dataset.werkiaSlackDmOwner = sourcePath;
       button3.addEventListener("click", (event) => {
@@ -9302,46 +9485,46 @@
     function renderPreview(dialog, preview) {
       const details = dialog.querySelector("dl");
       details.replaceChildren();
-      const row = (label, value) => details.append(el5("dt", { text: label }), el5("dd", {}, value));
+      const row = (label, value) => details.append(el6("dt", { text: label }), el6("dd", {}, value));
       row("Kandidat", preview.kandidat || "–");
       row("Vakanz", vacancyLine(preview) || "–");
-      row("Match", el5("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
+      row("Match", el6("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
       const recipients = preview.empfaenger || [];
       const reachable = recipients.filter((entry) => entry.erreichbar);
-      const list = el5("span");
-      if (!recipients.length) list.append(el5("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
+      const list = el6("span");
+      if (!recipients.length) list.append(el6("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
       recipients.forEach((entry, index) => {
         if (index) list.append(document.createTextNode(", "));
-        list.append(el5("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
+        list.append(el6("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
       });
       row("An", list);
       return reachable.length > 0;
     }
     async function openDialog(matchId) {
       closeDialog();
-      ensureStyle3();
-      const comment = el5("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
-      const count = el5("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
+      ensureStyle4();
+      const comment = el6("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const count = el6("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
       });
-      const sendButton = el5("button", { type: "button", className: "sd-primary", text: "Senden" });
+      const sendButton = el6("button", { type: "button", className: "sd-primary", text: "Senden" });
       sendButton.disabled = true;
       const tip = helpTip ? helpTip() : null;
-      const card = el5("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
-        el5("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
-        el5("div", { className: "sd-head" }, [el5("h2", { text: `${config.label} schicken` }), tip]),
-        el5("dl", {}, [el5("dt", { text: "Match" }), el5("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el5("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
+      const card = el6("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
+        el6("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
+        el6("div", { className: "sd-head" }, [el6("h2", { text: `${config.label} schicken` }), tip]),
+        el6("dl", {}, [el6("dt", { text: "Match" }), el6("dd", { className: "sd-muted", text: "Wird geladen …" })]),
+        el6("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
-        el5("div", { className: "sd-status" }),
-        el5("div", { className: "sd-foot" }, [
-          el5("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
+        el6("div", { className: "sd-status" }),
+        el6("div", { className: "sd-foot" }, [
+          el6("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
           sendButton
         ])
       ]);
-      const dialog = el5("div", { id: IDS3.dialog }, card);
+      const dialog = el6("div", { id: IDS3.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -9374,12 +9557,12 @@
       }
     }
     function sync() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         removeButtons();
         return;
       }
-      ensureStyle3();
-      document.querySelectorAll(ROW_SELECTOR10).forEach(addButton);
+      ensureStyle4();
+      document.querySelectorAll(ROW_SELECTOR9).forEach(addButton);
     }
     function scheduleSync() {
       if (syncTimer !== null) return;
@@ -9943,7 +10126,7 @@
     const MATCHES_MAX_PAGES = 25;
     async function matchesForEmployer(employerId) {
       const filter = { employerIds: [employerId] };
-      const byId = /* @__PURE__ */ new Map();
+      const byId2 = /* @__PURE__ */ new Map();
       for (let page = 0; page < MATCHES_MAX_PAGES; page += 1) {
         const data = await graphqlRequestWithRetry(MATCHES_BY_EMPLOYER_QUERY, {
           filter,
@@ -9953,11 +10136,11 @@
           sortOrder: "DESC"
         });
         const items = data?.items || [];
-        items.forEach((item) => byId.set(item.id, item));
+        items.forEach((item) => byId2.set(item.id, item));
         const total = Number(data?.total?.count);
-        if (items.length < MATCHES_PER_PAGE || Number.isFinite(total) && byId.size >= total) break;
+        if (items.length < MATCHES_PER_PAGE || Number.isFinite(total) && byId2.size >= total) break;
       }
-      return [...byId.values()];
+      return [...byId2.values()];
     }
     async function openInterviewIdsForMatch(matchId) {
       const perPage = 100;
@@ -11305,7 +11488,7 @@ ${buildCbreBody(current)}`;
     helpTip = () => kamHelp.tip("focus-modes")
   } = {}) {
     runtime.registerSource(SOURCE_PATH);
-    const isTargetPage9 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
+    const isTargetPage8 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
     const allModes = () => [...BUILT_IN_MODES, ...storage.load()];
     const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY), null));
     const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY));
@@ -11317,7 +11500,7 @@ ${buildCbreBody(current)}`;
       });
       return mePromise;
     };
-    function ensureStyle3() {
+    function ensureStyle4() {
       if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
       style.id = IDS5.style;
@@ -11548,14 +11731,14 @@ ${buildCbreBody(current)}`;
       if (element2 && element2.hidden !== hidden) element2.hidden = hidden;
     }
     function render() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         clearColumnFocus(document);
         document.getElementById(IDS5.group)?.remove();
         document.getElementById(IDS5.bar)?.remove();
         closeDialog();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       const own = storage.load();
       const state = parseListState(location.hash);
       let active = readActive();
@@ -11747,12 +11930,12 @@ ${buildCbreBody(current)}`;
     let state = null;
     let editing = null;
     let adminsOpen = false;
-    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element2 = document.getElementById(id);
       return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
     };
-    function ensureStyle3() {
+    function ensureStyle4() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
       style.id = IDS6.style;
@@ -11790,14 +11973,14 @@ ${buildCbreBody(current)}`;
     `;
       document.head.appendChild(style);
     }
-    function el5(tag, props = {}, children = []) {
+    function el6(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       Object.assign(element2, props);
       element2.append(...children.filter((child) => child !== null && child !== void 0));
       return element2;
     }
     function button3(text, onClick, className = "") {
-      return el5("button", { type: "button", textContent: text, className, onclick: onClick });
+      return el6("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
@@ -11860,19 +12043,19 @@ ${buildCbreBody(current)}`;
       }
     }
     function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el5("select");
-      select.append(el5("option", { value: "", textContent: "Bitte wählen …" }));
+      const select = el6("select");
+      select.append(el6("option", { value: "", textContent: "Bitte wählen …" }));
       for (const person of people) {
-        select.append(el5("option", { value: person.id, textContent: person.name }));
+        select.append(el6("option", { value: person.id, textContent: person.name }));
       }
       select.value = value || "";
       if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
       return select;
     }
     function entryRow(entry) {
-      const who = el5("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el5("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el5("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const who = el6("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el6("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el6("span", { className: "wv-badge", textContent: "läuft" }) : null;
       const actions = entry.darfBearbeiten ? [
         button3("Bearbeiten", () => {
           editing = entry;
@@ -11880,7 +12063,7 @@ ${buildCbreBody(current)}`;
         }, "wv-secondary"),
         confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
-      const row = el5("li", {}, [who, when, badge, ...actions]);
+      const row = el6("li", {}, [who, when, badge, ...actions]);
       if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
       return row;
     }
@@ -11889,8 +12072,8 @@ ${buildCbreBody(current)}`;
       const { ich } = state;
       const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
       const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el5("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el5("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const von = el6("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el6("input", { type: "date", value: editing ? editing.bis : today, min: today });
       const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
         const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
         const problem = validateDraft(ich, draft, today);
@@ -11905,31 +12088,31 @@ ${buildCbreBody(current)}`;
         render();
       }, "wv-secondary") : null;
       return [
-        el5("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el5("div", { className: "wv-form" }, [
-          el5("label", { textContent: "Abwesend" }),
+        el6("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el6("div", { className: "wv-form" }, [
+          el6("label", { textContent: "Abwesend" }),
           abwesend,
-          el5("label", { textContent: "Vertretung" }),
+          el6("label", { textContent: "Vertretung" }),
           vertretung,
-          el5("label", { textContent: "Von" }),
+          el6("label", { textContent: "Von" }),
           von,
-          el5("label", { textContent: "Bis (einschließlich)" }),
+          el6("label", { textContent: "Bis (einschließlich)" }),
           bis
         ]),
-        el5("div", { className: "wv-actions" }, [save, cancel])
+        el6("div", { className: "wv-actions" }, [save, cancel])
       ];
     }
     function adminSection() {
       const { ich } = state;
       const admins = state.admins || [];
-      const list = el5("ul");
+      const list = el6("ul");
       admins.forEach((admin) => {
         const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el5("li", {}, [el5("span", { className: "wv-who", textContent: admin.name }), remove]));
+        list.append(el6("li", {}, [el6("span", { className: "wv-who", textContent: admin.name }), remove]));
       });
       const parts = [
-        el5("summary", { textContent: `Admins (${admins.length})` }),
-        el5("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        el6("summary", { textContent: `Admins (${admins.length})` }),
+        el6("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
         list
       ];
       if (ich.darfAlles) {
@@ -11941,9 +12124,9 @@ ${buildCbreBody(current)}`;
           }
           run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
         }, "wv-secondary");
-        parts.push(el5("div", { className: "wv-actions" }, [candidate, add]));
+        parts.push(el6("div", { className: "wv-actions" }, [candidate, add]));
       }
-      const details = el5("details", { className: "wv-admins" }, parts);
+      const details = el6("details", { className: "wv-admins" }, parts);
       details.open = adminsOpen;
       details.addEventListener("toggle", () => {
         adminsOpen = details.open;
@@ -11958,24 +12141,24 @@ ${buildCbreBody(current)}`;
       if (!target) return;
       target.textContent = "";
       const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el5("ul");
-      if (!state.eintraege.length) list.append(el5("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      const list = el6("ul");
+      if (!state.eintraege.length) list.append(el6("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
       state.eintraege.forEach((entry) => list.append(entryRow(entry)));
       const tip = helpTip?.();
       target.append(
-        el5("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el5("p", { textContent: intro }),
+        el6("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el6("p", { textContent: intro }),
         list,
         ...form(),
         adminSection(),
-        el5("div", { className: "wv-status" }),
-        el5("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
+        el6("div", { className: "wv-status" }),
+        el6("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
       );
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle3();
-      const overlay = el5("div", { id: IDS6.dialog });
+      ensureStyle4();
+      const overlay = el6("div", { id: IDS6.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -11983,26 +12166,26 @@ ${buildCbreBody(current)}`;
       const close = button3("×", closeDialog, "wv-close");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const target = el5("div", { className: "wv-body" }, [
-        el5("h2", { textContent: "Vertretungen" }),
-        el5("div", { className: "wv-status", textContent: "Lädt …" })
+      const target = el6("div", { className: "wv-body" }, [
+        el6("h2", { textContent: "Vertretungen" }),
+        el6("div", { className: "wv-status", textContent: "Lädt …" })
       ]);
-      overlay.append(el5("div", { className: "wv-card" }, [close, target]));
+      overlay.append(el6("div", { className: "wv-card" }, [close, target]));
       document.body.appendChild(overlay);
       try {
         await refresh();
       } catch (error) {
         setStatus(error.message || String(error), true);
-        target.append(el5("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
+        target.append(el6("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
       }
     }
     function placeButton() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         owned(IDS6.button)?.remove();
         owned(IDS6.bar)?.remove();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       const slot = findSlot(document);
       const existing = owned(IDS6.button);
       if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
@@ -12037,7 +12220,7 @@ ${buildCbreBody(current)}`;
       owned(IDS6.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el5("div", { id: IDS6.bar }, [vertretungenButton]);
+      const bar = el6("div", { id: IDS6.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
@@ -12086,9 +12269,9 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
-  var RETRY_MS = 60 * 1e3;
-  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
-  function tiptapOf2(element2) {
+  var RETRY_MS2 = 60 * 1e3;
+  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
+  function tiptapOf3(element2) {
     try {
       return element2.wrappedJSObject?.editor || element2.editor || null;
     } catch {
@@ -12117,7 +12300,7 @@ ${buildCbreBody(current)}`;
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
-      if (fresh || Date.now() - failedAt < RETRY_MS) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS2) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
@@ -12140,7 +12323,7 @@ ${buildCbreBody(current)}`;
       return cache.aktiv;
     }
     function attach(element2) {
-      const editor = tiptapOf2(element2);
+      const editor = tiptapOf3(element2);
       if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
       attached.add(element2);
       const handled = /* @__PURE__ */ new Set();
@@ -12179,7 +12362,7 @@ ${buildCbreBody(current)}`;
       });
     }
     runtime.setInterval(() => {
-      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR2)) {
+      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR3)) {
         if (!attached.has(element2)) attach(element2);
       }
     }, SCAN_MS);
@@ -12369,6 +12552,7 @@ ${buildCbreBody(current)}`;
     button: "werkia-prio-button",
     bar: "werkia-prio-bar",
     panel: "werkia-prio-panel",
+    tab: "werkia-prio-tab",
     review: "werkia-prio-review",
     style: "werkia-prio-style"
   };
@@ -12377,7 +12561,7 @@ ${buildCbreBody(current)}`;
     prioFirst: "werkia-prio-zuerst",
     reviewDay: "werkia-prio-popup-tag"
   };
-  var ROW_SELECTOR11 = "tr.RaDataTable-row";
+  var ROW_SELECTOR10 = "tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
   var STAR_CLASS = "werkia-prio-star";
   var REFRESH_MS2 = 5 * 60 * 1e3;
@@ -12404,7 +12588,7 @@ ${buildCbreBody(current)}`;
   function rowGroups(tbody) {
     const groups = [];
     for (const child of [...tbody.children]) {
-      if (child.matches(ROW_SELECTOR11)) groups.push([child]);
+      if (child.matches(ROW_SELECTOR10)) groups.push([child]);
       else if (groups.length) groups[groups.length - 1].push(child);
     }
     return groups;
@@ -12474,7 +12658,7 @@ ${buildCbreBody(current)}`;
     let epoch = 0;
     let wasSorted = false;
     let lastPageKey = "";
-    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element2 = document.getElementById(id);
       return element2?.dataset.werkiaPrioOwner === sourcePath ? element2 : null;
@@ -12482,16 +12666,16 @@ ${buildCbreBody(current)}`;
     const today = () => berlinDay2(now());
     const collapsed = () => store.get(STORAGE_KEYS.collapsed) === "1";
     const prioFirst = () => store.get(STORAGE_KEYS.prioFirst) === "1";
-    function el5(tag, props = {}, children = []) {
+    function el6(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       Object.assign(element2, props);
       element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element2;
     }
-    const button3 = (text, onClick, className = "", title = "") => el5("button", { type: "button", textContent: text, className, title, onclick: onClick });
-    function ensureStyle3() {
+    const button3 = (text, onClick, className = "", title = "") => el6("button", { type: "button", textContent: text, className, title, onclick: onClick });
+    function ensureStyle4() {
       if (document.getElementById(IDS7.style)) return;
-      const style = el5("style", { id: IDS7.style });
+      const style = el6("style", { id: IDS7.style });
       const P = `#${IDS7.panel}`;
       const R = `#${IDS7.review}`;
       style.textContent = `
@@ -12502,6 +12686,9 @@ ${buildCbreBody(current)}`;
       #${IDS7.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
       #${IDS7.button}[data-active="1"] { color:${T.accentInk} !important; }
       ${P}, ${R} .wp-card { box-sizing:border-box; color:${T.ink}; background:${T.surface}; border:1px solid ${T.line}; border-radius:10px; box-shadow:${T.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
+      #${IDS7.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS7.tab}:hover { border-color:${T.accent}; }
+      #${IDS7.tab} svg { width:14px; height:14px; fill:currentColor; }
       ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
       ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T.line}; }
       ${P} .wp-title { font-weight:650; font-size:13px; }
@@ -12685,7 +12872,7 @@ ${buildCbreBody(current)}`;
         const prioButton = button3("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
         prioButton.id = IDS7.button;
         prioButton.dataset.werkiaPrioOwner = sourcePath;
-        prioButton.append(el5("span", { className: "wp-label" }));
+        prioButton.append(el6("span", { className: "wp-label" }));
         if (slot) {
           owned(IDS7.bar)?.remove();
           const look = nativeLookFrom(slot.sample);
@@ -12702,7 +12889,7 @@ ${buildCbreBody(current)}`;
           if (!anchor?.parentElement) return;
           prioButton.className = "wp-own";
           owned(IDS7.bar)?.remove();
-          const bar = el5("div", { id: IDS7.bar }, [prioButton]);
+          const bar = el6("div", { id: IDS7.bar }, [prioButton]);
           bar.dataset.werkiaPrioOwner = sourcePath;
           anchor.parentElement.insertBefore(bar, anchor);
         }
@@ -12730,28 +12917,38 @@ ${buildCbreBody(current)}`;
       store.set(STORAGE_KEYS.collapsed, collapsed() ? "0" : "1");
       tick();
     }
-    function positionPanel(panel) {
-      const anchor = owned(IDS7.button);
-      const rect = anchor?.getBoundingClientRect?.();
-      const top = rect && rect.bottom > 0 ? Math.max(56, Math.round(rect.bottom + 6)) : 64;
-      const value = `${top}px`;
-      if (panel.style.top !== value) panel.style.top = value;
+    function placeTab() {
+      let tab = owned(IDS7.tab);
+      if (!collapsed()) {
+        tab?.remove();
+        return;
+      }
+      if (!tab) {
+        tab = button3("", togglePanel, "", "Prio-Liste öffnen");
+        tab.id = IDS7.tab;
+        tab.dataset.werkiaPrioOwner = sourcePath;
+        tab.append(starIcon("14px"), el6("span", { className: "wp-label" }));
+        document.body.appendChild(tab);
+      }
+      const label = tab.querySelector(".wp-label");
+      const text = buttonLabel();
+      if (label.textContent !== text) label.textContent = text;
     }
     function placePanel2() {
       let panel = owned(IDS7.panel);
+      placeTab();
       if (collapsed()) {
         panel?.remove();
         return;
       }
       if (!panel) {
-        panel = el5("div", { id: IDS7.panel });
+        panel = el6("div", { id: IDS7.panel });
         panel.dataset.werkiaPrioOwner = sourcePath;
         panel.setAttribute("role", "region");
         panel.setAttribute("aria-label", "Prio-Liste");
         document.body.appendChild(panel);
         renderPanel();
       }
-      positionPanel(panel);
     }
     function extrasFor(employerId) {
       if (!renderEmployerExtras || !employerId) return null;
@@ -12765,23 +12962,23 @@ ${buildCbreBody(current)}`;
         extrasCache.set(employerId, element3);
       }
       const element2 = extrasCache.get(employerId);
-      return element2 ? el5("div", { className: "wp-extra" }, [element2]) : null;
+      return element2 ? el6("div", { className: "wp-extra" }, [element2]) : null;
     }
     function entryItem(entry, readOnly) {
-      const check = el5("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
+      const check = el6("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
       check.addEventListener("change", () => saveEntry(entry, { erledigt: check.checked }));
-      const name = el5("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
-      const tag = entry.uebertragen ? el5("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
-      const actions = readOnly ? el5("span") : el5("span", { className: "wp-actions" }, [
+      const name = el6("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
+      const tag = entry.uebertragen ? el6("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
+      const actions = readOnly ? el6("span") : el6("span", { className: "wp-actions" }, [
         button3("✎", () => {
           editingId = entry.id;
           renderPanel();
         }, "wp-icon", "Notiz bearbeiten"),
         button3("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
       ]);
-      const parts = [check, el5("div", {}, [name, tag]), actions];
+      const parts = [check, el6("div", {}, [name, tag]), actions];
       if (editingId === entry.id && !readOnly) {
-        const input = el5("input", { type: "text", value: entry.notiz, placeholder: "Kurze Notiz", maxLength: 300 });
+        const input = el6("input", { type: "text", value: entry.notiz, placeholder: "Kurze Notiz", maxLength: 300 });
         const save = () => {
           editingId = "";
           saveEntry(entry, { notiz: input.value.trim() });
@@ -12798,18 +12995,18 @@ ${buildCbreBody(current)}`;
             renderPanel();
           }
         });
-        parts.push(el5("div", { className: "wp-edit" }, [input, button3("Speichern", save, "wp-btn wp-primary")]));
+        parts.push(el6("div", { className: "wp-edit" }, [input, button3("Speichern", save, "wp-btn wp-primary")]));
         runtime.setTimeout(() => input.focus(), 0);
       } else if (entry.notiz) {
-        parts.push(el5("div", { className: "wp-notiz", textContent: entry.notiz }));
+        parts.push(el6("div", { className: "wp-notiz", textContent: entry.notiz }));
       }
       parts.push(extrasFor(entry.employerId));
-      return el5("li", { className: entry.erledigt ? "wp-done" : "" }, parts);
+      return el6("li", { className: entry.erledigt ? "wp-done" : "" }, parts);
     }
     function pageEmployers() {
       const onList = prioEmployerIds(entries, today());
       const found = /* @__PURE__ */ new Map();
-      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
+      for (const row of document.querySelectorAll(ROW_SELECTOR10)) {
         const employer = employerOfRow(row);
         if (employer && !onList.has(employer.id) && !found.has(employer.id)) found.set(employer.id, employer.name || "Unbekannter Arbeitgeber");
       }
@@ -12817,20 +13014,20 @@ ${buildCbreBody(current)}`;
     }
     function addForm() {
       const choices = pageEmployers();
-      if (!choices.length) return el5("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
-      const select = el5("select", { disabled: busy }, [el5("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
-      choices.forEach(([id, name]) => select.append(el5("option", { value: id, textContent: name })));
+      if (!choices.length) return el6("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
+      const select = el6("select", { disabled: busy }, [el6("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
+      choices.forEach(([id, name]) => select.append(el6("option", { value: id, textContent: name })));
       const add = button3("Hinzufügen", () => {
         if (!select.value) return;
         addEmployer(select.value, select.selectedOptions[0].textContent);
       }, "wp-btn", "Auf die heutige Prio-Liste setzen");
       add.disabled = busy;
-      return el5("div", { className: "wp-add" }, [select, add]);
+      return el6("div", { className: "wp-add" }, [select, add]);
     }
     function viewSelect() {
       if (!absent.length) return null;
-      const select = el5("select", { title: "Wessen Liste anzeigen" }, [el5("option", { value: "", textContent: "Meine Liste" })]);
-      absent.forEach((person) => select.append(el5("option", { value: person.id, textContent: `Liste von ${person.name || "vertretener Person"} (Vertretung)` })));
+      const select = el6("select", { title: "Wessen Liste anzeigen" }, [el6("option", { value: "", textContent: "Meine Liste" })]);
+      absent.forEach((person) => select.append(el6("option", { value: person.id, textContent: `Liste von ${person.name || "vertretener Person"} (Vertretung)` })));
       select.value = view;
       select.addEventListener("change", () => {
         view = select.value;
@@ -12846,56 +13043,56 @@ ${buildCbreBody(current)}`;
       const day = today();
       const tip = helpTip?.() || null;
       const close = button3("–", togglePanel, "wp-icon", "Einklappen");
-      const head = el5("div", { className: "wp-head" }, [el5("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el5("span", { style: "flex:1" }), close]);
-      const sw = el5("input", { type: "checkbox", checked: prioFirst() });
+      const head = el6("div", { className: "wp-head" }, [el6("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el6("span", { style: "flex:1" }), close]);
+      const sw = el6("input", { type: "checkbox", checked: prioFirst() });
       sw.addEventListener("change", () => {
         store.set(STORAGE_KEYS.prioFirst, sw.checked ? "1" : "0");
         renderRows();
       });
-      const switchRow = el5("label", { className: "wp-switch", title: "Zeilen dieser Seite mit Arbeitgebern der Prio-Liste nach oben" }, [sw, document.createTextNode("Prio zuerst")]);
-      const body = el5("div", { className: "wp-body" });
-      const status = el5("div", { className: `wp-status${error ? " wp-error" : ""}`, textContent: error || message });
+      const switchRow = el6("label", { className: "wp-switch", title: "Zeilen dieser Seite mit Arbeitgebern der Prio-Liste nach oben" }, [sw, document.createTextNode("Prio zuerst")]);
+      const body = el6("div", { className: "wp-body" });
+      const status = el6("div", { className: `wp-status${error ? " wp-error" : ""}`, textContent: error || message });
       if (view) {
         const state = foreign.get(view) || { entries: [], loading: true, error: "" };
         const person = absent.find((item) => item.id === view);
-        if (state.loading) body.append(el5("p", { className: "wp-hint", textContent: "Lädt …" }));
-        else if (state.error) body.append(el5("div", { className: "wp-status wp-error", textContent: state.error }));
+        if (state.loading) body.append(el6("p", { className: "wp-hint", textContent: "Lädt …" }));
+        else if (state.error) body.append(el6("div", { className: "wp-status wp-error", textContent: state.error }));
         else {
           const list = entriesForDay(state.entries, day);
-          body.append(el5("p", { className: "wp-hint", textContent: `Nur lesen: Prio-Liste von ${person?.name || "der vertretenen Person"}.` }));
-          if (!list.length) body.append(el5("p", { className: "wp-hint", textContent: "Heute steht nichts drauf." }));
-          else body.append(el5("ul", {}, list.map((entry) => entryItem(entry, true))));
+          body.append(el6("p", { className: "wp-hint", textContent: `Nur lesen: Prio-Liste von ${person?.name || "der vertretenen Person"}.` }));
+          if (!list.length) body.append(el6("p", { className: "wp-hint", textContent: "Heute steht nichts drauf." }));
+          else body.append(el6("ul", {}, list.map((entry) => entryItem(entry, true))));
         }
         panel.replaceChildren(head, body);
         return;
       }
-      if (!loaded && !error) body.append(el5("p", { className: "wp-hint", textContent: "Lädt …" }));
+      if (!loaded && !error) body.append(el6("p", { className: "wp-hint", textContent: "Lädt …" }));
       if (!loaded && error) {
-        body.append(status, el5("div", { className: "wp-add" }, [button3("Erneut laden", () => load2({ force: true }), "wp-btn")]));
+        body.append(status, el6("div", { className: "wp-add" }, [button3("Erneut laden", () => load2({ force: true }), "wp-btn")]));
         panel.replaceChildren(head, switchRow, body);
         return;
       }
       if (loaded) {
         const list = entriesForDay(entries, day);
-        if (!list.length) body.append(el5("p", { className: "wp-hint", textContent: "Heute steht noch nichts auf der Liste." }));
-        else body.append(el5("ul", {}, list.map((entry) => entryItem(entry, false))));
+        if (!list.length) body.append(el6("p", { className: "wp-hint", textContent: "Heute steht noch nichts auf der Liste." }));
+        else body.append(el6("ul", {}, list.map((entry) => entryItem(entry, false))));
         body.append(addForm());
         const later = laterEntries(entries, day);
         const open = openEntries(entries, day);
         const footer = [];
         if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay2(later[0].tag)}). `));
         if (open.length) footer.push(button3("Tag abschließen …", () => openReview(), "wp-link"));
-        if (footer.length) body.append(el5("p", { className: "wp-hint" }, footer));
+        if (footer.length) body.append(el6("p", { className: "wp-hint" }, footer));
         body.append(status);
       }
       panel.replaceChildren(head, switchRow, body);
     }
     function renderRows() {
-      if (!isTargetPage9()) return;
+      if (!isTargetPage8()) return;
       const day = today();
       const ids = prioEmployerIds(entries, day);
       const ready = loaded || Boolean(error);
-      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
+      for (const row of document.querySelectorAll(ROW_SELECTOR10)) {
         const employer = employerOfRow(row);
         if (!employer) continue;
         const flag = ids.has(employer.id) ? "1" : "";
@@ -12906,7 +13103,7 @@ ${buildCbreBody(current)}`;
         if (!ready) continue;
         let star = employer.link.previousElementSibling;
         if (!star?.classList?.contains(STAR_CLASS)) {
-          star = el5("button", { type: "button", className: STAR_CLASS });
+          star = el6("button", { type: "button", className: STAR_CLASS });
           star.dataset.werkiaPrioOwner = sourcePath;
           star.append(starIcon());
           star.addEventListener("click", (event) => {
@@ -12941,7 +13138,7 @@ ${buildCbreBody(current)}`;
     function applyOrder(ids) {
       const on = prioFirst();
       if (!on && !wasSorted) return;
-      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR11)].map((row) => row.parentElement))) {
+      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR10)].map((row) => row.parentElement))) {
         const groups = rowGroups(tbody);
         if (groups.some((group) => !natural.has(group[0]))) {
           epoch += 1;
@@ -12965,11 +13162,11 @@ ${buildCbreBody(current)}`;
       const day = today();
       const open = openEntries(entries, day);
       if (!open.length) return;
-      ensureStyle3();
+      ensureStyle4();
       const decisions = new Map(open.map((entry) => [entry.id, "morgen"]));
-      const status = el5("div", { className: "wp-status" });
+      const status = el6("div", { className: "wp-status" });
       const items = open.map((entry) => {
-        const seg = el5("span", { className: "wp-seg" });
+        const seg = el6("span", { className: "wp-seg" });
         const choices = [["erledigt", "Erledigt"], ["morgen", "Auf morgen"]].map(([value, label]) => {
           const choice = button3(label, () => {
             decisions.set(entry.id, value);
@@ -12980,7 +13177,7 @@ ${buildCbreBody(current)}`;
         });
         seg.append(...choices);
         const sub = [entry.uebertragen ? `übertragen vom ${formatDay2(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
-        return el5("li", {}, [el5("div", { className: "wp-who" }, [el5("b", { textContent: entry.employerName }), sub ? el5("span", { textContent: sub }) : null]), seg]);
+        return el6("li", {}, [el6("div", { className: "wp-who" }, [el6("b", { textContent: entry.employerName }), sub ? el6("span", { textContent: sub }) : null]), seg]);
       });
       const save = button3("Übernehmen", async () => {
         const saves = reviewSaves(open, decisions, day);
@@ -13006,17 +13203,17 @@ ${buildCbreBody(current)}`;
         closeReview();
       }, "wp-btn wp-primary");
       const later = button3("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
-      const card = el5("div", { className: "wp-card" });
+      const card = el6("div", { className: "wp-card" });
       card.setAttribute("role", "dialog");
       card.setAttribute("aria-label", "Prio-Liste: Tag abschließen");
       card.append(
-        el5("h2", { textContent: "Prio-Liste: Tag abschließen" }),
-        el5("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
-        el5("ul", {}, items),
+        el6("h2", { textContent: "Prio-Liste: Tag abschließen" }),
+        el6("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
+        el6("ul", {}, items),
         status,
-        el5("div", { className: "wp-foot" }, [later, save])
+        el6("div", { className: "wp-foot" }, [later, save])
       );
-      const overlay = el5("div", { id: IDS7.review }, [card]);
+      const overlay = el6("div", { id: IDS7.review }, [card]);
       overlay.dataset.werkiaPrioOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeReview();
@@ -13035,13 +13232,14 @@ ${buildCbreBody(current)}`;
       if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
     }
     function tick() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         owned(IDS7.button)?.remove();
         owned(IDS7.bar)?.remove();
         owned(IDS7.panel)?.remove();
+        owned(IDS7.tab)?.remove();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       placeButton();
       placePanel2();
       renderRows();
@@ -13070,13 +13268,9 @@ ${buildCbreBody(current)}`;
       closeReview();
     }, true);
     runtime.addWindowListener("hashchange", () => {
-      if (isTargetPage9()) load2();
+      if (isTargetPage8()) load2();
       schedule();
     });
-    runtime.addWindowListener("scroll", () => {
-      const panel = owned(IDS7.panel);
-      if (panel) positionPanel(panel);
-    }, { passive: true });
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.setInterval(() => {
       checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
@@ -13085,6 +13279,7 @@ ${buildCbreBody(current)}`;
       owned(IDS7.button)?.remove();
       owned(IDS7.bar)?.remove();
       owned(IDS7.panel)?.remove();
+      owned(IDS7.tab)?.remove();
       closeReview();
       document.querySelectorAll(`.${STAR_CLASS}`).forEach((star) => {
         if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
@@ -13522,20 +13717,23 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/comment-shortcuts/core.js
   var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
   var GROUPS = [
+    { id: "haeufig", label: "Häufig" },
     { id: "kontakt", label: "Kontakt" },
     { id: "termine", label: "Termine" },
     { id: "unterlagen", label: "Unterlagen" },
     // Ohne Ziel: keine Knöpfe, nur Tooltip.
     { id: "profil", label: "Personen und Profil" }
   ];
+  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
+  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
   var RAW = [
     // Kontakt und Erreichbarkeit
-    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG"],
+    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
     ["kontakt", "te", "AP telefonisch erreicht", "AG"],
     ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
-    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true }],
+    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
     ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
-    ["kontakt", "Mail raus", "Mail verschickt", "AG"],
+    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
     ["kontakt", "WA", "WhatsApp", "AG/M"],
     ["kontakt", "VC", "Videocall", "AG/M"],
     ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
@@ -13554,7 +13752,7 @@ ${buildCbreBody(current)}`;
     ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
     ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
     ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
-    ["termine", "TB", "Terminbestätigung", "M"],
+    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
     // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
     ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
     ["termine", "digi", "digitaler Termin", "M"],
@@ -13605,27 +13803,49 @@ ${buildCbreBody(current)}`;
     text,
     ziel,
     label: extra.label || kuerzel,
+    einfuegen: extra.einfuegen || extra.label || kuerzel,
+    optionen: Object.freeze([...extra.optionen || []]),
     varianten: Object.freeze([...extra.varianten || []]),
     unbestaetigt: Boolean(extra.unbestaetigt),
     hinweis: extra.hinweis || ""
   })));
-  var AG_NOTE_TAGS = Object.freeze(["Matches"]);
-  var writesMatch = (ziel) => ziel === TARGETS.M || ziel === TARGETS.AG_M;
-  var writesEmployer = (ziel) => ziel === TARGETS.AG || ziel === TARGETS.AG_M;
-  function targetLabel(ziel) {
-    if (ziel === TARGETS.AG) return "AG-Notiz";
-    if (ziel === TARGETS.M) return "Matchkommentar";
-    if (ziel === TARGETS.AG_M) return "AG-Notiz und Matchkommentar";
-    return "";
+  var PHRASE_RAW = [
+    ["AP tne, SA raus", TNE_OPTIONS],
+    ["Mail raus", MAIL_OPTIONS],
+    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
+    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
+    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
+    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
+    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
+  ];
+  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
+    id: `haeufig:${text}`,
+    gruppe: "haeufig",
+    kuerzel: text,
+    text,
+    ziel: TARGETS.M,
+    label: text,
+    einfuegen: text,
+    optionen: Object.freeze([...optionen]),
+    varianten: Object.freeze([]),
+    unbestaetigt: false,
+    hinweis: "",
+    satz: true
+  })));
+  function buttonGroups(shortcuts = SHORTCUTS, phrases = PHRASES) {
+    const items = [...phrases, ...shortcuts];
+    return GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.gruppe === group.id && item.ziel) })).filter((group) => group.items.length);
   }
-  function buttonGroups(shortcuts = SHORTCUTS) {
-    return GROUPS.map((group) => ({ ...group, items: shortcuts.filter((item) => item.gruppe === group.id && item.ziel) })).filter((group) => group.items.length);
-  }
-  function buttonTitle(item) {
-    const parts = [`${item.label}: ${item.text} → ${targetLabel(item.ziel)}`];
+  function buttonTitle2(item) {
+    const parts = [item.satz ? "In den Matchkommentar schreiben" : `${item.label}: ${item.text}`];
+    if (!item.satz && item.einfuegen !== item.label) parts.push(`schreibt „${item.einfuegen}“`);
     if (item.hinweis) parts.push(item.hinweis);
     if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    if (item.optionen.length) parts.push("Rechtsklick: weitere Varianten");
     return parts.join(" · ");
+  }
+  function menuOptions(item) {
+    return [.../* @__PURE__ */ new Set([item.einfuegen, ...item.optionen])];
   }
   function explainTitle(item, token = item.kuerzel) {
     const parts = [`${token}: ${item.text}`];
@@ -13689,27 +13909,6 @@ ${buildCbreBody(current)}`;
   function templateEntry({ id, titel, text }) {
     return { ...id ? { id } : {}, daten: { titel: String(titel).trim(), text: String(text).replace(/\s+$/, "") } };
   }
-  var MATCH_JOB_POSITION_QUERY2 = `query WerkiaShortcutsMatch($filter: MatchFilter, $perPage: Int) {
-  items: allMatches(filter: $filter, perPage: $perPage) { id jobPositionId }
-}`;
-  var JOB_POSITION_EMPLOYER_QUERY2 = `query WerkiaShortcutsJobPosition($filter: JobPositionFilter) {
-  items: allJobPositions(filter: $filter) { id employer { id name } }
-}`;
-  function matchIdFromHref5(href) {
-    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
-  }
-  function employerIdFromHref2(href) {
-    return String(href || "").match(/#\/Employer\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
-  }
-  async function resolveEmployer(request, matchId) {
-    if (!matchId) return null;
-    const matches = await request(MATCH_JOB_POSITION_QUERY2, { filter: { ids: [matchId] }, perPage: 1 });
-    const jobPositionId = (matches?.items || []).find((item) => String(item?.id) === String(matchId))?.jobPositionId;
-    if (!jobPositionId) return null;
-    const jobs = await request(JOB_POSITION_EMPLOYER_QUERY2, { filter: { ids: [jobPositionId] } });
-    const employer = (jobs?.items || []).find((item) => String(item?.id) === String(jobPositionId))?.employer;
-    return employer?.id ? { id: String(employer.id), name: String(employer.name || "") } : null;
-  }
 
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
@@ -13749,7 +13948,7 @@ ${buildCbreBody(current)}`;
       return null;
     }
   }
-  function ensureStyle(doc) {
+  function ensureStyle2(doc) {
     if (doc.getElementById(STYLE_ID8)) return;
     const style = doc.createElement("style");
     style.id = STYLE_ID8;
@@ -13776,7 +13975,7 @@ ${buildCbreBody(current)}`;
       const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
       if (shown === key) return;
       shown = key;
-      ensureStyle(document);
+      ensureStyle2(document);
       let tip = document.getElementById(EXPLAIN_ID);
       if (!tip) {
         tip = document.createElement("div");
@@ -13826,27 +14025,22 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/comment-shortcuts/index.js
-  var PREFIX = "werkia-shortcuts";
-  var STYLE_ID9 = `${PREFIX}-style`;
-  var BAR_CLASS3 = `${PREFIX}-bar`;
-  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
-  var DIALOG_SELECTOR = 'div[role="dialog"], .MuiDialog-paper';
-  var ROW_SELECTOR12 = "tr";
-  var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
-  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
-  var EMPLOYER_LINK_SELECTOR7 = 'a[href*="#/Employer/"]';
-  var GROUP_STORAGE_KEY = `${PREFIX}-group`;
+  var PREFIX2 = "werkia-shortcuts";
+  var STYLE_ID9 = `${PREFIX2}-style`;
+  var BAR_CLASS3 = `${PREFIX2}-bar`;
+  var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
+  var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
+  var GROUP_STORAGE_KEY = `${PREFIX2}-group`;
   var TEMPLATES_TAB = "vorlagen";
-  var FEEDBACK_MS = 5e3;
   var GROUPS2 = buttonGroups();
-  function tiptapOf3(element2) {
+  function tiptapOf4(element2) {
     try {
       return element2?.wrappedJSObject?.editor || element2?.editor || null;
     } catch {
       return null;
     }
   }
-  function el3(tag, props = {}, ...children) {
+  function el4(tag, props = {}, ...children) {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
       if (value === void 0 || value === null || value === false) continue;
@@ -13860,7 +14054,7 @@ ${buildCbreBody(current)}`;
     node.append(...children.flat().filter((child) => child !== null && child !== void 0 && child !== false));
     return node;
   }
-  var keepFocus = (event) => event.preventDefault();
+  var keepFocus2 = (event) => event.preventDefault();
   function storageGet(key, fallback) {
     try {
       return localStorage.getItem(key) ?? fallback;
@@ -13874,7 +14068,7 @@ ${buildCbreBody(current)}`;
     } catch {
     }
   }
-  function isDark(element2) {
+  function isDark2(element2) {
     let node = element2;
     while (node && node.nodeType === 1) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
@@ -13886,7 +14080,7 @@ ${buildCbreBody(current)}`;
     return false;
   }
   function insertIntoEditor(editorElement, text) {
-    const editor = tiptapOf3(editorElement);
+    const editor = tiptapOf4(editorElement);
     const multiline = /\n/.test(text);
     if (editor?.chain && editor.state?.selection) {
       const { $from } = editor.state.selection;
@@ -13908,7 +14102,7 @@ ${buildCbreBody(current)}`;
     const before = node?.nodeType === 3 ? node.textContent.slice(0, selection.anchorOffset) : "";
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
-  function ensureStyle2() {
+  function ensureStyle3() {
     if (document.getElementById(STYLE_ID9)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID9;
@@ -13925,65 +14119,57 @@ ${buildCbreBody(current)}`;
       --ws-line:#232326; --ws-line-strong:#303034; --ws-accent:#ff8a33; --ws-accent-ink:#ff9a4d; --ws-accent-soft:#26170b;
       --ws-navy:#7ea6d4; --ws-good:#3fbf3f; --ws-bad:#e86a6a;
     }
-    .${BAR_CLASS3} { display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:6px 8px; border:1px solid var(--ws-line); border-radius:8px; background:var(--ws-surface); }
+    .${BAR_CLASS3} { position:relative; display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:6px 8px; border:1px solid var(--ws-line); border-radius:8px; background:var(--ws-surface); }
     .${BAR_CLASS3} button, .${BAR_CLASS3} input, .${BAR_CLASS3} textarea { font:inherit; color:inherit; }
     .${BAR_CLASS3} :focus-visible { outline:2px solid var(--ws-accent); outline-offset:1px; }
-    .${PREFIX}-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; }
-    .${PREFIX}-tab { border:0; background:transparent; padding:3px 8px; border-radius:6px; cursor:pointer; color:var(--ws-ink2); font-weight:500; }
-    .${PREFIX}-tab:hover { background:var(--ws-sunken); color:var(--ws-ink); }
-    .${PREFIX}-tab[aria-pressed="true"] { background:var(--ws-accent-soft); color:var(--ws-accent-ink); font-weight:600; }
-    .${PREFIX}-legend { margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--ws-muted); font-size:11px; }
-    .${PREFIX}-legend i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:3px; vertical-align:-1px; }
-    .${PREFIX}-keys { display:flex; flex-wrap:wrap; gap:4px; }
-    .${PREFIX}-key { min-height:24px; padding:2px 8px; border:1px solid var(--ws-line-strong); border-left-width:3px; border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
-    .${PREFIX}-key:hover { background:var(--ws-sunken); }
-    .${PREFIX}-key[data-ziel="AG"] { border-left-color:var(--ws-navy); }
-    .${PREFIX}-key[data-ziel="M"] { border-left-color:var(--ws-line-strong); }
-    .${PREFIX}-key[data-ziel="AG/M"] { border-left-color:var(--ws-accent); }
-    .${PREFIX}-key[data-unbestaetigt] { border-style:dashed; border-left-style:solid; }
-    .${PREFIX}-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-    .${PREFIX}-ag { padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
-    .${PREFIX}-ag input { flex:1 1 220px; min-width:160px; height:26px; padding:0 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
-    .${PREFIX}-tag { padding:1px 6px; border-radius:4px; background:var(--ws-surface); border:1px solid var(--ws-line); color:var(--ws-navy); font-weight:600; }
-    .${PREFIX}-btn { height:26px; padding:0 10px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:500; }
-    .${PREFIX}-btn:hover:not(:disabled) { border-color:var(--ws-ink2); }
-    .${PREFIX}-btn:disabled { opacity:.5; cursor:default; }
-    .${PREFIX}-btn[data-tone="primary"] { border-color:var(--ws-accent); background:var(--ws-accent); color:#fff; }
-    .${PREFIX}-btn[data-tone="danger"] { color:var(--ws-bad); }
-    .${PREFIX}-link { border:0; background:transparent; padding:0 2px; color:var(--ws-ink2); cursor:pointer; text-decoration:underline; }
-    .${PREFIX}-status { color:var(--ws-ink2); }
-    .${PREFIX}-status[data-kind="ok"] { color:var(--ws-good); font-weight:600; }
-    .${PREFIX}-status[data-kind="error"] { color:var(--ws-bad); }
-    .${PREFIX}-templates { display:flex; flex-direction:column; gap:4px; }
-    .${PREFIX}-template { display:flex; align-items:center; gap:6px; }
-    .${PREFIX}-template .${PREFIX}-key { border-left-color:var(--ws-line-strong); font-weight:500; max-width:420px; overflow:hidden; text-overflow:ellipsis; }
-    .${PREFIX}-form { display:flex; flex-direction:column; gap:6px; padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
-    .${PREFIX}-form input, .${PREFIX}-form textarea { padding:4px 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
-    .${PREFIX}-form textarea { min-height:90px; resize:vertical; }
+    .${PREFIX2}-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; }
+    .${PREFIX2}-tab { border:0; background:transparent; padding:3px 8px; border-radius:6px; cursor:pointer; color:var(--ws-ink2); font-weight:500; }
+    .${PREFIX2}-tab:hover { background:var(--ws-sunken); color:var(--ws-ink); }
+    .${PREFIX2}-tab[aria-pressed="true"] { background:var(--ws-accent-soft); color:var(--ws-accent-ink); font-weight:600; }
+    .${PREFIX2}-help { margin-left:auto; display:flex; align-items:center; }
+    .${PREFIX2}-key i { margin-left:4px; color:var(--ws-muted); font-style:normal; font-weight:400; font-size:10px; }
+    .${PREFIX2}-menu { position:absolute; z-index:5; display:flex; flex-direction:column; min-width:180px; max-width:420px; padding:4px; border:1px solid var(--ws-line-strong); border-radius:8px; background:var(--ws-surface); box-shadow:0 8px 24px -12px rgba(9,9,11,.35); }
+    .${PREFIX2}-menu button { text-align:left; border:0; background:transparent; padding:5px 8px; border-radius:6px; cursor:pointer; white-space:normal; }
+    .${PREFIX2}-menu button:hover, .${PREFIX2}-menu button:focus-visible { background:var(--ws-sunken); }
+    .${PREFIX2}-menu button:first-child { font-weight:600; }
+    .${PREFIX2}-keys { display:flex; flex-wrap:wrap; gap:4px; }
+    .${PREFIX2}-key { min-height:24px; padding:2px 8px; border:1px solid var(--ws-line-strong); border-left-width:3px; border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
+    .${PREFIX2}-key:hover { background:var(--ws-sunken); }
+    .${PREFIX2}-key[data-unbestaetigt] { border-style:dashed; border-left-style:solid; }
+    .${PREFIX2}-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+    .${PREFIX2}-btn { height:26px; padding:0 10px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:500; }
+    .${PREFIX2}-btn:hover:not(:disabled) { border-color:var(--ws-ink2); }
+    .${PREFIX2}-btn:disabled { opacity:.5; cursor:default; }
+    .${PREFIX2}-btn[data-tone="primary"] { border-color:var(--ws-accent); background:var(--ws-accent); color:#fff; }
+    .${PREFIX2}-btn[data-tone="danger"] { color:var(--ws-bad); }
+    .${PREFIX2}-link { border:0; background:transparent; padding:0 2px; color:var(--ws-ink2); cursor:pointer; text-decoration:underline; }
+    .${PREFIX2}-status { color:var(--ws-ink2); }
+    .${PREFIX2}-status[data-kind="ok"] { color:var(--ws-good); font-weight:600; }
+    .${PREFIX2}-status[data-kind="error"] { color:var(--ws-bad); }
+    .${PREFIX2}-templates { display:flex; flex-direction:column; gap:4px; }
+    .${PREFIX2}-template { display:flex; align-items:center; gap:6px; }
+    .${PREFIX2}-template .${PREFIX2}-key { border-left-color:var(--ws-line-strong); font-weight:500; max-width:420px; overflow:hidden; text-overflow:ellipsis; }
+    .${PREFIX2}-form { display:flex; flex-direction:column; gap:6px; padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
+    .${PREFIX2}-form input, .${PREFIX2}-form textarea { padding:4px 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
+    .${PREFIX2}-form textarea { min-height:90px; resize:vertical; }
   `;
     document.head.appendChild(style);
   }
   function executeCommentShortcuts(runtime, {
     sourcePath,
-    getGraphqlAdapter,
-    getNotesProvider,
     getTemplatesClient,
     helpTip = () => null
   } = {}) {
     runtime.registerSource(sourcePath);
     executeShortcutExplainer(runtime);
-    let clickedMatch = { id: "", employer: null };
-    const employers = /* @__PURE__ */ new Map();
     const groupIds = GROUPS2.map((group) => group.id);
     let activeTab = storageGet(GROUP_STORAGE_KEY, groupIds[0]);
     if (activeTab !== "" && activeTab !== TEMPLATES_TAB && !groupIds.includes(activeTab)) activeTab = groupIds[0];
-    let ag = null;
-    let agFeedbackTimer = null;
     const templates = { state: "idle", items: [], error: "" };
     let form = null;
     const currentBar = () => document.querySelector(`.${BAR_CLASS3}`);
     function findDialog() {
-      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR3));
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR4));
       return dialogs[dialogs.length - 1] || null;
     }
     function editorBoxFor(editor, dialog) {
@@ -13995,57 +14181,36 @@ ${buildCbreBody(current)}`;
       }
       return editor.parentElement || editor;
     }
-    function dialogMatchId() {
-      return clickedMatch.id || matchIdFromHref5(location.hash);
-    }
-    function employerFor(matchId) {
-      if (!matchId) return Promise.resolve(null);
-      if (!employers.has(matchId)) {
-        const known = clickedMatch.id === matchId ? clickedMatch.employer : null;
-        const promise = known ? Promise.resolve(known) : resolveEmployer(getGraphqlAdapter().request, matchId);
-        employers.set(matchId, promise);
-        promise.catch(() => employers.delete(matchId));
-      }
-      return employers.get(matchId);
-    }
     function renderBar() {
       const bar = currentBar();
       if (!bar) return;
-      const tabs = el3(
+      const tabs = el4(
         "div",
-        { class: `${PREFIX}-tabs` },
-        GROUPS2.map((group2) => el3("button", {
+        { class: `${PREFIX2}-tabs` },
+        GROUPS2.map((group2) => el4("button", {
           type: "button",
-          class: `${PREFIX}-tab`,
+          class: `${PREFIX2}-tab`,
           "aria-pressed": String(activeTab === group2.id),
           dataset: { tab: group2.id },
           text: group2.label,
-          onmousedown: keepFocus,
+          onmousedown: keepFocus2,
           onclick: () => selectTab(group2.id)
         })),
-        el3("button", {
+        el4("button", {
           type: "button",
-          class: `${PREFIX}-tab`,
+          class: `${PREFIX2}-tab`,
           "aria-pressed": String(activeTab === TEMPLATES_TAB),
           dataset: { tab: TEMPLATES_TAB },
           text: "Vorlagen",
-          onmousedown: keepFocus,
+          onmousedown: keepFocus2,
           onclick: () => selectTab(TEMPLATES_TAB)
         }),
-        el3(
-          "span",
-          { class: `${PREFIX}-legend` },
-          el3("span", {}, el3("i", { style: "background:var(--ws-navy)" }), "AG-Notiz"),
-          el3("span", {}, el3("i", { style: "background:var(--ws-line-strong)" }), "Kommentar"),
-          el3("span", {}, el3("i", { style: "background:var(--ws-accent)" }), "beides"),
-          helpTip()
-        )
+        el4("span", { class: `${PREFIX2}-help` }, helpTip())
       );
       const parts = [tabs];
       const group = GROUPS2.find((item) => item.id === activeTab);
       if (group) parts.push(renderKeys(group));
       if (activeTab === TEMPLATES_TAB) parts.push(renderTemplates());
-      if (ag) parts.push(renderAg());
       bar.replaceChildren(...parts);
     }
     function selectTab(id) {
@@ -14055,146 +14220,58 @@ ${buildCbreBody(current)}`;
       renderBar();
     }
     function renderKeys(group) {
-      return el3("div", { class: `${PREFIX}-keys` }, group.items.map((item) => el3("button", {
+      return el4("div", { class: `${PREFIX2}-keys` }, group.items.map((item) => el4("button", {
         type: "button",
-        class: `${PREFIX}-key`,
-        title: buttonTitle(item),
-        dataset: { ziel: item.ziel, kuerzel: item.kuerzel, ...item.unbestaetigt ? { unbestaetigt: "" } : {} },
-        text: item.label,
-        onmousedown: keepFocus,
-        onclick: () => applyShortcut(item)
-      })));
+        class: `${PREFIX2}-key`,
+        title: buttonTitle2(item),
+        dataset: { kuerzel: item.kuerzel, ...item.unbestaetigt ? { unbestaetigt: "" } : {}, ...item.optionen.length ? { optionen: "" } : {} },
+        onmousedown: keepFocus2,
+        onclick: () => applyShortcut(item),
+        oncontextmenu: (event) => {
+          if (item.optionen.length) {
+            event.preventDefault();
+            openMenu(item, event.currentTarget);
+          }
+        }
+      }, item.label, item.optionen.length ? el4("i", { "aria-hidden": "true", text: "▾" }) : null)));
+    }
+    function closeMenu() {
+      currentBar()?.querySelector(`.${PREFIX2}-menu`)?.remove();
+    }
+    function openMenu(item, anchor) {
+      const bar = currentBar();
+      if (!bar) return;
+      closeMenu();
+      const menu = el4(
+        "div",
+        { class: `${PREFIX2}-menu`, role: "menu", "aria-label": `Varianten zu ${item.label}` },
+        menuOptions(item).map((text) => el4("button", {
+          type: "button",
+          role: "menuitem",
+          text,
+          onmousedown: keepFocus2,
+          onclick: () => {
+            closeMenu();
+            insertText(text);
+          }
+        }))
+      );
+      const barBox = bar.getBoundingClientRect();
+      const box = anchor.getBoundingClientRect();
+      menu.style.left = `${Math.max(0, Math.round(box.left - barBox.left))}px`;
+      menu.style.top = `${Math.round(box.bottom - barBox.top + 4)}px`;
+      bar.appendChild(menu);
     }
     function editorElement() {
-      return findDialog()?.querySelector(EDITOR_SELECTOR3) || null;
+      return findDialog()?.querySelector(EDITOR_SELECTOR4) || null;
+    }
+    function insertText(text) {
+      const editor = editorElement();
+      if (editor) insertIntoEditor(editor, text);
     }
     function applyShortcut(item) {
-      if (writesMatch(item.ziel)) {
-        const editor = editorElement();
-        if (editor) insertIntoEditor(editor, item.label);
-      }
-      if (writesEmployer(item.ziel)) openAg(item.label);
-    }
-    function openAg(text) {
-      runtime.clearTimeout?.(agFeedbackTimer);
-      const matchId = dialogMatchId();
-      ag = { text, matchId, employer: null, state: matchId ? "resolving" : "nomatch", message: "" };
-      const current = ag;
-      renderBar();
-      currentBar()?.querySelector(`.${PREFIX}-ag input`)?.focus();
-      if (!matchId) return;
-      employerFor(matchId).then((employer) => {
-        if (ag !== current) return;
-        ag.employer = employer;
-        ag.state = employer ? "ready" : "noemployer";
-        updateAg();
-      }, (error) => {
-        if (ag !== current) return;
-        ag.state = "error";
-        ag.message = `Arbeitgeber nicht gefunden: ${error?.message || error}`;
-        updateAg();
-      });
-    }
-    function updateAg() {
-      const bar = currentBar();
-      const row = bar?.querySelector(`.${PREFIX}-ag`);
-      if (!bar) return;
-      const input = row?.querySelector("input");
-      if (ag && input) ag.text = input.value;
-      const hadFocus = input && document.activeElement === input;
-      const next = ag ? renderAg() : null;
-      if (row && next) row.replaceWith(next);
-      else if (row) row.remove();
-      else if (next) bar.appendChild(next);
-      if (hadFocus) next?.querySelector("input")?.focus();
-    }
-    function agLabel() {
-      if (!ag) return "";
-      if (ag.state === "nomatch") return "Kein Match erkannt. Die AG-Notiz bitte im Arbeitgeberprofil anlegen.";
-      if (ag.state === "resolving") return "Arbeitgeber wird gesucht …";
-      if (ag.state === "noemployer") return "Zu diesem Match wurde kein Arbeitgeber gefunden.";
-      const name = ag.employer?.name || "Arbeitgeber";
-      return `AG-Notiz für ${name}:`;
-    }
-    function renderAg() {
-      const canSave = Boolean(ag.employer?.id) && !["saving", "saved"].includes(ag.state);
-      const statusKind = ag.state === "saved" ? "ok" : ag.state === "error" || ag.state === "failed" ? "error" : "";
-      if (ag.state === "saved") {
-        return el3(
-          "div",
-          { class: `${PREFIX}-ag ${PREFIX}-row` },
-          el3("span", { class: `${PREFIX}-status`, dataset: { kind: "ok" }, text: ag.message })
-        );
-      }
-      const input = el3("input", {
-        type: "text",
-        value: ag.text,
-        "aria-label": "Text der AG-Notiz",
-        onkeydown: (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.stopPropagation();
-            if (canSave) saveAg();
-          }
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            closeAg();
-          }
-        },
-        oninput: (event) => {
-          ag.text = event.target.value;
-        }
-      });
-      return el3(
-        "div",
-        { class: `${PREFIX}-ag`, role: "group", "aria-label": "AG-Notiz bestätigen" },
-        el3(
-          "div",
-          { class: `${PREFIX}-row` },
-          el3("span", { class: `${PREFIX}-status`, text: agLabel() }),
-          el3("span", { class: `${PREFIX}-tag`, title: "Tag der AG-Notiz: erscheint im Matchkommentar-Dialog", text: AG_NOTE_TAGS.map((tag) => `[${tag}]`).join("") }),
-          input,
-          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { tone: "primary", action: "ag-save" }, disabled: !canSave, text: ag.state === "saving" ? "Speichert …" : "Speichern", onclick: saveAg }),
-          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "ag-cancel" }, text: "Abbrechen", onclick: closeAg })
-        ),
-        ag.message ? el3("div", { class: `${PREFIX}-status`, dataset: { kind: statusKind }, text: ag.message }) : null
-      );
-    }
-    function closeAg() {
-      ag = null;
-      updateAg();
-    }
-    async function saveAg() {
-      if (!ag?.employer?.id || ag.state === "saving") return;
-      const input = currentBar()?.querySelector(`.${PREFIX}-ag input`);
-      if (input) ag.text = input.value;
-      const text = String(ag.text || "").trim();
-      if (!text) {
-        ag.state = "failed";
-        ag.message = "Die Notiz ist leer.";
-        updateAg();
-        return;
-      }
-      const current = ag;
-      ag.state = "saving";
-      ag.message = "";
-      updateAg();
-      try {
-        await getNotesProvider().create(current.employer.id, [...AG_NOTE_TAGS], text);
-        if (ag !== current) return;
-        ag.state = "saved";
-        ag.message = `✓ AG-Notiz für ${current.employer.name || "den Arbeitgeber"} gespeichert.`;
-        updateAg();
-        agFeedbackTimer = runtime.setTimeout(() => {
-          if (ag === current) closeAg();
-        }, FEEDBACK_MS);
-      } catch (error) {
-        if (ag !== current) return;
-        ag.state = "failed";
-        ag.message = `Nicht gespeichert: ${error?.message || error}`;
-        updateAg();
-      }
+      closeMenu();
+      insertText(item.einfuegen);
     }
     async function loadTemplates() {
       templates.state = "loading";
@@ -14211,54 +14288,54 @@ ${buildCbreBody(current)}`;
       if (activeTab === TEMPLATES_TAB) renderBar();
     }
     function renderTemplates() {
-      const box = el3("div", { class: `${PREFIX}-templates` });
+      const box = el4("div", { class: `${PREFIX2}-templates` });
       if (templates.state === "loading" || templates.state === "idle") {
-        box.append(el3("span", { class: `${PREFIX}-status`, text: "Vorlagen werden geladen …" }));
+        box.append(el4("span", { class: `${PREFIX2}-status`, text: "Vorlagen werden geladen …" }));
         return box;
       }
       if (templates.state === "error") {
-        box.append(el3(
+        box.append(el4(
           "div",
-          { class: `${PREFIX}-row` },
-          el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: templates.error }),
-          el3("button", { type: "button", class: `${PREFIX}-link`, text: "Erneut versuchen", onclick: loadTemplates })
+          { class: `${PREFIX2}-row` },
+          el4("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: templates.error }),
+          el4("button", { type: "button", class: `${PREFIX2}-link`, text: "Erneut versuchen", onclick: loadTemplates })
         ));
         return box;
       }
       if (!templates.items.length && !form) {
-        box.append(el3("span", { class: `${PREFIX}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
+        box.append(el4("span", { class: `${PREFIX2}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
       }
       for (const template of templates.items) {
         if (form?.id === template.id) continue;
-        box.append(el3(
+        box.append(el4(
           "div",
-          { class: `${PREFIX}-template` },
-          el3("button", {
+          { class: `${PREFIX2}-template` },
+          el4("button", {
             type: "button",
-            class: `${PREFIX}-key`,
+            class: `${PREFIX2}-key`,
             title: template.text,
             dataset: { vorlage: template.id },
             text: template.titel,
-            onmousedown: keepFocus,
+            onmousedown: keepFocus2,
             onclick: () => {
               const editor = editorElement();
               if (editor) insertIntoEditor(editor, template.text);
             }
           }),
-          el3("button", { type: "button", class: `${PREFIX}-link`, text: "Ändern", onclick: () => openForm(template) })
+          el4("button", { type: "button", class: `${PREFIX2}-link`, text: "Ändern", onclick: () => openForm(template) })
         ));
       }
       if (form) box.append(renderForm());
-      else box.append(el3("div", {}, el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
+      else box.append(el4("div", {}, el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
       return box;
     }
     function openForm(template) {
       form = { id: template?.id || "", titel: template?.titel || "", text: template?.text || "", error: "", saving: false, confirmDelete: false };
       renderBar();
-      currentBar()?.querySelector(`.${PREFIX}-form input`)?.focus();
+      currentBar()?.querySelector(`.${PREFIX2}-form input`)?.focus();
     }
     function readForm() {
-      const box = currentBar()?.querySelector(`.${PREFIX}-form`);
+      const box = currentBar()?.querySelector(`.${PREFIX2}-form`);
       if (!box || !form) return;
       form.titel = box.querySelector("input").value;
       form.text = box.querySelector("textarea").value;
@@ -14272,23 +14349,23 @@ ${buildCbreBody(current)}`;
           renderBar();
         }
       };
-      return el3(
+      return el4(
         "div",
-        { class: `${PREFIX}-form` },
-        el3("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
-        el3("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
-        form.error ? el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: form.error }) : null,
-        el3(
+        { class: `${PREFIX2}-form` },
+        el4("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
+        el4("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
+        form.error ? el4("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: form.error }) : null,
+        el4(
           "div",
-          { class: `${PREFIX}-row` },
-          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
-          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
+          { class: `${PREFIX2}-row` },
+          el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
+          el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
             form = null;
             renderBar();
           } }),
-          form.id ? el3("button", {
+          form.id ? el4("button", {
             type: "button",
-            class: `${PREFIX}-btn`,
+            class: `${PREFIX2}-btn`,
             dataset: { tone: "danger", action: "template-delete" },
             disabled: form.saving,
             text: form.confirmDelete ? "Wirklich löschen?" : "Löschen",
@@ -14341,33 +14418,32 @@ ${buildCbreBody(current)}`;
       }
       renderBar();
     }
-    runtime.addDocumentListener("click", (event) => {
-      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
-      if (!button3) return;
-      const row = button3.closest(ROW_SELECTOR12);
-      const matchId = matchIdFromHref5(row?.querySelector(MATCH_LINK_SELECTOR8)?.getAttribute("href"));
-      const link = row?.querySelector(EMPLOYER_LINK_SELECTOR7);
-      const employerId = employerIdFromHref2(link?.getAttribute("href"));
-      clickedMatch = { id: matchId, employer: employerId ? { id: employerId, name: (link.textContent || "").trim() } : null };
+    runtime.addDocumentListener("mousedown", (event) => {
+      if (!event.target?.closest?.(`.${PREFIX2}-menu`)) closeMenu();
+    }, true);
+    runtime.addDocumentListener("keydown", (event) => {
+      if (event.key === "Escape" && currentBar()?.querySelector(`.${PREFIX2}-menu`)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeMenu();
+      }
     }, true);
     function sync() {
       const dialog = findDialog();
       const existing = currentBar();
       if (!dialog) {
         if (existing) existing.remove();
-        ag = null;
         return;
       }
-      const editor = dialog.querySelector(EDITOR_SELECTOR3);
+      const editor = dialog.querySelector(EDITOR_SELECTOR4);
       const box = editorBoxFor(editor, dialog);
       if (existing && !dialog.contains(existing)) existing.remove();
       let bar = currentBar();
       if (!bar) {
-        ensureStyle2();
-        ag = null;
+        ensureStyle3();
         form = null;
-        bar = el3("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
-        bar.dataset.mode = isDark(dialog) ? "dark" : "light";
+        bar = el4("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
+        bar.dataset.mode = isDark2(dialog) ? "dark" : "light";
         box.parentElement?.insertBefore(bar, box);
         renderBar();
         if (activeTab === TEMPLATES_TAB && templates.state === "idle") loadTemplates();
@@ -14392,10 +14468,18 @@ ${buildCbreBody(current)}`;
   function executeKamCommentShortcuts(runtime) {
     executeCommentShortcuts(runtime, {
       sourcePath: "kam/toolbox/src/features/comment-shortcuts.js",
-      getGraphqlAdapter: getKamGraphqlAdapter,
-      getNotesProvider: () => employerNotesProviderFor(getKamGraphqlAdapter()),
       getTemplatesClient: () => toolboxDatenClientFor(getKamGraphqlAdapter()),
       helpTip: () => kamHelp.tip("comment-shortcuts")
+    });
+  }
+
+  // src/features/match-mention.js
+  function executeKamMatchMention(runtime) {
+    executeMatchMention(runtime, {
+      kind: "cem",
+      sourcePath: "kam/toolbox/src/features/match-mention.js",
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      helpTip: () => kamHelp.tip("match-mention")
     });
   }
 
@@ -14690,9 +14774,11 @@ ${buildCbreBody(current)}`;
   };
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
   var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
-  var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
+  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
+  var CLOCK_MS = 1e3;
+  var tickSlot = (nowMs) => Math.floor(nowMs / TICK_MS2);
   var WERKIA_REFRESH_MS = 10 * 60 * 1e3;
   var WERKIA_RETRY_MS = 2 * 60 * 1e3;
   var DATEN_REFRESH_MS = 5 * 60 * 1e3;
@@ -14710,7 +14796,7 @@ ${buildCbreBody(current)}`;
     svg.append(shape);
     return svg;
   }
-  function el4(tag, props = {}, children = []) {
+  function el5(tag, props = {}, children = []) {
     const element2 = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
       if (key === "style") element2.style.cssText = value;
@@ -14721,7 +14807,7 @@ ${buildCbreBody(current)}`;
     return element2;
   }
   function button2(text, onClick, className = "wtp-secondary") {
-    return el4("button", { type: "button", textContent: text, className, onclick: onClick });
+    return el5("button", { type: "button", textContent: text, className, onclick: onClick });
   }
   var CSS2 = `
   .wtp { --plane:#fafafa; --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
@@ -14807,7 +14893,7 @@ ${buildCbreBody(current)}`;
     let myId = "";
     let teamEditing = null;
     const reported = /* @__PURE__ */ new Set();
-    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element2 = document.getElementById(id);
       return element2?.dataset.werkiaTagesplanOwner === sourcePath ? element2 : null;
@@ -14817,9 +14903,9 @@ ${buildCbreBody(current)}`;
       element2.classList.add("wtp");
       return element2;
     };
-    function ensureStyle3() {
+    function ensureStyle4() {
       if (document.getElementById(IDS8.style)) return;
-      document.head.appendChild(el4("style", { id: IDS8.style, textContent: CSS2 }));
+      document.head.appendChild(el5("style", { id: IDS8.style, textContent: CSS2 }));
     }
     function readGesehen() {
       try {
@@ -14943,15 +15029,15 @@ ${buildCbreBody(current)}`;
     }
     function popupItem(item) {
       const parts = [
-        el4("div", { className: "wtp-title", textContent: item.titel }),
-        item.text ? el4("div", { className: "wtp-muted", textContent: item.text }) : null
+        el5("div", { className: "wtp-title", textContent: item.titel }),
+        item.text ? el5("div", { className: "wtp-muted", textContent: item.text }) : null
       ];
-      const actions = el4("div", { className: "wtp-row" });
-      if (item.matchId) actions.append(el4("a", { href: matchHref(item.matchId), textContent: "Match öffnen" }));
+      const actions = el5("div", { className: "wtp-row" });
+      if (item.matchId) actions.append(el5("a", { href: matchHref(item.matchId), textContent: "Match öffnen" }));
       if (item.art === "reminder") {
-        const later = el4("select", { title: "Später erinnern" }, [
-          el4("option", { value: "", textContent: "Später …" }),
-          ...SCHLUMMER_OPTIONEN.map((option) => el4("option", { value: option.id, textContent: option.label }))
+        const later = el5("select", { title: "Später erinnern" }, [
+          el5("option", { value: "", textContent: "Später …" }),
+          ...SCHLUMMER_OPTIONEN.map((option) => el5("option", { value: option.id, textContent: option.label }))
         ]);
         later.addEventListener("change", () => {
           if (later.value) reminderAction(item, later.value, later);
@@ -14965,7 +15051,7 @@ ${buildCbreBody(current)}`;
       const close = button2("×", () => markGesehen(item.key), "wtp-icon");
       close.title = "Ausblenden";
       close.style.float = "right";
-      const element2 = el4("div", { className: "wtp-item" }, [close, ...parts, actions, el4("div", { className: "wtp-status" })]);
+      const element2 = el5("div", { className: "wtp-item" }, [close, ...parts, actions, el5("div", { className: "wtp-status" })]);
       element2.dataset.key = item.key;
       return element2;
     }
@@ -14978,12 +15064,12 @@ ${buildCbreBody(current)}`;
       }
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
-      ensureStyle3();
-      const popup = existing || own(el4("div", { id: IDS8.popup, role: "alert" }));
+      ensureStyle4();
+      const popup = existing || own(el5("div", { id: IDS8.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
       popup.append(
-        el4("h2", {}, [document.createTextNode("Erinnerung"), helpTip("tagesplan-reminder")]),
+        el5("h2", {}, [document.createTextNode("Erinnerung"), helpTip("tagesplan-reminder")]),
         ...items.map(popupItem)
       );
       if (!existing) document.body.appendChild(popup);
@@ -15013,25 +15099,25 @@ ${buildCbreBody(current)}`;
     }
     function openReminderDialog(matchId) {
       closeDialog();
-      ensureStyle3();
-      const overlay = own(el4("div", { id: IDS8.dialog }));
+      ensureStyle4();
+      const overlay = own(el5("div", { id: IDS8.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const body = el4("div", { className: "wtp-body" });
+      const body = el5("div", { className: "wtp-body" });
       const close = button2("×", closeDialog, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.style.cssText = "position:absolute;top:10px;right:10px;";
-      overlay.append(el4("div", { className: "wtp-card" }, [close, body]));
+      overlay.append(el5("div", { className: "wtp-card" }, [close, body]));
       document.body.appendChild(overlay);
-      const status = el4("div", { className: "wtp-status" });
+      const status = el5("div", { className: "wtp-status" });
       const setStatus = (text, isError = false) => {
         status.textContent = text;
         status.classList.toggle("wtp-error", isError);
       };
       const render = () => {
         body.textContent = "";
-        const list = el4("ul");
+        const list = el5("ul");
         openReminders(matchId).forEach((entry) => {
           const remove = button2("Löschen", async () => {
             remove.disabled = true;
@@ -15045,12 +15131,12 @@ ${buildCbreBody(current)}`;
               setStatus(errorText(error), true);
             }
           }, "wtp-danger");
-          list.append(el4("li", {}, [el4("strong", { textContent: formatWhen(entry.faelligUm) }), el4("span", { textContent: entry.daten?.text || "" }), remove]));
+          list.append(el5("li", {}, [el5("strong", { textContent: formatWhen(entry.faelligUm) }), el5("span", { textContent: entry.daten?.text || "" }), remove]));
         });
         const preset = defaultReminderInput(now());
-        const tag = el4("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
-        const uhrzeit = el4("input", { type: "time", value: preset.uhrzeit, step: 300 });
-        const text = el4("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
+        const tag = el5("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
+        const uhrzeit = el5("input", { type: "time", value: preset.uhrzeit, step: 300 });
+        const text = el5("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
         const save = button2("Reminder speichern", async () => {
           const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value };
           const problem = validateReminderDraft(draft, now());
@@ -15079,12 +15165,12 @@ ${buildCbreBody(current)}`;
           if (event.key === "Enter") save.click();
         });
         body.append(
-          el4("h2", {}, [document.createTextNode("Reminder zum Match"), helpTip("tagesplan-reminder")]),
-          el4("h3", { textContent: "Offen" }),
-          openReminders(matchId).length ? list : el4("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
-          el4("h3", { textContent: "Neuer Reminder" }),
-          el4("div", { className: "wtp-grid" }, [el4("label", { textContent: "Wann" }), el4("div", { className: "wtp-row" }, [tag, uhrzeit]), el4("label", { textContent: "Woran" }), text]),
-          el4("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button2("Schließen", closeDialog)]),
+          el5("h2", {}, [document.createTextNode("Reminder zum Match"), helpTip("tagesplan-reminder")]),
+          el5("h3", { textContent: "Offen" }),
+          openReminders(matchId).length ? list : el5("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
+          el5("h3", { textContent: "Neuer Reminder" }),
+          el5("div", { className: "wtp-grid" }, [el5("label", { textContent: "Wann" }), el5("div", { className: "wtp-row" }, [tag, uhrzeit]), el5("label", { textContent: "Woran" }), text]),
+          el5("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button2("Schließen", closeDialog)]),
           status
         );
         text.focus?.();
@@ -15092,17 +15178,17 @@ ${buildCbreBody(current)}`;
       render();
     }
     function decorateRows() {
-      if (!isTargetPage9()) return;
-      for (const row of document.querySelectorAll(ROW_SELECTOR13)) {
-        const link = row.querySelector(MATCH_LINK_SELECTOR9);
+      if (!isTargetPage8()) return;
+      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
+        const link = row.querySelector(MATCH_LINK_SELECTOR8);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
         const cell = row.querySelector("td.column-buttons") || link.closest("td");
         if (!cell) continue;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
-          ensureStyle3();
-          rowButton = el4("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
+          ensureStyle4();
+          rowButton = el5("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
             event.preventDefault();
@@ -15126,9 +15212,9 @@ ${buildCbreBody(current)}`;
       teamEditing = null;
     }
     async function openPanel() {
-      ensureStyle3();
+      ensureStyle4();
       if (!owned(IDS8.panel)) {
-        const panel = own(el4("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
+        const panel = own(el5("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
       }
       renderPanel("Lädt …");
@@ -15143,19 +15229,19 @@ ${buildCbreBody(current)}`;
     }
     function entryElement(entry) {
       const tagLabel = { termin: "Termin", reminder: "Reminder", team: "Team", wvl: "WVL" }[entry.art];
-      const tag = el4("span", { className: `wtp-tag wtp-tag-${entry.art}`, textContent: tagLabel });
-      const time = el4("div", { className: entry.ueberfaellig ? "wtp-time wtp-late" : "wtp-time", textContent: entry.ueberfaellig ? "fällig" : entry.uhrzeit || "ganzer Tag" });
+      const tag = el5("span", { className: `wtp-tag wtp-tag-${entry.art}`, textContent: tagLabel });
+      const time = el5("div", { className: entry.ueberfaellig ? "wtp-time wtp-late" : "wtp-time", textContent: entry.ueberfaellig ? "fällig" : entry.uhrzeit || "ganzer Tag" });
       if (!entry.uhrzeit && !entry.ueberfaellig) time.classList.add("wtp-muted");
-      const main = el4("div", {}, [el4("div", { className: "wtp-title" }, [tag, document.createTextNode(entry.titel)])]);
-      const actions = el4("div", { className: "wtp-actions" });
+      const main = el5("div", {}, [el5("div", { className: "wtp-title" }, [tag, document.createTextNode(entry.titel)])]);
+      const actions = el5("div", { className: "wtp-actions" });
       if (entry.art === "termin") {
-        if (entry.detail) main.append(el4("div", { className: "wtp-muted", textContent: entry.detail }));
-        if (entry.ort) main.append(el4("div", { className: "wtp-muted", textContent: entry.ort }));
-        main.append(el4("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+        if (entry.detail) main.append(el5("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.ort) main.append(el5("div", { className: "wtp-muted", textContent: entry.ort }));
+        main.append(el5("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
       }
       if (entry.art === "reminder") {
-        if (entry.detail) main.append(el4("div", { className: "wtp-muted", textContent: entry.detail }));
-        if (entry.matchId) main.append(el4("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+        if (entry.detail) main.append(el5("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.matchId) main.append(el5("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
         if (!entry.erledigt) {
           const item = { reminder: entry.eintrag };
           actions.append(
@@ -15166,7 +15252,7 @@ ${buildCbreBody(current)}`;
       }
       if (entry.art === "team") {
         const sichtbar = describeSichtbarFuer(entry.eintrag.sichtbarFuer, ich?.personen || []);
-        main.append(el4("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
+        main.append(el5("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
         if (entry.eintrag.eigen && ich?.ich?.darfTeam) {
           actions.append(
             button2("Bearbeiten", () => {
@@ -15189,13 +15275,13 @@ ${buildCbreBody(current)}`;
         }
       }
       if (entry.art === "wvl") {
-        const list = el4("ul", {}, entry.wvl.map((item) => el4("li", {}, [
-          el4("a", { href: matchHref(item.matchId), textContent: item.kandidat }),
+        const list = el5("ul", {}, entry.wvl.map((item) => el5("li", {}, [
+          el5("a", { href: matchHref(item.matchId), textContent: item.kandidat }),
           document.createTextNode(` · ${item.arbeitgeber}${item.kamStatus ? ` · ${KAM_STATUS_LABELS2[item.kamStatus] || item.kamStatus}` : ""}`)
         ])));
-        main.append(el4("details", {}, [el4("summary", { textContent: "Matches anzeigen" }), list]));
+        main.append(el5("details", {}, [el5("summary", { textContent: "Matches anzeigen" }), list]));
       }
-      const element2 = el4("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
+      const element2 = el5("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
       if (actions.childElementCount) element2.append(actions);
       element2.dataset.art = entry.art;
       return element2;
@@ -15219,21 +15305,21 @@ ${buildCbreBody(current)}`;
       const editing = teamEditing && teamEditing.id ? teamEditing : null;
       const daten0 = editing?.daten || {};
       const sichtbar0 = parseSichtbarFuer(editing?.sichtbarFuer || "alle");
-      const tag = el4("input", { type: "date", value: daten0.tag || berlinDay2(now()) });
-      const uhrzeit = el4("input", { type: "time", value: daten0.uhrzeit || "", title: "Leer lassen für den ganzen Tag" });
-      const text = el4("textarea", { value: daten0.text || "", maxLength: 500, placeholder: "z. B. 10:00 Teamrunde, danach Feedbacks nachfassen" });
-      const art = el4("select", {}, [
-        el4("option", { value: "alle", textContent: "Alle" }),
-        el4("option", { value: "team", textContent: "Ein Team" }),
-        el4("option", { value: "personen", textContent: "Einzelne Personen" })
+      const tag = el5("input", { type: "date", value: daten0.tag || berlinDay2(now()) });
+      const uhrzeit = el5("input", { type: "time", value: daten0.uhrzeit || "", title: "Leer lassen für den ganzen Tag" });
+      const text = el5("textarea", { value: daten0.text || "", maxLength: 500, placeholder: "z. B. 10:00 Teamrunde, danach Feedbacks nachfassen" });
+      const art = el5("select", {}, [
+        el5("option", { value: "alle", textContent: "Alle" }),
+        el5("option", { value: "team", textContent: "Ein Team" }),
+        el5("option", { value: "personen", textContent: "Einzelne Personen" })
       ]);
       art.value = sichtbar0.art || "alle";
-      const teamSelect = el4("select", {}, (ich?.teams || []).map((item) => el4("option", { value: item.name, textContent: item.name })));
+      const teamSelect = el5("select", {}, (ich?.teams || []).map((item) => el5("option", { value: item.name, textContent: item.name })));
       if (sichtbar0.team) teamSelect.value = sichtbar0.team;
-      const people = el4("div", { className: "wtp-people" }, (ich?.personen || []).map((person) => {
-        const box = el4("input", { type: "checkbox", value: String(person.id), checked: sichtbar0.personen.includes(String(person.id)) });
+      const people = el5("div", { className: "wtp-people" }, (ich?.personen || []).map((person) => {
+        const box = el5("input", { type: "checkbox", value: String(person.id), checked: sichtbar0.personen.includes(String(person.id)) });
         box.style.height = "auto";
-        return el4("label", {}, [box, document.createTextNode(person.name)]);
+        return el5("label", {}, [box, document.createTextNode(person.name)]);
       }));
       const syncArt = () => {
         teamSelect.hidden = art.value !== "team";
@@ -15261,18 +15347,18 @@ ${buildCbreBody(current)}`;
           renderStatus(errorText(error), true);
         }
       }, "wtp-primary");
-      return el4("div", { className: "wtp-form" }, [
-        el4("div", { className: "wtp-grid" }, [
-          el4("label", { textContent: "Tag" }),
+      return el5("div", { className: "wtp-form" }, [
+        el5("div", { className: "wtp-grid" }, [
+          el5("label", { textContent: "Tag" }),
           tag,
-          el4("label", { textContent: "Uhrzeit" }),
+          el5("label", { textContent: "Uhrzeit" }),
           uhrzeit,
-          el4("label", { textContent: "Sichtbar für" }),
-          el4("div", {}, [art, teamSelect])
+          el5("label", { textContent: "Sichtbar für" }),
+          el5("div", {}, [art, teamSelect])
         ]),
         people,
-        el4("div", { style: "margin-top:8px" }, [text]),
-        el4("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button2("Abbrechen", () => {
+        el5("div", { style: "margin-top:8px" }, [text]),
+        el5("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button2("Abbrechen", () => {
           teamEditing = null;
           renderPanel();
         })])
@@ -15291,11 +15377,11 @@ ${buildCbreBody(current)}`;
       const close = button2("×", closePanel, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const head = el4("div", { className: "wtp-head" }, [
-        el4("div", {}, [el4("h2", {}, [document.createTextNode("Heute"), helpTip("tagesplan-timeline")]), el4("div", { className: "wtp-muted", textContent: formatDayHeading(day) })]),
+      const head = el5("div", { className: "wtp-head" }, [
+        el5("div", {}, [el5("h2", {}, [document.createTextNode("Heute"), helpTip("tagesplan-timeline")]), el5("div", { className: "wtp-muted", textContent: formatDayHeading(day) })]),
         close
       ]);
-      const status = el4("div", { className: `wtp-status${isError ? " wtp-error" : ""}`, textContent: message });
+      const status = el5("div", { className: `wtp-status${isError ? " wtp-error" : ""}`, textContent: message });
       const entries = timelineEntries({
         day,
         termine: werkia.day === day ? werkia.termine : [],
@@ -15303,25 +15389,25 @@ ${buildCbreBody(current)}`;
         reminder: daten.reminder,
         team: team.eintraege
       });
-      const list = el4("div", {}, entries.map(entryElement));
+      const list = el5("div", {}, entries.map(entryElement));
       const loading = !werkia.loaded && !werkia.error;
-      const empty = !entries.length && !loading ? el4("div", { className: "wtp-muted", style: "padding:12px 0", textContent: "Für heute steht nichts an." }) : null;
-      const errors = sourceErrors().map((text) => el4("div", { className: "wtp-status wtp-error", textContent: text }));
+      const empty = !entries.length && !loading ? el5("div", { className: "wtp-muted", style: "padding:12px 0", textContent: "Für heute steht nichts an." }) : null;
+      const errors = sourceErrors().map((text) => el5("div", { className: "wtp-status wtp-error", textContent: text }));
       const parts = [status, ...errors, list, empty];
       if (ich?.ich?.darfTeam) {
-        parts.push(el4("h3", { textContent: "Team-Eintrag" }));
+        parts.push(el5("h3", { textContent: "Team-Eintrag" }));
         parts.push(teamEditing ? teamForm() : button2("Neuer Team-Eintrag", () => {
           teamEditing = {};
           renderPanel();
         }));
       } else if (ichError && !daten.error) {
-        parts.push(el4("div", { className: "wtp-muted", textContent: `Rechte für Team-Einträge nicht geladen: ${ichError}` }));
+        parts.push(el5("div", { className: "wtp-muted", textContent: `Rechte für Team-Einträge nicht geladen: ${ichError}` }));
       }
       panel.textContent = "";
-      panel.append(head, el4("div", { className: "wtp-body" }, parts));
+      panel.append(head, el5("div", { className: "wtp-body" }, parts));
     }
     function placeButton() {
-      if (!isTargetPage9()) {
+      if (!isTargetPage8()) {
         owned(IDS8.button)?.remove();
         return;
       }
@@ -15335,7 +15421,7 @@ ${buildCbreBody(current)}`;
       if (existing && !slot) return;
       existing?.remove();
       if (!slot) return;
-      ensureStyle3();
+      ensureStyle4();
       const heute = button2("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
       heute.id = IDS8.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
@@ -15403,10 +15489,14 @@ ${buildCbreBody(current)}`;
     };
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
+    let lastSlot = tickSlot(now().getTime());
     runtime.setInterval(() => {
+      const slot = tickSlot(now().getTime());
+      if (slot === lastSlot) return;
+      lastSlot = slot;
       tick().catch(() => {
       });
-    }, TICK_MS2);
+    }, CLOCK_MS);
     runtime.addCleanup?.(() => {
       owned(IDS8.button)?.remove();
       owned(IDS8.popup)?.remove();
@@ -15856,7 +15946,7 @@ ${next}`;
       function getFingerprint() {
         return capturedAuth.fingerprint || GM_getValue(FINGERPRINT_STORAGE_KEY2, "") || "";
       }
-      const JOB_POSITION_QUERY = `query allJobPositions($filter: JobPositionFilter) {
+      const JOB_POSITION_QUERY2 = `query allJobPositions($filter: JobPositionFilter) {
     items: allJobPositions(filter: $filter) {
       id
       additionalInformation
@@ -15904,7 +15994,7 @@ ${next}`;
         });
       }
       async function fetchUrgentFlags(jobIds) {
-        const result = await werkiaGraphQL(JOB_POSITION_QUERY, { filter: { ids: jobIds } });
+        const result = await werkiaGraphQL(JOB_POSITION_QUERY2, { filter: { ids: jobIds } });
         const flags = /* @__PURE__ */ new Map();
         (result?.items || []).forEach((item) => {
           if (!item?.id) return;
@@ -16039,7 +16129,6 @@ ${next}`;
     { id: "kam-suite-chat-icon-redirect", execute: executeChatIconRedirect },
     { id: "kam-suite-appointment-copy-paste", execute: executeAppointmentCopyPaste },
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
-    { id: "kam-suite-slack-exports", execute: executeSlackExports2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
@@ -16052,6 +16141,7 @@ ${next}`;
     { id: "tagesplan", execute: executeTagesplan2 },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
     { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
+    { id: "match-mention", execute: executeKamMatchMention },
     { id: "om-notes-templates", execute: (runtime) => executeOmNotesTemplates(runtime, { helpTip: () => kamHelp.tip("om-notes-templates", { tone: "dark" }) }) },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule }
   ], location.hostname));

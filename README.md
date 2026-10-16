@@ -89,6 +89,7 @@ Enthaltene Funktionen:
 - Blendet neben dem Fragebogen ein Panel mit den oeffentlichen Vakanzangaben ein.
 - Vergleicht Fragebogen-Antworten mit den Vakanzanforderungen und zeigt eine farbige Match-Entscheidungs-Empfehlung.
 - Zeigt eine hervorgehobene Box mit den OM-Notizen zum Fragebogen direkt im Dialog.
+- Zeigt beim offenen Fragebogen links zwischen OM-Notizen und Routenbox die Notizen der Vakanz (Additional Notes) an.
 - Berechnet beim offenen Fragebogen Fahrzeit und Strecke zwischen Kandidatenwohnort und Arbeitsort, zeigt die Vakanzart und bei ortsgebundenen Vakanzen ab 50 Min einen Totenkopf.
 - Zeigt im Fragebogen unter der Routenbox alle Matches des Kandidaten beim selben Arbeitgeber und bei Schwesterfirmen derselben Unternehmensgruppe, jeweils mit OM Status. Warnt, wenn ein anderer Match schon gesendet oder hochgeladen ist.
 - Erlaubt auf Potenzielle Matches die Auswahl mehrerer Arbeitgeber und vorhandener Jobs für ein gemeinsames Offline-Match-Formular. Bei einem Arbeitgeber mit vorhandenem Match ist vor dem Öffnen eine Bestätigung nötig; Terminvorschläge lassen sich gesammelt löschen.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.8.210
+// @version      1.9.218
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1361,6 +1361,26 @@
     };
   }
 
+  // ../../shared/js/werkia-graphql/job-position-notes-provider.js
+  var JOB_POSITION_ADDITIONAL_INFORMATION_QUERY = `query JobPosition($id: UUID!) {
+  data: JobPosition(id: $id) {
+    id
+    additionalInformation
+    __typename
+  }
+}`;
+  function createJobPositionNotesProvider({ request }) {
+    return {
+      async loadJobPositionAdditionalInformation(jobPositionId) {
+        const result = await request(JOB_POSITION_ADDITIONAL_INFORMATION_QUERY, { id: jobPositionId });
+        return result?.data?.additionalInformation || "";
+      }
+    };
+  }
+  function sanitizeVacancyNotes(notes) {
+    return String(notes || "").replace(/\[\s*https?:\/\/[^\]]+\]/gi, "").replace(/estimate\s+salary\s+by\s+werkia/gi, "").split("\n").map((line) => line.trim()).filter(Boolean).join("\n").trim();
+  }
+
   // src/graphql.js
   var BEARER_STORAGE_KEY = "werkia_obc_graphql_bearer_v1";
   var FINGERPRINT_STORAGE_KEY = "werkia_obc_graphql_fingerprint_v1";
@@ -1376,7 +1396,10 @@
     adapter = {
       ...base,
       noGoProvider: createNoGoProvider({ request: base.request }),
-      commuteProvider: createCommuteProvider({ request: base.request })
+      commuteProvider: createCommuteProvider({ request: base.request }),
+      // Vakanz-Notizen (JobPosition.additionalInformation) fuer die Box
+      // zwischen OM-Notizen und Routenbox.
+      jobPositionNotesProvider: createJobPositionNotesProvider({ request: base.request })
     };
     return adapter;
   }
@@ -2114,6 +2137,20 @@
       ].filter(Boolean)
     };
   }
+  function vacancyNotesBoxTopic({ routes, page = PAGES.questionnaire }) {
+    return {
+      id: "vacancy-notes-box",
+      title: "Vakanz-Notizen neben dem Fragebogen",
+      page,
+      routes,
+      kind: "view",
+      summary: "Zeigt beim offenen OM-Fragebogen die Notizen der Vakanz („Additional Notes“ im Vakanzformular), damit du sie beim Prüfen nicht extra aufrufen musst.",
+      notes: [
+        "Die Box erscheint nur, wenn die Vakanz Notizen hat.",
+        "Links in eckigen Klammern und der Hinweis „estimate salary by werkia“ werden ausgeblendet."
+      ]
+    };
+  }
   function routeCalculationTopic({ routes, page = PAGES.questionnaire, commute = false }) {
     return {
       id: "route-calculation",
@@ -2354,6 +2391,7 @@
     vacancyPanelTopic({ routes: onPotentialMatches }),
     questionnaireEvaluationTopic({ routes: onPotentialMatches }),
     omNotesBoxTopic({ routes: onPotentialMatches }),
+    vacancyNotesBoxTopic({ routes: onPotentialMatches }),
     routeCalculationTopic({ routes: onPotentialMatches, commute: true }),
     commuteBadgesTopic(),
     {
@@ -3407,12 +3445,12 @@
         const s = window.getComputedStyle(d);
         return s.display !== "none" && s.visibility !== "hidden" && r.width > 0 && r.height > 0;
       });
-      const GAP = 12;
+      const GAP2 = 12;
       const MARGIN = 10;
       const MIN_WIDTH = 320;
       if (dialog) {
         const rect = dialog.getBoundingClientRect();
-        const left = rect.right + GAP;
+        const left = rect.right + GAP2;
         const width2 = Math.max(MIN_WIDTH, window.innerWidth - left - MARGIN);
         const top = Math.max(16, rect.top);
         const maxHeight = window.innerHeight - top - 16;
@@ -3996,9 +4034,9 @@
       const text = storedText.replace(new RegExp(escapedCompanyFlag, "ig"), "").replace(/^[\s,;|/-]+|[\s,;|/-]+$/g, "").trim();
       if ((!text || text === "-" || text === "–") && !flaggedCompany) return;
       const dialogRect = dialog.getBoundingClientRect();
-      const GAP = 12;
-      const WIDTH = Math.max(220, dialogRect.left - GAP - 12);
-      const left = Math.max(8, dialogRect.left - WIDTH - GAP);
+      const GAP2 = 12;
+      const WIDTH = Math.max(220, dialogRect.left - GAP2 - 12);
+      const left = Math.max(8, dialogRect.left - WIDTH - GAP2);
       const top = Math.max(16, dialogRect.top);
       const maxHeight = window.innerHeight - top - 16;
       const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
@@ -4087,6 +4125,115 @@
       createOrUpdateOmNotes(dialog);
     }
     attachQuestionnaireObserver(runtime, runOmNotesBox);
+  }
+
+  // src/features/obc-fragebogen/vacancy-notes-box.js
+  var VACANCY_NOTES_BOX_ID = "werkia-obc-vacancy-notes-box";
+  var OM_NOTES_ID2 = "werkia-om-notes-box";
+  var CANDIDATE_POTENTIAL_MATCHES_RE7 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+  var NOTES_CACHE_TTL = 2 * 60 * 1e3;
+  var GAP = 12;
+  function isCandidatePotentialMatchesPage6(hash = location.hash) {
+    return CANDIDATE_POTENTIAL_MATCHES_RE7.test(hash || "");
+  }
+  function computeVacancyNotesPosition(dialogRect, notesRect, viewportHeight) {
+    const width = notesRect?.width || Math.max(220, dialogRect.left - GAP - 12);
+    const left = Math.max(8, notesRect?.left ?? dialogRect.left - width - GAP);
+    const top = notesRect?.height ? notesRect.bottom + GAP : Math.max(16, dialogRect.top);
+    return { left, top: Math.min(top, viewportHeight - 90), width };
+  }
+  function executeVacancyNotesBox(runtime) {
+    runtime.registerSource("obc/toolbox/src/features/obc-fragebogen/vacancy-notes-box.js");
+    const context = getQuestionnaireContext();
+    const cache = /* @__PURE__ */ new Map();
+    function removeBox() {
+      document.getElementById(VACANCY_NOTES_BOX_ID)?.remove();
+    }
+    function positionBox(box, dialog) {
+      const notesBox = document.getElementById(OM_NOTES_ID2);
+      const { left, top, width } = computeVacancyNotesPosition(
+        dialog.getBoundingClientRect(),
+        notesBox?.getBoundingClientRect(),
+        window.innerHeight
+      );
+      const pos = { left: `${left}px`, top: `${top}px`, width: `${width}px`, maxHeight: `${Math.max(120, Math.round(window.innerHeight * 0.4))}px` };
+      for (const [key, value] of Object.entries(pos)) {
+        if (box.style[key] !== value) box.style[key] = value;
+      }
+    }
+    function renderBox(dialog, jobId, notes) {
+      let box = document.getElementById(VACANCY_NOTES_BOX_ID);
+      if (!notes) {
+        box?.remove();
+        return;
+      }
+      if (!box) {
+        box = document.createElement("div");
+        box.id = VACANCY_NOTES_BOX_ID;
+        box.style.cssText = `
+        position:fixed;
+        overflow-y:auto;
+        background:#fff4e6;
+        border:2px solid #fd7e14;
+        border-radius:10px;
+        padding:12px 16px;
+        font-size:14px;
+        line-height:1.5;
+        color:#000;
+        box-shadow:0 4px 14px rgba(0,0,0,0.15);
+        z-index:9999999;
+        box-sizing:border-box;
+        user-select:text;
+        cursor:text;
+      `;
+        for (const type of ["mousedown", "click", "dblclick"]) {
+          box.addEventListener(type, (event) => event.stopPropagation());
+        }
+        document.body.appendChild(box);
+      }
+      if (box.dataset.jobId !== jobId || box.dataset.notes !== notes) {
+        box.dataset.jobId = jobId;
+        box.dataset.notes = notes;
+        box.replaceChildren();
+        const header = document.createElement("div");
+        header.style.cssText = "font-weight:800;font-size:14px;margin-bottom:8px;color:#d9480f;border-bottom:1px solid #fd7e14;padding-bottom:6px;";
+        header.textContent = "📋 Vakanz-Notizen";
+        box.appendChild(header);
+        const text = document.createElement("div");
+        text.style.cssText = "white-space:pre-wrap;font-weight:600;";
+        text.textContent = notes;
+        box.appendChild(text);
+      }
+      positionBox(box, dialog);
+    }
+    function loadNotes(jobId) {
+      const cached = cache.get(jobId);
+      if (cached?.promise) return null;
+      if (cached && Date.now() - cached.time < NOTES_CACHE_TTL) return cached.notes;
+      const promise = getObcGraphqlAdapter().jobPositionNotesProvider.loadJobPositionAdditionalInformation(jobId).then((raw) => sanitizeVacancyNotes(raw)).catch((error) => {
+        console.warn("[Werkia OBC Vakanz-Notizen] Per GraphQL nicht geladen.", error);
+        return "";
+      }).then((notes) => {
+        cache.set(jobId, { notes, time: Date.now() });
+        run();
+      });
+      cache.set(jobId, { promise });
+      return null;
+    }
+    function run() {
+      if (!isCandidatePotentialMatchesPage6()) return removeBox();
+      const dialog = findQuestionnaireDialog(document, { strictMode: false });
+      const jobId = context.jobId;
+      if (!dialog || !jobId) return removeBox();
+      const notes = loadNotes(jobId);
+      if (notes === null) {
+        const box = document.getElementById(VACANCY_NOTES_BOX_ID);
+        if (box && box.dataset.jobId !== jobId) box.remove();
+        return;
+      }
+      renderBox(dialog, jobId, notes);
+    }
+    attachQuestionnaireObserver(runtime, run);
   }
 
   // ../../shared/js/route-commute/core.js
@@ -4660,7 +4807,7 @@
 
   // src/features/obc-fragebogen/route-calculation.js
   var ROUTE_BOX_ID3 = "werkia-obc-route-box";
-  var CANDIDATE_POTENTIAL_MATCHES_RE7 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+  var CANDIDATE_POTENTIAL_MATCHES_RE8 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   var QUESTIONNAIRE_LABELS3 = [
     "Reisehäufigkeit",
     "Montagebereitschaft",
@@ -4677,8 +4824,8 @@
     "Erforderliche Führerschein",
     "Führerschein"
   ];
-  function isCandidatePotentialMatchesPage6(hash = location.hash) {
-    return CANDIDATE_POTENTIAL_MATCHES_RE7.test(hash || "");
+  function isCandidatePotentialMatchesPage7(hash = location.hash) {
+    return CANDIDATE_POTENTIAL_MATCHES_RE8.test(hash || "");
   }
   function escapeHtml3(str) {
     return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -4780,7 +4927,7 @@
     }
     function positionRouteBox(box, dialog) {
       const dialogRect = dialog.getBoundingClientRect();
-      const notesBox = document.getElementById("werkia-om-notes-box");
+      const notesBox = document.getElementById("werkia-obc-vacancy-notes-box") || document.getElementById("werkia-om-notes-box");
       const notesRect = notesBox?.getBoundingClientRect();
       const gap = 12;
       const width = notesRect?.width || Math.max(220, dialogRect.left - gap - 12);
@@ -4897,7 +5044,7 @@
       });
     }
     function runRouteCalculation() {
-      if (!isCandidatePotentialMatchesPage6()) {
+      if (!isCandidatePotentialMatchesPage7()) {
         document.getElementById(ROUTE_BOX_ID3)?.remove();
         return;
       }
@@ -5055,7 +5202,7 @@
   var BOX_ID = "werkia-obc-duplicate-matches-box";
   var REFRESH_BUTTON_ID = "werkia-obc-duplicate-matches-refresh";
   var ROUTE_BOX_ID4 = "werkia-obc-route-box";
-  var OM_NOTES_ID2 = "werkia-om-notes-box";
+  var OM_NOTES_ID3 = "werkia-om-notes-box";
   var OM_NOTES_LABEL = "Zusätzliche Information - OM";
   var PURPLE = "#e5dbff";
   var GREEN2 = "#d8f5d0";
@@ -5342,7 +5489,7 @@
     }
     function positionBox(box, dialog) {
       const dialogRect = dialog.getBoundingClientRect();
-      const anchor = document.getElementById(ROUTE_BOX_ID4) || document.getElementById(OM_NOTES_ID2);
+      const anchor = document.getElementById(ROUTE_BOX_ID4) || document.getElementById(OM_NOTES_ID3);
       const anchorRect = anchor?.getBoundingClientRect();
       const gap = 12;
       const width = anchorRect?.width || Math.max(220, dialogRect.left - gap - 12);
@@ -7851,9 +7998,10 @@
     { id: "obc-fragebogen-questionnaire-context", execute: executeQuestionnaireContext },
     { id: "obc-fragebogen-vacancy-panel", execute: executeVacancyPanel },
     { id: "obc-fragebogen-questionnaire-evaluation", execute: executeQuestionnaireEvaluation },
-    // om-notes-box must run before route-calculation: route-calculation
-    // positions its box relative to #werkia-om-notes-box.
+    // om-notes-box, then vacancy-notes-box, then route-calculation: each
+    // box docks below the one before it in the left column.
     { id: "obc-fragebogen-om-notes-box", execute: executeOmNotesBox },
+    { id: "obc-fragebogen-vacancy-notes-box", execute: executeVacancyNotesBox },
     { id: "obc-fragebogen-route-calculation", execute: executeRouteCalculation },
     // After route-calculation: docks below #werkia-obc-route-box.
     { id: "obc-fragebogen-duplicate-matches", execute: executeDuplicateMatches },

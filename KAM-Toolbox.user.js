@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.8.186
+// @version      1.9.200
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1292,6 +1292,16 @@
     const getValue = typeof GM_getValue === "function" ? GM_getValue : () => "";
     return String(getValue(BEARER_STORAGE_KEY, "") || "");
   }
+  function getKamGraphqlAuth() {
+    const store = createGraphqlAuthStore({
+      getValue: typeof GM_getValue === "function" ? GM_getValue : () => "",
+      setValue: () => {
+      },
+      bearerStorageKey: BEARER_STORAGE_KEY,
+      fingerprintStorageKey: FINGERPRINT_STORAGE_KEY
+    });
+    return store.getAuth();
+  }
 
   // ../../shared/js/admin-dom/text.js
   var ESCAPE_HTML_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
@@ -1526,25 +1536,25 @@
     };
     function tip(topicId, { tone = "light" } = {}) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
-      const button2 = document.createElement("button");
-      button2.type = "button";
-      button2.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
-      button2.setAttribute("aria-label", tipLabel(topic));
-      button2.title = tipLabel(topic);
-      button2.textContent = "?";
-      return styled(button2, tipStyle(tone));
+      const button3 = document.createElement("button");
+      button3.type = "button";
+      button3.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
+      button3.setAttribute("aria-label", tipLabel(topic));
+      button3.title = tipLabel(topic);
+      button3.textContent = "?";
+      return styled(button3, tipStyle(tone));
     }
     function tipHtml(topicId, options) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
       return buildTipHtml(namespace, topic, options);
     }
     function ownTipFrom(target) {
-      const button2 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
-      const parsed = parseTipAttributeValue(button2?.getAttribute(HELP_ATTRIBUTE));
-      return parsed?.namespace === namespace ? { button: button2, topicId: parsed.topicId } : null;
+      const button3 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
+      const parsed = parseTipAttributeValue(button3?.getAttribute(HELP_ATTRIBUTE));
+      return parsed?.namespace === namespace ? { button: button3, topicId: parsed.topicId } : null;
     }
     const popover = () => document.getElementById(popoverId);
-    function closePopover() {
+    function closePopover2() {
       timers2.clearTimeout(showTimer);
       timers2.clearTimeout(hideTimer);
       popover()?.remove();
@@ -1568,7 +1578,7 @@
         current.pinned = current.pinned || pinned;
         return;
       }
-      closePopover();
+      closePopover2();
       const box = el2("div", {
         position: "fixed",
         zIndex: Z_TOP,
@@ -1629,7 +1639,7 @@
       if (!current || current.pinned) return;
       timers2.clearTimeout(hideTimer);
       hideTimer = timers2.setTimeout(() => {
-        if (current && !current.pinned) closePopover();
+        if (current && !current.pinned) closePopover2();
       }, 200);
     }
     function closeOverview() {
@@ -1664,7 +1674,7 @@
       return wrap2;
     }
     function openOverview({ topicId } = {}) {
-      closePopover();
+      closePopover2();
       closeOverview();
       ensureExtraStyles();
       const { here, elsewhere } = splitTopicsByLocation(topics, { hash: location.hash || "", hostname: location.hostname || "" });
@@ -1752,9 +1762,9 @@
       const onAdmin = dockHosts.test(location.hostname || "");
       const { here } = splitTopicsByLocation(topics, { hash: location.hash || "", hostname: location.hostname || "" });
       let dock = document.getElementById(DOCK_ID);
-      let button2 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
+      let button3 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
       if (!onAdmin || !here.length) {
-        button2?.remove();
+        button3?.remove();
         if (dock && !dock.children.length) dock.remove();
         return;
       }
@@ -1772,8 +1782,8 @@
         dock.id = DOCK_ID;
         document.body.appendChild(dock);
       }
-      if (!button2) {
-        button2 = el2("button", {
+      if (!button3) {
+        button3 = el2("button", {
           display: "inline-flex",
           alignItems: "center",
           gap: "6px",
@@ -1787,9 +1797,9 @@
           font: `600 12px/1 ${FONT2}`,
           cursor: "pointer"
         });
-        button2.type = "button";
-        button2.setAttribute("data-werkia-help-dock-button", namespace);
-        button2.title = `Was macht die ${toolboxName} auf dieser Seite?`;
+        button3.type = "button";
+        button3.setAttribute("data-werkia-help-dock-button", namespace);
+        button3.title = `Was macht die ${toolboxName} auf dieser Seite?`;
         const mark2 = el2("span", {
           display: "inline-flex",
           alignItems: "center",
@@ -1801,9 +1811,9 @@
           color: "#fff",
           font: `700 12px/1 ${FONT2}`
         }, "?");
-        button2.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
-        button2.addEventListener("click", () => openOverview());
-        dock.appendChild(button2);
+        button3.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
+        button3.addEventListener("click", () => openOverview());
+        dock.appendChild(button3);
       }
     }
     function install(runtime, { dock = true, menu = true, dockHostPattern } = {}) {
@@ -1822,7 +1832,7 @@
         if (own) {
           event.preventDefault();
           event.stopPropagation();
-          if (current?.anchor === own.button && current.pinned) closePopover();
+          if (current?.anchor === own.button && current.pinned) closePopover2();
           else showPopover(own.button, own.topicId, true);
           return;
         }
@@ -1833,7 +1843,7 @@
           openOverview({ topicId: overviewLink.dataset.werkiaHelpOverviewLink });
           return;
         }
-        if (current && !popover()?.contains(event.target)) closePopover();
+        if (current && !popover()?.contains(event.target)) closePopover2();
       }, true);
       runtime.addDocumentListener("mouseover", (event) => {
         const own = ownTipFrom(event.target);
@@ -1858,16 +1868,16 @@
         if (event.key !== "Escape" || !current) return;
         event.preventDefault();
         event.stopPropagation();
-        closePopover();
+        closePopover2();
       }, true);
       runtime.addWindowListener("scroll", () => {
         const box = popover();
         if (!box || !current) return;
-        if (!current.anchor.isConnected) closePopover();
+        if (!current.anchor.isConnected) closePopover2();
         else positionPopover(box, current.anchor);
       }, true);
       runtime.addWindowListener("resize", () => {
-        if (current) closePopover();
+        if (current) closePopover2();
       });
       if (dock) {
         runtime.addWindowListener("hashchange", syncDock);
@@ -1881,7 +1891,7 @@
         }
       }
       runtime.addCleanup(() => {
-        closePopover();
+        closePopover2();
         closeOverview();
         const dockEl = document.getElementById(DOCK_ID);
         dockEl?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`)?.remove();
@@ -2147,6 +2157,642 @@
     };
   }
 
+  // ../../shared/js/employer-notes/core.js
+  var NOTE_TAGS = [
+    { id: "Matches", label: "Matches", hint: "im Matchkommentar-Dialog" },
+    { id: "AP", label: "AP", hint: "neben den Kontaktbadges" },
+    { id: "Vakanzen", label: "Vakanzen", hint: "im Vakanz-Panel" },
+    { id: "Prozess", label: "Prozess", hint: "am Arbeitgeber in Meine Matches und an der Prio-Liste" }
+  ];
+  var TAG_BY_LOWER = new Map(NOTE_TAGS.map((tag) => [tag.id.toLowerCase(), tag.id]));
+  var EMPLOYER_COMMENTS_QUERY = `query WerkiaEmployerNotes($filter: EmployerCommentFilter!, $perPage: Int) {
+  items: allEmployerComments(filter: $filter, perPage: $perPage) { id comment employerId employeeId createdAt }
+}`;
+  var CREATE_EMPLOYER_COMMENT_MUTATION = `mutation WerkiaCreateEmployerNote($comment: String!, $employerId: UUID!) {
+  data: createEmployerComment(comment: $comment, employerId: $employerId) { id comment employerId employeeId createdAt }
+}`;
+  var MATCH_JOB_POSITION_QUERY = `query WerkiaEmployerNoteMatch($filter: MatchFilter) {
+  items: allMatches(filter: $filter) { id jobPositionId }
+}`;
+  var JOB_POSITION_EMPLOYER_QUERY = `query WerkiaEmployerNoteJob($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) { id employerId }
+}`;
+  var EMPLOYEE_NAMES_QUERY = `query WerkiaEmployerNoteAuthors($filter: EmployeeFilter) {
+  items: allEmployees(filter: $filter) { id firstName lastName }
+}`;
+  var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
+  function htmlToText(html) {
+    return String(html || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>\s*<p[^>]*>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&(#\d+|#x[0-9a-f]+|\w+);/gi, (match, name) => {
+      if (/^#x/i.test(name)) return String.fromCodePoint(parseInt(name.slice(2), 16));
+      if (/^#\d/.test(name)) return String.fromCodePoint(Number(name.slice(1)));
+      return ENTITIES[name.toLowerCase()] ?? match;
+    }).replace(/[ \t]+\n/g, "\n").trim();
+  }
+  function textToHtml(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+  }
+  function parseNoteText(value) {
+    let rest = String(value || "").trimStart();
+    const tags = [];
+    for (; ; ) {
+      const match = /^\[([^\]\n]{1,30})\]\s*/.exec(rest);
+      const tag = match && TAG_BY_LOWER.get(match[1].trim().toLowerCase());
+      if (!tag) break;
+      if (!tags.includes(tag)) tags.push(tag);
+      rest = rest.slice(match[0].length);
+    }
+    return { tags, text: rest.trim() };
+  }
+  function formatNoteText(tags, text) {
+    const known = NOTE_TAGS.map((tag) => tag.id).filter((id) => (tags || []).includes(id));
+    return `${known.map((tag) => `[${tag}]`).join("")}${known.length ? " " : ""}${String(text || "").trim()}`;
+  }
+  function noteToHtml(tags, text) {
+    return textToHtml(formatNoteText(tags, text));
+  }
+  function toNote(item, authorNames = /* @__PURE__ */ new Map()) {
+    const plain = htmlToText(item.comment);
+    const { tags, text } = parseNoteText(plain);
+    return {
+      id: String(item.id),
+      employerId: String(item.employerId || ""),
+      employeeId: String(item.employeeId || ""),
+      author: authorNames.get(String(item.employeeId || "")) || "",
+      createdAt: String(item.createdAt || ""),
+      tags,
+      text,
+      plain
+    };
+  }
+  function sortNotes(notes) {
+    return [...notes].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+  function notesWithTag(notes, tag) {
+    return (notes || []).filter((note) => note.tags.includes(tag));
+  }
+  function formatNoteDate(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  }
+  var CACHE_MS2 = 5 * 60 * 1e3;
+  var PER_PAGE = 200;
+  var MAX_PARALLEL = 4;
+  function limitParallel(fn, max = MAX_PARALLEL) {
+    let active = 0;
+    const queue = [];
+    const next = () => {
+      if (active >= max || !queue.length) return;
+      active += 1;
+      const { args, resolve, reject } = queue.shift();
+      Promise.resolve().then(() => fn(...args)).then(resolve, reject).finally(() => {
+        active -= 1;
+        next();
+      });
+    };
+    return (...args) => new Promise((resolve, reject) => {
+      queue.push({ args, resolve, reject });
+      next();
+    });
+  }
+  function createEmployerNotesProvider({ request: rawRequest, now = () => Date.now() }) {
+    const request = limitParallel(rawRequest);
+    const cache = /* @__PURE__ */ new Map();
+    const names = /* @__PURE__ */ new Map();
+    const listeners = /* @__PURE__ */ new Set();
+    const matchEmployers = /* @__PURE__ */ new Map();
+    async function loadNames(ids) {
+      const missing = [...new Set(ids)].filter((id) => id && !names.has(id));
+      if (!missing.length) return;
+      const data = await request(EMPLOYEE_NAMES_QUERY, { filter: { ids: missing } });
+      for (const employee of data?.items || []) {
+        names.set(String(employee.id), [employee.firstName, employee.lastName].filter(Boolean).join(" ").trim());
+      }
+      for (const id of missing) if (!names.has(id)) names.set(id, "");
+    }
+    async function fetchNotes(employerId) {
+      const data = await request(EMPLOYER_COMMENTS_QUERY, { filter: { employerId }, perPage: PER_PAGE });
+      const items = (data?.items || []).filter((item) => String(item.employerId) === String(employerId));
+      try {
+        await loadNames(items.map((item) => String(item.employeeId || "")));
+      } catch {
+      }
+      return sortNotes(items.map((item) => toNote(item, names)));
+    }
+    function list(employerId, { fresh = false } = {}) {
+      const key = String(employerId || "");
+      if (!key) return Promise.resolve([]);
+      const hit = cache.get(key);
+      if (!fresh && hit && now() - hit.at < CACHE_MS2) return hit.promise;
+      const promise = fetchNotes(key);
+      cache.set(key, { at: now(), promise });
+      promise.catch(() => cache.delete(key));
+      return promise;
+    }
+    async function create(employerId, tags, text) {
+      if (!String(text || "").trim()) throw new Error("Die Notiz ist leer.");
+      const data = await request(CREATE_EMPLOYER_COMMENT_MUTATION, { employerId, comment: noteToHtml(tags, text) });
+      if (!data?.data?.id) throw new Error("AG-Notiz wurde nicht gespeichert.");
+      cache.delete(String(employerId));
+      for (const listener of listeners) {
+        try {
+          listener(String(employerId));
+        } catch {
+        }
+      }
+      return toNote(data.data, names);
+    }
+    function employerIdForMatch(matchId) {
+      const key = String(matchId || "");
+      if (!key) return Promise.resolve("");
+      if (!matchEmployers.has(key)) {
+        const promise = (async () => {
+          const matches = await request(MATCH_JOB_POSITION_QUERY, { filter: { ids: [key] } });
+          const jobPositionId = (matches?.items || []).find((item) => String(item.id) === key)?.jobPositionId;
+          if (!jobPositionId) return "";
+          const jobs = await request(JOB_POSITION_EMPLOYER_QUERY, { filter: { ids: [jobPositionId] } });
+          return String((jobs?.items || []).find((item) => String(item.id) === String(jobPositionId))?.employerId || "");
+        })();
+        matchEmployers.set(key, promise);
+        promise.then((id) => {
+          if (!id) matchEmployers.delete(key);
+        }, () => matchEmployers.delete(key));
+      }
+      return matchEmployers.get(key);
+    }
+    function subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+    return { list, create, subscribe, employerIdForMatch };
+  }
+  var providers = /* @__PURE__ */ new WeakMap();
+  function employerNotesProviderFor(graphqlAdapter) {
+    if (!providers.has(graphqlAdapter)) providers.set(graphqlAdapter, createEmployerNotesProvider({ request: graphqlAdapter.request }));
+    return providers.get(graphqlAdapter);
+  }
+
+  // ../../shared/js/employer-notes/index.js
+  var STYLE_ID = "werkia-agn-style-v1";
+  var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
+  var EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"]';
+  var COMMENTS_BUTTON_SELECTOR = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var MATCH_LINK_SELECTOR = 'a[href*="#/Match/"]';
+  var EMPLOYER_LINK_SELECTOR = 'a[href*="#/Employer/"]';
+  var FONT3 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var STYLE = `
+.werkia-agn, .werkia-agn-pop, .werkia-agn-panel { font: 400 12px/1.45 ${FONT3}; color: #09090b; box-sizing: border-box; }
+.werkia-agn *, .werkia-agn-pop *, .werkia-agn-panel * { box-sizing: border-box; }
+.werkia-agn-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; font-size: 12px; color: #09090b; }
+.werkia-agn-head small { font-weight: 500; color: #8b8b94; }
+.werkia-agn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.werkia-agn-note { padding: 7px 9px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; }
+.werkia-agn-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: #8b8b94; font-size: 11px; margin-bottom: 2px; }
+.werkia-agn-tag { padding: 0 6px; border-radius: 999px; background: #f4f4f5; color: #52525b; font-size: 10.5px; font-weight: 600; line-height: 16px; }
+.werkia-agn-text { white-space: pre-wrap; overflow-wrap: anywhere; color: #09090b; }
+.werkia-agn-empty { color: #8b8b94; }
+.werkia-agn-badge { display: inline-flex; vertical-align: middle; margin: 5px 0 3px 6px; }
+.werkia-agn-badge[hidden] { display: none; }
+.werkia-agn-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-chip:hover, .werkia-agn-chip[aria-expanded="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+.werkia-agn-chip b { font-weight: 700; color: #b85400; }
+.werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
+.werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
+.werkia-agn-panel { position: fixed; z-index: 1400; width: 300px; overflow: auto; padding: 12px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); display: flex; flex-direction: column; gap: 12px; }
+.werkia-agn-write { border-top: 1px solid #e4e4e7; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.werkia-agn-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.werkia-agn-toggle { height: 26px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-toggle[aria-pressed="true"] { border-color: #ef6c00; background: #fff3e8; color: #b85400; }
+.werkia-agn-save { height: 30px; padding: 0 12px; border: 1px solid #09090b; border-radius: 8px; background: #09090b; color: #fff; font: 600 12px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-save:disabled { opacity: .45; cursor: default; }
+.werkia-agn-hint { color: #8b8b94; font-size: 11px; }
+.werkia-agn-status { min-height: 16px; font-size: 11.5px; color: #52525b; }
+.werkia-agn-status[data-tone="ok"] { color: #0a7c0a; }
+.werkia-agn-status[data-tone="error"] { color: #b52f2f; }
+`;
+  function ensureEmployerNotesStyle(doc = document) {
+    if (doc.getElementById(STYLE_ID)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = STYLE;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  function matchIdFromHref(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function employerIdFromHref(href) {
+    return String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
+  }
+  function employerIdFromRow(row) {
+    return employerIdFromHref(row?.querySelector(EMPLOYER_LINK_SELECTOR)?.getAttribute("href"));
+  }
+  function matchIdFromRow(row) {
+    return matchIdFromHref(row?.querySelector(MATCH_LINK_SELECTOR)?.getAttribute("href"));
+  }
+  function element(doc, tag, className, text) {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text !== void 0) node.textContent = text;
+    return node;
+  }
+  function renderNote(doc, note, currentTag) {
+    const item = element(doc, "li", "werkia-agn-note");
+    const meta = element(doc, "div", "werkia-agn-meta");
+    meta.append([formatNoteDate(note.createdAt), note.author].filter(Boolean).join(" · "));
+    for (const tag of note.tags.filter((tag2) => tag2 !== currentTag)) meta.append(element(doc, "span", "werkia-agn-tag", tag));
+    item.append(meta, element(doc, "div", "werkia-agn-text", note.text));
+    return item;
+  }
+  function watch(provider, node, getEmployerId2, reload) {
+    if (!provider.subscribe) return;
+    const unsubscribe = provider.subscribe((employerId) => {
+      if (!node.isConnected) {
+        unsubscribe?.();
+        return;
+      }
+      if (employerId === getEmployerId2()) reload({ fresh: true });
+    });
+  }
+  function createEmployerNotesList({ provider, employerId = "", tag, limit = 3, document: doc = document, title, helpTip = null, hideWhenEmpty = false }) {
+    ensureEmployerNotesStyle(doc);
+    const root = element(doc, "section", "werkia-agn");
+    const head = element(doc, "div", "werkia-agn-head");
+    const heading = element(doc, "span", "", title || `AG-Notizen · ${tag}`);
+    const count = element(doc, "small");
+    head.append(...[heading, count, helpTip].filter(Boolean));
+    const list = element(doc, "ol", "werkia-agn-list");
+    const empty = element(doc, "div", "werkia-agn-empty");
+    root.append(head, list, empty);
+    let current = String(employerId || "");
+    let generation = 0;
+    function show(notes, message = "") {
+      list.replaceChildren(...notes.map((note) => renderNote(doc, note, tag)));
+      empty.textContent = message;
+      empty.hidden = !message;
+      root.hidden = hideWhenEmpty && !notes.length;
+    }
+    async function load2({ fresh = false } = {}) {
+      const mine = ++generation;
+      if (!current) {
+        show([], "Arbeitgeber wird ermittelt …");
+        return;
+      }
+      if (!list.children.length) show([], "Wird geladen …");
+      try {
+        const all = notesWithTag(await provider.list(current, { fresh }), tag);
+        if (mine !== generation) return;
+        const shown = all.slice(0, limit);
+        count.textContent = all.length > shown.length ? `${shown.length} von ${all.length}` : "";
+        show(shown, shown.length ? "" : `Keine Notiz mit Tag ${tag}.`);
+      } catch (error) {
+        if (mine !== generation) return;
+        console.warn("[AG-Notizen]", error);
+        show([], "AG-Notizen konnten nicht geladen werden.");
+      }
+    }
+    watch(provider, root, () => current, load2);
+    load2();
+    return {
+      element: root,
+      setEmployerId(next) {
+        const value = String(next || "");
+        if (value === current) return;
+        current = value;
+        list.replaceChildren();
+        load2();
+      },
+      reload: () => load2({ fresh: true })
+    };
+  }
+  var openPopovers = /* @__PURE__ */ new WeakMap();
+  function closePopover(doc) {
+    const open = openPopovers.get(doc);
+    if (!open) return;
+    open.pop.remove();
+    open.chip.setAttribute("aria-expanded", "false");
+    open.cleanup();
+    openPopovers.delete(doc);
+  }
+  function openPopover(doc, chip, notes, tag) {
+    closePopover(doc);
+    const pop = element(doc, "div", "werkia-agn-pop");
+    pop.setAttribute("role", "dialog");
+    const head = element(doc, "div", "werkia-agn-head");
+    const close = element(doc, "button", "werkia-agn-close", "✕");
+    close.type = "button";
+    close.setAttribute("aria-label", "Schließen");
+    head.append(element(doc, "span", "", `AG-Notizen · ${tag}`), close);
+    const list = element(doc, "ol", "werkia-agn-list");
+    list.append(...notes.map((note) => renderNote(doc, note, tag)));
+    pop.append(head, list);
+    doc.body.appendChild(pop);
+    const view = doc.defaultView;
+    const rect = chip.getBoundingClientRect();
+    const width = 340;
+    const left = Math.max(8, Math.min(rect.left, (view?.innerWidth || 1200) - width - 8));
+    pop.style.left = `${left}px`;
+    pop.style.top = `${rect.bottom + 6}px`;
+    const onDown = (event) => {
+      if (pop.contains(event.target) || chip.contains(event.target)) return;
+      closePopover(doc);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") closePopover(doc);
+    };
+    doc.addEventListener("mousedown", onDown, true);
+    doc.addEventListener("keydown", onKey, true);
+    close.addEventListener("click", () => closePopover(doc));
+    chip.setAttribute("aria-expanded", "true");
+    openPopovers.set(doc, {
+      pop,
+      chip,
+      cleanup() {
+        doc.removeEventListener("mousedown", onDown, true);
+        doc.removeEventListener("keydown", onKey, true);
+      }
+    });
+  }
+  function createEmployerNoteBadge({ provider, employerId, tag, document: doc = document }) {
+    ensureEmployerNotesStyle(doc);
+    const root = element(doc, "span", "werkia-agn-badge");
+    root.hidden = true;
+    root.dataset.employerId = String(employerId || "");
+    root.dataset.tag = tag;
+    const chip = element(doc, "button", "werkia-agn-chip");
+    chip.type = "button";
+    chip.setAttribute("aria-expanded", "false");
+    root.appendChild(chip);
+    let notes = [];
+    ["click", "mousedown", "mouseup", "pointerdown", "pointerup"].forEach((type) => {
+      root.addEventListener(type, (event) => event.stopPropagation());
+    });
+    chip.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (chip.getAttribute("aria-expanded") === "true") closePopover(doc);
+      else if (notes.length) openPopover(doc, chip, notes, tag);
+    });
+    async function load2({ fresh = false } = {}) {
+      try {
+        notes = notesWithTag(await provider.list(root.dataset.employerId, { fresh }), tag);
+      } catch (error) {
+        console.warn("[AG-Notizen]", error);
+        notes = [];
+      }
+      chip.replaceChildren(doc.createTextNode(`${tag} `), element(doc, "b", "", String(notes.length)));
+      const latest = notes[0];
+      chip.title = latest ? `${notes.length} AG-${notes.length === 1 ? "Notiz" : "Notizen"} mit Tag ${tag}. Neueste: ${latest.text.slice(0, 140)}` : "";
+      root.hidden = !notes.length;
+    }
+    watch(provider, root, () => root.dataset.employerId, load2);
+    load2();
+    return root;
+  }
+  function findMatchCommentsDialog(doc = document) {
+    const dialogs = [...doc.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR));
+    return dialogs[dialogs.length - 1] || null;
+  }
+  function tiptapOf(editorElement) {
+    try {
+      return editorElement.wrappedJSObject?.editor || editorElement.editor || null;
+    } catch {
+      return null;
+    }
+  }
+  function editorText(editorElement) {
+    const editor = tiptapOf(editorElement);
+    let html = "";
+    try {
+      html = editor?.getHTML?.() || "";
+    } catch {
+      html = "";
+    }
+    return htmlToText(html || editorElement?.innerHTML || "");
+  }
+  function clearEditor(editorElement) {
+    const editor = tiptapOf(editorElement);
+    try {
+      if (editor?.commands?.clearContent) {
+        editor.commands.clearContent(true);
+        return;
+      }
+    } catch {
+    }
+    const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : editorElement.ownerDocument.defaultView;
+    editorElement.innerHTML = "<p></p>";
+    const InputEventCtor = page?.InputEvent || page?.Event;
+    editorElement.dispatchEvent(new InputEventCtor("input", { bubbles: true, cancelable: true }));
+  }
+  function employerNotesTopic({
+    id = "employer-notes",
+    page,
+    routes,
+    where = "Wo die Tags erscheinen: Matches hier im Matchkommentar-Dialog, AP, Vakanzen und Prozess in der KAM-Toolbox (AG Response Rate, Vakanz-Panel, Meine Matches).",
+    displays = []
+  }) {
+    return {
+      id,
+      title: "AG-Notizen mit Tags",
+      page,
+      routes,
+      kind: "write",
+      summary: "Neben dem Matchkommentar-Dialog stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld als Arbeitgeberkommentar gespeichert statt als Matchkommentar.",
+      steps: [
+        "Den Text wie gewohnt ins Kommentarfeld schreiben.",
+        "Rechts einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
+        "„Als AG-Notiz speichern“ klicken. Der Text landet am Arbeitgeber, das Kommentarfeld wird geleert."
+      ],
+      notes: [
+        "Was nur diesen Kandidaten oder CEM betrifft, bleibt ein Matchkommentar und wird wie immer mit dem Pfeil abgeschickt.",
+        "Gespeichert wird mit den Tags vorn, z. B. „[AP][Prozess] Bewerbungen immer an Melanie in CC“. Im Adminpanel steht die Notiz bei den Kommentaren des Arbeitgebers, auch ohne Toolbox lesbar.",
+        where,
+        ...displays,
+        "Notizen werden 5 Minuten zwischengespeichert. Was du selbst speicherst, erscheint sofort."
+      ]
+    };
+  }
+  function placePanel(panel, paper, view) {
+    const rect = paper.getBoundingClientRect();
+    const width = 300;
+    const gap = 12;
+    const viewWidth = view?.innerWidth || 1200;
+    const viewHeight = view?.innerHeight || 800;
+    let left = rect.right + gap;
+    if (left + width > viewWidth - 8) left = rect.left - gap - width;
+    if (left < 8) left = Math.max(8, viewWidth - width - 8);
+    const top = Math.max(16, rect.top);
+    const next = { left: `${Math.round(left)}px`, top: `${Math.round(top)}px`, maxHeight: `${Math.round(viewHeight - top - 16)}px` };
+    for (const [key, value] of Object.entries(next)) if (panel.style[key] !== value) panel.style[key] = value;
+  }
+  function executeEmployerNotesDialog(runtime, {
+    getProvider,
+    sourcePath,
+    helpTip = () => null,
+    owner = "toolbox"
+  } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    let clicked = { matchId: "", employerId: "" };
+    let state = null;
+    function provider() {
+      try {
+        return getProvider();
+      } catch {
+        return null;
+      }
+    }
+    function currentTarget() {
+      if (clicked.matchId || clicked.employerId) return clicked;
+      return { matchId: matchIdFromHref(location.hash), employerId: "" };
+    }
+    function setStatus(text, tone = "") {
+      if (!state) return;
+      const status = state.panel.querySelector(".werkia-agn-status");
+      if (status.textContent !== text) status.textContent = text;
+      if ((status.dataset.tone || "") !== tone) status.dataset.tone = tone;
+    }
+    function updateSaveState() {
+      if (!state) return;
+      const button3 = state.panel.querySelector(".werkia-agn-save");
+      const anyTag = state.panel.querySelector('.werkia-agn-toggle[aria-pressed="true"]');
+      const disabled = state.saving || !state.employerId || !anyTag;
+      if (button3.disabled !== disabled) button3.disabled = disabled;
+    }
+    async function save() {
+      if (!state || state.saving) return;
+      const current = state;
+      const editor = current.dialog.querySelector(EDITOR_SELECTOR);
+      const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button3) => button3.dataset.tag);
+      const text = editor ? editorText(editor) : "";
+      if (!text) {
+        setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
+        return;
+      }
+      if (!tags.length) {
+        setStatus("Mindestens einen Tag wählen.", "error");
+        return;
+      }
+      if (!current.employerId) {
+        setStatus("Arbeitgeber nicht erkannt, Notiz nicht gespeichert.", "error");
+        return;
+      }
+      current.saving = true;
+      updateSaveState();
+      setStatus("Wird gespeichert …");
+      try {
+        await current.provider.create(current.employerId, tags, text);
+        if (state !== current) return;
+        clearEditor(editor);
+        current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button3) => button3.setAttribute("aria-pressed", "false"));
+        setStatus(`Als AG-Notiz gespeichert (${tags.join(", ")}).`, "ok");
+      } catch (error) {
+        console.warn("[AG-Notizen]", error);
+        if (state === current) setStatus(`Nicht gespeichert: ${error.message}`, "error");
+      } finally {
+        current.saving = false;
+        updateSaveState();
+      }
+    }
+    function buildPanel(notesProvider) {
+      const panel = element(document, "aside", "werkia-agn-panel");
+      panel.setAttribute(PANEL_ATTRIBUTE, owner);
+      const list = createEmployerNotesList({ provider: notesProvider, tag: "Matches", limit: 3, document, helpTip: helpTip() });
+      const write = element(document, "div", "werkia-agn-write");
+      const head = element(document, "div", "werkia-agn-head", "Als AG-Notiz speichern");
+      const tags = element(document, "div", "werkia-agn-tags");
+      for (const tag of NOTE_TAGS) {
+        const toggle = element(document, "button", "werkia-agn-toggle", tag.label);
+        toggle.type = "button";
+        toggle.dataset.tag = tag.id;
+        toggle.title = `Erscheint ${tag.hint}`;
+        toggle.setAttribute("aria-pressed", "false");
+        toggle.addEventListener("click", (event) => {
+          event.preventDefault();
+          toggle.setAttribute("aria-pressed", toggle.getAttribute("aria-pressed") === "true" ? "false" : "true");
+          updateSaveState();
+        });
+        tags.appendChild(toggle);
+      }
+      const button3 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
+      button3.type = "button";
+      button3.disabled = true;
+      button3.addEventListener("click", (event) => {
+        event.preventDefault();
+        save();
+      });
+      const hint = element(document, "div", "werkia-agn-hint", "Mindestens einen Tag wählen. Nimmt den Text aus dem Kommentarfeld und speichert ihn am Arbeitgeber statt am Match.");
+      write.append(head, tags, button3, element(document, "div", "werkia-agn-status"), hint);
+      panel.append(list.element, write);
+      return { panel, list };
+    }
+    function teardown() {
+      state?.panel.remove();
+      state = null;
+    }
+    function resolveEmployer2(current, matchId) {
+      current.provider.employerIdForMatch(matchId).then((employerId) => {
+        if (state !== current) return;
+        current.employerId = employerId;
+        current.list.setEmployerId(employerId);
+        if (!employerId) setStatus("Arbeitgeber zu diesem Match nicht gefunden.", "error");
+        updateSaveState();
+      }, (error) => {
+        console.warn("[AG-Notizen]", error);
+        if (state === current) setStatus("Arbeitgeber konnte nicht ermittelt werden.", "error");
+      });
+    }
+    function render() {
+      const dialog = findMatchCommentsDialog(document);
+      if (!dialog) {
+        if (state) {
+          teardown();
+          clicked = { matchId: "", employerId: "" };
+        }
+        return;
+      }
+      const host = dialog.closest(".MuiDialog-container") || dialog.parentElement || document.body;
+      const foreign = host.querySelector(`[${PANEL_ATTRIBUTE}]`);
+      if (foreign && foreign !== state?.panel) return;
+      const target = currentTarget();
+      if (state && (state.dialog !== dialog || state.matchId !== target.matchId)) teardown();
+      if (!state) {
+        const notesProvider = provider();
+        if (!notesProvider) return;
+        ensureEmployerNotesStyle(document);
+        const { panel, list } = buildPanel(notesProvider);
+        state = { panel, list, dialog, provider: notesProvider, matchId: target.matchId, employerId: target.employerId, saving: false };
+        host.appendChild(panel);
+        if (target.employerId) list.setEmployerId(target.employerId);
+        else if (target.matchId) resolveEmployer2(state, target.matchId);
+        else {
+          list.setEmployerId("");
+          setStatus("Match nicht erkannt. Den Dialog über den Kommentar-Knopf der Zeile öffnen.", "error");
+        }
+        updateSaveState();
+      }
+      if (state.panel.parentElement !== host) host.appendChild(state.panel);
+      placePanel(state.panel, dialog, window);
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    };
+    runtime.addDocumentListener("click", (event) => {
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button3) return;
+      const row = button3.closest("tr");
+      clicked = { matchId: matchIdFromRow(row), employerId: employerIdFromRow(row) };
+      schedule();
+    }, true);
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("resize", schedule);
+    schedule();
+  }
+
   // src/help.js
   var MY_MATCHES = "KAM › Meine Matches";
   var QUESTIONNAIRE = "OM-Fragebogen (Meine Matches)";
@@ -2205,6 +2851,45 @@
       ]
     },
     {
+      id: "comment-shortcuts",
+      title: "Kürzel und Vorlagen",
+      page: "Matchkommentar-Dialog",
+      routes: onMyMatches,
+      kind: "write",
+      summary: "Über dem Kommentarfeld steht eine Leiste mit den gängigen KAM-Kürzeln, nach Gruppen. Ein Klick schreibt das Kürzel in den Kommentar oder legt eine AG-Notiz am Arbeitgeber an. Fährst du im Dialog mit der Maus über ein Kürzel, steht die Bedeutung daneben. Der Reiter „Vorlagen“ hält deine eigenen längeren Texte.",
+      steps: [
+        "Reiter wählen (Kontakt, Termine, Unterlagen) und ein Kürzel anklicken. Ein zweiter Klick auf den Reiter klappt die Knöpfe ein.",
+        "Grau markierte Kürzel kommen in den Kommentar. Blau markierte öffnen eine Zeile „AG-Notiz für …“: Text prüfen, bei Bedarf ändern und „Speichern“ klicken. Orange markierte machen beides.",
+        "Was ein Kürzel heißt: mit der Maus darüberfahren, in alten Kommentaren, im Textfeld und in den AG-Notizen.",
+        "Vorlagen: „+ Neue Vorlage“ anlegen, ein Klick auf den Titel fügt den Text ein, „Ändern“ bearbeitet oder löscht sie."
+      ],
+      notes: [
+        "Die AG-Notiz wird erst mit „Speichern“ angelegt, als Arbeitgeberkommentar mit dem Tag [Matches]. Am Match ändert sich nichts, auch nicht die WVL.",
+        "Der Kommentar selbst wird wie gewohnt mit dem Pfeil abgeschickt.",
+        "Kürzel mit gestricheltem Rand haben eine Bedeutung, die die KAM noch bestätigen. Sie steht im Tooltip.",
+        "Groß- und Kleinschreibung zählt: „te“ heißt telefonisch erreicht, „TE“ Terminerinnerung.",
+        "Vorlagen liegen pro Person auf dem Toolbox-Server und sind auf jedem Rechner gleich. Ist der Server nicht erreichbar, steht das im Reiter. Die Kürzel funktionieren trotzdem."
+      ]
+    },
+    {
+      id: "slack-dm",
+      title: "An CEM: Match per Slack-DM schicken",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "external",
+      summary: "„An CEM“ neben dem Anzeigen-Link jeder Match-Zeile schickt der CEM-Person des Kandidaten eine Slack-DM mit Kandidat, Vakanz und Link zum Match, auf Wunsch mit Kommentar.",
+      steps: [
+        "„An CEM“ in der Zeile klicken.",
+        "Im Dialog prüfen, wer die Nachricht bekommt. Optional einen Kommentar schreiben.",
+        "„Senden“ klicken. Der Dialog meldet, an wen die DM ging."
+      ],
+      notes: [
+        "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die CEM-Person, die beim Kandidaten eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
+        "Die Nachricht kommt vom OPS-Bot, aber unter deinem Namen mit KAM-Icon. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
+        "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht."
+      ]
+    },
+    {
       id: "contact-badges",
       title: "AG Response Rate",
       page: MY_MATCHES,
@@ -2217,6 +2902,12 @@
         "Der Wert kommt aus dem Arbeitgeberprofil und wird alle 5 Minuten nachgeladen."
       ]
     },
+    employerNotesTopic({
+      page: `${MY_MATCHES} › Matchkommentar-Dialog`,
+      routes: onMyMatches,
+      where: "Wo die Tags erscheinen: Matches im Matchkommentar-Dialog, AP und Prozess in Meine Matches hinter der AG Response Rate, Vakanzen im Vakanz-Panel am OM-Fragebogen.",
+      displays: ["AP und Prozess stehen als Chip mit Anzahl hinter dem Arbeitgeber, nur wenn es solche Notizen gibt. Ein Klick zeigt sie."]
+    }),
     {
       id: "vacancy-city-badges",
       title: "Stadt neben dem Vakanztitel",
@@ -2266,7 +2957,78 @@
     omNotesBoxTopic({ routes: onMyMatches, page: QUESTIONNAIRE }),
     routeCalculationTopic({ routes: onMyMatches, page: QUESTIONNAIRE }),
     filterPresetsTopic({ page: MY_MATCHES, routes: onMyMatches }),
+    {
+      id: "focus-modes",
+      title: "Focus-Modes",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "local",
+      summary: "Ein Focus-Mode stellt die Liste mit einem Klick auf eine Aufgabe ein: Filter, Sortierung und eine hervorgehobene Spalte.",
+      steps: [
+        "Im Dropdown „Focus-Mode“ neben den Filtervorlagen einen Modus wählen.",
+        "„VTA-Session“ zeigt die VT-Anfragen wie der Schalter „Anfragen“ und stellt die Terminspalte nach vorn.",
+        "„Feedbacks einholen“ zeigt die Matches im KAM-Status „VT Feedback“, die am längsten wartenden zuerst, mit der Terminspalte vorn.",
+        "„Verlassen“ bringt die Ansicht von vorher zurück."
+      ],
+      notes: [
+        "Wer selbst am Filter dreht, verlässt den Modus damit. Die Spalte steht dann wieder an ihrem Platz.",
+        "Der Modus behält die KAM-Auswahl und „Von“ der aktuellen Ansicht.",
+        "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
+      ]
+    },
     vertretungenTopic({ page: MY_MATCHES, routes: onMyMatches }),
+    {
+      id: "prio-liste",
+      title: "Prio-Liste",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "Arbeitgeber, um die du dich heute zuerst kümmern willst. Der Knopf „Prio-Liste“ oben rechts klappt die Liste auf und zu. Einträge lassen sich abhaken, mit einer kurzen Notiz versehen und wieder entfernen.",
+      steps: [
+        "Auf den Stern vor einem Arbeitgeber in der Liste klicken oder im Panel einen Arbeitgeber dieser Seite wählen und „Hinzufügen“.",
+        "Erledigtes abhaken. ✎ bearbeitet die Notiz, × nimmt den Arbeitgeber von der Liste.",
+        "Um 17:30 fragt ein Fenster je offenem Eintrag: erledigt oder auf morgen. „Tag abschließen …“ im Panel öffnet es auch früher."
+      ],
+      notes: [
+        "Die Liste gehört zu deiner Person, nicht zum Rechner: auf jedem Gerät gleich. Im Adminpanel ändert sich nichts.",
+        "Nicht Erledigtes erscheint am nächsten Tag wieder, als „übertragen“ markiert. Auf die Liste kommt nur, was du selbst markierst.",
+        "„Prio zuerst“ sortiert die Zeilen der aktuellen Seite: Arbeitgeber der Prio-Liste stehen oben. Andere Seiten der Liste bleiben, wie sie sind. Der Schalter gilt nur in diesem Browser.",
+        "Vertrittst du heute jemanden, wählst du oben im Panel dessen Liste und siehst sie, ohne etwas zu ändern.",
+        "Ist der Toolbox-Server nicht erreichbar, steht die Meldung im Panel. Gespeichert ist dann nichts."
+      ]
+    },
+    {
+      id: "tagesplan-timeline",
+      title: "Heute: Tages-Timeline",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "„Heute“ neben den Filter-Knöpfen öffnet rechts eine Seitenleiste mit deinem Tag: bestätigte Termine, heute fällige WVL, deine Reminder und Team-Einträge deiner Leitung.",
+      notes: [
+        "Termine sind die bestätigten Terminvorschläge deiner Matches, mit Uhrzeit in deutscher Zeit. WVL zeigt alle Matches mit KAM-WVL heute, außer Out und Hired.",
+        "Offene Reminder von früheren Tagen stehen oben als „fällig“, bis du sie erledigst oder löschst.",
+        "Team-Einträge schreibt, wer Admin der Vertretungen ist. Sie sind für alle, ein Team oder einzelne Personen sichtbar.",
+        "Reminder und Team-Einträge liegen auf dem Toolbox-Server, nicht im Adminpanel. Ist er nicht erreichbar, zeigt die Leiste einen Hinweis und Termine und WVL trotzdem."
+      ]
+    },
+    {
+      id: "tagesplan-reminder",
+      title: "Reminder und Erinnerungen",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "Die Glocke in jeder Zeile setzt einen Reminder zum Match: Zeit und ein kurzer Text. Zur Zeit erscheint unten rechts eine Erinnerung, auf jeder Seite des Adminpanels.",
+      steps: [
+        "In der Zeile die Glocke klicken, Tag, Uhrzeit und Text eintragen, „Reminder speichern“.",
+        "In der Erinnerung „Erledigt“, „Später …“ (10 Minuten, 1 Stunde, morgen 9:00) oder „Löschen“ wählen."
+      ],
+      notes: [
+        "Automatisch erinnert die Toolbox 15 Minuten vor einem bestätigten Termin und einmal am Tag an die heute fälligen WVL.",
+        "Ist dein Browser zur fälligen Zeit zu, kommt die Erinnerung per Slack. Hat die Toolbox sie schon gezeigt, kommt keine Slack-Nachricht.",
+        "Eine orange Glocke heißt: Zu diesem Match gibt es offene Reminder. Die Zeiten stehen im Tooltip.",
+        "Im Adminpanel ändert sich nichts. Reminder liegen pro Person auf dem Toolbox-Server und sind auf jedem Rechner gleich."
+      ]
+    },
     {
       id: "chat-status-banner",
       title: "Status-Banner im Chat",
@@ -2356,9 +3118,9 @@
   // ../../shared/js/admin-panel-reload.js
   var ADMIN_PANEL_RELOAD_SELECTOR = 'header button[aria-label="Neu laden"]';
   function reloadAdminPanel(documentRef = document) {
-    const button2 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
-    if (!button2 || button2.disabled) return false;
-    button2.click();
+    const button3 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
+    if (!button3 || button3.disabled) return false;
+    button3.click();
     return true;
   }
 
@@ -2522,8 +3284,8 @@
     }
     const statusFor = (dialog) => (text, tone = "") => setStatus(text, tone, dialog);
     function setRunningControls(dialog, isRunning) {
-      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element) => {
-        element.disabled = isRunning;
+      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element2) => {
+        element2.disabled = isRunning;
       });
       const stopButton = dialog.querySelector('[data-action="close"]');
       if (stopButton) {
@@ -2678,17 +3440,17 @@
     function installButton(header, id, label, title, onClick) {
       if (!header || document.getElementById(id)) return;
       injectStyle();
-      const button2 = document.createElement("button");
-      button2.id = id;
-      button2.type = "button";
-      button2.textContent = label;
-      button2.title = title;
-      button2.addEventListener("click", (event) => {
+      const button3 = document.createElement("button");
+      button3.id = id;
+      button3.type = "button";
+      button3.textContent = label;
+      button3.title = title;
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         onClick();
       });
-      header.appendChild(button2);
+      header.appendChild(button3);
     }
     return {
       state,
@@ -2865,10 +3627,10 @@
 
   // ../../shared/js/bulk-match-actions/index.js
   var ROW_SELECTOR = "tbody tr.RaDataTable-row";
-  var EMPLOYER_LINK_SELECTOR = 'a[href*="#/Employer/"]';
+  var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
@@ -2877,7 +3639,7 @@
       team,
       isTargetPage: isTargetPage9,
       getRequest,
-      ids: IDS5,
+      ids: IDS9,
       fields,
       columns,
       statusOptions,
@@ -2902,37 +3664,37 @@
       }
       return null;
     }
-    function clickLikeUser(element) {
+    function clickLikeUser(element2) {
       const eventOptions = { bubbles: true, cancelable: true, composed: true, button: 0, buttons: 1 };
       if (typeof PointerEvent === "function") {
-        element.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element2.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element.dispatchEvent(new MouseEvent("mousedown", eventOptions));
+      element2.dispatchEvent(new MouseEvent("mousedown", eventOptions));
       if (typeof PointerEvent === "function") {
-        element.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element2.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
-      element.click();
+      element2.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
+      element2.click();
     }
-    function visibleOverlay(element) {
-      if (!element) return false;
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
+    function visibleOverlay(element2) {
+      if (!element2) return false;
+      const style = getComputedStyle(element2);
+      const rect = element2.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR2) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
-    function shownOnPage(element) {
-      if (!element.isConnected || element.closest("[hidden]")) return false;
-      const style = getComputedStyle(element);
+    function shownOnPage(element2) {
+      if (!element2.isConnected || element2.closest("[hidden]")) return false;
+      const style = getComputedStyle(element2);
       return style.display !== "none" && style.visibility !== "hidden";
     }
     function listIsLoading() {
-      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element) => !element.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element));
+      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element2) => !element2.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element2));
     }
     function employerFromRow(row) {
-      const link = row.querySelector(EMPLOYER_LINK_SELECTOR);
+      const link = row.querySelector(EMPLOYER_LINK_SELECTOR2);
       if (!link) return null;
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
@@ -2952,23 +3714,23 @@
       const label = [candidate, vacancy].filter(Boolean).join(" – ");
       return label.length > 90 ? `${label.slice(0, 89)}…` : label;
     }
-    function matchIdFromRow(row) {
-      const link = row.querySelector(MATCH_LINK_SELECTOR);
+    function matchIdFromRow2(row) {
+      const link = row.querySelector(MATCH_LINK_SELECTOR2);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS5,
-      buttonIds: [IDS5.button, IDS5.statusButton, IDS5.forwardButton, IDS5.declinePastButton],
+      ids: IDS9,
+      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS5.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS5.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
       return getRows().map((row, index) => {
-        const matchId = matchIdFromRow(row);
+        const matchId = matchIdFromRow2(row);
         if (!matchId || seen.has(matchId)) return null;
         seen.add(matchId);
         const employer = employerFromRow(row) || { id: "", name: "Ohne Arbeitgeber" };
@@ -3103,13 +3865,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS5.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS5.feedbackShortcuts;
+      shortcuts.id = IDS9.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -3208,7 +3970,7 @@
       return interviews;
     }
     function markRow(matchId, markCell) {
-      getRows().filter((row) => matchIdFromRow(row) === matchId).forEach((row) => markCell(row.querySelector(INTERVIEW_CELL_SELECTOR2)));
+      getRows().filter((row) => matchIdFromRow2(row) === matchId).forEach((row) => markCell(row.querySelector(INTERVIEW_CELL_SELECTOR2)));
     }
     async function forwardInterview(matchId, interview) {
       const request = getRequest();
@@ -3409,10 +4171,10 @@
     function installHeaderButtons() {
       if (!isTargetPage9()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS5.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS5.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS5.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS5.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -3552,8 +4314,8 @@
   // src/features/kam-suite/contact-badges.js
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
-  var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
-  var STYLE_ID = "werkia-kam-contact-style";
+  var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
+  var STYLE_ID2 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
   var CONTACT_OPTIONS = {
     no_contact: { short: "Kein Kontakt", full: "Kein Kontakt (>1 Woche)", tone: "no-contact", priority: 2 },
@@ -3588,7 +4350,7 @@
       return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(WVL_CELL_SELECTOR));
     }
     function employerFromRow(row) {
-      const link = row.querySelector(EMPLOYER_LINK_SELECTOR2);
+      const link = row.querySelector(EMPLOYER_LINK_SELECTOR3);
       if (!link) return null;
       const id = getContactEmployerId(link.href) || link.href;
       return { id, name: normalize4(link.textContent) || "Unbekannter Arbeitgeber" };
@@ -3612,10 +4374,10 @@
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID2)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID;
+      style.id = STYLE_ID2;
       style.textContent = `
       .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
       .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
@@ -3704,7 +4466,7 @@
     function renderContactBadges() {
       getRows().forEach((row) => {
         const employer = employerFromRow(row);
-        const link = row.querySelector(EMPLOYER_LINK_SELECTOR2);
+        const link = row.querySelector(EMPLOYER_LINK_SELECTOR3);
         if (!employer || !link) return;
         let wrap2 = [...row.querySelectorAll(".werkia-kam-contact")].find((node) => node.dataset.employerId === employer.id);
         if (!wrap2) {
@@ -3774,7 +4536,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle();
+        ensureStyle3();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
       }, 150);
@@ -3785,6 +4547,66 @@
       if (isTargetPage2()) loadEmployerContacts({ force: true }).catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
     }, REFRESH_INTERVAL_MS);
     scheduleContactBadges();
+  }
+
+  // src/features/kam-suite/employer-notes.js
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var EMPLOYER_LINK_SELECTOR4 = 'a[href*="#/Employer/"]';
+  var BOX_CLASS = "werkia-kam-employer-notes";
+  var ROW_TAGS = ["AP", "Prozess"];
+  function getKamEmployerNotesProvider() {
+    return employerNotesProviderFor(getKamGraphqlAdapter());
+  }
+  function executeKamEmployerNotes(runtime) {
+    runtime.registerSource("kam/toolbox/src/features/kam-suite/employer-notes.js");
+    executeEmployerNotesDialog(runtime, {
+      getProvider: getKamEmployerNotesProvider,
+      helpTip: () => kamHelp.tip("employer-notes"),
+      owner: "kam"
+    });
+    function syncRow(row, provider) {
+      const employerId = employerIdFromRow(row);
+      const link = row.querySelector(EMPLOYER_LINK_SELECTOR4);
+      let box = row.querySelector(`.${BOX_CLASS}`);
+      if (!employerId || !link) {
+        box?.remove();
+        return;
+      }
+      if (box && box.dataset.employerId !== employerId) {
+        box.remove();
+        box = null;
+      }
+      if (!box) {
+        box = document.createElement("span");
+        box.className = BOX_CLASS;
+        box.dataset.employerId = employerId;
+        for (const tag of ROW_TAGS) box.appendChild(createEmployerNoteBadge({ provider, employerId, tag, document }));
+      }
+      const anchor = row.querySelector(".werkia-kam-contact") || link;
+      if (anchor.nextElementSibling !== box) anchor.insertAdjacentElement("afterend", box);
+    }
+    function render() {
+      if (!isTargetPage2()) return;
+      let provider;
+      try {
+        provider = getKamEmployerNotesProvider();
+      } catch {
+        return;
+      }
+      document.querySelectorAll(ROW_SELECTOR3).forEach((row) => syncRow(row, provider));
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 250);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    schedule();
   }
 
   // ../../shared/js/werkia-graphql/job-position-city-provider.js
@@ -3809,9 +4631,9 @@
   }
 
   // src/features/kam-suite/vacancy-city-badges.js
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID2 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID3 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage3(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -3825,7 +4647,7 @@
     const cityIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR));
     }
     function jobPositionFromRow(row) {
       const link = row.querySelector(JOB_TITLE_LINK_SELECTOR);
@@ -3841,10 +4663,10 @@
       });
       return [...ids];
     }
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID2)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID3)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID2;
+      style.id = STYLE_ID3;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -3912,7 +4734,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage3()) return;
-        ensureStyle();
+        ensureStyle3();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -3939,7 +4761,7 @@
   var CANDIDATE_CEM_QUERY = `query allCandidates($filter: CandidateFilter) {
   items: allCandidates(filter: $filter) { id cemEmployeeId __typename }
 }`;
-  var EMPLOYEE_NAMES_QUERY = `query allEmployees($filter: EmployeeFilter!) {
+  var EMPLOYEE_NAMES_QUERY2 = `query allEmployees($filter: EmployeeFilter!) {
   items: allEmployees(filter: $filter) { id firstName lastName __typename }
 }`;
   function chunks(values, size) {
@@ -3990,7 +4812,7 @@
     const candidateIds = [...new Set([...matches.values()].map((match) => match.candidateId).filter(Boolean))];
     const candidates = candidateIds.length ? await loadById(request, CANDIDATE_CEM_QUERY, candidateIds) : /* @__PURE__ */ new Map();
     const employeeIds = [...new Set([...candidates.values()].map((candidate) => candidate.cemEmployeeId).filter(Boolean))];
-    const employees = employeeIds.length ? await loadById(request, EMPLOYEE_NAMES_QUERY, employeeIds) : /* @__PURE__ */ new Map();
+    const employees = employeeIds.length ? await loadById(request, EMPLOYEE_NAMES_QUERY2, employeeIds) : /* @__PURE__ */ new Map();
     for (const [matchId, match] of matches) {
       const cemEmployeeId = candidates.get(match.candidateId)?.cemEmployeeId;
       info.set(matchId, {
@@ -4002,11 +4824,11 @@
   }
 
   // src/features/kam-suite/cem-status-line.js
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
-  var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID3 = "werkia-kam-cem-line-style";
+  var STYLE_ID4 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
@@ -4029,15 +4851,15 @@
     const failedMatchIds = /* @__PURE__ */ new Set();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row) => row.querySelector(KAM_STATUS_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row) => row.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
-    function matchIdFromRow(row) {
-      return getMatchId(row.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
+    function matchIdFromRow2(row) {
+      return getMatchId(row.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
     }
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID3)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID4)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID3;
+      style.id = STYLE_ID4;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -4054,7 +4876,7 @@
     `;
       document.head.appendChild(style);
     }
-    function icon(path) {
+    function icon2(path) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("aria-hidden", "true");
@@ -4076,14 +4898,14 @@
       }
     }
     function nameButton(name) {
-      const button2 = document.createElement("button");
-      button2.type = "button";
-      button2.className = `${LINE_CLASS}__name`;
-      button2.title = "CEM-Namen kopieren";
+      const button3 = document.createElement("button");
+      button3.type = "button";
+      button3.className = `${LINE_CLASS}__name`;
+      button3.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button2.append(label, icon(COPY_ICON_PATH));
-      return button2;
+      button3.append(label, icon2(COPY_ICON_PATH));
+      return button3;
     }
     function renderState(matchId) {
       const info = infoByMatchId.get(matchId);
@@ -4122,7 +4944,7 @@
     function renderLines() {
       getRows().forEach((row) => {
         const cell = row.querySelector(KAM_STATUS_CELL_SELECTOR);
-        const matchId = matchIdFromRow(row);
+        const matchId = matchIdFromRow2(row);
         let line = cell.querySelector(`.${LINE_CLASS}`);
         if (!matchId) {
           line?.remove();
@@ -4142,7 +4964,7 @@
     }
     async function loadCemInfo({ force = false } = {}) {
       if (loadPromise) return loadPromise;
-      const matchIds = [...new Set(getRows().map(matchIdFromRow).filter(Boolean))].filter((id) => force || !infoByMatchId.has(id) && !failedMatchIds.has(id));
+      const matchIds = [...new Set(getRows().map(matchIdFromRow2).filter(Boolean))].filter((id) => force || !infoByMatchId.has(id) && !failedMatchIds.has(id));
       if (!matchIds.length) return;
       loadPromise = (async () => {
         try {
@@ -4172,26 +4994,26 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle();
+        ensureStyle3();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button2 = event.target.closest?.(`.${LINE_CLASS}__name`);
-      if (!button2) return;
+      const button3 = event.target.closest?.(`.${LINE_CLASS}__name`);
+      if (!button3) return;
       event.preventDefault();
       event.stopPropagation();
-      const name = button2.querySelector("span")?.textContent || "";
+      const name = button3.querySelector("span")?.textContent || "";
       if (!name) return;
       copyText(name).then(() => {
-        button2.dataset.copied = "true";
-        button2.title = "Kopiert";
-        button2.querySelector("svg")?.replaceWith(icon(CHECK_ICON_PATH));
+        button3.dataset.copied = "true";
+        button3.title = "Kopiert";
+        button3.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
         runtime.setTimeout(() => {
-          delete button2.dataset.copied;
-          button2.title = "CEM-Namen kopieren";
-          button2.querySelector("svg")?.replaceWith(icon(COPY_ICON_PATH));
+          delete button3.dataset.copied;
+          button3.title = "CEM-Namen kopieren";
+          button3.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -4373,8 +5195,8 @@
   ];
   function findListAnchor(root = document) {
     for (const selector of LIST_ANCHOR_SELECTORS) {
-      const element = root.querySelector(selector);
-      if (element) return element;
+      const element2 = root.querySelector(selector);
+      if (element2) return element2;
     }
     return null;
   }
@@ -4399,13 +5221,13 @@
     });
     const owner = sourcePath || routes.join(",");
     const ownElement = (id) => {
-      const element = document.getElementById(id);
-      return element?.dataset.werkiaPresetsOwner === owner ? element : null;
+      const element2 = document.getElementById(id);
+      return element2?.dataset.werkiaPresetsOwner === owner ? element2 : null;
     };
     const isTargetPage9 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle() {
+    function ensureStyle3() {
       if (document.getElementById(IDS2.style)) return;
       const style = document.createElement("style");
       style.id = IDS2.style;
@@ -4596,7 +5418,7 @@
         closeDialog();
         return;
       }
-      ensureStyle();
+      ensureStyle3();
       let bar = document.getElementById(IDS2.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -4651,7 +5473,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID4 = "werkia-match-status-filter-style";
+  var STYLE_ID5 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -4668,10 +5490,10 @@
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage9 = () => route.test(location.hash);
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID4)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID5)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID5;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -4696,14 +5518,14 @@
       const title = document.createElement("strong");
       title.textContent = label;
       const chips = options.map((option) => {
-        const button2 = document.createElement("button");
-        button2.type = "button";
-        button2.dataset.value = option.value;
-        button2.textContent = option.label;
+        const button3 = document.createElement("button");
+        button3.type = "button";
+        button3.dataset.value = option.value;
+        button3.textContent = option.label;
         const chipTone = tone(option.value);
-        if (chipTone) button2.dataset.tone = chipTone;
-        button2.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
-        return button2;
+        if (chipTone) button3.dataset.tone = chipTone;
+        button3.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
+        return button3;
       });
       const reset = document.createElement("button");
       reset.type = "button";
@@ -4716,9 +5538,9 @@
     }
     function syncBar(bar) {
       const selected = selectedStatuses(currentFilter(), field);
-      bar.querySelectorAll("button[data-value]").forEach((button2) => {
-        const pressed = String(selected.includes(button2.dataset.value));
-        if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
+      bar.querySelectorAll("button[data-value]").forEach((button3) => {
+        const pressed = String(selected.includes(button3.dataset.value));
+        if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
       });
       const reset = bar.querySelector(`.${BAR_CLASS}-reset`);
       if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
@@ -4729,7 +5551,7 @@
         bar?.remove();
         return;
       }
-      ensureStyle();
+      ensureStyle3();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -4803,9 +5625,9 @@
     const context = getQuestionnaireContext();
     function captureContext(event) {
       if (!isTargetPage5()) return;
-      const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button2) return;
-      const row = button2.closest("tr");
+      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
+      const row = button3.closest("tr");
       if (!row) return;
       const next = buildQuestionnaireContext(row);
       Object.assign(context, next || EMPTY_CONTEXT);
@@ -4871,7 +5693,7 @@
       if (/Matchkommentare/i.test(text)) return false;
       if (/Kandidat Dateien/i.test(text)) return false;
       const labels = new Set(
-        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el3) => (el3.innerText || "").trim())
+        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el5) => (el5.innerText || "").trim())
       );
       const count = QUESTIONNAIRE_LABELS.filter((l) => labels.has(l)).length;
       const hasHeader = labels.has("Kandidat") && labels.has("Job");
@@ -4927,7 +5749,7 @@
       const width = Math.min(520, window.innerWidth - 40);
       return { left: window.innerWidth - width - MARGIN, top: 80, width, maxHeight: window.innerHeight - 100 };
     }
-    function makeVacancySection(heading, items, icon = "✓") {
+    function makeVacancySection(heading, items, icon2 = "✓") {
       const wrap2 = document.createElement("div");
       const h = document.createElement("div");
       h.style.cssText = `
@@ -4944,14 +5766,26 @@
         display:flex; gap:10px; margin-bottom:10px;
         color:#222; font-size:16px; align-items:flex-start; line-height:1.65;
       `;
-        const iconColor = icon === "✓" ? "#16a34a" : "#888";
-        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon)}</span><span>${escapeHtml(item)}</span>`;
+        const iconColor = icon2 === "✓" ? "#16a34a" : "#888";
+        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon2)}</span><span>${escapeHtml(item)}</span>`;
         ul.appendChild(li);
       });
       wrap2.appendChild(ul);
       return wrap2;
     }
-    function buildVacancyPanel(data, jobTitle, uuid, token) {
+    function appendEmployerNotes(panel, employerId) {
+      if (!employerId) return;
+      let provider;
+      try {
+        provider = getKamEmployerNotesProvider();
+      } catch {
+        return;
+      }
+      const notes = createEmployerNotesList({ provider, employerId, tag: "Vakanzen", limit: 5, document, hideWhenEmpty: true });
+      notes.element.style.margin = "0 0 18px";
+      panel.appendChild(notes.element);
+    }
+    function buildVacancyPanel(data, jobTitle, uuid, token, employerId = "") {
       const panel = document.createElement("div");
       panel.id = PANEL_ID;
       panel.dataset.werkiaClickToken = token;
@@ -4995,6 +5829,7 @@
       header.appendChild(titleSpan);
       header.appendChild(closeBtn);
       panel.appendChild(header);
+      appendEmployerNotes(panel, employerId);
       if (!data || !data.zustaendigkeiten && !data.profil) {
         const err = document.createElement("div");
         err.style.cssText = "color:#888;font-size:14px;";
@@ -5055,15 +5890,16 @@
     }
     async function handleQuestionnaireButtonClick(event) {
       if (!isTargetPage5()) return;
-      const button2 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button2) return;
-      const row = button2.closest("tr");
+      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
+      const row = button3.closest("tr");
       if (!row) return;
       const vacancyLink = row.querySelector('a[href*="werkia.de/bewerben/"]');
       const uuid = vacancyLink?.href.match(/bewerben\/([a-f0-9-]{36})/i)?.[1] || "";
       if (!uuid) return;
       const jobTitleElement = row.querySelector(".column-jobPositionId a span, .column-jobPositionId a");
       const jobTitle = jobTitleElement?.textContent?.trim() || "";
+      const employerId = employerIdFromRow(row);
       const routeKey = context.key || "";
       const token = String(++clickCounter);
       showVacancyLoading(jobTitle, token);
@@ -5076,7 +5912,7 @@
         return;
       }
       removeVacancyPanel();
-      document.body.appendChild(buildVacancyPanel(data, jobTitle, uuid, token));
+      document.body.appendChild(buildVacancyPanel(data, jobTitle, uuid, token, employerId));
     }
     runtime.addDocumentListener("click", (event) => {
       handleQuestionnaireButtonClick(event).catch((error) => console.warn("[Werkia KAM Fragebogen] Fragebogen konnte nicht vorbereitet werden.", error));
@@ -5438,7 +6274,7 @@
   }
   function getDialogLabelTexts(dialog) {
     if (!dialog) return [];
-    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el3) => (el3.innerText || el3.textContent || "").trim()).filter(Boolean);
+    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el5) => (el5.innerText || el5.textContent || "").trim()).filter(Boolean);
   }
   function isQuestionnaireDialog(dialog, { strictMode = true, fold: fold2 = false, labels = QUESTIONNAIRE_LABELS2 } = {}) {
     if (!dialog) return false;
@@ -5475,7 +6311,7 @@
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return null;
     const field = mode === "last" ? fields[fields.length - 1] : fields[0];
-    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el3) => (el3.innerText || el3.textContent || "").trim()) || null;
+    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el5) => (el5.innerText || el5.textContent || "").trim()) || null;
   }
   function findValueAllowEmpty(dialog, labelText, mode = "first", { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
@@ -5493,11 +6329,11 @@
   function getPositionEls(dialog, labelText, { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return [];
-    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el3) => (el3.innerText || el3.textContent || "").trim() && normalize5(el3.innerText || el3.textContent, fold2) !== "berufsausbildung");
+    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el5) => (el5.innerText || el5.textContent || "").trim() && normalize5(el5.innerText || el5.textContent, fold2) !== "berufsausbildung");
   }
   function getQuestionnaireHeaderValue(dialog, labelText, { fold: fold2 = false } = {}) {
     const field = getFieldsByLabel(dialog, labelText, { fold: fold2 })[0];
-    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el3) => el3.textContent?.trim() && normalize5(el3.textContent, fold2) !== normalize5(labelText, fold2)) : null;
+    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el5) => el5.textContent?.trim() && normalize5(el5.textContent, fold2) !== normalize5(labelText, fold2)) : null;
     if (value?.textContent?.trim()) return value.textContent.trim();
     const lines = (dialog.innerText || dialog.textContent || "").split("\n").map((line) => line.trim()).filter(Boolean);
     const labelIndex = lines.findIndex((line) => normalize5(line, fold2) === normalize5(labelText, fold2));
@@ -5519,7 +6355,7 @@
   function comparisonValue(value, original, options = {}) {
     return original && isOwnMarkedValue(value, original, options) ? original : value;
   }
-  function mark(el3, color, title = "", options = {}) {
+  function mark(el5, color, title = "", options = {}) {
     const {
       markAttr = DEFAULT_MARK_ATTR,
       originalAttr = DEFAULT_ORIGINAL_ATTR,
@@ -5528,24 +6364,24 @@
       prefixByColor = null,
       dedupeAttr = null
     } = options;
-    if (!el3) return;
+    if (!el5) return;
     if (dedupeAttr) {
       const signature = `${color}|${title}`;
-      if (el3.dataset[dedupeAttr] === signature) return;
-      el3.dataset[dedupeAttr] = signature;
+      if (el5.dataset[dedupeAttr] === signature) return;
+      el5.dataset[dedupeAttr] = signature;
     }
-    if (!el3.dataset[originalAttr]) el3.dataset[originalAttr] = el3.innerText || "";
-    el3.dataset[markAttr] = "true";
-    el3.style.background = color;
-    el3.style.color = "#000";
-    el3.style.padding = "4px 6px";
-    el3.style.borderRadius = "4px";
-    el3.style.fontWeight = fontWeight;
-    el3.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
-    if (title) el3.title = title;
-    const original = el3.dataset[originalAttr];
+    if (!el5.dataset[originalAttr]) el5.dataset[originalAttr] = el5.innerText || "";
+    el5.dataset[markAttr] = "true";
+    el5.style.background = color;
+    el5.style.color = "#000";
+    el5.style.padding = "4px 6px";
+    el5.style.borderRadius = "4px";
+    el5.style.fontWeight = fontWeight;
+    el5.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
+    if (title) el5.title = title;
+    const original = el5.dataset[originalAttr];
     const prefix = prefixByColor?.[color];
-    el3.innerText = prefix ? `${prefix}${original}` : original;
+    el5.innerText = prefix ? `${prefix}${original}` : original;
   }
   function clearMarks(root = document, options = {}) {
     const {
@@ -5553,19 +6389,19 @@
       originalAttr = DEFAULT_ORIGINAL_ATTR,
       dedupeAttr = null
     } = options;
-    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el3) => {
-      const original = el3.dataset[originalAttr];
-      if (original && isOwnMarkedValue(el3.innerText || "", original, options)) el3.innerText = original;
-      el3.style.background = "";
-      el3.style.color = "";
-      el3.style.padding = "";
-      el3.style.borderRadius = "";
-      el3.style.fontWeight = "";
-      el3.style.boxShadow = "";
-      el3.title = "";
-      delete el3.dataset[markAttr];
-      delete el3.dataset[originalAttr];
-      if (dedupeAttr) delete el3.dataset[dedupeAttr];
+    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el5) => {
+      const original = el5.dataset[originalAttr];
+      if (original && isOwnMarkedValue(el5.innerText || "", original, options)) el5.innerText = original;
+      el5.style.background = "";
+      el5.style.color = "";
+      el5.style.padding = "";
+      el5.style.borderRadius = "";
+      el5.style.fontWeight = "";
+      el5.style.boxShadow = "";
+      el5.title = "";
+      delete el5.dataset[markAttr];
+      delete el5.dataset[originalAttr];
+      if (dedupeAttr) delete el5.dataset[dedupeAttr];
     });
   }
 
@@ -5600,8 +6436,8 @@
   }
   function executeQuestionnaireEvaluation(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-evaluation.js");
-    function mark2(el3, color, title = "") {
-      mark(el3, color, title, MARK_OPTIONS);
+    function mark2(el5, color, title = "") {
+      mark(el5, color, title, MARK_OPTIONS);
     }
     function clearMarks2() {
       clearMarks(document, MARK_OPTIONS);
@@ -5652,20 +6488,20 @@
       return { status: "send" };
     }
     function compareRecognition(dialog) {
-      const el3 = findValue(dialog, "Recognition status");
-      if (!el3) return { status: "send" };
-      const v = clean(el3.innerText);
+      const el5 = findValue(dialog, "Recognition status");
+      if (!el5) return { status: "send" };
+      const v = clean(el5.innerText);
       if (v.includes("ja, ist anerkannt")) {
-        mark2(el3, GREEN, "Anerkennung: Ja");
+        mark2(el5, GREEN, "Anerkennung: Ja");
         return { status: "send" };
       }
       if (v.includes("in anerkennung")) {
-        mark2(el3, YELLOW, "In Anerkennung");
-        return { status: "unclear", detail: `Recognition status: ${el3.innerText}` };
+        mark2(el5, YELLOW, "In Anerkennung");
+        return { status: "unclear", detail: `Recognition status: ${el5.innerText}` };
       }
       if (v.includes("noch nicht beantragt")) {
-        mark2(el3, RED, "Noch nicht beantragt");
-        return { status: "no-send", detail: `Recognition status: ${el3.innerText}` };
+        mark2(el5, RED, "Noch nicht beantragt");
+        return { status: "no-send", detail: `Recognition status: ${el5.innerText}` };
       }
       return { status: "send" };
     }
@@ -5714,8 +6550,8 @@
       return { status: "send" };
     }
     function comparePositions(dialog) {
-      const empEls = getPositionEls(dialog, "Position").map((el3) => ({ el: el3, value: clean(el3.innerText) }));
-      const candEls = getPositionEls(dialog, "Positionen").map((el3) => ({ el: el3, value: clean(el3.innerText) }));
+      const empEls = getPositionEls(dialog, "Position").map((el5) => ({ el: el5, value: clean(el5.innerText) }));
+      const candEls = getPositionEls(dialog, "Positionen").map((el5) => ({ el: el5, value: clean(el5.innerText) }));
       if (!empEls.length) return { status: "send" };
       if (!candEls.length) return { status: "unclear", detail: `Positionen: ${empEls.map((p) => p.value).join(", ")} → leer` };
       let anyGreen = false;
@@ -5875,7 +6711,7 @@
     function currentFieldSignature(dialog) {
       return [...dialog.querySelectorAll("span.ra-field")].map((field) => {
         const label = field.querySelector("p span")?.innerText?.trim() || "";
-        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el3) => comparisonValue2(el3.innerText ?? el3.textContent ?? "", el3.dataset[ORIGINAL_TEXT])).join("|");
+        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el5) => comparisonValue2(el5.innerText ?? el5.textContent ?? "", el5.dataset[ORIGINAL_TEXT])).join("|");
         return `${label}=${values}`;
       }).join(";");
     }
@@ -6385,7 +7221,7 @@
     const isQuestionnaireDialog2 = (dialog) => {
       const text = dialog?.innerText || dialog?.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element) => (element.innerText || "").trim()));
+      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element2) => (element2.innerText || "").trim()));
       return labels.has("Kandidat") && labels.has("Job") && QUESTIONNAIRE_LABELS3.filter((label) => labels.has(label)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog2(dialog)) || null;
@@ -6525,8 +7361,8 @@
     }
     function captureQuestionnaireClick(event) {
       if (!isTargetPage5()) return;
-      const button2 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
-      if (!button2) return;
+      const button3 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
       if (!context.key) return;
       scheduleUpdate();
       waitForQuestionnaireDialog(context.key);
@@ -6544,7 +7380,7 @@
   }
 
   // src/features/kam-suite/candidate-file-popup.js
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
@@ -6557,12 +7393,12 @@
     let pendingCandidateId = "";
     let pendingCandidateAt = 0;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row) => row.querySelector(WVL_CELL_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row) => row.querySelector(WVL_CELL_SELECTOR2));
     }
-    function visibleOverlay(element) {
-      if (!element) return false;
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
+    function visibleOverlay(element2) {
+      if (!element2) return false;
+      const style = getComputedStyle(element2);
+      const rect = element2.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function candidateFilesDialog() {
@@ -6584,22 +7420,22 @@
       const dialog = candidateFilesDialog();
       if (!dialog || dialog.querySelector(".werkia-kam-candidate-open")) return;
       const candidateId = pendingCandidateId;
-      const button2 = document.createElement("button");
-      button2.className = "werkia-kam-candidate-open";
-      button2.type = "button";
-      button2.textContent = "Kandidatenansicht öffnen ↗";
-      button2.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
-      button2.addEventListener("click", (event) => {
+      const button3 = document.createElement("button");
+      button3.className = "werkia-kam-candidate-open";
+      button3.type = "button";
+      button3.textContent = "Kandidatenansicht öffnen ↗";
+      button3.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         openCandidateViewPopup(candidateId);
       });
       const title = dialog.querySelector(".MuiDialogTitle-root");
-      if (title) title.insertAdjacentElement("afterend", button2);
-      else dialog.prepend(button2);
+      if (title) title.insertAdjacentElement("afterend", button3);
+      else dialog.prepend(button3);
     }
     function installCandidateFileHooks() {
-      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element) => element.remove());
+      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element2) => element2.remove());
       getRows().forEach((row) => {
         const actionsCell = row.querySelector(CANDIDATE_ACTIONS_CELL_SELECTOR);
         if (!actionsCell) return;
@@ -6646,16 +7482,16 @@
 
   // src/features/kam-suite/status-effects.js
   var STATUS_SELECTOR = ".MuiSelect-root";
-  function getSelectData(el3) {
-    const input = el3.querySelector("input.MuiSelect-nativeInput");
-    const combo = el3.querySelector('[role="combobox"]');
+  function getSelectData(el5) {
+    const input = el5.querySelector("input.MuiSelect-nativeInput");
+    const combo = el5.querySelector('[role="combobox"]');
     return {
       value: input?.value || "",
       text: combo?.textContent?.trim() || ""
     };
   }
-  function getState(el3) {
-    const { value, text } = getSelectData(el3);
+  function getState(el5) {
+    const { value, text } = getSelectData(el5);
     if (value === "process" || text === "Senden") return "process";
     if (value === "hired" || text === "Hired") return "hired";
     return value || text || "empty";
@@ -6665,23 +7501,23 @@
     const lastStates = /* @__PURE__ */ new WeakMap();
     let initialized = false;
     function initSelectStates() {
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el3) => {
-        lastStates.set(el3, getState(el3));
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el5) => {
+        lastStates.set(el5, getState(el5));
       });
       initialized = true;
     }
-    function flashGreen(el3) {
-      const inner = el3.querySelector('[role="combobox"]') || el3;
-      el3.style.transition = "all 0.2s ease";
-      el3.style.backgroundColor = "#bbf7d0";
-      el3.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
+    function flashGreen(el5) {
+      const inner = el5.querySelector('[role="combobox"]') || el5;
+      el5.style.transition = "all 0.2s ease";
+      el5.style.backgroundColor = "#bbf7d0";
+      el5.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
       inner.style.transition = "all 0.2s ease";
       inner.style.backgroundColor = "#bbf7d0";
       inner.style.color = "#14532d";
       inner.style.fontWeight = "700";
       runtime.setTimeout(() => {
-        el3.style.backgroundColor = "";
-        el3.style.boxShadow = "";
+        el5.style.backgroundColor = "";
+        el5.style.boxShadow = "";
         inner.style.backgroundColor = "";
         inner.style.color = "";
         inner.style.fontWeight = "";
@@ -6854,24 +7690,24 @@
     }
     function checkSelects() {
       if (!initialized) return;
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el3) => {
-        const currentState = getState(el3);
-        if (!lastStates.has(el3)) {
-          lastStates.set(el3, currentState);
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el5) => {
+        const currentState = getState(el5);
+        if (!lastStates.has(el5)) {
+          lastStates.set(el5, currentState);
           return;
         }
-        const lastState = lastStates.get(el3);
+        const lastState = lastStates.get(el5);
         if (currentState !== lastState) {
           if (currentState === "process") {
-            flashGreen(el3);
+            flashGreen(el5);
             showAnotherOneText();
             fireConfetti();
           }
           if (currentState === "hired") {
-            flashGreen(el3);
+            flashGreen(el5);
             showHiredCelebration();
           }
-          lastStates.set(el3, currentState);
+          lastStates.set(el5, currentState);
         }
       });
     }
@@ -6968,7 +7804,7 @@
       const candidate = rightLinks[0];
       if (!candidate) return null;
       const row = candidate.closest("div") || candidate.parentElement;
-      const prio = [...row.querySelectorAll("span, div, button")].find((el3) => /^[A-F]\d*$/i.test((el3.innerText || "").trim()));
+      const prio = [...row.querySelectorAll("span, div, button")].find((el5) => /^[A-F]\d*$/i.test((el5.innerText || "").trim()));
       return prio || candidate;
     }
     function ensureBox() {
@@ -7090,15 +7926,15 @@
 
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
-  var ROW_SELECTOR6 = "tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
-  var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
+  var ROW_SELECTOR7 = "tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row) {
-    const link = row?.querySelector(MATCH_LINK_SELECTOR3);
+    const link = row?.querySelector(MATCH_LINK_SELECTOR4);
     return link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
   }
   function getEmployerIdFromChatRow(row) {
-    const link = row?.querySelector(EMPLOYER_LINK_SELECTOR3);
+    const link = row?.querySelector(EMPLOYER_LINK_SELECTOR5);
     return link?.getAttribute("href")?.match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
   }
   function buildDirectChatUrl(chatIconHref, matchId, employerId) {
@@ -7121,7 +7957,7 @@
       if (!isTargetPage()) return;
       const link = event.target.closest(CHAT_LINK_SELECTOR);
       if (!link) return;
-      const row = link.closest(ROW_SELECTOR6);
+      const row = link.closest(ROW_SELECTOR7);
       const matchId = getMatchIdFromChatRow(row);
       if (!matchId) return;
       event.preventDefault();
@@ -7264,7 +8100,7 @@
     location: { names: ["location", "locationId", "appointmentLocation"], label: "Standort", fallbackIndex: 2 }
   };
   function getAppointments(root = document) {
-    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el3) => el3.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
+    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el5) => el5.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
   }
   function hasAppointmentFields(dialog) {
     return Boolean(dialog?.querySelector?.(APPOINTMENT_INPUT_SELECTOR));
@@ -7298,10 +8134,10 @@
   }
   function executeAppointmentCopyPaste(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/appointment-copy-paste.js");
-    function isVisible2(element) {
-      if (!element) return false;
-      const rect = element.getBoundingClientRect();
-      const style = window.getComputedStyle(element);
+    function isVisible2(element2) {
+      if (!element2) return false;
+      const rect = element2.getBoundingClientRect();
+      const style = window.getComputedStyle(element2);
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function appointmentDialog() {
@@ -7323,9 +8159,9 @@
       }
     }
     function termToast(text) {
-      const el3 = document.createElement("div");
-      el3.textContent = text;
-      el3.style.cssText = `
+      const el5 = document.createElement("div");
+      el5.textContent = text;
+      el5.style.cssText = `
       position: fixed;
       bottom: 24px;
       right: 24px;
@@ -7336,22 +8172,22 @@
       z-index: 99999999;
       font-size: 14px;
     `;
-      document.body.appendChild(el3);
-      runtime.setTimeout(() => el3.remove(), 2200);
+      document.body.appendChild(el5);
+      runtime.setTimeout(() => el5.remove(), 2200);
     }
-    function setValue(el3, value) {
-      el3.focus();
+    function setValue(el5, value) {
+      el5.focus();
       const inputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
       const textareaSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-      if (el3.tagName === "TEXTAREA") {
-        textareaSetter?.call(el3, value);
+      if (el5.tagName === "TEXTAREA") {
+        textareaSetter?.call(el5, value);
       } else {
-        inputSetter?.call(el3, value);
+        inputSetter?.call(el5, value);
       }
-      el3.dispatchEvent(new Event("input", { bubbles: true }));
-      el3.dispatchEvent(new Event("change", { bubbles: true }));
-      el3.dispatchEvent(new Event("blur", { bubbles: true }));
-      el3.blur();
+      el5.dispatchEvent(new Event("input", { bubbles: true }));
+      el5.dispatchEvent(new Event("change", { bubbles: true }));
+      el5.dispatchEvent(new Event("blur", { bubbles: true }));
+      el5.blur();
     }
     function setPicker(root, value) {
       const values = parseAppointmentValue(value);
@@ -7381,7 +8217,7 @@
         if (select) return select;
       }
       const selects = [...dialog.querySelectorAll(".MuiSelect-select")];
-      const fieldLabel = [...dialog.querySelectorAll("label")].find((element) => element.textContent?.trim().replace(/\*/g, "").trim() === label);
+      const fieldLabel = [...dialog.querySelectorAll("label")].find((element2) => element2.textContent?.trim().replace(/\*/g, "").trim() === label);
       if (fieldLabel) {
         const labelledSelect = selects.find((select) => select.getAttribute("aria-labelledby")?.split(/\s+/).includes(fieldLabel.id));
         if (labelledSelect) return labelledSelect;
@@ -7619,10 +8455,10 @@
   }
 
   // ../../shared/js/slack-exports/index.js
-  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
-  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var EXPORTS_SELECTOR = ".werkia-slack-exports";
-  var STYLE_ID5 = "werkia-slack-exports-style";
+  var STYLE_ID6 = "werkia-slack-exports-style";
   var SENT_STORE_KEY = "werkia_vt_slack_exports_sent_v1";
   var APPOINTMENT_DATE_RE = /\b\d{1,2}\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mär(?:z)?|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|dez(?:ember)?)\.?\s+\d{4}\s+\d{1,2}:\d{2}\b/i;
   var APPOINTMENT_DATE_ALL_RE = new RegExp(APPOINTMENT_DATE_RE.source, "gi");
@@ -7669,7 +8505,7 @@
   function isTargetPage7(hash = location.hash, role) {
     return new RegExp(`#/${role}/MyMatches(?:[/?]|$)`, "i").test(hash);
   }
-  function matchIdFromHref(href) {
+  function matchIdFromHref2(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function hasAppointmentDate(text) {
@@ -7743,10 +8579,10 @@
       } catch {
       }
     }
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID5)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID6;
       style.textContent = `
       .werkia-slack-exports { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .werkia-slack-export { min-height:24px; padding:3px 8px; border:0; border-radius:5px; background:#4956df; color:#fff; cursor:pointer; font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
@@ -7758,8 +8594,8 @@
     function appointmentCell(row) {
       return [...row.querySelectorAll("td")].find((cell) => hasAppointmentDate(cell.innerText));
     }
-    function matchIdFromRow(row) {
-      return matchIdFromHref(row.querySelector(MATCH_LINK_SELECTOR4)?.href);
+    function matchIdFromRow2(row) {
+      return matchIdFromHref2(row.querySelector(MATCH_LINK_SELECTOR5)?.href);
     }
     async function loadMatchData(matchId) {
       if (matchDataCache.has(matchId)) return matchDataCache.get(matchId);
@@ -7814,52 +8650,52 @@
         textarea.remove();
       }
     }
-    async function copyExport(button2, type) {
-      const row = button2.closest("tr");
-      const matchId = row && matchIdFromRow(row);
+    async function copyExport(button3, type) {
+      const row = button3.closest("tr");
+      const matchId = row && matchIdFromRow2(row);
       if (!matchId) return;
       const previousSentAt = sentAt(matchId, type);
       if (previousSentAt && !window.confirm(resendConfirmText(type, previousSentAt))) return;
-      button2.disabled = true;
-      button2.textContent = "Lädt …";
+      button3.disabled = true;
+      button3.textContent = "Lädt …";
       try {
         const data = await loadMatchData(matchId);
         const appointmentAt = latestAppointmentDate(appointmentCell(row)?.innerText);
         if (webhookUrl2) {
           await new Promise((resolve, reject) => GM_xmlhttpRequest({ method: "POST", url: webhookUrl2, headers: { "Content-Type": "application/json" }, data: JSON.stringify({ matchId, type, slackText: buildSlackApiText(type, data, taggedRole, appointmentAt) }), onload: (response) => response.status >= 200 && response.status < 300 ? resolve() : reject(new Error(`Webhook HTTP ${response.status}`)), onerror: reject }));
           markSent(matchId, type);
-          button2.textContent = "Gesendet";
+          button3.textContent = "Gesendet";
         } else {
           await copyText(buildSlackText(type, { ...data, appointmentAt }, taggedRole));
           markSent(matchId, type);
-          button2.textContent = "Kopiert";
+          button3.textContent = "Kopiert";
         }
       } catch (error) {
         console.warn("[Slack-Export] Kopieren fehlgeschlagen.", error);
-        button2.textContent = "Fehler";
+        button3.textContent = "Fehler";
       } finally {
         runtime.setTimeout(() => {
-          if (!button2.isConnected) return;
-          button2.disabled = false;
-          button2.textContent = exportButtonLabel(type, sentAt(matchId, type));
-          button2.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
+          if (!button3.isConnected) return;
+          button3.disabled = false;
+          button3.textContent = exportButtonLabel(type, sentAt(matchId, type));
+          button3.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
         }, 1200);
       }
     }
     function addExports(row) {
       const cell = appointmentCell(row);
-      const matchId = matchIdFromRow(row);
+      const matchId = matchIdFromRow2(row);
       if (!cell || !matchId || cell.querySelector(EXPORTS_SELECTOR)) return;
       const exports = document.createElement("div");
       exports.className = EXPORTS_SELECTOR.slice(1);
       ["VTA", "VTV"].forEach((type) => {
-        const button2 = document.createElement("button");
-        button2.type = "button";
-        button2.className = "werkia-slack-export";
-        button2.textContent = exportButtonLabel(type, sentAt(matchId, type));
-        button2.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
-        button2.addEventListener("click", () => copyExport(button2, type));
-        exports.appendChild(button2);
+        const button3 = document.createElement("button");
+        button3.type = "button";
+        button3.className = "werkia-slack-export";
+        button3.textContent = exportButtonLabel(type, sentAt(matchId, type));
+        button3.title = exportButtonTitle(type, webhookUrl2, sentAt(matchId, type));
+        button3.addEventListener("click", () => copyExport(button3, type));
+        exports.appendChild(button3);
       });
       const tip = helpTip?.();
       if (tip) {
@@ -7869,15 +8705,15 @@
       cell.appendChild(exports);
     }
     function removeExports() {
-      document.querySelectorAll(EXPORTS_SELECTOR).forEach((element) => element.remove());
+      document.querySelectorAll(EXPORTS_SELECTOR).forEach((element2) => element2.remove());
     }
     function syncExports() {
       if (!isTargetPage7(location.hash, role)) {
         removeExports();
         return;
       }
-      ensureStyle();
-      document.querySelectorAll(ROW_SELECTOR7).forEach(addExports);
+      ensureStyle3();
+      document.querySelectorAll(ROW_SELECTOR8).forEach(addExports);
     }
     function scheduleSync() {
       if (syncTimer !== null) return;
@@ -7891,7 +8727,7 @@
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       removeExports();
-      document.getElementById(STYLE_ID5)?.remove();
+      document.getElementById(STYLE_ID6)?.remove();
     });
     scheduleSync();
   }
@@ -7934,15 +8770,15 @@
 
   // src/features/kam-suite/match-slack-actions.js
   var defaultWebhookUrl = true ? "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var VT_BLOCK_SELECTOR = ".werkia-slack-exports";
   var VT_BUTTON_SELECTOR = ".werkia-slack-export";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID6 = "werkia-kam-match-actions-style";
+  var STYLE_ID7 = "werkia-kam-match-actions-style";
   var STORE_KEY = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
@@ -7953,7 +8789,7 @@
   function jobPositionIdFromHref(href) {
     return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
   }
-  function matchIdFromHref2(href) {
+  function matchIdFromHref3(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function formatAt(iso) {
@@ -8034,21 +8870,21 @@
       saveStore(store);
     }
     function rows() {
-      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR9)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR2));
     }
     function rowIds(row) {
       return {
         jobPositionId: jobPositionIdFromHref(row.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref2(row.querySelector(MATCH_LINK_SELECTOR5)?.href)
+        matchId: matchIdFromHref3(row.querySelector(MATCH_LINK_SELECTOR6)?.href)
       };
     }
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row) => rowIds(row).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle() {
-      if (document.getElementById(STYLE_ID6)) return;
+    function ensureStyle3() {
+      if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID6;
+      style.id = STYLE_ID7;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -8067,28 +8903,28 @@
       document.head.appendChild(style);
     }
     const post = (payload) => postJson(webhookUrl2, payload);
-    function applyState(button2, { state, label, title, disabled = false }) {
-      if (button2.dataset.busy === "true") return;
-      if (button2.textContent !== label) button2.textContent = label;
-      if (button2.title !== title) button2.title = title;
-      if (button2.dataset.state !== state) button2.dataset.state = state;
-      if (button2.disabled !== disabled) button2.disabled = disabled;
+    function applyState(button3, { state, label, title, disabled = false }) {
+      if (button3.dataset.busy === "true") return;
+      if (button3.textContent !== label) button3.textContent = label;
+      if (button3.title !== title) button3.title = title;
+      if (button3.dataset.state !== state) button3.dataset.state = state;
+      if (button3.disabled !== disabled) button3.disabled = disabled;
     }
-    function flash(button2, text) {
-      button2.dataset.busy = "true";
-      button2.textContent = text;
+    function flash(button3, text) {
+      button3.dataset.busy = "true";
+      button3.textContent = text;
       runtime.setTimeout(() => {
-        delete button2.dataset.busy;
+        delete button3.dataset.busy;
         render();
       }, 1500);
     }
-    async function onUrgentClick(button2, jobPositionId, matchId) {
+    async function onUrgentClick(button3, jobPositionId, matchId) {
       const urgency = urgencyIndex.get(jobPositionId);
       const { state } = urgentButtonState(urgency, loadStore().pending[jobPositionId]);
       if (state === "loading" || state === "pending") return;
       const target = !urgency.urgent;
       if (!target && !window.confirm(STOP_URGENT_CONFIRM_TEXT)) return;
-      button2.disabled = true;
+      button3.disabled = true;
       try {
         await post({ type: target ? "DRINGEND" : "NICHT_DRINGEND", jobPositionId, matchId });
         updateStore((store) => {
@@ -8098,22 +8934,22 @@
         schedulePendingPoll();
       } catch (error) {
         console.warn("[KAM Dringend]", error);
-        flash(button2, "Fehler");
+        flash(button3, "Fehler");
       }
     }
-    async function onPushClick(button2, jobPositionId, matchId) {
+    async function onPushClick(button3, jobPositionId, matchId) {
       const sentAt = loadStore().pushSent[jobPositionId];
       if (sentAt && !window.confirm(pushResendConfirmText(sentAt))) return;
-      button2.disabled = true;
+      button3.disabled = true;
       try {
         await post({ type: "PUSH", jobPositionId, matchId });
         updateStore((store) => {
           store.pushSent[jobPositionId] = (/* @__PURE__ */ new Date()).toISOString();
         });
-        flash(button2, "Gesendet");
+        flash(button3, "Gesendet");
       } catch (error) {
         console.warn("[KAM Push Request]", error);
-        flash(button2, "Fehler");
+        flash(button3, "Fehler");
       }
     }
     function placeBar(row, bar) {
@@ -8220,14 +9056,14 @@
       }, PENDING_POLL_MS);
     }
     function removeBars() {
-      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element) => element.remove());
+      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element2) => element2.remove());
     }
     function sync() {
       if (!isTargetPage8()) {
         removeBars();
         return;
       }
-      ensureStyle();
+      ensureStyle3();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -8248,9 +9084,334 @@
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID6)?.remove();
+      document.getElementById(STYLE_ID7)?.remove();
     });
     scheduleSync();
+  }
+
+  // ../../shared/js/slack-dm/core.js
+  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS = 2e4;
+  var MAX_COMMENT = 1500;
+  var OFFLINE_MESSAGE = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
+  var DIRECTIONS = {
+    AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
+    AN_KAM: { id: "AN_KAM", label: "An KAM", role: "KAM", title: "Match an die KAM-Person des Arbeitgebers schicken (Slack-DM)" }
+  };
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref4(href) {
+    const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id : "";
+  }
+  function buildPayload({ action, direction, matchId, comment = "", auth, testChannel = "" }) {
+    if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
+    const bearer = String(auth?.bearer || "").trim();
+    if (!bearer) throw new Error(NO_AUTH_MESSAGE);
+    const payload = {
+      action,
+      richtung: direction,
+      matchId,
+      kommentar: String(comment || "").trim().slice(0, MAX_COMMENT),
+      bearer,
+      fingerprint: String(auth?.fingerprint || "").trim()
+    };
+    if (testChannel) payload.testChannel = testChannel;
+    return payload;
+  }
+  function parseResponse(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    if (status === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
+    throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createSlackDmClient({ request, getAuth, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
+      let payload;
+      try {
+        payload = buildPayload({ action, direction, matchId, comment, auth: getAuth(), testChannel });
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+      });
+    });
+  }
+  function recipientLabel(entry) {
+    const name = String(entry?.name || "").trim() || "Unbekannt";
+    return entry?.vertretungVon ? `${name} (Vertretung für ${entry.vertretungVon})` : name;
+  }
+  function joinNames(names) {
+    const list = (names || []).filter(Boolean);
+    if (list.length <= 1) return list.join("");
+    return `${list.slice(0, -1).join(", ")} und ${list[list.length - 1]}`;
+  }
+  function sentMessage(response) {
+    const names = response?.gesendet || [];
+    return names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+  }
+  function vacancyLine(preview) {
+    const place = [preview?.arbeitgeber, preview?.ort ? `(${preview.ort})` : ""].filter(Boolean).join(" ");
+    return [preview?.vakanz, place].filter(Boolean).join(" · ");
+  }
+
+  // ../../shared/js/slack-dm/index.js
+  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
+  var BUTTON_CLASS = "werkia-slack-dm-button";
+  var IDS3 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var CLOSE_AFTER_SENT_MS = 1600;
+  var FONT4 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var CSS = `
+  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT4}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
+  .${BUTTON_CLASS}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
+  #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT4}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS3.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS3.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS3.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS3.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT4}; }
+  #${IDS3.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS3.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS3.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS3.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS3.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS3.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS3.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS3.dialog} .sd-warn { color:#8a6700; }
+  #${IDS3.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS3.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT4}; resize:vertical; }
+  #${IDS3.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS3.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS3.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS3.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS3.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS3.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS3.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT4}; }
+  #${IDS3.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS3.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS3.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS3.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS3.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+`;
+  function executeSlackDm(runtime, {
+    routes = [],
+    direction,
+    getAuth,
+    sourcePath,
+    helpTip,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const config = DIRECTIONS[direction];
+    if (!config) throw new Error(`Slack-DM: unbekannte Richtung ${direction}`);
+    const send = createSlackDmClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      }),
+      getAuth: () => getAuth ? getAuth() : {}
+    });
+    let syncTimer = null;
+    let closeTimer = null;
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    function ensureStyle3() {
+      if (document.getElementById(IDS3.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS3.style;
+      style.textContent = CSS;
+      document.head.appendChild(style);
+    }
+    function el5(tag, props = {}, children = []) {
+      const element2 = document.createElement(tag);
+      for (const [key, value] of Object.entries(props)) {
+        if (key === "className") element2.className = value;
+        else if (key === "text") element2.textContent = value;
+        else if (key.startsWith("on")) element2.addEventListener(key.slice(2), value);
+        else element2.setAttribute(key, value);
+      }
+      for (const child of [].concat(children)) if (child) element2.append(child);
+      return element2;
+    }
+    function matchCellOf(row) {
+      if (row.querySelector("tr")) return null;
+      const link = [...row.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
+      const matchId = matchIdFromHref4(link?.getAttribute("href"));
+      return matchId ? { matchId, cell: link.closest("td") } : null;
+    }
+    function addButton(row) {
+      const target = matchCellOf(row);
+      if (!target?.cell) return;
+      const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
+      if (existing?.dataset.matchId === target.matchId) return;
+      existing?.remove();
+      const button3 = el5("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
+      button3.dataset.matchId = target.matchId;
+      button3.dataset.werkiaSlackDmOwner = sourcePath;
+      button3.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openDialog(target.matchId);
+      });
+      target.cell.appendChild(button3);
+    }
+    function removeButtons() {
+      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button3) => {
+        if (button3.dataset.werkiaSlackDmOwner === sourcePath) button3.remove();
+      });
+    }
+    function closeDialog() {
+      if (closeTimer !== null) {
+        runtime.clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+      document.getElementById(IDS3.dialog)?.remove();
+      document.removeEventListener("keydown", onKeydown, true);
+    }
+    function onKeydown(event) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeDialog();
+      }
+    }
+    function setStatus(dialog, text, tone = "") {
+      const status = dialog.querySelector(".sd-status");
+      status.textContent = text;
+      status.className = `sd-status${tone ? ` sd-${tone}` : ""}`;
+    }
+    function renderPreview(dialog, preview) {
+      const details = dialog.querySelector("dl");
+      details.replaceChildren();
+      const row = (label, value) => details.append(el5("dt", { text: label }), el5("dd", {}, value));
+      row("Kandidat", preview.kandidat || "–");
+      row("Vakanz", vacancyLine(preview) || "–");
+      row("Match", el5("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
+      const recipients = preview.empfaenger || [];
+      const reachable = recipients.filter((entry) => entry.erreichbar);
+      const list = el5("span");
+      if (!recipients.length) list.append(el5("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
+      recipients.forEach((entry, index) => {
+        if (index) list.append(document.createTextNode(", "));
+        list.append(el5("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
+      });
+      row("An", list);
+      return reachable.length > 0;
+    }
+    async function openDialog(matchId) {
+      closeDialog();
+      ensureStyle3();
+      const comment = el5("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const count = el5("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
+      comment.addEventListener("input", () => {
+        count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
+      });
+      const sendButton = el5("button", { type: "button", className: "sd-primary", text: "Senden" });
+      sendButton.disabled = true;
+      const tip = helpTip ? helpTip() : null;
+      const card = el5("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
+        el5("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
+        el5("div", { className: "sd-head" }, [el5("h2", { text: `${config.label} schicken` }), tip]),
+        el5("dl", {}, [el5("dt", { text: "Match" }), el5("dd", { className: "sd-muted", text: "Wird geladen …" })]),
+        el5("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
+        comment,
+        count,
+        el5("div", { className: "sd-status" }),
+        el5("div", { className: "sd-foot" }, [
+          el5("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
+          sendButton
+        ])
+      ]);
+      const dialog = el5("div", { id: IDS3.dialog }, card);
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) closeDialog();
+      });
+      document.body.appendChild(dialog);
+      document.addEventListener("keydown", onKeydown, true);
+      comment.focus();
+      sendButton.addEventListener("click", async () => {
+        sendButton.disabled = true;
+        setStatus(dialog, "Wird gesendet …");
+        try {
+          const response = await send({ action: "senden", direction, matchId, comment: comment.value });
+          if (!dialog.isConnected) return;
+          setStatus(dialog, sentMessage(response), "ok");
+          closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
+        } catch (error) {
+          if (!dialog.isConnected) return;
+          setStatus(dialog, error.message || String(error), "error");
+          sendButton.disabled = false;
+        }
+      });
+      try {
+        const preview = await send({ action: "vorschau", direction, matchId });
+        if (!dialog.isConnected) return;
+        sendButton.disabled = !renderPreview(dialog, preview);
+        if (sendButton.disabled) setStatus(dialog, "Niemand der Empfänger ist in Slack erreichbar.", "error");
+      } catch (error) {
+        if (!dialog.isConnected) return;
+        dialog.querySelector("dd").textContent = "Nicht geladen";
+        setStatus(dialog, error.message || String(error), "error");
+      }
+    }
+    function sync() {
+      if (!isTargetPage9()) {
+        removeButtons();
+        return;
+      }
+      ensureStyle3();
+      document.querySelectorAll(ROW_SELECTOR10).forEach(addButton);
+    }
+    function scheduleSync() {
+      if (syncTimer !== null) return;
+      syncTimer = runtime.setTimeout(() => {
+        syncTimer = null;
+        sync();
+      }, 150);
+    }
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", () => {
+      closeDialog();
+      scheduleSync();
+    });
+    runtime.addCleanup?.(() => {
+      if (syncTimer !== null) runtime.clearTimeout(syncTimer);
+      closeDialog();
+      removeButtons();
+      document.getElementById(IDS3.style)?.remove();
+    });
+    scheduleSync();
+  }
+
+  // src/features/kam-suite/slack-dm.js
+  function executeSlackDm2(runtime, options = {}) {
+    executeSlackDm(runtime, {
+      routes: [ROUTES.kamMyMatches],
+      direction: "AN_CEM",
+      getAuth: getKamGraphqlAuth,
+      helpTip: () => kamHelp.tip("slack-dm"),
+      sourcePath: "kam/toolbox/src/features/kam-suite/slack-dm.js",
+      ...options
+    });
   }
 
   // src/features/kam-suite/cbre-softgarden.js
@@ -8620,8 +9781,8 @@
     'div[aria-label="Message body"]',
     'div[role="document"]'
   ];
-  function isVisible(element) {
-    return element.getClientRects().length > 0;
+  function isVisible(element2) {
+    return element2.getClientRects().length > 0;
   }
   var OUTSIDE_READING_PANE_SELECTOR = '[role="listbox"], [role="grid"], [role="tree"], [role="navigation"]';
   function readingPaneRoot() {
@@ -8631,7 +9792,7 @@
     while (node.parentElement && node.parentElement !== document.body && node.parentElement !== document.documentElement) {
       if (node.matches?.('[role="main"]')) break;
       const parent = node.parentElement;
-      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element) => !node.contains(element))) break;
+      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element2) => !node.contains(element2))) break;
       node = parent;
     }
     return node;
@@ -8643,13 +9804,13 @@
     return readingPaneRoot()?.innerText || text;
   }
   function readSubjectsFromReadingPane() {
-    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element) => (element.getAttribute("title") || element.textContent || "").trim()).filter(Boolean);
+    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element2) => (element2.getAttribute("title") || element2.textContent || "").trim()).filter(Boolean);
     return [...new Set(subjects)];
   }
   function readMailContext() {
     return { subjects: readSubjectsFromReadingPane(), bodyText: readMailBodyText() };
   }
-  var IDS3 = {
+  var IDS4 = {
     launcher: "werkia-outen-launcher",
     popover: "werkia-outen-popover",
     dialog: "werkia-outen-dialog",
@@ -8703,11 +9864,11 @@
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS2 = 35e3;
+    const REQUEST_TIMEOUT_MS4 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS2);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS4);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -8961,10 +10122,10 @@
       });
     }
     function ensureLauncher() {
-      let launcher = document.getElementById(IDS3.launcher);
+      let launcher = document.getElementById(IDS4.launcher);
       if (!launcher) {
         launcher = document.createElement("button");
-        launcher.id = IDS3.launcher;
+        launcher.id = IDS4.launcher;
         launcher.type = "button";
         launcher.textContent = "KAM";
         launcher.title = "KAM-Toolbox: Bewerbungsmail erkannt";
@@ -8991,23 +10152,23 @@
       }
       return launcher;
     }
-    function closePopover() {
-      document.getElementById(IDS3.popover)?.remove();
-      document.getElementById(IDS3.launcher)?.setAttribute("aria-expanded", "false");
+    function closePopover2() {
+      document.getElementById(IDS4.popover)?.remove();
+      document.getElementById(IDS4.launcher)?.setAttribute("aria-expanded", "false");
     }
     function removeLauncher() {
-      closePopover();
-      document.getElementById(IDS3.launcher)?.remove();
+      closePopover2();
+      document.getElementById(IDS4.launcher)?.remove();
     }
     function togglePopover() {
-      if (document.getElementById(IDS3.popover)) closePopover();
+      if (document.getElementById(IDS4.popover)) closePopover2();
       else renderPopover();
     }
     function renderPopover() {
-      let popover = document.getElementById(IDS3.popover);
+      let popover = document.getElementById(IDS4.popover);
       if (!popover) {
         popover = document.createElement("div");
-        popover.id = IDS3.popover;
+        popover.id = IDS4.popover;
         popover.setAttribute("role", "dialog");
         popover.setAttribute("aria-label", "KAM-Toolbox");
         styled2(popover, {
@@ -9025,7 +10186,7 @@
         });
         document.body.appendChild(popover);
       }
-      document.getElementById(IDS3.launcher)?.setAttribute("aria-expanded", "true");
+      document.getElementById(IDS4.launcher)?.setAttribute("aria-expanded", "true");
       const summary = applicationSummary(readMailContext());
       popover.dataset.summary = JSON.stringify(summary);
       const line = (label, value) => {
@@ -9045,18 +10206,18 @@
       closeBtn.textContent = "×";
       closeBtn.setAttribute("aria-label", "Schließen");
       styled2(closeBtn, { border: "0", background: "transparent", color: "#fff", fontSize: "20px", lineHeight: "1", cursor: "pointer" });
-      closeBtn.addEventListener("click", closePopover);
+      closeBtn.addEventListener("click", closePopover2);
       head.append(title, closeBtn);
       const outenBtn = buildButton("Match outen", { action: "outen", primary: true });
       outenBtn.addEventListener("click", () => {
-        closePopover();
+        closePopover2();
         openWizard(readMailContext());
       });
       const actions = [outenBtn];
       if (isCbreEmployerName(summary.employerName)) {
         const cbreBtn = buildButton("An CBRE senden", { action: "cbre" });
         cbreBtn.addEventListener("click", () => {
-          closePopover();
+          closePopover2();
           openWizard(readMailContext(), { mode: "cbre" });
         });
         actions.unshift(cbreBtn);
@@ -9384,7 +10545,7 @@
       }
     }
     function oversizedAttachments() {
-      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element) => element.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
+      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element2) => element2.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
     }
     async function renderCbreStep(dialog, state, match) {
       if (isDialogClosed(dialog)) return;
@@ -9409,21 +10570,21 @@
         return label;
       };
       const input = (value) => {
-        const element = document.createElement("input");
-        element.type = "text";
-        element.value = value || "";
-        return styled2(element, fieldStyle);
+        const element2 = document.createElement("input");
+        element2.type = "text";
+        element2.value = value || "";
+        return styled2(element2, fieldStyle);
       };
       const select = (options, value) => {
-        const element = document.createElement("select");
+        const element2 = document.createElement("select");
         options.forEach(([optionValue, text]) => {
           const option = document.createElement("option");
           option.value = optionValue;
           option.textContent = text;
-          element.appendChild(option);
+          element2.appendChild(option);
         });
-        element.value = value;
-        return styled2(element, fieldStyle);
+        element2.value = value;
+        return styled2(element2, fieldStyle);
       };
       const fields = {
         firstName: input(candidate.firstName || match.candidate?.firstName),
@@ -9453,7 +10614,7 @@
       );
       const preview = document.createElement("pre");
       styled2(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
-      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element]) => [key, element.value]));
+      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element2]) => [key, element2.value]));
       const updatePreview = () => {
         const current = values();
         preview.textContent = `An: ${CBRE_RECIPIENT}
@@ -9461,9 +10622,9 @@ Betreff: ${cbreSubject(current.positionId)}
 
 ${buildCbreBody(current)}`;
       };
-      Object.values(fields).forEach((element) => {
-        element.addEventListener("input", updatePreview);
-        element.addEventListener("change", updatePreview);
+      Object.values(fields).forEach((element2) => {
+        element2.addEventListener("input", updatePreview);
+        element2.addEventListener("change", updatePreview);
       });
       updatePreview();
       const notes = [hasRefrigerationCertificate(candidate.certificates) ? "Laut Adminpanel hat der Kandidat einen Kälteschein. Ob groß oder klein, steht dort nicht – bitte auswählen." : "Laut Adminpanel ist kein Kälteschein hinterlegt. Für die Stelle ist der große Pflicht, der kleine geht unter Umständen."];
@@ -9517,12 +10678,12 @@ ${buildCbreBody(current)}`;
     async function openBccField() {
       const existing = visibleElement(COMPOSE_SELECTORS.bcc);
       if (existing) return existing;
-      const button2 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element) => {
-        const label = `${element.getAttribute("aria-label") || ""} ${element.getAttribute("title") || ""}`;
-        return (element.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
+      const button3 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element2) => {
+        const label = `${element2.getAttribute("aria-label") || ""} ${element2.getAttribute("title") || ""}`;
+        return (element2.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
       });
-      if (!button2) return null;
-      button2.click();
+      if (!button3) return null;
+      button3.click();
       return waitForElement(COMPOSE_SELECTORS.bcc, 3e3);
     }
     function visibleElement(selector) {
@@ -9531,8 +10692,8 @@ ${buildCbreBody(current)}`;
     async function waitForElement(selector, timeoutMs = 8e3) {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        const element = visibleElement(selector);
-        if (element) return element;
+        const element2 = visibleElement(selector);
+        if (element2) return element2;
         await sleep2(150);
       }
       return null;
@@ -9544,10 +10705,10 @@ ${buildCbreBody(current)}`;
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    function placeCaretAtEnd(element) {
-      element.focus();
+    function placeCaretAtEnd(element2) {
+      element2.focus();
       const range = document.createRange();
-      range.selectNodeContents(element);
+      range.selectNodeContents(element2);
       range.collapse(false);
       const selection = window.getSelection();
       selection.removeAllRanges();
@@ -9566,19 +10727,19 @@ ${buildCbreBody(current)}`;
         if (line) document.execCommand("insertText", false, line);
       });
     }
-    function editorText(editor) {
+    function editorText2(editor) {
       return (editor.innerText || "").replace(/ /g, " ").replace(/\n{2,}/g, "\n").trim();
     }
-    function editableIn(element) {
-      if (!element) return null;
-      if (element.isContentEditable) return element;
-      return element.querySelector('[contenteditable="true"]') || element;
+    function editableIn(element2) {
+      if (!element2) return null;
+      if (element2.isContentEditable) return element2;
+      return element2.querySelector('[contenteditable="true"]') || element2;
     }
     function recipientPresent(toField, address) {
       let node = toField;
       for (let depth = 0; node && depth < 4; depth += 1, node = node.parentElement) {
         if (recipientLabelMatches(node.innerText, address)) return true;
-        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element) => recipientLabelMatches(`${element.getAttribute("title") || ""} ${element.getAttribute("aria-label") || ""}`, address));
+        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element2) => recipientLabelMatches(`${element2.getAttribute("title") || ""} ${element2.getAttribute("aria-label") || ""}`, address));
         if (labelled) return true;
       }
       return false;
@@ -9589,13 +10750,13 @@ ${buildCbreBody(current)}`;
       target.dispatchEvent(new KeyboardEvent("keypress", init));
       target.dispatchEvent(new KeyboardEvent("keyup", init));
     }
-    async function waitForStableText(element, { quietMs = 700, timeoutMs = 5e3 } = {}) {
+    async function waitForStableText(element2, { quietMs = 700, timeoutMs = 5e3 } = {}) {
       const deadline = Date.now() + timeoutMs;
-      let last = element.innerText;
+      let last = element2.innerText;
       let stableSince = Date.now();
       while (Date.now() < deadline) {
         await sleep2(150);
-        const current = element.innerText;
+        const current = element2.innerText;
         if (current !== last) {
           last = current;
           stableSince = Date.now();
@@ -9669,9 +10830,9 @@ ${buildCbreBody(current)}`;
       }
     }
     function showCbreToast({ text, tone }) {
-      document.getElementById(IDS3.toast)?.remove();
+      document.getElementById(IDS4.toast)?.remove();
       const toast = document.createElement("div");
-      toast.id = IDS3.toast;
+      toast.id = IDS4.toast;
       toast.setAttribute("role", "status");
       toast.title = "Klicken zum Schließen";
       toast.textContent = text;
@@ -9767,9 +10928,9 @@ ${buildCbreBody(current)}`;
       }).catch((error) => renderCaughtError(dialog, error));
     }
     function openWizard(context, { mode = "outen" } = {}) {
-      document.getElementById(IDS3.dialog)?.remove();
+      document.getElementById(IDS4.dialog)?.remove();
       const dialog = document.createElement("dialog");
-      dialog.id = IDS3.dialog;
+      dialog.id = IDS4.dialog;
       styleDialogFrame(dialog);
       document.body.appendChild(dialog);
       const resolved = resolveApplicationSubject(context);
@@ -9791,7 +10952,7 @@ ${buildCbreBody(current)}`;
     let settleUntil = 0;
     let lastMatched = false;
     function mailKey() {
-      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element) => element.id).join("|");
+      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element2) => element2.id).join("|");
       return `${location.href}#${ids}`;
     }
     function evaluateMail() {
@@ -9818,14 +10979,14 @@ ${buildCbreBody(current)}`;
           return;
         }
         ensureLauncher();
-        const popover = document.getElementById(IDS3.popover);
+        const popover = document.getElementById(IDS4.popover);
         if (popover && popover.dataset.summary !== JSON.stringify(applicationSummary(readMailContext()))) renderPopover();
       }, 400);
     }
     runtime.createMutationObserver(scheduleCheck).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addCleanup(() => {
       removeLauncher();
-      document.getElementById(IDS3.dialog)?.remove();
+      document.getElementById(IDS4.dialog)?.remove();
     });
     scheduleCheck();
   }
@@ -9853,10 +11014,585 @@ ${buildCbreBody(current)}`;
     });
   }
 
+  // src/features/focus-modes/core.js
+  var ROUTE = "KAM/MyMatches";
+  var STORAGE_KEY2 = "werkia_kam_focus_modes_v1";
+  var ACTIVE_KEY = "werkia_kam_focus_active_v1";
+  var STORE_VERSION2 = 1;
+  var SCOPE_KEYS = ["kamEmployeeIds", "interviewCreatorTeam"];
+  var DEFAULT_CREATOR_TEAM = "cem_agc";
+  var KAM_ROLE_NAME = "Key Account Management";
+  var OPEN_KAM_STATUSES = [
+    "pending",
+    "with_cem",
+    "interview_request",
+    "interview_conducted",
+    "hot_case",
+    "hot_hot_case",
+    "match_mail_sent",
+    "interview_feedback"
+  ];
+  var BUILT_IN_MODES = [
+    {
+      id: "vta-session",
+      name: "VTA-Session",
+      description: "VT-Anfragen wie im Schalter „Anfragen“, Terminspalte vorn",
+      filter: {
+        hasKamStatus: true,
+        kamStatuses: OPEN_KAM_STATUSES,
+        interviewStatuses: ["suggestion"],
+        selectedMatchFilter: "suggestion",
+        suggestionOrForwardedToggleFilterApplied: true
+      },
+      sort: "",
+      order: "",
+      perPage: 0,
+      column: "interview",
+      front: true,
+      builtIn: true
+    },
+    // Vorlaeufig (2026-10-15): "VT Feedback" als "Feedback einholen" gelesen,
+    // noch von den KAM zu bestaetigen. Ein Filter "ohne Feedback" und eine
+    // Sortierung nach Termindatum gibt es nicht (README.md); sortiert wird
+    // nach der letzten Statusaenderung, aelteste zuerst: wer am laengsten auf
+    // Feedback wartet, steht oben. lastStatusChangeAt ist eine sortierbare
+    // Spalte der Liste.
+    {
+      id: "feedbacks-einholen",
+      name: "Feedbacks einholen",
+      description: "KAM-Status „VT Feedback“, am längsten wartende zuerst, Terminspalte vorn",
+      filter: {
+        hasKamStatus: true,
+        kamStatuses: ["interview_feedback"]
+      },
+      sort: "lastStatusChangeAt",
+      order: "ASC",
+      perPage: 0,
+      column: "interview",
+      front: true,
+      builtIn: true
+    }
+  ];
+  var COLUMN_LABELS = {
+    interview: "Termin",
+    kamStatus: "KAM Status",
+    kamFollowUpDate: "KAM WVL",
+    lastStatusChangeAt: "Historie",
+    candidateId: "Kandidat",
+    jobPositionId: "Vakanz",
+    matchComments: "Match Aktionen"
+  };
+  function hashHasFilter(hash = "") {
+    return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
+  }
+  function pickScope(filter) {
+    const scope = {};
+    SCOPE_KEYS.forEach((key) => {
+      if (filter && !isEmptyFilterValue(filter[key])) scope[key] = filter[key];
+    });
+    return scope;
+  }
+  function withoutScope(filter) {
+    const rest = { ...filter || {} };
+    SCOPE_KEYS.forEach((key) => {
+      delete rest[key];
+    });
+    return rest;
+  }
+  function defaultScope(me) {
+    const scope = { interviewCreatorTeam: DEFAULT_CREATOR_TEAM };
+    const isKam = (me?.roles || []).some((role) => role?.name === KAM_ROLE_NAME);
+    if (isKam && me?.id) scope.kamEmployeeIds = [me.id];
+    return scope;
+  }
+  function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter)) {
+    const filter = mode.builtIn ? { ...scope, ...mode.filter } : { ...mode.filter || {} };
+    return {
+      route: currentState?.route || ROUTE,
+      filter,
+      sort: mode.sort || currentState?.sort || "",
+      order: mode.order || currentState?.order || "",
+      perPage: mode.perPage || currentState?.perPage || 0
+    };
+  }
+  function modeHash(mode, hash, scope) {
+    const state = parseListState(hash);
+    return buildListHash(applyModeToState(mode, state, scope));
+  }
+  function modeMatchesState(mode, state) {
+    if (!mode || !state) return false;
+    if (String(state.route).toLowerCase() !== ROUTE.toLowerCase()) return false;
+    if (mode.builtIn) return filterKey(withoutScope(state.filter)) === filterKey(mode.filter);
+    return filterKey(state.filter) === filterKey(mode.filter);
+  }
+  function leaveHash(previousHash, currentHash) {
+    if (previousHash && parseListState(previousHash).route.toLowerCase() === ROUTE.toLowerCase()) return previousHash;
+    const state = parseListState(currentHash);
+    return buildListHash({ ...state, route: ROUTE, filter: pickScope(state.filter) });
+  }
+  function cleanColumn(value) {
+    return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(String(value || "")) ? String(value) : "";
+  }
+  function normalizeMode(raw) {
+    if (!raw || typeof raw !== "object" || !String(raw.name || "").trim()) return null;
+    return {
+      id: String(raw.id || createPresetId()),
+      name: String(raw.name).trim(),
+      filter: raw.filter && typeof raw.filter === "object" && !Array.isArray(raw.filter) ? raw.filter : {},
+      sort: String(raw.sort || ""),
+      order: String(raw.order || ""),
+      perPage: Number.parseInt(raw.perPage, 10) || 0,
+      column: cleanColumn(raw.column),
+      front: Boolean(raw.front)
+    };
+  }
+  function modeFromState(name, state, { column = "", front = false } = {}) {
+    return normalizeMode({
+      id: createPresetId(),
+      name,
+      filter: state?.filter,
+      sort: state?.sort,
+      order: state?.order,
+      perPage: state?.perPage,
+      column,
+      front
+    });
+  }
+  function parseModes(raw) {
+    let parsed = raw;
+    if (typeof raw === "string") {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = null;
+      }
+    }
+    const list = Array.isArray(parsed?.modes) ? parsed.modes : [];
+    return list.map(normalizeMode).filter(Boolean);
+  }
+  function serializeModes(modes) {
+    return JSON.stringify({ version: STORE_VERSION2, modes });
+  }
+  function upsertMode(modes, mode) {
+    const kept = (modes || []).filter((entry) => entry.id !== mode.id);
+    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === mode.name.toLowerCase());
+    if (sameName >= 0) kept.splice(sameName, 1, mode);
+    else kept.push(mode);
+    return kept;
+  }
+  function removeMode(modes, id) {
+    return (modes || []).filter((entry) => entry.id !== id);
+  }
+  function parseActive(raw) {
+    try {
+      const parsed = JSON.parse(raw || "null");
+      return parsed && typeof parsed.id === "string" ? { id: parsed.id, previousHash: String(parsed.previousHash || "") } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // src/features/focus-modes/columns.js
+  var HIGHLIGHT_CLASS = "werkia-focus-col";
+  var HEAD_CLASS = "werkia-focus-col-head";
+  var NEXT_ATTR = "data-werkia-focus-next";
+  var FRONT_AFTER = "column-buttons";
+  function columnClass(column) {
+    return `column-${column}`;
+  }
+  function columnOf(cell) {
+    return [...cell?.classList || []].find((name) => name.startsWith("column-")) || "";
+  }
+  function directCell(row, className) {
+    return [...row.children].find((child) => child.classList?.contains(className)) || null;
+  }
+  function frontReference(row, cell) {
+    const cells = [...row.children];
+    const after = cells.findIndex((child) => child.classList?.contains(FRONT_AFTER));
+    return cells.slice(after + 1).find((child) => child !== cell && columnOf(child)) || null;
+  }
+  function rowsOf(root) {
+    return [...root.querySelectorAll("table tr")];
+  }
+  function applyColumnFocus(root, { column, front = false } = {}) {
+    if (!column) return 0;
+    const className = columnClass(column);
+    let touched = 0;
+    rowsOf(root).forEach((row) => {
+      const cell = directCell(row, className);
+      if (!cell) return;
+      if (!cell.classList.contains(HIGHLIGHT_CLASS)) cell.classList.add(HIGHLIGHT_CLASS);
+      if (cell.tagName === "TH" && !cell.classList.contains(HEAD_CLASS)) cell.classList.add(HEAD_CLASS);
+      if (!front) return;
+      const reference = frontReference(row, cell);
+      if (!reference) return;
+      const cells = [...row.children];
+      if (cells.indexOf(cell) < cells.indexOf(reference)) return;
+      if (!cell.hasAttribute(NEXT_ATTR)) cell.setAttribute(NEXT_ATTR, columnOf(cell.nextElementSibling));
+      row.insertBefore(cell, reference);
+      touched += 1;
+    });
+    return touched;
+  }
+  function clearColumnFocus(root) {
+    root.querySelectorAll(`.${HIGHLIGHT_CLASS}, [${NEXT_ATTR}]`).forEach((cell) => {
+      cell.classList.remove(HIGHLIGHT_CLASS, HEAD_CLASS);
+      if (!cell.hasAttribute(NEXT_ATTR)) return;
+      const next = cell.getAttribute(NEXT_ATTR);
+      cell.removeAttribute(NEXT_ATTR);
+      const row = cell.parentElement;
+      if (!row) return;
+      const reference = next ? directCell(row, next) : null;
+      if (reference) row.insertBefore(cell, reference);
+      else row.appendChild(cell);
+    });
+  }
+  function visibleColumns(root, labels = {}) {
+    const head = root.querySelector("table thead tr");
+    if (!head) return [];
+    return [...head.children].map((cell) => {
+      const name = columnOf(cell).replace(/^column-/, "");
+      if (!name || name === "buttons") return null;
+      const text = (cell.textContent || "").replace(/\s+/g, " ").trim();
+      return { value: name, label: labels[name] || text || name };
+    }).filter(Boolean);
+  }
+
+  // src/features/focus-modes/index.js
+  var SOURCE_PATH = "kam/toolbox/src/features/focus-modes/index.js";
+  var IDS5 = {
+    group: "werkia-focus-group",
+    bar: "werkia-focus-bar",
+    select: "werkia-focus-select",
+    leave: "werkia-focus-leave",
+    save: "werkia-focus-save",
+    remove: "werkia-focus-remove",
+    style: "werkia-focus-style",
+    dialog: "werkia-focus-dialog"
+  };
+  var PRESETS_BAR_ID = "werkia-filter-presets-bar";
+  var ME_QUERY = `query WerkiaFocusModesMe {
+  me: currentEmployee { id roles { name } }
+}`;
+  function safe(callback, fallback = "") {
+    try {
+      return callback();
+    } catch {
+      return fallback;
+    }
+  }
+  function createDefaultStorage() {
+    const gmGet = typeof GM_getValue === "function" ? GM_getValue : null;
+    const gmSet = typeof GM_setValue === "function" ? GM_setValue : null;
+    return {
+      load() {
+        const primary = parseModes(safe(() => localStorage.getItem(STORAGE_KEY2)));
+        if (primary.length || !gmGet) return primary;
+        const backup = parseModes(safe(() => gmGet(STORAGE_KEY2, "")));
+        if (backup.length) safe(() => localStorage.setItem(STORAGE_KEY2, serializeModes(backup)));
+        return backup;
+      },
+      save(modes) {
+        const serialized = serializeModes(modes);
+        safe(() => localStorage.setItem(STORAGE_KEY2, serialized));
+        if (gmSet) safe(() => gmSet(STORAGE_KEY2, serialized));
+      }
+    };
+  }
+  function executeFocusModes(runtime, {
+    storage = createDefaultStorage(),
+    request = (...args) => getKamGraphqlAdapter().request(...args),
+    helpTip = () => kamHelp.tip("focus-modes")
+  } = {}) {
+    runtime.registerSource(SOURCE_PATH);
+    const isTargetPage9 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
+    const allModes = () => [...BUILT_IN_MODES, ...storage.load()];
+    const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY), null));
+    const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY));
+    let mePromise = null;
+    const loadMe = () => {
+      mePromise ||= Promise.resolve().then(() => request(ME_QUERY, {})).then((data) => data?.me || null).catch((error) => {
+        mePromise = null;
+        throw error;
+      });
+      return mePromise;
+    };
+    function ensureStyle3() {
+      if (document.getElementById(IDS5.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS5.style;
+      style.textContent = `
+      #${IDS5.group}, #${IDS5.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS5.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS5.group}.is-active, #${IDS5.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS5.group} > strong, #${IDS5.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS5.group}.is-active > strong, #${IDS5.bar}.is-active > strong { color:#b85400; }
+      #${IDS5.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS5.group} button, #${IDS5.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS5.group} button:hover, #${IDS5.bar} button:hover { background:#f4f4f5; }
+      #${IDS5.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS5.leave}:hover { background:#b85400 !important; }
+      #${IDS5.group} [hidden], #${IDS5.bar} [hidden] { display:none !important; }
+      .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
+      .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
+      #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS5.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS5.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS5.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS5.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS5.dialog} input[type=text], #${IDS5.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS5.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS5.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS5.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS5.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+    `;
+      document.head.appendChild(style);
+    }
+    async function activate(mode) {
+      const before = location.hash;
+      let scope;
+      if (hashHasFilter(before)) {
+        scope = pickScope(parseListState(before).filter);
+      } else {
+        try {
+          scope = defaultScope(await loadMe());
+        } catch {
+          window.alert("Focus-Mode: Konnte nicht ermitteln, wer angemeldet ist. Bitte die Seite neu laden oder einmal einen Filter setzen und es erneut versuchen.");
+          render();
+          return;
+        }
+      }
+      const previous = readActive();
+      writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
+      location.hash = modeHash(mode, before, scope);
+      render();
+    }
+    function leave() {
+      const active = readActive();
+      writeActive(null);
+      clearColumnFocus(document);
+      location.hash = leaveHash(active?.previousHash, location.hash);
+      render();
+    }
+    function removeOwn(mode) {
+      if (!window.confirm(`Focus-Mode „${mode.name}“ löschen?`)) return;
+      storage.save(removeMode(storage.load(), mode.id));
+      leave();
+    }
+    function closeDialog() {
+      document.getElementById(IDS5.dialog)?.remove();
+    }
+    function openSaveDialog() {
+      closeDialog();
+      const state = parseListState(location.hash);
+      const overlay = document.createElement("div");
+      overlay.id = IDS5.dialog;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const card = document.createElement("div");
+      card.className = "werkia-focus-card";
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-label", "Als Focus-Mode speichern");
+      const heading = document.createElement("h2");
+      heading.textContent = "Als Focus-Mode speichern";
+      const hint = document.createElement("p");
+      hint.textContent = "Speichert Filter, Sortierung und Seitengröße der aktuellen Ansicht zusammen mit einer hervorgehobenen Spalte. Liegt nur in diesem Browser.";
+      const nameLabel = document.createElement("label");
+      nameLabel.textContent = "Name";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.name = "name";
+      nameLabel.appendChild(nameInput);
+      const columnLabel = document.createElement("label");
+      columnLabel.textContent = "Hervorgehobene Spalte";
+      const columnSelect = document.createElement("select");
+      columnSelect.name = "column";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "Keine";
+      columnSelect.appendChild(none);
+      visibleColumns(document, COLUMN_LABELS).forEach(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        columnSelect.appendChild(option);
+      });
+      columnLabel.appendChild(columnSelect);
+      const frontLabel = document.createElement("label");
+      frontLabel.className = "werkia-focus-check";
+      const frontInput = document.createElement("input");
+      frontInput.type = "checkbox";
+      frontInput.name = "front";
+      frontLabel.append(frontInput, document.createTextNode("Spalte nach vorn stellen"));
+      const actions = document.createElement("div");
+      actions.className = "werkia-focus-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Abbrechen";
+      cancel.addEventListener("click", closeDialog);
+      const confirm = document.createElement("button");
+      confirm.type = "button";
+      confirm.className = "werkia-focus-primary";
+      confirm.textContent = "Speichern";
+      confirm.addEventListener("click", () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          nameInput.focus();
+          return;
+        }
+        if (BUILT_IN_MODES.some((mode2) => mode2.name.toLowerCase() === name.toLowerCase())) {
+          window.alert(`„${name}“ ist ein fester Focus-Mode. Bitte einen anderen Namen wählen.`);
+          return;
+        }
+        const mode = modeFromState(name, state, { column: columnSelect.value, front: frontInput.checked && Boolean(columnSelect.value) });
+        const modes = upsertMode(storage.load(), mode);
+        storage.save(modes);
+        const saved = modes.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+        writeActive({ id: saved.id, previousHash: readActive()?.previousHash || "" });
+        closeDialog();
+        render();
+      });
+      actions.append(cancel, confirm);
+      card.append(heading, hint, nameLabel, columnLabel, frontLabel, actions);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      nameInput.focus();
+    }
+    function buildControls(container) {
+      const title = document.createElement("strong");
+      title.textContent = "Focus-Mode";
+      const select = document.createElement("select");
+      select.id = IDS5.select;
+      select.setAttribute("aria-label", "Focus-Mode wählen");
+      select.addEventListener("change", () => {
+        const mode = allModes().find((entry) => entry.id === select.value);
+        if (mode) activate(mode);
+        else if (readActive()) leave();
+      });
+      const leaveButton = document.createElement("button");
+      leaveButton.type = "button";
+      leaveButton.id = IDS5.leave;
+      leaveButton.textContent = "Verlassen";
+      leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
+      leaveButton.addEventListener("click", leave);
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.id = IDS5.save;
+      saveButton.textContent = "Als Focus-Mode speichern";
+      saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
+      saveButton.addEventListener("click", openSaveDialog);
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.id = IDS5.remove;
+      removeButton.textContent = "Löschen";
+      removeButton.title = "Diesen eigenen Focus-Mode löschen";
+      removeButton.addEventListener("click", () => {
+        const own = storage.load().find((entry) => entry.id === readActive()?.id);
+        if (own) removeOwn(own);
+      });
+      const tip = safe(() => helpTip?.(), null);
+      container.append(...[title, tip, select, leaveButton, removeButton, saveButton].filter(Boolean));
+    }
+    function ensureControls() {
+      const presetsBar = document.getElementById(PRESETS_BAR_ID);
+      let group = document.getElementById(IDS5.group);
+      let ownBar = document.getElementById(IDS5.bar);
+      if (presetsBar) {
+        ownBar?.remove();
+        if (group && group.parentElement === presetsBar) return group;
+        group?.remove();
+        group = document.createElement("span");
+        group.id = IDS5.group;
+        buildControls(group);
+        presetsBar.appendChild(group);
+        return group;
+      }
+      group?.remove();
+      if (ownBar) return ownBar;
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return null;
+      ownBar = document.createElement("div");
+      ownBar.id = IDS5.bar;
+      buildControls(ownBar);
+      anchor.parentElement.insertBefore(ownBar, anchor);
+      return ownBar;
+    }
+    const optionSignatures = /* @__PURE__ */ new WeakMap();
+    function fillSelect(select, own, activeId) {
+      const signature = JSON.stringify(own.map((mode) => [mode.id, mode.name]));
+      if (optionSignatures.get(select) !== signature) {
+        optionSignatures.set(select, signature);
+        select.textContent = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Kein Focus-Mode";
+        select.appendChild(placeholder);
+        [["Team", BUILT_IN_MODES], ["Eigene", own]].forEach(([label, modes]) => {
+          if (!modes.length) return;
+          const group = document.createElement("optgroup");
+          group.label = label;
+          modes.forEach((mode) => {
+            const option = document.createElement("option");
+            option.value = mode.id;
+            option.textContent = mode.name;
+            if (mode.description) option.title = mode.description;
+            group.appendChild(option);
+          });
+          select.appendChild(group);
+        });
+      }
+      if (select.value !== activeId) select.value = activeId;
+    }
+    function setHidden(element2, hidden) {
+      if (element2 && element2.hidden !== hidden) element2.hidden = hidden;
+    }
+    function render() {
+      if (!isTargetPage9()) {
+        clearColumnFocus(document);
+        document.getElementById(IDS5.group)?.remove();
+        document.getElementById(IDS5.bar)?.remove();
+        closeDialog();
+        return;
+      }
+      ensureStyle3();
+      const own = storage.load();
+      const state = parseListState(location.hash);
+      let active = readActive();
+      let mode = active ? [...BUILT_IN_MODES, ...own].find((entry) => entry.id === active.id) : null;
+      if (active && !modeMatchesState(mode, state)) {
+        writeActive(null);
+        active = null;
+        mode = null;
+      }
+      if (mode?.column) applyColumnFocus(document, mode);
+      else clearColumnFocus(document);
+      const container = ensureControls();
+      if (!container) return;
+      const isActive = Boolean(mode);
+      if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
+      fillSelect(container.querySelector(`#${IDS5.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS5.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS5.remove}`), !isActive || Boolean(mode?.builtIn));
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS = 15e3;
-  var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var WEBHOOK_URL2 = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS2 = 15e3;
+  var OFFLINE_MESSAGE2 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
   me: currentEmployee { id __typename }
 }`;
@@ -9888,7 +11624,7 @@ ${buildCbreBody(current)}`;
     if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
     return "";
   }
-  function parseResponse(status, text) {
+  function parseResponse2(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -9899,7 +11635,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+  function createVertretungenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -9909,13 +11645,13 @@ ${buildCbreBody(current)}`;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse(response.status, response.responseText));
+            resolve(parseResponse2(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
       });
     });
   }
@@ -9936,7 +11672,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/vertretungen/index.js
-  var IDS4 = {
+  var IDS6 = {
     button: "werkia-vertretungen-button",
     bar: "werkia-vertretungen-bar",
     dialog: "werkia-vertretungen-dialog",
@@ -9965,9 +11701,9 @@ ${buildCbreBody(current)}`;
     if (!sample || !view) return null;
     const computed = view.getComputedStyle(sample);
     const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
-    const icon = sample.querySelector("svg");
-    const iconStyle = icon ? view.getComputedStyle(icon) : null;
-    const iconBox = icon?.parentElement && icon.parentElement !== sample ? view.getComputedStyle(icon.parentElement) : null;
+    const icon2 = sample.querySelector("svg");
+    const iconStyle = icon2 ? view.getComputedStyle(icon2) : null;
+    const iconBox = icon2?.parentElement && icon2.parentElement !== sample ? view.getComputedStyle(icon2.parentElement) : null;
     return {
       style,
       iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
@@ -9976,13 +11712,13 @@ ${buildCbreBody(current)}`;
   }
   function findToolbar(root = document) {
     for (const selector of TOOLBAR_SELECTORS) {
-      const element = root.querySelector(selector);
-      if (element) return element;
+      const element2 = root.querySelector(selector);
+      if (element2) return element2;
     }
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /^filter hinzuf/i.test(element.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && /^filter hinzuf/i.test(element2.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -9990,7 +11726,7 @@ ${buildCbreBody(current)}`;
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && element2.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -10013,73 +11749,73 @@ ${buildCbreBody(current)}`;
     let adminsOpen = false;
     const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element = document.getElementById(id);
-      return element?.dataset.werkiaVertretungenOwner === sourcePath ? element : null;
+      const element2 = document.getElementById(id);
+      return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
     };
-    function ensureStyle() {
-      if (document.getElementById(IDS4.style)) return;
+    function ensureStyle3() {
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS4.style;
+      style.id = IDS6.style;
       style.textContent = `
-      #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS4.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS4.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS4.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS4.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS4.dialog} .wv-admins { margin-top:16px; }
-      #${IDS4.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS4.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS4.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS4.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS4.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS4.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS4.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS4.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS4.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS4.dialog} select, #${IDS4.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS4.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS4.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS4.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS4.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS4.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS4.dialog} .wv-status.wv-error { color:#a02334; }
+      #${IDS6.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS6.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS6.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS6.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS6.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS6.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS6.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS6.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS6.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS6.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS6.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS6.dialog} .wv-admins { margin-top:16px; }
+      #${IDS6.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS6.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS6.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS6.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS6.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS6.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS6.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS6.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS6.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS6.dialog} select, #${IDS6.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS6.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS6.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS6.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS6.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS6.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS6.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS6.dialog} .wv-status.wv-error { color:#a02334; }
     `;
       document.head.appendChild(style);
     }
-    function el3(tag, props = {}, children = []) {
-      const element = document.createElement(tag);
-      Object.assign(element, props);
-      element.append(...children.filter((child) => child !== null && child !== void 0));
-      return element;
+    function el5(tag, props = {}, children = []) {
+      const element2 = document.createElement(tag);
+      Object.assign(element2, props);
+      element2.append(...children.filter((child) => child !== null && child !== void 0));
+      return element2;
     }
-    function button2(text, onClick, className = "") {
-      return el3("button", { type: "button", textContent: text, className, onclick: onClick });
+    function button3(text, onClick, className = "") {
+      return el5("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
       let timer = null;
-      const element = button2(label, () => {
+      const element2 = button3(label, () => {
         if (!armed) {
           armed = true;
-          element.textContent = question;
+          element2.textContent = question;
           timer = runtime.setTimeout(() => {
             armed = false;
-            element.textContent = label;
+            element2.textContent = label;
           }, CONFIRM_MS);
           return;
         }
         if (timer !== null) runtime.clearTimeout?.(timer);
         onConfirm();
       }, "wv-danger");
-      return element;
+      return element2;
     }
     async function loadMyId() {
       if (myId) return myId;
@@ -10092,18 +11828,18 @@ ${buildCbreBody(current)}`;
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function closeDialog() {
-      owned(IDS4.dialog)?.remove();
+      owned(IDS6.dialog)?.remove();
       editing = null;
     }
     function setStatus(text, isError = false) {
-      const status = owned(IDS4.dialog)?.querySelector(".wv-status");
+      const status = owned(IDS6.dialog)?.querySelector(".wv-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS4.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
-        element.disabled = busy;
+      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
+        element2.disabled = busy;
       });
     }
     async function refresh(message = "") {
@@ -10124,27 +11860,27 @@ ${buildCbreBody(current)}`;
       }
     }
     function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el3("select");
-      select.append(el3("option", { value: "", textContent: "Bitte wählen …" }));
+      const select = el5("select");
+      select.append(el5("option", { value: "", textContent: "Bitte wählen …" }));
       for (const person of people) {
-        select.append(el3("option", { value: person.id, textContent: person.name }));
+        select.append(el5("option", { value: person.id, textContent: person.name }));
       }
       select.value = value || "";
       if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
       return select;
     }
     function entryRow(entry) {
-      const who = el3("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el3("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el3("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const who = el5("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el5("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el5("span", { className: "wv-badge", textContent: "läuft" }) : null;
       const actions = entry.darfBearbeiten ? [
-        button2("Bearbeiten", () => {
+        button3("Bearbeiten", () => {
           editing = entry;
           render();
         }, "wv-secondary"),
         confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
-      const row = el3("li", {}, [who, when, badge, ...actions]);
+      const row = el5("li", {}, [who, when, badge, ...actions]);
       if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
       return row;
     }
@@ -10153,9 +11889,9 @@ ${buildCbreBody(current)}`;
       const { ich } = state;
       const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
       const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el3("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el3("input", { type: "date", value: editing ? editing.bis : today, min: today });
-      const save = button2(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+      const von = el5("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el5("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
         const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
         const problem = validateDraft(ich, draft, today);
         if (problem) {
@@ -10164,50 +11900,50 @@ ${buildCbreBody(current)}`;
         }
         run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
       });
-      const cancel = editing ? button2("Abbrechen", () => {
+      const cancel = editing ? button3("Abbrechen", () => {
         editing = null;
         render();
       }, "wv-secondary") : null;
       return [
-        el3("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el3("div", { className: "wv-form" }, [
-          el3("label", { textContent: "Abwesend" }),
+        el5("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el5("div", { className: "wv-form" }, [
+          el5("label", { textContent: "Abwesend" }),
           abwesend,
-          el3("label", { textContent: "Vertretung" }),
+          el5("label", { textContent: "Vertretung" }),
           vertretung,
-          el3("label", { textContent: "Von" }),
+          el5("label", { textContent: "Von" }),
           von,
-          el3("label", { textContent: "Bis (einschließlich)" }),
+          el5("label", { textContent: "Bis (einschließlich)" }),
           bis
         ]),
-        el3("div", { className: "wv-actions" }, [save, cancel])
+        el5("div", { className: "wv-actions" }, [save, cancel])
       ];
     }
     function adminSection() {
       const { ich } = state;
       const admins = state.admins || [];
-      const list = el3("ul");
+      const list = el5("ul");
       admins.forEach((admin) => {
         const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el3("li", {}, [el3("span", { className: "wv-who", textContent: admin.name }), remove]));
+        list.append(el5("li", {}, [el5("span", { className: "wv-who", textContent: admin.name }), remove]));
       });
       const parts = [
-        el3("summary", { textContent: `Admins (${admins.length})` }),
-        el3("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        el5("summary", { textContent: `Admins (${admins.length})` }),
+        el5("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
         list
       ];
       if (ich.darfAlles) {
         const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
-        const add = button2("Als Admin eintragen", () => {
+        const add = button3("Als Admin eintragen", () => {
           if (!candidate.value) {
             setStatus("Bitte auswählen, wer Admin werden soll.", true);
             return;
           }
           run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
         }, "wv-secondary");
-        parts.push(el3("div", { className: "wv-actions" }, [candidate, add]));
+        parts.push(el5("div", { className: "wv-actions" }, [candidate, add]));
       }
-      const details = el3("details", { className: "wv-admins" }, parts);
+      const details = el5("details", { className: "wv-admins" }, parts);
       details.open = adminsOpen;
       details.addEventListener("toggle", () => {
         adminsOpen = details.open;
@@ -10215,82 +11951,82 @@ ${buildCbreBody(current)}`;
       return details;
     }
     function card() {
-      return owned(IDS4.dialog)?.querySelector(".wv-body");
+      return owned(IDS6.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
       if (!target) return;
       target.textContent = "";
       const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el3("ul");
-      if (!state.eintraege.length) list.append(el3("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      const list = el5("ul");
+      if (!state.eintraege.length) list.append(el5("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
       state.eintraege.forEach((entry) => list.append(entryRow(entry)));
       const tip = helpTip?.();
       target.append(
-        el3("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el3("p", { textContent: intro }),
+        el5("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el5("p", { textContent: intro }),
         list,
         ...form(),
         adminSection(),
-        el3("div", { className: "wv-status" }),
-        el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
+        el5("div", { className: "wv-status" }),
+        el5("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
       );
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle();
-      const overlay = el3("div", { id: IDS4.dialog });
+      ensureStyle3();
+      const overlay = el5("div", { id: IDS6.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const close = button2("×", closeDialog, "wv-close");
+      const close = button3("×", closeDialog, "wv-close");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const target = el3("div", { className: "wv-body" }, [
-        el3("h2", { textContent: "Vertretungen" }),
-        el3("div", { className: "wv-status", textContent: "Lädt …" })
+      const target = el5("div", { className: "wv-body" }, [
+        el5("h2", { textContent: "Vertretungen" }),
+        el5("div", { className: "wv-status", textContent: "Lädt …" })
       ]);
-      overlay.append(el3("div", { className: "wv-card" }, [close, target]));
+      overlay.append(el5("div", { className: "wv-card" }, [close, target]));
       document.body.appendChild(overlay);
       try {
         await refresh();
       } catch (error) {
         setStatus(error.message || String(error), true);
-        target.append(el3("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
+        target.append(el5("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
       }
     }
     function placeButton() {
       if (!isTargetPage9()) {
-        owned(IDS4.button)?.remove();
-        owned(IDS4.bar)?.remove();
+        owned(IDS6.button)?.remove();
+        owned(IDS6.bar)?.remove();
         return;
       }
-      ensureStyle();
+      ensureStyle3();
       const slot = findSlot(document);
-      const existing = owned(IDS4.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
+      const existing = owned(IDS6.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
       existing?.remove();
-      const vertretungenButton = button2("Vertretungen", openDialog);
-      vertretungenButton.id = IDS4.button;
+      const vertretungenButton = button3("Vertretungen", openDialog);
+      vertretungenButton.id = IDS6.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (slot) {
-        owned(IDS4.bar)?.remove();
+        owned(IDS6.bar)?.remove();
         const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
           Object.assign(vertretungenButton.style, look.style);
-          const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          icon.setAttribute("viewBox", "0 0 24 24");
-          icon.setAttribute("aria-hidden", "true");
-          icon.style.width = look.iconSize;
-          icon.style.height = look.iconSize;
-          icon.style.marginRight = look.iconGap;
+          const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon2.setAttribute("viewBox", "0 0 24 24");
+          icon2.setAttribute("aria-hidden", "true");
+          icon2.style.width = look.iconSize;
+          icon2.style.height = look.iconSize;
+          icon2.style.marginRight = look.iconGap;
           const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
           path.setAttribute("d", PEOPLE_ICON_PATH);
-          icon.append(path);
-          vertretungenButton.prepend(icon);
+          icon2.append(path);
+          vertretungenButton.prepend(icon2);
         } else {
           vertretungenButton.className = "wv-own";
         }
@@ -10298,15 +12034,15 @@ ${buildCbreBody(current)}`;
         return;
       }
       vertretungenButton.className = "wv-own";
-      owned(IDS4.bar)?.remove();
+      owned(IDS6.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el3("div", { id: IDS4.bar }, [vertretungenButton]);
+      const bar = el5("div", { id: IDS6.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS4.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS6.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -10328,8 +12064,8 @@ ${buildCbreBody(current)}`;
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     runtime.addCleanup?.(() => {
-      owned(IDS4.button)?.remove();
-      owned(IDS4.bar)?.remove();
+      owned(IDS6.button)?.remove();
+      owned(IDS6.bar)?.remove();
       closeDialog();
     });
     schedule();
@@ -10351,10 +12087,10 @@ ${buildCbreBody(current)}`;
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
   var RETRY_MS = 60 * 1e3;
-  var EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"]';
-  function tiptapOf(element) {
+  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
+  function tiptapOf2(element2) {
     try {
-      return element.wrappedJSObject?.editor || element.editor || null;
+      return element2.wrappedJSObject?.editor || element2.editor || null;
     } catch {
       return null;
     }
@@ -10403,10 +12139,10 @@ ${buildCbreBody(current)}`;
       await loading;
       return cache.aktiv;
     }
-    function attach(element) {
-      const editor = tiptapOf(element);
+    function attach(element2) {
+      const editor = tiptapOf2(element2);
       if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
-      attached.add(element);
+      attached.add(element2);
       const handled = /* @__PURE__ */ new Set();
       let pending = false;
       async function apply() {
@@ -10443,8 +12179,8 @@ ${buildCbreBody(current)}`;
       });
     }
     runtime.setInterval(() => {
-      for (const element of document.querySelectorAll(EDITOR_SELECTOR)) {
-        if (!attached.has(element)) attach(element);
+      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR2)) {
+        if (!attached.has(element2)) attach(element2);
       }
     }, SCAN_MS);
   }
@@ -10454,6 +12190,931 @@ ${buildCbreBody(current)}`;
     executeVertretungMentions(runtime, {
       getGraphqlAdapter: getKamGraphqlAdapter,
       sourcePath: "kam/toolbox/src/features/kam-suite/vertretung-mittaggen.js"
+    });
+  }
+
+  // ../../shared/js/toolbox-daten/core.js
+  var WEBHOOK_URL3 = "https://srv-a1.tail4b9d62.ts.net/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS3 = 15e3;
+  var OFFLINE_MESSAGE3 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaToolboxDatenMe {
+  me: currentEmployee { id __typename }
+}`;
+  function berlinDay2(date = /* @__PURE__ */ new Date()) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  }
+  function nextWorkday(day = berlinDay2()) {
+    const date = /* @__PURE__ */ new Date(`${day}T12:00:00Z`);
+    do
+      date.setUTCDate(date.getUTCDate() + 1);
+    while ([0, 6].includes(date.getUTCDay()));
+    return date.toISOString().slice(0, 10);
+  }
+  function parseResponse3(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse3(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+      });
+    });
+  }
+  function createEmployeeIdSource(graphqlRequest) {
+    let pending = null;
+    return () => {
+      if (!pending) {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY2, {}).then((data) => {
+          const id = String(data?.me?.id || "");
+          if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
+          return id;
+        }).catch((error) => {
+          pending = null;
+          throw error;
+        });
+      }
+      return pending;
+    };
+  }
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL3 }) {
+    const post = createToolboxDatenRequest({ request, url });
+    const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
+    return {
+      async ich() {
+        return call("ich");
+      },
+      async liste(bereich, { fuer } = {}) {
+        return (await call("liste", { bereich, ...fuer ? { fuer } : {} })).eintraege || [];
+      },
+      async speichern(bereich, eintrag) {
+        return (await call("speichern", { bereich, eintrag })).eintrag;
+      },
+      async loeschen(bereich, id) {
+        await call("loeschen", { bereich, id });
+      },
+      async angezeigt(bereich, ids) {
+        await call("angezeigt", { bereich, ids });
+      }
+    };
+  }
+  var clients = /* @__PURE__ */ new WeakMap();
+  function toolboxDatenClientFor(graphqlAdapter, request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null) {
+    if (!graphqlAdapter) throw new Error("Toolbox-Daten: GraphQL-Adapter fehlt.");
+    if (!clients.has(graphqlAdapter)) {
+      clients.set(graphqlAdapter, createToolboxDatenClient({
+        request: request || (() => {
+          throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+        }),
+        getEmployeeId: createEmployeeIdSource(graphqlAdapter.request)
+      }));
+    }
+    return clients.get(graphqlAdapter);
+  }
+
+  // ../../shared/js/prio-liste/core.js
+  var BEREICH = "prio";
+  var REVIEW_TIME = "17:30";
+  function berlinTime(date = /* @__PURE__ */ new Date()) {
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  }
+  function formatDay2(day) {
+    const [, month, date] = String(day || "").split("-");
+    return month && date ? `${date}.${month}.` : String(day || "");
+  }
+  function normalizeEntry(raw) {
+    const daten = raw?.daten || {};
+    return {
+      id: String(raw?.id || ""),
+      employerId: String(daten.employerId || ""),
+      employerName: String(daten.employerName || "").trim() || "Unbekannter Arbeitgeber",
+      notiz: String(daten.notiz || ""),
+      tag: String(daten.tag || ""),
+      erledigt: Boolean(raw?.erledigtAm),
+      erledigtAm: String(raw?.erledigtAm || ""),
+      autorName: String(raw?.autorName || "")
+    };
+  }
+  function toDaten(entry) {
+    return { employerId: entry.employerId, employerName: entry.employerName, notiz: entry.notiz || "", tag: entry.tag };
+  }
+  function entriesForDay(entries, today = berlinDay2()) {
+    return entries.filter((entry) => entry.tag === today || entry.tag && entry.tag < today && !entry.erledigt).map((entry) => ({ ...entry, uebertragen: entry.tag < today })).sort((a, b) => Number(a.erledigt) - Number(b.erledigt) || Number(b.uebertragen) - Number(a.uebertragen) || a.employerName.localeCompare(b.employerName, "de"));
+  }
+  function laterEntries(entries, today = berlinDay2()) {
+    return entries.filter((entry) => entry.tag > today && !entry.erledigt).sort((a, b) => a.tag.localeCompare(b.tag) || a.employerName.localeCompare(b.employerName, "de"));
+  }
+  function openEntries(entries, today = berlinDay2()) {
+    return entriesForDay(entries, today).filter((entry) => !entry.erledigt);
+  }
+  function prioEmployerIds(entries, today = berlinDay2()) {
+    return new Set(openEntries(entries, today).map((entry) => entry.employerId).filter(Boolean));
+  }
+  function entryForEmployer(entries, employerId, today = berlinDay2()) {
+    return openEntries(entries, today).find((entry) => entry.employerId === employerId) || null;
+  }
+  function newEntry({ employerId, employerName, notiz = "" }, today = berlinDay2()) {
+    return { daten: { employerId: String(employerId), employerName: String(employerName || "").trim(), notiz, tag: today } };
+  }
+  function reviewDue({ now = /* @__PURE__ */ new Date(), lastShownDay = "", openCount = 0 } = {}) {
+    const today = berlinDay2(now);
+    return lastShownDay !== today && berlinTime(now) >= REVIEW_TIME && openCount > 0;
+  }
+  function reviewSaves(entries, decisions, today = berlinDay2()) {
+    const get = (id) => decisions instanceof Map ? decisions.get(id) : decisions?.[id];
+    const saves = [];
+    for (const entry of entries) {
+      const decision = get(entry.id);
+      if (decision === "erledigt") saves.push({ id: entry.id, daten: toDaten(entry), erledigt: true });
+      else if (decision === "morgen") saves.push({ id: entry.id, daten: { ...toDaten(entry), tag: nextWorkday(today) } });
+    }
+    return saves;
+  }
+  function orderRows(rows, prioIds = null) {
+    return [...rows].sort((a, b) => {
+      if (prioIds) {
+        const diff = Number(!prioIds.has(a.employerId)) - Number(!prioIds.has(b.employerId));
+        if (diff) return diff;
+      }
+      return a.natural - b.natural;
+    }).map((row) => row.key);
+  }
+  function absentFor(aktiv, myId) {
+    const seen = /* @__PURE__ */ new Set();
+    return (aktiv || []).filter((entry) => entry.vertretungId === myId && entry.abwesendId && entry.abwesendId !== myId).filter((entry) => seen.has(entry.abwesendId) ? false : seen.add(entry.abwesendId)).map((entry) => ({ id: String(entry.abwesendId), name: String(entry.abwesendName || "") }));
+  }
+
+  // ../../shared/js/prio-liste/index.js
+  var IDS7 = {
+    button: "werkia-prio-button",
+    bar: "werkia-prio-bar",
+    panel: "werkia-prio-panel",
+    review: "werkia-prio-review",
+    style: "werkia-prio-style"
+  };
+  var STORAGE_KEYS = {
+    collapsed: "werkia-prio-eingeklappt",
+    prioFirst: "werkia-prio-zuerst",
+    reviewDay: "werkia-prio-popup-tag"
+  };
+  var ROW_SELECTOR11 = "tr.RaDataTable-row";
+  var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
+  var STAR_CLASS = "werkia-prio-star";
+  var REFRESH_MS2 = 5 * 60 * 1e3;
+  var REVIEW_CHECK_MS = 60 * 1e3;
+  var STAR_PATH = "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+  var T = {
+    surface: "#ffffff",
+    sunken: "#f4f4f5",
+    ink: "#09090b",
+    ink2: "#52525b",
+    muted: "#8b8b94",
+    line: "#e4e4e7",
+    lineStrong: "#d4d4d8",
+    accent: "#ef6c00",
+    accentInk: "#b85400",
+    accentSoft: "#fff3e8",
+    good: "#0a7c0a",
+    bad: "#b52f2f",
+    shadow: "0 16px 48px -16px rgba(9,9,11,.28)"
+  };
+  function getEmployerId(href) {
+    return String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
+  }
+  function rowGroups(tbody) {
+    const groups = [];
+    for (const child of [...tbody.children]) {
+      if (child.matches(ROW_SELECTOR11)) groups.push([child]);
+      else if (groups.length) groups[groups.length - 1].push(child);
+    }
+    return groups;
+  }
+  function employerOfRow(row) {
+    const link = row.querySelector(EMPLOYER_LINK_SELECTOR6);
+    const id = getEmployerId(link?.getAttribute("href") || link?.href);
+    return id ? { id, name: String(link.textContent || "").replace(/\s+/g, " ").trim(), link } : null;
+  }
+  function createLocalStore(storage) {
+    return {
+      get(key, fallback = "") {
+        try {
+          return storage?.getItem(key) ?? fallback;
+        } catch {
+          return fallback;
+        }
+      },
+      set(key, value) {
+        try {
+          storage?.setItem(key, String(value));
+        } catch {
+        }
+      }
+    };
+  }
+  function createAbsentLoader({ getGraphqlAdapter, request }) {
+    if (!request) return async () => [];
+    const post = createVertretungenClient({ request });
+    let employeeId = null;
+    return async () => {
+      employeeId ||= createEmployeeIdSource(getGraphqlAdapter().request);
+      const myId = await employeeId();
+      const data = await post({ action: "heute", employeeId: myId });
+      return absentFor(data.aktiv, myId);
+    };
+  }
+  function executePrioListe(runtime, {
+    routes = [],
+    sourcePath,
+    helpTip,
+    // () => Client aus toolboxDatenClientFor(...): liste, speichern, loeschen.
+    getClient,
+    // () => Promise<[{ id, name }]>: heute vertretene Personen.
+    loadAbsent = async () => [],
+    // (employerId) => HTMLElement|null, z. B. AG-Notiz [Prozess].
+    renderEmployerExtras = null,
+    storage = typeof localStorage !== "undefined" ? localStorage : null,
+    now = () => /* @__PURE__ */ new Date()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const store = createLocalStore(storage);
+    let entries = [];
+    let loaded = false;
+    let loading = null;
+    let loadedAt = 0;
+    let error = "";
+    let message = "";
+    let editingId = "";
+    let busy = false;
+    let absent = [];
+    let absentLoaded = false;
+    let view = "";
+    const foreign = /* @__PURE__ */ new Map();
+    const extrasCache = /* @__PURE__ */ new Map();
+    const natural = /* @__PURE__ */ new WeakMap();
+    let epoch = 0;
+    let wasSorted = false;
+    let lastPageKey = "";
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const owned = (id) => {
+      const element2 = document.getElementById(id);
+      return element2?.dataset.werkiaPrioOwner === sourcePath ? element2 : null;
+    };
+    const today = () => berlinDay2(now());
+    const collapsed = () => store.get(STORAGE_KEYS.collapsed) === "1";
+    const prioFirst = () => store.get(STORAGE_KEYS.prioFirst) === "1";
+    function el5(tag, props = {}, children = []) {
+      const element2 = document.createElement(tag);
+      Object.assign(element2, props);
+      element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element2;
+    }
+    const button3 = (text, onClick, className = "", title = "") => el5("button", { type: "button", textContent: text, className, title, onclick: onClick });
+    function ensureStyle3() {
+      if (document.getElementById(IDS7.style)) return;
+      const style = el5("style", { id: IDS7.style });
+      const P = `#${IDS7.panel}`;
+      const R = `#${IDS7.review}`;
+      style.textContent = `
+      #${IDS7.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
+      #${IDS7.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS7.button}.wp-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS7.button}.wp-native svg { flex:none; fill:currentColor; }
+      #${IDS7.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS7.button}[data-active="1"] { color:${T.accentInk} !important; }
+      ${P}, ${R} .wp-card { box-sizing:border-box; color:${T.ink}; background:${T.surface}; border:1px solid ${T.line}; border-radius:10px; box-shadow:${T.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
+      ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
+      ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T.line}; }
+      ${P} .wp-title { font-weight:650; font-size:13px; }
+      ${P} .wp-head select { flex:1; min-width:0; }
+      ${P} .wp-body { overflow:auto; padding:6px 12px 10px; }
+      ${P} .wp-switch { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid ${T.line}; color:${T.ink2}; font-size:12px; cursor:pointer; }
+      ${P} .wp-switch input { accent-color:${T.accent}; margin:0; }
+      ${P} ul { margin:0; padding:0; list-style:none; }
+      ${P} li { display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:start; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${P} li:last-child { border-bottom:0; }
+      ${P} li input[type=checkbox] { margin:2px 0 0; accent-color:${T.accent}; }
+      ${P} li .wp-name { color:${T.ink}; font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
+      ${P} li .wp-name:hover { color:${T.accentInk}; text-decoration:underline; }
+      ${P} li.wp-done .wp-name { color:${T.muted}; text-decoration:line-through; }
+      ${P} li .wp-notiz, ${P} li .wp-extra, ${P} li .wp-edit { grid-column:2 / 4; }
+      ${P} li .wp-notiz { color:${T.ink2}; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${P} li .wp-edit { display:flex; gap:4px; }
+      ${P} li .wp-edit input { flex:1; min-width:0; }
+      ${P} .wp-tag { margin-left:6px; padding:1px 6px; border-radius:999px; background:${T.accentSoft}; color:${T.accentInk}; font-size:11px; font-weight:600; white-space:nowrap; }
+      ${P} .wp-actions { display:flex; gap:2px; }
+      ${P} .wp-icon { min-width:24px; height:24px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:${T.muted}; cursor:pointer; font:400 14px/24px system-ui,Arial,sans-serif; }
+      ${P} .wp-icon:hover { background:${T.sunken}; color:${T.ink}; }
+      ${P} .wp-add { display:flex; gap:6px; margin-top:10px; }
+      ${P} .wp-add select { flex:1; min-width:0; }
+      ${P} select, ${P} input[type=text], ${R} select { height:28px; box-sizing:border-box; padding:3px 6px; border:1px solid ${T.lineStrong}; border-radius:6px; background:${T.surface}; color:${T.ink}; font:400 12px/1.2 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn, ${R} .wp-btn { height:28px; padding:0 10px; border:1px solid ${T.lineStrong}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn:hover, ${R} .wp-btn:hover { background:${T.sunken}; }
+      ${P} .wp-primary, ${R} .wp-primary { border-color:${T.accent}; background:${T.accent}; color:#fff; }
+      ${P} .wp-primary:hover, ${R} .wp-primary:hover { background:${T.accentInk}; }
+      ${P} button:disabled, ${R} button:disabled { cursor:wait; opacity:.6; }
+      ${P} .wp-hint { margin:8px 0 0; color:${T.muted}; font-size:12px; }
+      ${P} .wp-link { border:0; padding:0; background:none; color:${T.accentInk}; cursor:pointer; font:inherit; font-size:12px; text-decoration:underline; }
+      ${P} .wp-status, ${R} .wp-status { min-height:0; font-size:12px; color:${T.ink2}; }
+      ${P} .wp-status:not(:empty) { margin-top:8px; }
+      ${P} .wp-status.wp-error, ${R} .wp-status.wp-error { color:${T.bad}; }
+      ${R} { position:fixed; inset:0; z-index:2147482000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.4); }
+      ${R} .wp-card { width:min(560px,94vw); max-height:86vh; overflow:auto; padding:18px 20px; }
+      ${R} h2 { margin:0 0 4px; font-size:15px; font-weight:650; }
+      ${R} p { margin:0 0 12px; color:${T.ink2}; font-size:12px; }
+      ${R} ul { margin:0 0 12px; padding:0; list-style:none; }
+      ${R} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${R} .wp-who { flex:1; min-width:0; }
+      ${R} .wp-who b { display:block; font-weight:600; }
+      ${R} .wp-who span { color:${T.ink2}; font-size:12px; }
+      ${R} .wp-seg { display:inline-flex; border:1px solid ${T.lineStrong}; border-radius:6px; overflow:hidden; }
+      ${R} .wp-seg button { height:26px; padding:0 10px; border:0; background:${T.surface}; color:${T.ink2}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${R} .wp-seg button + button { border-left:1px solid ${T.lineStrong}; }
+      ${R} .wp-seg button[aria-pressed="true"] { background:${T.accentSoft}; color:${T.accentInk}; }
+      ${R} .wp-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+      .${STAR_CLASS} { display:inline-flex; vertical-align:-3px; width:18px; height:18px; margin-right:3px; padding:0; border:0; background:transparent; cursor:pointer; color:${T.lineStrong}; }
+      .${STAR_CLASS}:hover { color:${T.accent}; }
+      .${STAR_CLASS}[data-on="1"] { color:${T.accent}; }
+      .${STAR_CLASS} svg { width:18px; height:18px; fill:currentColor; }
+      tr[data-werkia-prio="1"] > td:first-child { box-shadow:inset 3px 0 0 ${T.accent}; }
+    `;
+      document.head.appendChild(style);
+    }
+    async function load2({ force = false } = {}) {
+      if (!force && loaded && Date.now() - loadedAt < REFRESH_MS2) return entries;
+      if (!loading) {
+        loading = (async () => {
+          try {
+            const raw = await getClient().liste(BEREICH);
+            entries = raw.map(normalizeEntry);
+            loaded = true;
+            error = "";
+          } catch (failure) {
+            error = failure?.message || String(failure);
+          } finally {
+            loadedAt = Date.now();
+            loading = null;
+          }
+        })();
+      }
+      await loading;
+      renderPanel();
+      return entries;
+    }
+    async function loadForeign(id) {
+      const state = { entries: [], error: "", loading: true };
+      foreign.set(id, state);
+      renderPanel();
+      try {
+        state.entries = (await getClient().liste(BEREICH, { fuer: id })).map(normalizeEntry);
+        const name = state.entries.find((entry) => entry.autorName)?.autorName;
+        const person = absent.find((item) => item.id === id);
+        if (person && name && !person.name) person.name = name;
+      } catch (failure) {
+        state.error = failure?.message || String(failure);
+      }
+      state.loading = false;
+      renderPanel();
+    }
+    async function loadAbsentOnce() {
+      if (absentLoaded) return;
+      absentLoaded = true;
+      try {
+        absent = await loadAbsent();
+      } catch (failure) {
+        absent = [];
+        console.warn("[Prio-Liste] Vertretungen nicht geladen:", failure);
+      }
+      renderPanel();
+    }
+    async function mutate(action, success = "") {
+      if (busy) return;
+      busy = true;
+      message = "";
+      renderPanel();
+      try {
+        await action();
+        error = "";
+        message = success;
+      } catch (failure) {
+        error = failure?.message || String(failure);
+        if (collapsed()) {
+          store.set(STORAGE_KEYS.collapsed, "0");
+          placePanel2();
+        }
+      } finally {
+        busy = false;
+        renderPanel();
+        renderRows();
+      }
+    }
+    function replaceEntry(saved) {
+      const entry = normalizeEntry(saved);
+      const index = entries.findIndex((item) => item.id === entry.id);
+      if (index >= 0) entries[index] = entry;
+      else entries.push(entry);
+    }
+    function addEmployer(employerId, employerName) {
+      return mutate(async () => {
+        const day = today();
+        const existing = entries.find((entry) => entry.employerId === employerId && !entry.erledigt);
+        if (existing && existing.tag <= day) return;
+        const saved = existing ? await getClient().speichern(BEREICH, { id: existing.id, daten: { ...toDaten(existing), tag: day } }) : await getClient().speichern(BEREICH, newEntry({ employerId, employerName }, day));
+        replaceEntry(saved);
+      }, `${employerName} steht auf der Prio-Liste.`);
+    }
+    function removeEntry(entry) {
+      return mutate(async () => {
+        await getClient().loeschen(BEREICH, entry.id);
+        entries = entries.filter((item) => item.id !== entry.id);
+      }, `${entry.employerName} ist von der Liste.`);
+    }
+    function saveEntry(entry, patch) {
+      return mutate(async () => {
+        const next = { ...entry, ...patch };
+        const payload = { id: entry.id, daten: toDaten(next) };
+        if ("erledigt" in patch) payload.erledigt = Boolean(patch.erledigt);
+        replaceEntry(await getClient().speichern(BEREICH, payload));
+      });
+    }
+    function slotBefore(slot) {
+      let before = slot.before;
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS7.button) {
+        before = before.previousElementSibling;
+      }
+      return before;
+    }
+    function buttonLabel() {
+      const open = openEntries(entries, today()).length;
+      return loaded ? `Prio-Liste (${open})` : "Prio-Liste";
+    }
+    function placeButton() {
+      const slot = findSlot(document);
+      let existing = owned(IDS7.button);
+      if (existing && slot) {
+        let next = existing.nextElementSibling;
+        while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
+        if (existing.parentElement !== slot.parent || next !== slot.before) {
+          existing.remove();
+          existing = null;
+        }
+      } else if (existing && !slot && existing.parentElement?.id !== IDS7.bar) {
+        existing.remove();
+        existing = null;
+      }
+      if (!existing) {
+        const prioButton = button3("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
+        prioButton.id = IDS7.button;
+        prioButton.dataset.werkiaPrioOwner = sourcePath;
+        prioButton.append(el5("span", { className: "wp-label" }));
+        if (slot) {
+          owned(IDS7.bar)?.remove();
+          const look = nativeLookFrom(slot.sample);
+          if (look) {
+            prioButton.className = "wp-native";
+            Object.assign(prioButton.style, look.style);
+            prioButton.prepend(starIcon(look.iconSize, look.iconGap));
+          } else {
+            prioButton.className = "wp-own";
+          }
+          slot.parent.insertBefore(prioButton, slotBefore(slot));
+        } else {
+          const anchor = findListAnchor(document);
+          if (!anchor?.parentElement) return;
+          prioButton.className = "wp-own";
+          owned(IDS7.bar)?.remove();
+          const bar = el5("div", { id: IDS7.bar }, [prioButton]);
+          bar.dataset.werkiaPrioOwner = sourcePath;
+          anchor.parentElement.insertBefore(bar, anchor);
+        }
+        existing = prioButton;
+      }
+      const label = existing.querySelector(".wp-label");
+      const text = buttonLabel();
+      if (label && label.textContent !== text) label.textContent = text;
+      const active = !collapsed() ? "1" : "0";
+      if (existing.dataset.active !== active) existing.dataset.active = active;
+    }
+    function starIcon(size = "18px", gap = "0") {
+      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon2.setAttribute("viewBox", "0 0 24 24");
+      icon2.setAttribute("aria-hidden", "true");
+      icon2.style.width = size;
+      icon2.style.height = size;
+      if (gap) icon2.style.marginRight = gap;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", STAR_PATH);
+      icon2.append(path);
+      return icon2;
+    }
+    function togglePanel() {
+      store.set(STORAGE_KEYS.collapsed, collapsed() ? "0" : "1");
+      tick();
+    }
+    function positionPanel(panel) {
+      const anchor = owned(IDS7.button);
+      const rect = anchor?.getBoundingClientRect?.();
+      const top = rect && rect.bottom > 0 ? Math.max(56, Math.round(rect.bottom + 6)) : 64;
+      const value = `${top}px`;
+      if (panel.style.top !== value) panel.style.top = value;
+    }
+    function placePanel2() {
+      let panel = owned(IDS7.panel);
+      if (collapsed()) {
+        panel?.remove();
+        return;
+      }
+      if (!panel) {
+        panel = el5("div", { id: IDS7.panel });
+        panel.dataset.werkiaPrioOwner = sourcePath;
+        panel.setAttribute("role", "region");
+        panel.setAttribute("aria-label", "Prio-Liste");
+        document.body.appendChild(panel);
+        renderPanel();
+      }
+      positionPanel(panel);
+    }
+    function extrasFor(employerId) {
+      if (!renderEmployerExtras || !employerId) return null;
+      if (!extrasCache.has(employerId)) {
+        let element3 = null;
+        try {
+          element3 = renderEmployerExtras(employerId) || null;
+        } catch (failure) {
+          console.warn("[Prio-Liste] Zusatz am Arbeitgeber:", failure);
+        }
+        extrasCache.set(employerId, element3);
+      }
+      const element2 = extrasCache.get(employerId);
+      return element2 ? el5("div", { className: "wp-extra" }, [element2]) : null;
+    }
+    function entryItem(entry, readOnly) {
+      const check = el5("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
+      check.addEventListener("change", () => saveEntry(entry, { erledigt: check.checked }));
+      const name = el5("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
+      const tag = entry.uebertragen ? el5("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
+      const actions = readOnly ? el5("span") : el5("span", { className: "wp-actions" }, [
+        button3("✎", () => {
+          editingId = entry.id;
+          renderPanel();
+        }, "wp-icon", "Notiz bearbeiten"),
+        button3("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
+      ]);
+      const parts = [check, el5("div", {}, [name, tag]), actions];
+      if (editingId === entry.id && !readOnly) {
+        const input = el5("input", { type: "text", value: entry.notiz, placeholder: "Kurze Notiz", maxLength: 300 });
+        const save = () => {
+          editingId = "";
+          saveEntry(entry, { notiz: input.value.trim() });
+        };
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            save();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            editingId = "";
+            renderPanel();
+          }
+        });
+        parts.push(el5("div", { className: "wp-edit" }, [input, button3("Speichern", save, "wp-btn wp-primary")]));
+        runtime.setTimeout(() => input.focus(), 0);
+      } else if (entry.notiz) {
+        parts.push(el5("div", { className: "wp-notiz", textContent: entry.notiz }));
+      }
+      parts.push(extrasFor(entry.employerId));
+      return el5("li", { className: entry.erledigt ? "wp-done" : "" }, parts);
+    }
+    function pageEmployers() {
+      const onList = prioEmployerIds(entries, today());
+      const found = /* @__PURE__ */ new Map();
+      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
+        const employer = employerOfRow(row);
+        if (employer && !onList.has(employer.id) && !found.has(employer.id)) found.set(employer.id, employer.name || "Unbekannter Arbeitgeber");
+      }
+      return [...found].sort((a, b) => a[1].localeCompare(b[1], "de"));
+    }
+    function addForm() {
+      const choices = pageEmployers();
+      if (!choices.length) return el5("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
+      const select = el5("select", { disabled: busy }, [el5("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
+      choices.forEach(([id, name]) => select.append(el5("option", { value: id, textContent: name })));
+      const add = button3("Hinzufügen", () => {
+        if (!select.value) return;
+        addEmployer(select.value, select.selectedOptions[0].textContent);
+      }, "wp-btn", "Auf die heutige Prio-Liste setzen");
+      add.disabled = busy;
+      return el5("div", { className: "wp-add" }, [select, add]);
+    }
+    function viewSelect() {
+      if (!absent.length) return null;
+      const select = el5("select", { title: "Wessen Liste anzeigen" }, [el5("option", { value: "", textContent: "Meine Liste" })]);
+      absent.forEach((person) => select.append(el5("option", { value: person.id, textContent: `Liste von ${person.name || "vertretener Person"} (Vertretung)` })));
+      select.value = view;
+      select.addEventListener("change", () => {
+        view = select.value;
+        editingId = "";
+        if (view && !foreign.get(view)?.entries.length) loadForeign(view);
+        else renderPanel();
+      });
+      return select;
+    }
+    function renderPanel() {
+      const panel = owned(IDS7.panel);
+      if (!panel) return;
+      const day = today();
+      const tip = helpTip?.() || null;
+      const close = button3("–", togglePanel, "wp-icon", "Einklappen");
+      const head = el5("div", { className: "wp-head" }, [el5("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el5("span", { style: "flex:1" }), close]);
+      const sw = el5("input", { type: "checkbox", checked: prioFirst() });
+      sw.addEventListener("change", () => {
+        store.set(STORAGE_KEYS.prioFirst, sw.checked ? "1" : "0");
+        renderRows();
+      });
+      const switchRow = el5("label", { className: "wp-switch", title: "Zeilen dieser Seite mit Arbeitgebern der Prio-Liste nach oben" }, [sw, document.createTextNode("Prio zuerst")]);
+      const body = el5("div", { className: "wp-body" });
+      const status = el5("div", { className: `wp-status${error ? " wp-error" : ""}`, textContent: error || message });
+      if (view) {
+        const state = foreign.get(view) || { entries: [], loading: true, error: "" };
+        const person = absent.find((item) => item.id === view);
+        if (state.loading) body.append(el5("p", { className: "wp-hint", textContent: "Lädt …" }));
+        else if (state.error) body.append(el5("div", { className: "wp-status wp-error", textContent: state.error }));
+        else {
+          const list = entriesForDay(state.entries, day);
+          body.append(el5("p", { className: "wp-hint", textContent: `Nur lesen: Prio-Liste von ${person?.name || "der vertretenen Person"}.` }));
+          if (!list.length) body.append(el5("p", { className: "wp-hint", textContent: "Heute steht nichts drauf." }));
+          else body.append(el5("ul", {}, list.map((entry) => entryItem(entry, true))));
+        }
+        panel.replaceChildren(head, body);
+        return;
+      }
+      if (!loaded && !error) body.append(el5("p", { className: "wp-hint", textContent: "Lädt …" }));
+      if (!loaded && error) {
+        body.append(status, el5("div", { className: "wp-add" }, [button3("Erneut laden", () => load2({ force: true }), "wp-btn")]));
+        panel.replaceChildren(head, switchRow, body);
+        return;
+      }
+      if (loaded) {
+        const list = entriesForDay(entries, day);
+        if (!list.length) body.append(el5("p", { className: "wp-hint", textContent: "Heute steht noch nichts auf der Liste." }));
+        else body.append(el5("ul", {}, list.map((entry) => entryItem(entry, false))));
+        body.append(addForm());
+        const later = laterEntries(entries, day);
+        const open = openEntries(entries, day);
+        const footer = [];
+        if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay2(later[0].tag)}). `));
+        if (open.length) footer.push(button3("Tag abschließen …", () => openReview(), "wp-link"));
+        if (footer.length) body.append(el5("p", { className: "wp-hint" }, footer));
+        body.append(status);
+      }
+      panel.replaceChildren(head, switchRow, body);
+    }
+    function renderRows() {
+      if (!isTargetPage9()) return;
+      const day = today();
+      const ids = prioEmployerIds(entries, day);
+      const ready = loaded || Boolean(error);
+      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
+        const employer = employerOfRow(row);
+        if (!employer) continue;
+        const flag = ids.has(employer.id) ? "1" : "";
+        if ((row.dataset.werkiaPrio || "") !== flag) {
+          if (flag) row.dataset.werkiaPrio = flag;
+          else delete row.dataset.werkiaPrio;
+        }
+        if (!ready) continue;
+        let star = employer.link.previousElementSibling;
+        if (!star?.classList?.contains(STAR_CLASS)) {
+          star = el5("button", { type: "button", className: STAR_CLASS });
+          star.dataset.werkiaPrioOwner = sourcePath;
+          star.append(starIcon());
+          star.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onStar(star.dataset.employerId, star.dataset.employerName);
+          });
+          employer.link.insertAdjacentElement("beforebegin", star);
+        }
+        const on = flag ? "1" : "0";
+        const title = flag ? "Von der Prio-Liste nehmen" : "Auf die Prio-Liste setzen";
+        if (star.dataset.employerId !== employer.id) star.dataset.employerId = employer.id;
+        if (star.dataset.employerName !== employer.name) star.dataset.employerName = employer.name;
+        if (star.dataset.on !== on) star.dataset.on = on;
+        if (star.title !== title) {
+          star.title = title;
+          star.setAttribute("aria-label", title);
+        }
+      }
+      applyOrder(ids);
+    }
+    function onStar(employerId, employerName) {
+      if (!employerId || busy) return;
+      if (!loaded) {
+        load2({ force: true });
+        return;
+      }
+      const entry = entryForEmployer(entries, employerId, today());
+      if (entry) removeEntry(entry);
+      else addEmployer(employerId, employerName || "Unbekannter Arbeitgeber");
+    }
+    function applyOrder(ids) {
+      const on = prioFirst();
+      if (!on && !wasSorted) return;
+      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR11)].map((row) => row.parentElement))) {
+        const groups = rowGroups(tbody);
+        if (groups.some((group) => !natural.has(group[0]))) {
+          epoch += 1;
+          groups.forEach((group, index) => {
+            if (!natural.has(group[0])) natural.set(group[0], epoch * 1e5 + index);
+          });
+        }
+        const rows = groups.map((group, index) => ({ key: index, employerId: employerOfRow(group[0])?.id || "", natural: natural.get(group[0]) }));
+        const order = orderRows(rows, on ? ids : null);
+        if (order.every((key, index) => key === index)) continue;
+        const first = order.findIndex((key, index) => key !== index);
+        for (const key of order.slice(first)) tbody.append(...groups[key]);
+      }
+      wasSorted = on;
+    }
+    function closeReview() {
+      owned(IDS7.review)?.remove();
+    }
+    function openReview() {
+      closeReview();
+      const day = today();
+      const open = openEntries(entries, day);
+      if (!open.length) return;
+      ensureStyle3();
+      const decisions = new Map(open.map((entry) => [entry.id, "morgen"]));
+      const status = el5("div", { className: "wp-status" });
+      const items = open.map((entry) => {
+        const seg = el5("span", { className: "wp-seg" });
+        const choices = [["erledigt", "Erledigt"], ["morgen", "Auf morgen"]].map(([value, label]) => {
+          const choice = button3(label, () => {
+            decisions.set(entry.id, value);
+            seg.querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === choice)));
+          });
+          choice.setAttribute("aria-pressed", String(decisions.get(entry.id) === value));
+          return choice;
+        });
+        seg.append(...choices);
+        const sub = [entry.uebertragen ? `übertragen vom ${formatDay2(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
+        return el5("li", {}, [el5("div", { className: "wp-who" }, [el5("b", { textContent: entry.employerName }), sub ? el5("span", { textContent: sub }) : null]), seg]);
+      });
+      const save = button3("Übernehmen", async () => {
+        const saves = reviewSaves(open, decisions, day);
+        save.disabled = true;
+        status.className = "wp-status";
+        status.textContent = "Speichert …";
+        const failed = [];
+        for (const payload of saves) {
+          try {
+            replaceEntry(await getClient().speichern(BEREICH, payload));
+          } catch (failure) {
+            failed.push(failure?.message || String(failure));
+          }
+        }
+        renderPanel();
+        renderRows();
+        if (failed.length) {
+          save.disabled = false;
+          status.className = "wp-status wp-error";
+          status.textContent = `${failed.length} von ${saves.length} nicht gespeichert: ${failed[0]}`;
+          return;
+        }
+        closeReview();
+      }, "wp-btn wp-primary");
+      const later = button3("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
+      const card = el5("div", { className: "wp-card" });
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-label", "Prio-Liste: Tag abschließen");
+      card.append(
+        el5("h2", { textContent: "Prio-Liste: Tag abschließen" }),
+        el5("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
+        el5("ul", {}, items),
+        status,
+        el5("div", { className: "wp-foot" }, [later, save])
+      );
+      const overlay = el5("div", { id: IDS7.review }, [card]);
+      overlay.dataset.werkiaPrioOwner = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeReview();
+      });
+      document.body.appendChild(overlay);
+    }
+    async function checkReview() {
+      const date = now();
+      const day = berlinDay2(date);
+      const lastShownDay = store.get(STORAGE_KEYS.reviewDay);
+      if (!reviewDue({ now: date, lastShownDay, openCount: 1 })) return;
+      await load2();
+      if (!loaded) return;
+      if (owned(IDS7.review)) return;
+      store.set(STORAGE_KEYS.reviewDay, day);
+      if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
+    }
+    function tick() {
+      if (!isTargetPage9()) {
+        owned(IDS7.button)?.remove();
+        owned(IDS7.bar)?.remove();
+        owned(IDS7.panel)?.remove();
+        return;
+      }
+      ensureStyle3();
+      placeButton();
+      placePanel2();
+      renderRows();
+      const pageKey = pageEmployers().map(([id]) => id).join(",");
+      const panel = owned(IDS7.panel);
+      if (panel && pageKey !== lastPageKey && !panel.contains(document.activeElement)) {
+        lastPageKey = pageKey;
+        renderPanel();
+      }
+      if (!loaded && !loading && !error) load2();
+      else if (loaded && Date.now() - loadedAt >= REFRESH_MS2 && !loading) load2({ force: true });
+      loadAbsentOnce();
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        tick();
+      }, 200);
+    };
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS7.review)) return;
+      event.stopPropagation();
+      closeReview();
+    }, true);
+    runtime.addWindowListener("hashchange", () => {
+      if (isTargetPage9()) load2();
+      schedule();
+    });
+    runtime.addWindowListener("scroll", () => {
+      const panel = owned(IDS7.panel);
+      if (panel) positionPanel(panel);
+    }, { passive: true });
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.setInterval(() => {
+      checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
+    }, REVIEW_CHECK_MS);
+    runtime.addCleanup?.(() => {
+      owned(IDS7.button)?.remove();
+      owned(IDS7.bar)?.remove();
+      owned(IDS7.panel)?.remove();
+      closeReview();
+      document.querySelectorAll(`.${STAR_CLASS}`).forEach((star) => {
+        if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
+      });
+    });
+    schedule();
+    runtime.setTimeout(() => {
+      checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
+    }, 3e3);
+    return { load: load2, openReview, checkReview, tick, get entries() {
+      return entries;
+    } };
+  }
+
+  // src/features/prio-liste.js
+  function executePrioListe2(runtime, options = {}) {
+    const request = options.request ?? (typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null);
+    return executePrioListe(runtime, {
+      routes: [ROUTES.kamMyMatches],
+      sourcePath: "kam/toolbox/src/features/prio-liste.js",
+      helpTip: () => kamHelp.tip("prio-liste"),
+      getClient: () => toolboxDatenClientFor(getKamGraphqlAdapter(), request),
+      loadAbsent: createAbsentLoader({ getGraphqlAdapter: getKamGraphqlAdapter, request }),
+      renderEmployerExtras: (employerId) => createEmployerNoteBadge({
+        provider: employerNotesProviderFor(getKamGraphqlAdapter()),
+        employerId,
+        tag: "Prozess",
+        document
+      }),
+      ...options
     });
   }
 
@@ -10531,7 +13192,7 @@ ${buildCbreBody(current)}`;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS5 = {
+    const IDS9 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -10543,9 +13204,9 @@ ${buildCbreBody(current)}`;
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS5.style)) return;
+      if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
-      style.id = IDS5.style;
+      style.id = IDS9.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -10716,8 +13377,8 @@ ${buildCbreBody(current)}`;
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS5.dialog, style: IDS5.dialogStyle, status: IDS5.dialogStatus },
-      buttonIds: [IDS5.bulkButton],
+      ids: { dialog: IDS9.dialog, style: IDS9.dialogStyle, status: IDS9.dialogStatus },
+      buttonIds: [IDS9.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -10792,7 +13453,7 @@ ${buildCbreBody(current)}`;
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS5.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS9.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -10814,8 +13475,8 @@ ${buildCbreBody(current)}`;
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS5.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS5.dialog)?.remove();
+      document.getElementById(IDS9.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS9.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -10830,31 +13491,1946 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS5.style)?.remove();
-      document.getElementById(IDS5.dialogStyle)?.remove();
+      document.getElementById(IDS9.style)?.remove();
+      document.getElementById(IDS9.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
 
   // src/features/vacancy-status.js
-  var SOURCE_PATH = "kam/toolbox/src/features/vacancy-status.js";
+  var SOURCE_PATH2 = "kam/toolbox/src/features/vacancy-status.js";
   function isKamMyMatchesRoute(hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(String(hash || ""));
   }
   function executeVacancyStatus2(runtime) {
     const getRequest = () => getKamGraphqlAdapter().request;
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH,
+      sourcePath: SOURCE_PATH2,
       getRequest,
       namespace: "kam",
       bulk: { team: "KAM", tipHtml: () => kamHelp.tipHtml("vacancy-status-bulk", { tone: "dark" }) }
     });
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH,
+      sourcePath: SOURCE_PATH2,
       getRequest,
       namespace: "kam-matches",
       placement: "match-list",
       isRoute: isKamMyMatchesRoute
+    });
+  }
+
+  // ../../shared/js/comment-shortcuts/core.js
+  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
+  var GROUPS = [
+    { id: "kontakt", label: "Kontakt" },
+    { id: "termine", label: "Termine" },
+    { id: "unterlagen", label: "Unterlagen" },
+    // Ohne Ziel: keine Knöpfe, nur Tooltip.
+    { id: "profil", label: "Personen und Profil" }
+  ];
+  var RAW = [
+    // Kontakt und Erreichbarkeit
+    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG"],
+    ["kontakt", "te", "AP telefonisch erreicht", "AG"],
+    ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
+    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true }],
+    ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
+    ["kontakt", "Mail raus", "Mail verschickt", "AG"],
+    ["kontakt", "WA", "WhatsApp", "AG/M"],
+    ["kontakt", "VC", "Videocall", "AG/M"],
+    ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
+    ["kontakt", "RM", "Rückmeldung", "AG/M"],
+    ["kontakt", "FB", "Feedback", "M"],
+    ["kontakt", "JF", "Jour fixe", "AG"],
+    ["kontakt", "FYI", "zur Info", "AG/M", { varianten: ["FMI"] }],
+    ["kontakt", "Sek", "Sekretariat", "AG"],
+    // Termine und Prozess
+    ["termine", "VT", "Vorstellungstermin", "M"],
+    ["termine", "VTA", "VT-Anfrage (Anfrage Vorstellungstermin)", "M"],
+    ["termine", "VTV", "Vorstellungstermin vereinbart", "M", { unbestaetigt: true }],
+    ["termine", "VTS", "Vorstellungstermin stattgefunden", "M", { unbestaetigt: true, hinweis: "auch Mehrzahl von VT" }],
+    ["termine", "VG", "Vorstellungsgespräch", "M", { varianten: ["VSG"] }],
+    ["termine", "HT", "Hospitation/Probetag", "M", { unbestaetigt: true }],
+    ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
+    ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
+    ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
+    ["termine", "TB", "Terminbestätigung", "M"],
+    // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
+    ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
+    ["termine", "digi", "digitaler Termin", "M"],
+    ["termine", "HC", "Hot Case", "M"],
+    ["termine", "HHC", "Hot Hot Case", "M"],
+    ["termine", "out", "Absage", "M"],
+    ["termine", "on hold", "pausiert", "AG/M"],
+    ["termine", "ABS", "Absage", "M"],
+    ["termine", "WVL", "Wiedervorlage", "M"],
+    // Unterlagen und Vertrag
+    ["unterlagen", "UL", "Unterlagen", "M"],
+    ["unterlagen", "CV", "Lebenslauf", "M"],
+    ["unterlagen", "GB", "Gesellenbrief", "M"],
+    ["unterlagen", "AZ", "Arbeitszeugnis", "M"],
+    ["unterlagen", "PFB", "Personalfragebogen", "M"],
+    ["unterlagen", "AV", "Arbeitsvertrag", "M"],
+    ["unterlagen", "AVU", "Unterschrift Arbeitsvertrag", "M"],
+    ["unterlagen", "SD", "Startdatum", "M"],
+    ["unterlagen", "PZ", "Probezeit", "M"],
+    // Eindeutig: "KD-Dienst" (Kundendienst) bleibt unberührt, ein Bindestrich
+    // gilt beim Vorschlag als Teil des Wortes.
+    ["unterlagen", "KD", "Kontaktdaten", "AG/M", { hinweis: "nicht in „KD-Dienst“ (Kundendienst)" }],
+    // Personen und Profil: kein Ziel, keine Knöpfe, nur Tooltip.
+    ["profil", "AP", "Ansprechpartner", null],
+    ["profil", "BEW", "Bewerber", null],
+    ["profil", "AG", "Arbeitgeber", null],
+    ["profil", "GF", "Geschäftsführung", null],
+    ["profil", "FA", "Fachabteilung", null],
+    ["profil", "SV", "Stellvertreter des AP", null, { unbestaetigt: true }],
+    ["profil", "BE", "Berufserfahrung", null],
+    ["profil", "FS", "Führerschein", null],
+    ["profil", "RB", "Reisebereitschaft", null],
+    ["profil", "MB", "Montagebereitschaft", null, { unbestaetigt: true }],
+    ["profil", "TZ", "Teilzeit", null],
+    ["profil", "VZ", "Vollzeit", null],
+    ["profil", "FW", "Firmenwagen", null],
+    ["profil", "HO", "Homeoffice", null],
+    ["profil", "PV", "Photovoltaik", null, { unbestaetigt: true }],
+    ["profil", "WP", "Wärmepumpe", null, { unbestaetigt: true }],
+    ["profil", "SHK", "Sanitär-Heizung-Klima", null, { unbestaetigt: true }],
+    ["profil", "ZS", "Zählerschrank", null, { unbestaetigt: true }],
+    ["profil", "PL", "Projektleiter", null]
+  ];
+  var SHORTCUTS = Object.freeze(RAW.map(([gruppe, kuerzel, text, ziel, extra = {}]) => Object.freeze({
+    id: `${gruppe}:${kuerzel}`,
+    gruppe,
+    kuerzel,
+    text,
+    ziel,
+    label: extra.label || kuerzel,
+    varianten: Object.freeze([...extra.varianten || []]),
+    unbestaetigt: Boolean(extra.unbestaetigt),
+    hinweis: extra.hinweis || ""
+  })));
+  var AG_NOTE_TAGS = Object.freeze(["Matches"]);
+  var writesMatch = (ziel) => ziel === TARGETS.M || ziel === TARGETS.AG_M;
+  var writesEmployer = (ziel) => ziel === TARGETS.AG || ziel === TARGETS.AG_M;
+  function targetLabel(ziel) {
+    if (ziel === TARGETS.AG) return "AG-Notiz";
+    if (ziel === TARGETS.M) return "Matchkommentar";
+    if (ziel === TARGETS.AG_M) return "AG-Notiz und Matchkommentar";
+    return "";
+  }
+  function buttonGroups(shortcuts = SHORTCUTS) {
+    return GROUPS.map((group) => ({ ...group, items: shortcuts.filter((item) => item.gruppe === group.id && item.ziel) })).filter((group) => group.items.length);
+  }
+  function buttonTitle(item) {
+    const parts = [`${item.label}: ${item.text} → ${targetLabel(item.ziel)}`];
+    if (item.hinweis) parts.push(item.hinweis);
+    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    return parts.join(" · ");
+  }
+  function explainTitle(item, token = item.kuerzel) {
+    const parts = [`${token}: ${item.text}`];
+    if (item.hinweis) parts.push(item.hinweis);
+    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    return parts.join(" · ");
+  }
+  var WORD_CHAR = /[\p{L}\p{N}_-]/u;
+  function explainTokens(shortcuts = SHORTCUTS) {
+    const tokens = [];
+    for (const item of shortcuts) {
+      for (const token of /* @__PURE__ */ new Set([item.kuerzel, ...item.varianten])) tokens.push({ token, item });
+    }
+    return tokens.sort((a, b) => b.token.length - a.token.length);
+  }
+  var DEFAULT_TOKENS = explainTokens();
+  function shortcutAtOffset(text, offset, tokens = DEFAULT_TOKENS) {
+    const value = String(text || "");
+    const at = Number(offset);
+    if (!Number.isInteger(at) || at < 0 || at > value.length) return null;
+    for (const { token, item } of tokens) {
+      let start = value.lastIndexOf(token, at);
+      while (start >= 0 && start + token.length >= at) {
+        const end = start + token.length;
+        const prev = value.charAt(start - 1);
+        const next = value.charAt(end);
+        if (at < end && (!prev || !WORD_CHAR.test(prev)) && (!next || !WORD_CHAR.test(next))) return { item, token, start, end };
+        start = start > 0 ? value.lastIndexOf(token, start - 1) : -1;
+      }
+    }
+    return null;
+  }
+  function insertionText(before, text) {
+    const prev = String(before || "").slice(-1);
+    return `${prev && !/\s/.test(prev) ? " " : ""}${text}`;
+  }
+  var TEMPLATE_AREA = "vorlage";
+  var TEMPLATE_TITLE_MAX = 60;
+  var TEMPLATE_TEXT_MAX = 4e3;
+  function toTemplate(eintrag) {
+    const daten = eintrag?.daten || {};
+    return {
+      id: String(eintrag?.id || ""),
+      titel: String(daten.titel || "").trim(),
+      text: String(daten.text || ""),
+      eigen: eintrag?.eigen !== false
+    };
+  }
+  function sortTemplates(templates) {
+    return [...templates].sort((a, b) => a.titel.localeCompare(b.titel, "de", { sensitivity: "base" }));
+  }
+  function validateTemplate({ titel, text }) {
+    const title = String(titel || "").trim();
+    const body = String(text || "").trim();
+    if (!title) return "Bitte einen Titel eingeben.";
+    if (title.length > TEMPLATE_TITLE_MAX) return `Der Titel darf höchstens ${TEMPLATE_TITLE_MAX} Zeichen haben.`;
+    if (!body) return "Bitte einen Text eingeben.";
+    if (body.length > TEMPLATE_TEXT_MAX) return `Der Text darf höchstens ${TEMPLATE_TEXT_MAX} Zeichen haben.`;
+    return "";
+  }
+  function templateEntry({ id, titel, text }) {
+    return { ...id ? { id } : {}, daten: { titel: String(titel).trim(), text: String(text).replace(/\s+$/, "") } };
+  }
+  var MATCH_JOB_POSITION_QUERY2 = `query WerkiaShortcutsMatch($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) { id jobPositionId }
+}`;
+  var JOB_POSITION_EMPLOYER_QUERY2 = `query WerkiaShortcutsJobPosition($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) { id employer { id name } }
+}`;
+  function matchIdFromHref5(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function employerIdFromHref2(href) {
+    return String(href || "").match(/#\/Employer\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  async function resolveEmployer(request, matchId) {
+    if (!matchId) return null;
+    const matches = await request(MATCH_JOB_POSITION_QUERY2, { filter: { ids: [matchId] }, perPage: 1 });
+    const jobPositionId = (matches?.items || []).find((item) => String(item?.id) === String(matchId))?.jobPositionId;
+    if (!jobPositionId) return null;
+    const jobs = await request(JOB_POSITION_EMPLOYER_QUERY2, { filter: { ids: [jobPositionId] } });
+    const employer = (jobs?.items || []).find((item) => String(item?.id) === String(jobPositionId))?.employer;
+    return employer?.id ? { id: String(employer.id), name: String(employer.name || "") } : null;
+  }
+
+  // ../../shared/js/comment-shortcuts/explain.js
+  var EXPLAIN_ID = "werkia-shortcuts-explain";
+  var OWNER_ATTR = "data-werkia-shortcut-explain";
+  var STYLE_ID8 = `${EXPLAIN_ID}-style`;
+  var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
+  var NOTES_SELECTOR = '[class*="werkia-agn"]';
+  var MOVE_THROTTLE_MS = 60;
+  function inScope(element2) {
+    if (!element2?.closest) return false;
+    if (element2.closest(`#${EXPLAIN_ID}`)) return false;
+    if (element2.closest(NOTES_SELECTOR)) return true;
+    const scope = element2.closest(SCOPE_SELECTOR);
+    return Boolean(scope && /Matchkommentare/i.test(scope.textContent || ""));
+  }
+  function textPointAt(doc, x, y) {
+    try {
+      if (typeof doc.caretPositionFromPoint === "function") {
+        const position = doc.caretPositionFromPoint(x, y);
+        if (position?.offsetNode) return { node: position.offsetNode, offset: position.offset };
+      }
+      if (typeof doc.caretRangeFromPoint === "function") {
+        const range = doc.caretRangeFromPoint(x, y);
+        if (range?.startContainer) return { node: range.startContainer, offset: range.startOffset };
+      }
+    } catch {
+    }
+    return null;
+  }
+  function wordBox(doc, node, start, end) {
+    try {
+      const range = doc.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, end);
+      return range.getBoundingClientRect?.() || null;
+    } catch {
+      return null;
+    }
+  }
+  function ensureStyle(doc) {
+    if (doc.getElementById(STYLE_ID8)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID8;
+    style.textContent = `
+    #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
+      background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
+      font:12px/1.35 "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #${EXPLAIN_ID} b { color:#b85400; }
+  `;
+    doc.head.appendChild(style);
+  }
+  function executeShortcutExplainer(runtime, { sourcePath } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    const root = document.documentElement;
+    if (root.hasAttribute(OWNER_ATTR)) return;
+    root.setAttribute(OWNER_ATTR, "");
+    let shown = "";
+    let last = 0;
+    function hide() {
+      shown = "";
+      document.getElementById(EXPLAIN_ID)?.remove();
+    }
+    function show(found, box) {
+      const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
+      if (shown === key) return;
+      shown = key;
+      ensureStyle(document);
+      let tip = document.getElementById(EXPLAIN_ID);
+      if (!tip) {
+        tip = document.createElement("div");
+        tip.id = EXPLAIN_ID;
+        tip.setAttribute("role", "tooltip");
+        document.body.appendChild(tip);
+      }
+      const title = explainTitle(found.item, found.token);
+      const rest = title.slice(found.token.length + 1);
+      const strong = document.createElement("b");
+      strong.textContent = `${found.token}:`;
+      tip.replaceChildren(strong, document.createTextNode(rest));
+      const left = Math.max(8, Math.min(box.left, window.innerWidth - 368));
+      tip.style.left = `${Math.round(left)}px`;
+      tip.style.top = `${Math.round(box.bottom + 4)}px`;
+    }
+    function onMove(event) {
+      const now = Date.now();
+      if (now - last < MOVE_THROTTLE_MS) return;
+      last = now;
+      if (!inScope(event.target)) {
+        if (shown) hide();
+        return;
+      }
+      const point = textPointAt(document, event.clientX, event.clientY);
+      const node = point?.node;
+      if (!node || node.nodeType !== 3 || !inScope(node.parentElement)) {
+        if (shown) hide();
+        return;
+      }
+      const found = shortcutAtOffset(node.textContent, point.offset) || (point.offset > 0 ? shortcutAtOffset(node.textContent, point.offset - 1) : null);
+      if (!found) {
+        if (shown) hide();
+        return;
+      }
+      const box = wordBox(document, node, found.start, found.end);
+      const inside = box && event.clientX >= box.left - 1 && event.clientX <= box.right + 1 && event.clientY >= box.top - 1 && event.clientY <= box.bottom + 1;
+      if (!inside) {
+        if (shown) hide();
+        return;
+      }
+      show(found, box);
+    }
+    runtime.addDocumentListener("mousemove", onMove, true);
+    runtime.addDocumentListener("mousedown", hide, true);
+    runtime.addWindowListener("scroll", hide, true);
+  }
+
+  // ../../shared/js/comment-shortcuts/index.js
+  var PREFIX = "werkia-shortcuts";
+  var STYLE_ID9 = `${PREFIX}-style`;
+  var BAR_CLASS3 = `${PREFIX}-bar`;
+  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
+  var DIALOG_SELECTOR = 'div[role="dialog"], .MuiDialog-paper';
+  var ROW_SELECTOR12 = "tr";
+  var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var EMPLOYER_LINK_SELECTOR7 = 'a[href*="#/Employer/"]';
+  var GROUP_STORAGE_KEY = `${PREFIX}-group`;
+  var TEMPLATES_TAB = "vorlagen";
+  var FEEDBACK_MS = 5e3;
+  var GROUPS2 = buttonGroups();
+  function tiptapOf3(element2) {
+    try {
+      return element2?.wrappedJSObject?.editor || element2?.editor || null;
+    } catch {
+      return null;
+    }
+  }
+  function el3(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (value === void 0 || value === null || value === false) continue;
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else if (key === "dataset") Object.assign(node.dataset, value);
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else if (key === "value" || key in node && typeof value !== "string") node[key] = value;
+      else node.setAttribute(key, value === true ? "" : value);
+    }
+    node.append(...children.flat().filter((child) => child !== null && child !== void 0 && child !== false));
+    return node;
+  }
+  var keepFocus = (event) => event.preventDefault();
+  function storageGet(key, fallback) {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function storageSet(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+    }
+  }
+  function isDark(element2) {
+    let node = element2;
+    while (node && node.nodeType === 1) {
+      const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
+      if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
+        return (0.2126 * match[1] + 0.7152 * match[2] + 0.0722 * match[3]) / 255 < 0.5;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+  function insertIntoEditor(editorElement, text) {
+    const editor = tiptapOf3(editorElement);
+    const multiline = /\n/.test(text);
+    if (editor?.chain && editor.state?.selection) {
+      const { $from } = editor.state.selection;
+      const before2 = $from.parent.textBetween(0, $from.parentOffset, null, "￼");
+      const content = multiline ? textToHtml(text) : escapeHtml(insertionText(before2, text));
+      editor.chain().focus().insertContent(content).run();
+      return true;
+    }
+    editorElement.focus();
+    const selection = window.getSelection?.();
+    if (selection && (!selection.rangeCount || !editorElement.contains(selection.anchorNode))) {
+      const range = document.createRange();
+      range.selectNodeContents(editorElement);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const node = selection?.anchorNode;
+    const before = node?.nodeType === 3 ? node.textContent.slice(0, selection.anchorOffset) : "";
+    return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
+  }
+  function ensureStyle2() {
+    if (document.getElementById(STYLE_ID9)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID9;
+    style.textContent = `
+    .${BAR_CLASS3} {
+      --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
+      --ws-line:#e4e4e7; --ws-line-strong:#d4d4d8; --ws-accent:#ef6c00; --ws-accent-ink:#b85400; --ws-accent-soft:#fff3e8;
+      --ws-navy:#284e75; --ws-good:#0a7c0a; --ws-bad:#b52f2f;
+      font-family:"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size:12px; line-height:1.35; color:var(--ws-ink);
+    }
+    .${BAR_CLASS3}[data-mode="dark"] {
+      --ws-surface:#111113; --ws-sunken:#18181b; --ws-ink:#fafafa; --ws-ink2:#a1a1aa; --ws-muted:#71717a;
+      --ws-line:#232326; --ws-line-strong:#303034; --ws-accent:#ff8a33; --ws-accent-ink:#ff9a4d; --ws-accent-soft:#26170b;
+      --ws-navy:#7ea6d4; --ws-good:#3fbf3f; --ws-bad:#e86a6a;
+    }
+    .${BAR_CLASS3} { display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:6px 8px; border:1px solid var(--ws-line); border-radius:8px; background:var(--ws-surface); }
+    .${BAR_CLASS3} button, .${BAR_CLASS3} input, .${BAR_CLASS3} textarea { font:inherit; color:inherit; }
+    .${BAR_CLASS3} :focus-visible { outline:2px solid var(--ws-accent); outline-offset:1px; }
+    .${PREFIX}-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; }
+    .${PREFIX}-tab { border:0; background:transparent; padding:3px 8px; border-radius:6px; cursor:pointer; color:var(--ws-ink2); font-weight:500; }
+    .${PREFIX}-tab:hover { background:var(--ws-sunken); color:var(--ws-ink); }
+    .${PREFIX}-tab[aria-pressed="true"] { background:var(--ws-accent-soft); color:var(--ws-accent-ink); font-weight:600; }
+    .${PREFIX}-legend { margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--ws-muted); font-size:11px; }
+    .${PREFIX}-legend i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:3px; vertical-align:-1px; }
+    .${PREFIX}-keys { display:flex; flex-wrap:wrap; gap:4px; }
+    .${PREFIX}-key { min-height:24px; padding:2px 8px; border:1px solid var(--ws-line-strong); border-left-width:3px; border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
+    .${PREFIX}-key:hover { background:var(--ws-sunken); }
+    .${PREFIX}-key[data-ziel="AG"] { border-left-color:var(--ws-navy); }
+    .${PREFIX}-key[data-ziel="M"] { border-left-color:var(--ws-line-strong); }
+    .${PREFIX}-key[data-ziel="AG/M"] { border-left-color:var(--ws-accent); }
+    .${PREFIX}-key[data-unbestaetigt] { border-style:dashed; border-left-style:solid; }
+    .${PREFIX}-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+    .${PREFIX}-ag { padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
+    .${PREFIX}-ag input { flex:1 1 220px; min-width:160px; height:26px; padding:0 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
+    .${PREFIX}-tag { padding:1px 6px; border-radius:4px; background:var(--ws-surface); border:1px solid var(--ws-line); color:var(--ws-navy); font-weight:600; }
+    .${PREFIX}-btn { height:26px; padding:0 10px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:500; }
+    .${PREFIX}-btn:hover:not(:disabled) { border-color:var(--ws-ink2); }
+    .${PREFIX}-btn:disabled { opacity:.5; cursor:default; }
+    .${PREFIX}-btn[data-tone="primary"] { border-color:var(--ws-accent); background:var(--ws-accent); color:#fff; }
+    .${PREFIX}-btn[data-tone="danger"] { color:var(--ws-bad); }
+    .${PREFIX}-link { border:0; background:transparent; padding:0 2px; color:var(--ws-ink2); cursor:pointer; text-decoration:underline; }
+    .${PREFIX}-status { color:var(--ws-ink2); }
+    .${PREFIX}-status[data-kind="ok"] { color:var(--ws-good); font-weight:600; }
+    .${PREFIX}-status[data-kind="error"] { color:var(--ws-bad); }
+    .${PREFIX}-templates { display:flex; flex-direction:column; gap:4px; }
+    .${PREFIX}-template { display:flex; align-items:center; gap:6px; }
+    .${PREFIX}-template .${PREFIX}-key { border-left-color:var(--ws-line-strong); font-weight:500; max-width:420px; overflow:hidden; text-overflow:ellipsis; }
+    .${PREFIX}-form { display:flex; flex-direction:column; gap:6px; padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
+    .${PREFIX}-form input, .${PREFIX}-form textarea { padding:4px 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
+    .${PREFIX}-form textarea { min-height:90px; resize:vertical; }
+  `;
+    document.head.appendChild(style);
+  }
+  function executeCommentShortcuts(runtime, {
+    sourcePath,
+    getGraphqlAdapter,
+    getNotesProvider,
+    getTemplatesClient,
+    helpTip = () => null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    executeShortcutExplainer(runtime);
+    let clickedMatch = { id: "", employer: null };
+    const employers = /* @__PURE__ */ new Map();
+    const groupIds = GROUPS2.map((group) => group.id);
+    let activeTab = storageGet(GROUP_STORAGE_KEY, groupIds[0]);
+    if (activeTab !== "" && activeTab !== TEMPLATES_TAB && !groupIds.includes(activeTab)) activeTab = groupIds[0];
+    let ag = null;
+    let agFeedbackTimer = null;
+    const templates = { state: "idle", items: [], error: "" };
+    let form = null;
+    const currentBar = () => document.querySelector(`.${BAR_CLASS3}`);
+    function findDialog() {
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR3));
+      return dialogs[dialogs.length - 1] || null;
+    }
+    function editorBoxFor(editor, dialog) {
+      let box = editor;
+      for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
+        const parent = box.parentElement;
+        if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
+        box = parent;
+      }
+      return editor.parentElement || editor;
+    }
+    function dialogMatchId() {
+      return clickedMatch.id || matchIdFromHref5(location.hash);
+    }
+    function employerFor(matchId) {
+      if (!matchId) return Promise.resolve(null);
+      if (!employers.has(matchId)) {
+        const known = clickedMatch.id === matchId ? clickedMatch.employer : null;
+        const promise = known ? Promise.resolve(known) : resolveEmployer(getGraphqlAdapter().request, matchId);
+        employers.set(matchId, promise);
+        promise.catch(() => employers.delete(matchId));
+      }
+      return employers.get(matchId);
+    }
+    function renderBar() {
+      const bar = currentBar();
+      if (!bar) return;
+      const tabs = el3(
+        "div",
+        { class: `${PREFIX}-tabs` },
+        GROUPS2.map((group2) => el3("button", {
+          type: "button",
+          class: `${PREFIX}-tab`,
+          "aria-pressed": String(activeTab === group2.id),
+          dataset: { tab: group2.id },
+          text: group2.label,
+          onmousedown: keepFocus,
+          onclick: () => selectTab(group2.id)
+        })),
+        el3("button", {
+          type: "button",
+          class: `${PREFIX}-tab`,
+          "aria-pressed": String(activeTab === TEMPLATES_TAB),
+          dataset: { tab: TEMPLATES_TAB },
+          text: "Vorlagen",
+          onmousedown: keepFocus,
+          onclick: () => selectTab(TEMPLATES_TAB)
+        }),
+        el3(
+          "span",
+          { class: `${PREFIX}-legend` },
+          el3("span", {}, el3("i", { style: "background:var(--ws-navy)" }), "AG-Notiz"),
+          el3("span", {}, el3("i", { style: "background:var(--ws-line-strong)" }), "Kommentar"),
+          el3("span", {}, el3("i", { style: "background:var(--ws-accent)" }), "beides"),
+          helpTip()
+        )
+      );
+      const parts = [tabs];
+      const group = GROUPS2.find((item) => item.id === activeTab);
+      if (group) parts.push(renderKeys(group));
+      if (activeTab === TEMPLATES_TAB) parts.push(renderTemplates());
+      if (ag) parts.push(renderAg());
+      bar.replaceChildren(...parts);
+    }
+    function selectTab(id) {
+      activeTab = activeTab === id ? "" : id;
+      storageSet(GROUP_STORAGE_KEY, activeTab);
+      if (activeTab === TEMPLATES_TAB && templates.state === "idle") loadTemplates();
+      renderBar();
+    }
+    function renderKeys(group) {
+      return el3("div", { class: `${PREFIX}-keys` }, group.items.map((item) => el3("button", {
+        type: "button",
+        class: `${PREFIX}-key`,
+        title: buttonTitle(item),
+        dataset: { ziel: item.ziel, kuerzel: item.kuerzel, ...item.unbestaetigt ? { unbestaetigt: "" } : {} },
+        text: item.label,
+        onmousedown: keepFocus,
+        onclick: () => applyShortcut(item)
+      })));
+    }
+    function editorElement() {
+      return findDialog()?.querySelector(EDITOR_SELECTOR3) || null;
+    }
+    function applyShortcut(item) {
+      if (writesMatch(item.ziel)) {
+        const editor = editorElement();
+        if (editor) insertIntoEditor(editor, item.label);
+      }
+      if (writesEmployer(item.ziel)) openAg(item.label);
+    }
+    function openAg(text) {
+      runtime.clearTimeout?.(agFeedbackTimer);
+      const matchId = dialogMatchId();
+      ag = { text, matchId, employer: null, state: matchId ? "resolving" : "nomatch", message: "" };
+      const current = ag;
+      renderBar();
+      currentBar()?.querySelector(`.${PREFIX}-ag input`)?.focus();
+      if (!matchId) return;
+      employerFor(matchId).then((employer) => {
+        if (ag !== current) return;
+        ag.employer = employer;
+        ag.state = employer ? "ready" : "noemployer";
+        updateAg();
+      }, (error) => {
+        if (ag !== current) return;
+        ag.state = "error";
+        ag.message = `Arbeitgeber nicht gefunden: ${error?.message || error}`;
+        updateAg();
+      });
+    }
+    function updateAg() {
+      const bar = currentBar();
+      const row = bar?.querySelector(`.${PREFIX}-ag`);
+      if (!bar) return;
+      const input = row?.querySelector("input");
+      if (ag && input) ag.text = input.value;
+      const hadFocus = input && document.activeElement === input;
+      const next = ag ? renderAg() : null;
+      if (row && next) row.replaceWith(next);
+      else if (row) row.remove();
+      else if (next) bar.appendChild(next);
+      if (hadFocus) next?.querySelector("input")?.focus();
+    }
+    function agLabel() {
+      if (!ag) return "";
+      if (ag.state === "nomatch") return "Kein Match erkannt. Die AG-Notiz bitte im Arbeitgeberprofil anlegen.";
+      if (ag.state === "resolving") return "Arbeitgeber wird gesucht …";
+      if (ag.state === "noemployer") return "Zu diesem Match wurde kein Arbeitgeber gefunden.";
+      const name = ag.employer?.name || "Arbeitgeber";
+      return `AG-Notiz für ${name}:`;
+    }
+    function renderAg() {
+      const canSave = Boolean(ag.employer?.id) && !["saving", "saved"].includes(ag.state);
+      const statusKind = ag.state === "saved" ? "ok" : ag.state === "error" || ag.state === "failed" ? "error" : "";
+      if (ag.state === "saved") {
+        return el3(
+          "div",
+          { class: `${PREFIX}-ag ${PREFIX}-row` },
+          el3("span", { class: `${PREFIX}-status`, dataset: { kind: "ok" }, text: ag.message })
+        );
+      }
+      const input = el3("input", {
+        type: "text",
+        value: ag.text,
+        "aria-label": "Text der AG-Notiz",
+        onkeydown: (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            if (canSave) saveAg();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            closeAg();
+          }
+        },
+        oninput: (event) => {
+          ag.text = event.target.value;
+        }
+      });
+      return el3(
+        "div",
+        { class: `${PREFIX}-ag`, role: "group", "aria-label": "AG-Notiz bestätigen" },
+        el3(
+          "div",
+          { class: `${PREFIX}-row` },
+          el3("span", { class: `${PREFIX}-status`, text: agLabel() }),
+          el3("span", { class: `${PREFIX}-tag`, title: "Tag der AG-Notiz: erscheint im Matchkommentar-Dialog", text: AG_NOTE_TAGS.map((tag) => `[${tag}]`).join("") }),
+          input,
+          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { tone: "primary", action: "ag-save" }, disabled: !canSave, text: ag.state === "saving" ? "Speichert …" : "Speichern", onclick: saveAg }),
+          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "ag-cancel" }, text: "Abbrechen", onclick: closeAg })
+        ),
+        ag.message ? el3("div", { class: `${PREFIX}-status`, dataset: { kind: statusKind }, text: ag.message }) : null
+      );
+    }
+    function closeAg() {
+      ag = null;
+      updateAg();
+    }
+    async function saveAg() {
+      if (!ag?.employer?.id || ag.state === "saving") return;
+      const input = currentBar()?.querySelector(`.${PREFIX}-ag input`);
+      if (input) ag.text = input.value;
+      const text = String(ag.text || "").trim();
+      if (!text) {
+        ag.state = "failed";
+        ag.message = "Die Notiz ist leer.";
+        updateAg();
+        return;
+      }
+      const current = ag;
+      ag.state = "saving";
+      ag.message = "";
+      updateAg();
+      try {
+        await getNotesProvider().create(current.employer.id, [...AG_NOTE_TAGS], text);
+        if (ag !== current) return;
+        ag.state = "saved";
+        ag.message = `✓ AG-Notiz für ${current.employer.name || "den Arbeitgeber"} gespeichert.`;
+        updateAg();
+        agFeedbackTimer = runtime.setTimeout(() => {
+          if (ag === current) closeAg();
+        }, FEEDBACK_MS);
+      } catch (error) {
+        if (ag !== current) return;
+        ag.state = "failed";
+        ag.message = `Nicht gespeichert: ${error?.message || error}`;
+        updateAg();
+      }
+    }
+    async function loadTemplates() {
+      templates.state = "loading";
+      templates.error = "";
+      renderBar();
+      try {
+        const entries = await getTemplatesClient().liste(TEMPLATE_AREA);
+        templates.items = sortTemplates(entries.map(toTemplate).filter((item) => item.id && item.titel));
+        templates.state = "ok";
+      } catch (error) {
+        templates.state = "error";
+        templates.error = error?.message || String(error);
+      }
+      if (activeTab === TEMPLATES_TAB) renderBar();
+    }
+    function renderTemplates() {
+      const box = el3("div", { class: `${PREFIX}-templates` });
+      if (templates.state === "loading" || templates.state === "idle") {
+        box.append(el3("span", { class: `${PREFIX}-status`, text: "Vorlagen werden geladen …" }));
+        return box;
+      }
+      if (templates.state === "error") {
+        box.append(el3(
+          "div",
+          { class: `${PREFIX}-row` },
+          el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: templates.error }),
+          el3("button", { type: "button", class: `${PREFIX}-link`, text: "Erneut versuchen", onclick: loadTemplates })
+        ));
+        return box;
+      }
+      if (!templates.items.length && !form) {
+        box.append(el3("span", { class: `${PREFIX}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
+      }
+      for (const template of templates.items) {
+        if (form?.id === template.id) continue;
+        box.append(el3(
+          "div",
+          { class: `${PREFIX}-template` },
+          el3("button", {
+            type: "button",
+            class: `${PREFIX}-key`,
+            title: template.text,
+            dataset: { vorlage: template.id },
+            text: template.titel,
+            onmousedown: keepFocus,
+            onclick: () => {
+              const editor = editorElement();
+              if (editor) insertIntoEditor(editor, template.text);
+            }
+          }),
+          el3("button", { type: "button", class: `${PREFIX}-link`, text: "Ändern", onclick: () => openForm(template) })
+        ));
+      }
+      if (form) box.append(renderForm());
+      else box.append(el3("div", {}, el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
+      return box;
+    }
+    function openForm(template) {
+      form = { id: template?.id || "", titel: template?.titel || "", text: template?.text || "", error: "", saving: false, confirmDelete: false };
+      renderBar();
+      currentBar()?.querySelector(`.${PREFIX}-form input`)?.focus();
+    }
+    function readForm() {
+      const box = currentBar()?.querySelector(`.${PREFIX}-form`);
+      if (!box || !form) return;
+      form.titel = box.querySelector("input").value;
+      form.text = box.querySelector("textarea").value;
+    }
+    function renderForm() {
+      const stop = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          form = null;
+          renderBar();
+        }
+      };
+      return el3(
+        "div",
+        { class: `${PREFIX}-form` },
+        el3("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
+        el3("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
+        form.error ? el3("span", { class: `${PREFIX}-status`, dataset: { kind: "error" }, text: form.error }) : null,
+        el3(
+          "div",
+          { class: `${PREFIX}-row` },
+          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
+          el3("button", { type: "button", class: `${PREFIX}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
+            form = null;
+            renderBar();
+          } }),
+          form.id ? el3("button", {
+            type: "button",
+            class: `${PREFIX}-btn`,
+            dataset: { tone: "danger", action: "template-delete" },
+            disabled: form.saving,
+            text: form.confirmDelete ? "Wirklich löschen?" : "Löschen",
+            onclick: deleteForm
+          }) : null
+        )
+      );
+    }
+    async function saveForm() {
+      readForm();
+      const error = validateTemplate(form);
+      if (error) {
+        form.error = error;
+        renderBar();
+        return;
+      }
+      const current = form;
+      form.saving = true;
+      form.error = "";
+      renderBar();
+      try {
+        const saved = toTemplate(await getTemplatesClient().speichern(TEMPLATE_AREA, templateEntry(current)));
+        const item = saved.id ? saved : { ...current, id: current.id };
+        templates.items = sortTemplates([...templates.items.filter((entry) => entry.id !== item.id), item]);
+        if (form === current) form = null;
+      } catch (failure) {
+        current.saving = false;
+        current.error = `Nicht gespeichert: ${failure?.message || failure}`;
+      }
+      renderBar();
+    }
+    async function deleteForm() {
+      readForm();
+      if (!form.confirmDelete) {
+        form.confirmDelete = true;
+        renderBar();
+        return;
+      }
+      const current = form;
+      form.saving = true;
+      renderBar();
+      try {
+        await getTemplatesClient().loeschen(TEMPLATE_AREA, current.id);
+        templates.items = templates.items.filter((entry) => entry.id !== current.id);
+        if (form === current) form = null;
+      } catch (failure) {
+        current.saving = false;
+        current.confirmDelete = false;
+        current.error = `Nicht gelöscht: ${failure?.message || failure}`;
+      }
+      renderBar();
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      if (!button3) return;
+      const row = button3.closest(ROW_SELECTOR12);
+      const matchId = matchIdFromHref5(row?.querySelector(MATCH_LINK_SELECTOR8)?.getAttribute("href"));
+      const link = row?.querySelector(EMPLOYER_LINK_SELECTOR7);
+      const employerId = employerIdFromHref2(link?.getAttribute("href"));
+      clickedMatch = { id: matchId, employer: employerId ? { id: employerId, name: (link.textContent || "").trim() } : null };
+    }, true);
+    function sync() {
+      const dialog = findDialog();
+      const existing = currentBar();
+      if (!dialog) {
+        if (existing) existing.remove();
+        ag = null;
+        return;
+      }
+      const editor = dialog.querySelector(EDITOR_SELECTOR3);
+      const box = editorBoxFor(editor, dialog);
+      if (existing && !dialog.contains(existing)) existing.remove();
+      let bar = currentBar();
+      if (!bar) {
+        ensureStyle2();
+        ag = null;
+        form = null;
+        bar = el3("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
+        bar.dataset.mode = isDark(dialog) ? "dark" : "light";
+        box.parentElement?.insertBefore(bar, box);
+        renderBar();
+        if (activeTab === TEMPLATES_TAB && templates.state === "idle") loadTemplates();
+      } else if (bar.nextElementSibling !== box) {
+        box.parentElement?.insertBefore(bar, box);
+      }
+    }
+    let scheduled = false;
+    const scheduleSync = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleSync();
+  }
+
+  // src/features/comment-shortcuts.js
+  function executeKamCommentShortcuts(runtime) {
+    executeCommentShortcuts(runtime, {
+      sourcePath: "kam/toolbox/src/features/comment-shortcuts.js",
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      getNotesProvider: () => employerNotesProviderFor(getKamGraphqlAdapter()),
+      getTemplatesClient: () => toolboxDatenClientFor(getKamGraphqlAdapter()),
+      helpTip: () => kamHelp.tip("comment-shortcuts")
+    });
+  }
+
+  // ../../shared/js/tagesplan/core.js
+  var TERMIN_VORLAUF_MS = 15 * 60 * 1e3;
+  var WVL_OHNE_STATUS = ["out", "hired"];
+  var KAM_STATUS_LABELS2 = {
+    pending: "Ausstehend",
+    with_cem: "Bei CEM",
+    interview_request: "VT-Anfrage",
+    interview_conducted: "Stattgefundenes VT",
+    hot_case: "Hot Case",
+    hot_hot_case: "Hot Hot Case",
+    hired: "Hired",
+    out: "Out",
+    match_mail_sent: "MM gesendet",
+    interview_feedback: "VT Feedback"
+  };
+  var INTERVIEW_TYPE_LABELS = {
+    phone: "Telefoninterview",
+    digital: "Digitales VT",
+    interview: "VT vor Ort",
+    trial_day: "Probearbeit",
+    avu: "AVU",
+    fictional: "Fiktiver Termin",
+    second_interview: "Zweites VT",
+    second_trial_day: "Zweite Probearbeit"
+  };
+  var TERMINE_QUERY = `query WerkiaTagesplanTermine($filter: InterviewsFilter!) {
+  items: allInterviews(filter: $filter, page: 0, perPage: 200) { id status type dates location matchId }
+}`;
+  var WVL_QUERY = `query WerkiaTagesplanWvl($filter: MatchFilter) {
+  items: allMatches(filter: $filter, page: 0, perPage: 300, sortField: "id", sortOrder: "ASC") { id candidateId jobPositionId kamStatus kamFollowUpDate }
+}`;
+  var MATCHES_QUERY = `query WerkiaTagesplanMatches($ids: [UUID!]) {
+  items: allMatches(filter: { ids: $ids }, page: 0, perPage: 300) { id candidateId jobPositionId kamStatus kamFollowUpDate }
+}`;
+  var MATCH_NAMES_QUERY = `query WerkiaTagesplanNamen($jobIds: [UUID!], $candidateIds: [UUID!]) {
+  jobs: allJobPositions(filter: { ids: $jobIds }, page: 0, perPage: 300) { id mainTitle employer { id name } }
+  candidates: allCandidates(filter: { ids: $candidateIds }, page: 0, perPage: 300) { id firstName lastName }
+}`;
+  var PARTS_FORMAT = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  });
+  function berlinParts(date) {
+    const parts = Object.fromEntries(PARTS_FORMAT.formatToParts(new Date(date)).map((part) => [part.type, part.value]));
+    return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+  }
+  function berlinTime2(date) {
+    return berlinParts(date).time;
+  }
+  function berlinLocalToDate(day, time = "00:00") {
+    const [year, month, dayOfMonth] = day.split("-").map(Number);
+    const [hour, minute] = time.split(":").map(Number);
+    const guess = Date.UTC(year, month - 1, dayOfMonth, hour, minute);
+    for (const offsetHours of [1, 2]) {
+      const candidate = new Date(guess - offsetHours * 36e5);
+      const parts = berlinParts(candidate);
+      if (parts.day === day && parts.time === time) return candidate;
+    }
+    return new Date(guess - 36e5);
+  }
+  function berlinDayRange(day) {
+    const next = /* @__PURE__ */ new Date(`${day}T12:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    return {
+      von: berlinLocalToDate(day, "00:00").toISOString(),
+      bis: berlinLocalToDate(next.toISOString().slice(0, 10), "00:00").toISOString()
+    };
+  }
+  function termineVariables(employeeId, day) {
+    const { von, bis } = berlinDayRange(day);
+    return { filter: { kamEmployeeIds: [employeeId], statuses: ["confirmed"], dateFrom: von, dateTo: bis } };
+  }
+  function wvlVariables(employeeId, day) {
+    return { filter: { kamEmployeeIds: [employeeId], kamFollowUpDateFrom: day, kamFollowUpDateTo: day } };
+  }
+  function interviewTypeLabel(type) {
+    const value = String(type || "");
+    const rescheduled = value.startsWith("rescheduled_");
+    const base = rescheduled ? value.slice("rescheduled_".length) : value;
+    const label = INTERVIEW_TYPE_LABELS[base] || base || "Termin";
+    return rescheduled ? `${label} (verschoben)` : label;
+  }
+  function matchNames(matches = [], jobs = [], candidates = []) {
+    const jobsById = new Map(jobs.filter(Boolean).map((job) => [job.id, job]));
+    const candidatesById = new Map(candidates.filter(Boolean).map((candidate) => [candidate.id, candidate]));
+    const names = /* @__PURE__ */ new Map();
+    for (const match of matches.filter(Boolean)) {
+      const job = jobsById.get(match.jobPositionId);
+      const candidate = candidatesById.get(match.candidateId);
+      names.set(match.id, {
+        kandidat: [candidate?.firstName, candidate?.lastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ") || "Unbekannter Kandidat",
+        arbeitgeber: job?.employer?.name || "Unbekannter Arbeitgeber",
+        vakanz: job?.mainTitle || "",
+        kamStatus: match.kamStatus || ""
+      });
+    }
+    return names;
+  }
+  function matchLabel(name) {
+    if (!name) return "";
+    return [name.kandidat, name.arbeitgeber].filter(Boolean).join(" – ");
+  }
+  function termineFromInterviews(interviews = [], day, names = /* @__PURE__ */ new Map()) {
+    const termine = [];
+    for (const interview of interviews.filter(Boolean)) {
+      if (interview.status !== "confirmed") continue;
+      for (const date of interview.dates || []) {
+        if (berlinDay2(new Date(date)) !== day) continue;
+        termine.push({
+          id: `${interview.id}|${date}`,
+          interviewId: interview.id,
+          matchId: interview.matchId,
+          at: new Date(date).toISOString(),
+          uhrzeit: berlinTime2(date),
+          typ: interviewTypeLabel(interview.type),
+          ort: interview.location || "",
+          ...names.get(interview.matchId) || { kandidat: "Unbekannter Kandidat", arbeitgeber: "", vakanz: "" }
+        });
+      }
+    }
+    return termine.sort((a, b) => a.at.localeCompare(b.at));
+  }
+  function wvlFromMatches(matches = [], day, names = /* @__PURE__ */ new Map()) {
+    return matches.filter((match) => match && match.kamFollowUpDate === day && !WVL_OHNE_STATUS.includes(match.kamStatus)).map((match) => ({ matchId: match.id, kamStatus: match.kamStatus || "", ...names.get(match.id) || { kandidat: "Unbekannter Kandidat", arbeitgeber: "", vakanz: "" } })).sort((a, b) => a.arbeitgeber.localeCompare(b.arbeitgeber, "de") || a.kandidat.localeCompare(b.kandidat, "de"));
+  }
+  function isOpenReminder(reminder) {
+    return Boolean(reminder?.faelligUm) && !reminder.erledigtAm;
+  }
+  function popupKey(kind, id, extra = "") {
+    return extra ? `${kind}:${id}:${extra}` : `${kind}:${id}`;
+  }
+  function dueItems({ termine = [], wvl = [], reminder = [], now = /* @__PURE__ */ new Date(), day = berlinDay2(now), gesehen = {} }) {
+    const time = new Date(now).getTime();
+    const items = [];
+    for (const termin of termine) {
+      const at = new Date(termin.at).getTime();
+      const key = popupKey("termin", termin.id);
+      if (at - TERMIN_VORLAUF_MS <= time && time < at && !gesehen[key]) {
+        items.push({ key, art: "termin", zeit: termin.uhrzeit, titel: `${termin.typ} um ${termin.uhrzeit}`, text: matchLabel(termin), matchId: termin.matchId });
+      }
+    }
+    const wvlKey = popupKey("wvl", day);
+    if (wvl.length && !gesehen[wvlKey]) {
+      items.push({ key: wvlKey, art: "wvl", zeit: "", titel: wvl.length === 1 ? "1 WVL heute fällig" : `${wvl.length} WVL heute fällig`, text: "Liste in der Tages-Timeline („Heute“ in Meine Matches).", matchId: "" });
+    }
+    for (const entry of reminder) {
+      if (!isOpenReminder(entry)) continue;
+      const key = popupKey("reminder", entry.id, entry.faelligUm);
+      if (new Date(entry.faelligUm).getTime() > time || gesehen[key]) continue;
+      const daten = entry.daten || {};
+      items.push({
+        key,
+        art: "reminder",
+        zeit: berlinTime2(entry.faelligUm),
+        titel: daten.text || "Reminder",
+        text: daten.label || "",
+        matchId: daten.matchId || "",
+        reminder: entry
+      });
+    }
+    return items;
+  }
+  function reminderToReportShown(items, reported = /* @__PURE__ */ new Set()) {
+    return items.filter((item) => item.art === "reminder").filter((item) => {
+      const { angezeigtAm, faelligUm } = item.reminder;
+      return !(angezeigtAm && angezeigtAm >= faelligUm) && !reported.has(item.key);
+    });
+  }
+  var SCHLUMMER_OPTIONEN = [
+    { id: "10m", label: "in 10 Minuten" },
+    { id: "1h", label: "in 1 Stunde" },
+    { id: "morgen", label: "morgen 9:00" }
+  ];
+  function snoozeUntil(option, now = /* @__PURE__ */ new Date()) {
+    const time = new Date(now).getTime();
+    if (option === "10m") return new Date(time + 10 * 6e4).toISOString();
+    if (option === "1h") return new Date(time + 60 * 6e4).toISOString();
+    if (option === "morgen") {
+      const next = /* @__PURE__ */ new Date(`${berlinDay2(now)}T12:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      return berlinLocalToDate(next.toISOString().slice(0, 10), "09:00").toISOString();
+    }
+    throw new Error(`Unbekannte Schlummer-Option: ${option}`);
+  }
+  function defaultReminderInput(now = /* @__PURE__ */ new Date()) {
+    const later = new Date(new Date(now).getTime() + 60 * 6e4);
+    const { day, time } = berlinParts(later);
+    return { tag: day, uhrzeit: `${time.slice(0, 2)}:00` };
+  }
+  function validateReminderDraft({ tag, uhrzeit, text }, now = /* @__PURE__ */ new Date()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tag || "")) return "Bitte ein Datum wählen.";
+    if (!/^\d{2}:\d{2}$/.test(uhrzeit || "")) return "Bitte eine Uhrzeit wählen.";
+    if (!String(text || "").trim()) return "Bitte kurz schreiben, woran erinnert werden soll.";
+    if (String(text).length > 300) return "Der Text ist zu lang (höchstens 300 Zeichen).";
+    if (berlinLocalToDate(tag, uhrzeit).getTime() < new Date(now).getTime() - 6e4) return "Der Zeitpunkt liegt in der Vergangenheit.";
+    return "";
+  }
+  function reminderEintrag({ tag, uhrzeit, text }, { matchId = "", label = "" } = {}) {
+    return {
+      daten: { matchId, label, text: String(text).trim() },
+      faelligUm: berlinLocalToDate(tag, uhrzeit).toISOString(),
+      erledigt: false
+    };
+  }
+  function buildSichtbarFuer({ art, team = "", personen = [] }) {
+    if (art === "alle") return "alle";
+    if (art === "team") return team ? `team:${team}` : "";
+    if (art === "personen") return personen.length ? `personen:${personen.join(",")}` : "";
+    return "";
+  }
+  function parseSichtbarFuer(value) {
+    const text = String(value || "");
+    if (text === "alle") return { art: "alle", team: "", personen: [] };
+    if (text.startsWith("team:")) return { art: "team", team: text.slice(5), personen: [] };
+    if (text.startsWith("personen:")) return { art: "personen", team: "", personen: text.slice(9).split(",").filter(Boolean) };
+    return { art: "", team: "", personen: [] };
+  }
+  function describeSichtbarFuer(value, personen = []) {
+    const parsed = parseSichtbarFuer(value);
+    if (parsed.art === "alle") return "für alle";
+    if (parsed.art === "team") return `für ${parsed.team}`;
+    if (parsed.art === "personen") {
+      const names = new Map(personen.map((person) => [String(person.id), person.name]));
+      return `für ${parsed.personen.map((id) => names.get(id) || "Unbekannt").join(", ")}`;
+    }
+    return "nur für dich";
+  }
+  function validateTeamDraft({ tag, uhrzeit, text, sichtbarFuer }) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tag || "")) return "Bitte ein Datum wählen.";
+    if (uhrzeit && !/^\d{2}:\d{2}$/.test(uhrzeit)) return "Die Uhrzeit bitte als HH:MM angeben oder leer lassen.";
+    if (!String(text || "").trim()) return "Bitte einen Text eintragen.";
+    if (String(text).length > 500) return "Der Text ist zu lang (höchstens 500 Zeichen).";
+    if (!sichtbarFuer) return "Bitte wählen, wer den Eintrag sieht.";
+    return "";
+  }
+  function timelineEntries({ day, termine = [], reminder = [], wvl = [], team = [], today = day }) {
+    const entries = [];
+    if (wvl.length) entries.push({ art: "wvl", uhrzeit: "", titel: wvl.length === 1 ? "1 WVL fällig" : `${wvl.length} WVL fällig`, wvl });
+    for (const entry of team) {
+      const daten = entry.daten || {};
+      if (daten.tag !== day) continue;
+      entries.push({ art: "team", uhrzeit: daten.uhrzeit || "", titel: daten.text || "", autor: entry.autorName || "", eintrag: entry });
+    }
+    for (const termin of termine) {
+      entries.push({ art: "termin", uhrzeit: termin.uhrzeit, titel: `${termin.typ}: ${termin.kandidat}`, detail: [termin.arbeitgeber, termin.vakanz].filter(Boolean).join(" · "), ort: termin.ort, matchId: termin.matchId });
+    }
+    for (const entry of reminder) {
+      if (!entry?.faelligUm) continue;
+      const reminderDay = berlinDay2(new Date(entry.faelligUm));
+      const overdue = day === today && reminderDay < day && isOpenReminder(entry);
+      if (reminderDay !== day && !overdue) continue;
+      const daten = entry.daten || {};
+      entries.push({
+        art: "reminder",
+        uhrzeit: overdue ? "" : berlinTime2(entry.faelligUm),
+        titel: daten.text || "Reminder",
+        detail: daten.label || "",
+        matchId: daten.matchId || "",
+        erledigt: Boolean(entry.erledigtAm),
+        ueberfaellig: overdue,
+        eintrag: entry
+      });
+    }
+    return entries.sort((a, b) => (a.uhrzeit ? 1 : 0) - (b.uhrzeit ? 1 : 0) || a.uhrzeit.localeCompare(b.uhrzeit));
+  }
+  function formatDayHeading(day) {
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", weekday: "long", day: "numeric", month: "long" }).format(/* @__PURE__ */ new Date(`${day}T12:00:00Z`));
+  }
+  function matchHref(matchId) {
+    return `#/Match/${matchId}/show`;
+  }
+  function pruneGesehen(gesehen = {}, now = /* @__PURE__ */ new Date()) {
+    const limit = new Date(now).getTime() - 3 * 24 * 36e5;
+    return Object.fromEntries(Object.entries(gesehen).filter(([, at]) => new Date(at).getTime() >= limit));
+  }
+
+  // ../../shared/js/tagesplan/index.js
+  var IDS8 = {
+    style: "werkia-tagesplan-style",
+    button: "werkia-tagesplan-button",
+    panel: "werkia-tagesplan-panel",
+    popup: "werkia-tagesplan-popup",
+    dialog: "werkia-tagesplan-reminder-dialog"
+  };
+  var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
+  var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
+  var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
+  var TICK_MS2 = 30 * 1e3;
+  var WERKIA_REFRESH_MS = 10 * 60 * 1e3;
+  var WERKIA_RETRY_MS = 2 * 60 * 1e3;
+  var DATEN_REFRESH_MS = 5 * 60 * 1e3;
+  var TODAY_ICON = "M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z";
+  var BELL_ICON = "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z";
+  var errorText = (error) => error?.message || String(error);
+  function icon(path, size = "18px") {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.style.width = size;
+    svg.style.height = size;
+    const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    shape.setAttribute("d", path);
+    svg.append(shape);
+    return svg;
+  }
+  function el4(tag, props = {}, children = []) {
+    const element2 = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "style") element2.style.cssText = value;
+      else if (key === "role" || key.startsWith("aria-")) element2.setAttribute(key, value);
+      else element2[key] = value;
+    }
+    element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+    return element2;
+  }
+  function button2(text, onClick, className = "wtp-secondary") {
+    return el4("button", { type: "button", textContent: text, className, onclick: onClick });
+  }
+  var CSS2 = `
+  .wtp { --plane:#fafafa; --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
+    --accent:#ef6c00; --accent-ink:#b85400; --accent-soft:#fff3e8; --navy:#284e75; --good:#0a7c0a; --bad:#b52f2f; --warn:#8a6700;
+    font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.45; color:var(--ink); }
+  .wtp * { box-sizing:border-box; }
+  .wtp button { font:inherit; font-size:12px; font-weight:600; min-height:28px; padding:4px 10px; border-radius:6px; cursor:pointer; border:1px solid transparent; }
+  .wtp button:disabled { opacity:.6; cursor:wait; }
+  .wtp .wtp-primary { background:var(--accent); color:#fff; }
+  .wtp .wtp-primary:hover { background:var(--accent-ink); }
+  .wtp .wtp-secondary { background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
+  .wtp .wtp-secondary:hover { background:var(--sunken); }
+  .wtp .wtp-danger { background:var(--surface); color:var(--bad); border-color:var(--line-strong); }
+  .wtp .wtp-icon { min-height:0; width:28px; height:28px; padding:0; border:0; background:transparent; color:var(--ink-2); font-size:18px; line-height:28px; }
+  .wtp .wtp-icon:hover { background:var(--sunken); }
+  .wtp input, .wtp select, .wtp textarea { font:inherit; height:30px; padding:4px 8px; border:1px solid var(--line-strong); border-radius:6px; background:var(--surface); color:var(--ink); }
+  .wtp textarea { height:auto; min-height:56px; width:100%; resize:vertical; }
+  .wtp h2 { margin:0; font-size:15px; font-weight:650; letter-spacing:-.01em; display:flex; align-items:center; gap:6px; }
+  .wtp h3 { margin:16px 0 6px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .wtp a { color:var(--navy); }
+  .wtp .wtp-muted { color:var(--muted); font-size:12px; }
+  .wtp .wtp-status { min-height:16px; font-size:12px; color:var(--ink-2); }
+  .wtp .wtp-error { color:var(--bad); }
+  .wtp .wtp-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .wtp .wtp-grid { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+  .wtp ul { list-style:none; margin:0; padding:0; }
+  #${IDS8.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS8.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
+  #${IDS8.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
+  #${IDS8.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
+  #${IDS8.panel} .wtp-title { font-weight:600; }
+  #${IDS8.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
+  #${IDS8.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
+  #${IDS8.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
+  #${IDS8.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
+  #${IDS8.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
+  #${IDS8.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
+  #${IDS8.panel} .wtp-late { color:var(--bad); font-weight:600; }
+  #${IDS8.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
+  #${IDS8.panel} details summary { cursor:pointer; color:var(--ink-2); }
+  #${IDS8.panel} details li { padding:3px 0; }
+  #${IDS8.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+  #${IDS8.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
+  #${IDS8.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
+  #${IDS8.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
+  #${IDS8.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.popup} .wtp-item:last-of-type { border-bottom:0; }
+  #${IDS8.popup} .wtp-title { font-weight:600; }
+  #${IDS8.popup} .wtp-row { margin-top:6px; }
+  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+  #${IDS8.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
+  #${IDS8.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.dialog} li span { flex:1; }
+  .${ROW_BUTTON_CLASS} { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-left:4px; padding:0; border:0; border-radius:50%; background:transparent; color:#8b8b94; cursor:pointer; vertical-align:middle; }
+  .${ROW_BUTTON_CLASS}:hover { background:#f4f4f5; color:#52525b; }
+  .${ROW_BUTTON_CLASS} svg { fill:currentColor; }
+  .${ROW_BUTTON_CLASS}.wtp-has { color:#ef6c00; }
+  #${IDS8.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+  #${IDS8.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
+  #${IDS8.button}.wtp-native svg { flex:none; fill:currentColor; }
+  #${IDS8.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
+`;
+  function executeTagesplan(runtime, {
+    routes = [],
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip = () => null,
+    datenClient = null,
+    now = () => /* @__PURE__ */ new Date(),
+    storage = typeof localStorage !== "undefined" ? localStorage : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const graphql = (query, variables) => getGraphqlAdapter().request(query, variables);
+    const employeeId = createEmployeeIdSource(graphql);
+    const client = () => datenClient || toolboxDatenClientFor(getGraphqlAdapter());
+    const werkia = { day: "", termine: [], wvl: [], error: "", loaded: false, nextAt: 0, pending: null };
+    const daten = { reminder: [], error: "", loaded: false, nextAt: 0, pending: null };
+    const team = { eintraege: [], error: "", loaded: false };
+    let ich = null;
+    let ichError = "";
+    let myId = "";
+    let teamEditing = null;
+    const reported = /* @__PURE__ */ new Set();
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
+    const owned = (id) => {
+      const element2 = document.getElementById(id);
+      return element2?.dataset.werkiaTagesplanOwner === sourcePath ? element2 : null;
+    };
+    const own = (element2) => {
+      element2.dataset.werkiaTagesplanOwner = sourcePath;
+      element2.classList.add("wtp");
+      return element2;
+    };
+    function ensureStyle3() {
+      if (document.getElementById(IDS8.style)) return;
+      document.head.appendChild(el4("style", { id: IDS8.style, textContent: CSS2 }));
+    }
+    function readGesehen() {
+      try {
+        return JSON.parse(storage?.getItem(GESEHEN_KEY) || "{}") || {};
+      } catch {
+        return {};
+      }
+    }
+    function markGesehen(key) {
+      const gesehen = pruneGesehen({ ...readGesehen(), [key]: now().toISOString() }, now());
+      try {
+        storage?.setItem(GESEHEN_KEY, JSON.stringify(gesehen));
+      } catch {
+      }
+      renderPopup();
+    }
+    async function resolveNames(matchIds, knownMatches = []) {
+      const known = new Map(knownMatches.map((match) => [match.id, match]));
+      const missing = [...new Set(matchIds)].filter((id) => id && !known.has(id));
+      if (missing.length) {
+        const result = await graphql(MATCHES_QUERY, { ids: missing });
+        (result?.items || []).forEach((match) => known.set(match.id, match));
+      }
+      const matches = [...known.values()].filter((match) => matchIds.includes(match.id));
+      const jobIds = [...new Set(matches.map((match) => match.jobPositionId).filter(Boolean))];
+      const candidateIds = [...new Set(matches.map((match) => match.candidateId).filter(Boolean))];
+      if (!jobIds.length && !candidateIds.length) return matchNames(matches);
+      const names = await graphql(MATCH_NAMES_QUERY, { jobIds, candidateIds });
+      return matchNames(matches, names?.jobs || [], names?.candidates || []);
+    }
+    function loadWerkia() {
+      if (werkia.pending) return werkia.pending;
+      werkia.pending = (async () => {
+        const day = berlinDay2(now());
+        try {
+          myId = await employeeId();
+          const [interviews, matches] = await Promise.all([
+            graphql(TERMINE_QUERY, termineVariables(myId, day)),
+            graphql(WVL_QUERY, wvlVariables(myId, day))
+          ]);
+          const interviewItems = (interviews?.items || []).filter((item) => item?.status === "confirmed");
+          const wvlMatches = matches?.items || [];
+          const ids = [...interviewItems.map((item) => item.matchId), ...wvlMatches.map((match) => match.id)];
+          const names = await resolveNames(ids, wvlMatches);
+          Object.assign(werkia, {
+            day,
+            termine: termineFromInterviews(interviewItems, day, names),
+            wvl: wvlFromMatches(wvlMatches, day, names),
+            error: "",
+            loaded: true,
+            nextAt: now().getTime() + WERKIA_REFRESH_MS
+          });
+        } catch (error) {
+          Object.assign(werkia, { error: errorText(error), nextAt: now().getTime() + WERKIA_RETRY_MS });
+        } finally {
+          werkia.pending = null;
+        }
+      })();
+      return werkia.pending;
+    }
+    function loadReminder() {
+      if (daten.pending) return daten.pending;
+      daten.pending = (async () => {
+        try {
+          daten.reminder = await client().liste("reminder");
+          Object.assign(daten, { error: "", loaded: true });
+        } catch (error) {
+          daten.error = errorText(error);
+        } finally {
+          daten.nextAt = now().getTime() + DATEN_REFRESH_MS;
+          daten.pending = null;
+        }
+      })();
+      return daten.pending;
+    }
+    async function loadTeam() {
+      try {
+        team.eintraege = await client().liste("team");
+        Object.assign(team, { error: "", loaded: true });
+      } catch (error) {
+        team.error = errorText(error);
+      }
+    }
+    async function loadIch() {
+      try {
+        ich = await client().ich();
+        ichError = "";
+      } catch (error) {
+        ichError = errorText(error);
+      }
+    }
+    function replaceReminder(saved, previousId = saved?.id) {
+      daten.reminder = [...daten.reminder.filter((entry) => entry.id !== previousId), ...saved ? [saved] : []];
+      refreshViews();
+    }
+    async function reminderAction(item, action, element2) {
+      const entry = item.reminder;
+      const status = element2.closest(".wtp-item")?.querySelector(".wtp-status");
+      element2.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+        control.disabled = true;
+      });
+      try {
+        if (action === "erledigt") {
+          replaceReminder(await client().speichern("reminder", { id: entry.id, daten: entry.daten, faelligUm: entry.faelligUm, erledigt: true }) || { ...entry, erledigtAm: now().toISOString() });
+        } else if (action === "loeschen") {
+          await client().loeschen("reminder", entry.id);
+          replaceReminder(null, entry.id);
+        } else {
+          const faelligUm = snoozeUntil(action, now());
+          replaceReminder(await client().speichern("reminder", { id: entry.id, daten: entry.daten, faelligUm, erledigt: false }) || { ...entry, faelligUm, angezeigtAm: "" });
+        }
+      } catch (error) {
+        element2.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+          control.disabled = false;
+        });
+        if (status) {
+          status.textContent = errorText(error);
+          status.classList.add("wtp-error");
+        }
+      }
+    }
+    function popupItem(item) {
+      const parts = [
+        el4("div", { className: "wtp-title", textContent: item.titel }),
+        item.text ? el4("div", { className: "wtp-muted", textContent: item.text }) : null
+      ];
+      const actions = el4("div", { className: "wtp-row" });
+      if (item.matchId) actions.append(el4("a", { href: matchHref(item.matchId), textContent: "Match öffnen" }));
+      if (item.art === "reminder") {
+        const later = el4("select", { title: "Später erinnern" }, [
+          el4("option", { value: "", textContent: "Später …" }),
+          ...SCHLUMMER_OPTIONEN.map((option) => el4("option", { value: option.id, textContent: option.label }))
+        ]);
+        later.addEventListener("change", () => {
+          if (later.value) reminderAction(item, later.value, later);
+        });
+        const erledigt = button2("Erledigt", (event) => reminderAction(item, "erledigt", event.currentTarget), "wtp-primary");
+        const loeschen = button2("Löschen", (event) => reminderAction(item, "loeschen", event.currentTarget), "wtp-danger");
+        actions.append(erledigt, later, loeschen);
+      } else {
+        actions.append(button2("OK", () => markGesehen(item.key), "wtp-primary"));
+      }
+      const close = button2("×", () => markGesehen(item.key), "wtp-icon");
+      close.title = "Ausblenden";
+      close.style.float = "right";
+      const element2 = el4("div", { className: "wtp-item" }, [close, ...parts, actions, el4("div", { className: "wtp-status" })]);
+      element2.dataset.key = item.key;
+      return element2;
+    }
+    function renderPopup() {
+      const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
+      const existing = owned(IDS8.popup);
+      if (!items.length) {
+        existing?.remove();
+        return;
+      }
+      const signature = items.map((item) => item.key).join("|");
+      if (existing?.dataset.signature === signature) return;
+      ensureStyle3();
+      const popup = existing || own(el4("div", { id: IDS8.popup, role: "alert" }));
+      popup.dataset.signature = signature;
+      popup.textContent = "";
+      popup.append(
+        el4("h2", {}, [document.createTextNode("Erinnerung"), helpTip("tagesplan-reminder")]),
+        ...items.map(popupItem)
+      );
+      if (!existing) document.body.appendChild(popup);
+      reportShown(items);
+    }
+    function reportShown(items) {
+      const fresh = reminderToReportShown(items, reported);
+      if (!fresh.length) return;
+      fresh.forEach((item) => reported.add(item.key));
+      client().angezeigt("reminder", fresh.map((item) => item.reminder.id)).catch((error) => {
+        fresh.forEach((item) => reported.delete(item.key));
+        console.warn(`[${toolboxName} Tagesplan] Angezeigt nicht gemeldet:`, errorText(error));
+      });
+    }
+    function openReminders(matchId) {
+      return daten.reminder.filter((entry) => isOpenReminder(entry) && entry.daten?.matchId === matchId).sort((a, b) => a.faelligUm.localeCompare(b.faelligUm));
+    }
+    function formatWhen(iso) {
+      const date = new Date(iso);
+      const day = berlinDay2(date);
+      const time = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }).format(date);
+      if (day === berlinDay2(now())) return `heute ${time}`;
+      return `${new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" }).format(date)} ${time}`;
+    }
+    function closeDialog() {
+      owned(IDS8.dialog)?.remove();
+    }
+    function openReminderDialog(matchId) {
+      closeDialog();
+      ensureStyle3();
+      const overlay = own(el4("div", { id: IDS8.dialog }));
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const body = el4("div", { className: "wtp-body" });
+      const close = button2("×", closeDialog, "wtp-icon");
+      close.title = "Schließen (Esc)";
+      close.style.cssText = "position:absolute;top:10px;right:10px;";
+      overlay.append(el4("div", { className: "wtp-card" }, [close, body]));
+      document.body.appendChild(overlay);
+      const status = el4("div", { className: "wtp-status" });
+      const setStatus = (text, isError = false) => {
+        status.textContent = text;
+        status.classList.toggle("wtp-error", isError);
+      };
+      const render = () => {
+        body.textContent = "";
+        const list = el4("ul");
+        openReminders(matchId).forEach((entry) => {
+          const remove = button2("Löschen", async () => {
+            remove.disabled = true;
+            try {
+              await client().loeschen("reminder", entry.id);
+              replaceReminder(null, entry.id);
+              render();
+              setStatus("Gelöscht.");
+            } catch (error) {
+              remove.disabled = false;
+              setStatus(errorText(error), true);
+            }
+          }, "wtp-danger");
+          list.append(el4("li", {}, [el4("strong", { textContent: formatWhen(entry.faelligUm) }), el4("span", { textContent: entry.daten?.text || "" }), remove]));
+        });
+        const preset = defaultReminderInput(now());
+        const tag = el4("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
+        const uhrzeit = el4("input", { type: "time", value: preset.uhrzeit, step: 300 });
+        const text = el4("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
+        const save = button2("Reminder speichern", async () => {
+          const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value };
+          const problem = validateReminderDraft(draft, now());
+          if (problem) {
+            setStatus(problem, true);
+            return;
+          }
+          save.disabled = true;
+          setStatus("Speichert …");
+          try {
+            let label = "";
+            try {
+              label = matchLabel((await resolveNames([matchId])).get(matchId));
+            } catch {
+            }
+            const saved = await client().speichern("reminder", reminderEintrag(draft, { matchId, label }));
+            replaceReminder(saved);
+            render();
+            setStatus("Gespeichert. Die Toolbox erinnert dich zur Zeit, bei geschlossenem Browser der Slack-Bot.");
+          } catch (error) {
+            save.disabled = false;
+            setStatus(errorText(error), true);
+          }
+        }, "wtp-primary");
+        text.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") save.click();
+        });
+        body.append(
+          el4("h2", {}, [document.createTextNode("Reminder zum Match"), helpTip("tagesplan-reminder")]),
+          el4("h3", { textContent: "Offen" }),
+          openReminders(matchId).length ? list : el4("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
+          el4("h3", { textContent: "Neuer Reminder" }),
+          el4("div", { className: "wtp-grid" }, [el4("label", { textContent: "Wann" }), el4("div", { className: "wtp-row" }, [tag, uhrzeit]), el4("label", { textContent: "Woran" }), text]),
+          el4("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button2("Schließen", closeDialog)]),
+          status
+        );
+        text.focus?.();
+      };
+      render();
+    }
+    function decorateRows() {
+      if (!isTargetPage9()) return;
+      for (const row of document.querySelectorAll(ROW_SELECTOR13)) {
+        const link = row.querySelector(MATCH_LINK_SELECTOR9);
+        const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
+        if (!matchId) continue;
+        const cell = row.querySelector("td.column-buttons") || link.closest("td");
+        if (!cell) continue;
+        let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
+        if (!rowButton) {
+          ensureStyle3();
+          rowButton = el4("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
+          rowButton.dataset.werkiaTagesplanOwner = sourcePath;
+          rowButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openReminderDialog(rowButton.dataset.matchId);
+          });
+          cell.appendChild(rowButton);
+        }
+        const open = openReminders(matchId);
+        const title = open.length ? `Reminder: ${open.map((entry) => `${formatWhen(entry.faelligUm)} ${entry.daten?.text || ""}`).join("; ")}` : "Reminder setzen";
+        if (rowButton.dataset.matchId !== matchId) rowButton.dataset.matchId = matchId;
+        if (rowButton.title !== title) {
+          rowButton.title = title;
+          rowButton.setAttribute("aria-label", title);
+        }
+        if (rowButton.classList.contains("wtp-has") !== Boolean(open.length)) rowButton.classList.toggle("wtp-has", Boolean(open.length));
+      }
+    }
+    function closePanel() {
+      owned(IDS8.panel)?.remove();
+      teamEditing = null;
+    }
+    async function openPanel() {
+      ensureStyle3();
+      if (!owned(IDS8.panel)) {
+        const panel = own(el4("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
+        document.body.appendChild(panel);
+      }
+      renderPanel("Lädt …");
+      await Promise.all([loadWerkia(), loadReminder(), loadTeam(), loadIch()]);
+      refreshViews();
+    }
+    function sourceErrors() {
+      const errors = [];
+      if (werkia.error) errors.push(`Termine und WVL: ${werkia.error}`);
+      if (daten.error || team.error) errors.push(`Reminder und Team-Einträge: ${daten.error || team.error}`);
+      return errors;
+    }
+    function entryElement(entry) {
+      const tagLabel = { termin: "Termin", reminder: "Reminder", team: "Team", wvl: "WVL" }[entry.art];
+      const tag = el4("span", { className: `wtp-tag wtp-tag-${entry.art}`, textContent: tagLabel });
+      const time = el4("div", { className: entry.ueberfaellig ? "wtp-time wtp-late" : "wtp-time", textContent: entry.ueberfaellig ? "fällig" : entry.uhrzeit || "ganzer Tag" });
+      if (!entry.uhrzeit && !entry.ueberfaellig) time.classList.add("wtp-muted");
+      const main = el4("div", {}, [el4("div", { className: "wtp-title" }, [tag, document.createTextNode(entry.titel)])]);
+      const actions = el4("div", { className: "wtp-actions" });
+      if (entry.art === "termin") {
+        if (entry.detail) main.append(el4("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.ort) main.append(el4("div", { className: "wtp-muted", textContent: entry.ort }));
+        main.append(el4("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+      }
+      if (entry.art === "reminder") {
+        if (entry.detail) main.append(el4("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.matchId) main.append(el4("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+        if (!entry.erledigt) {
+          const item = { reminder: entry.eintrag };
+          actions.append(
+            button2("Erledigt", (event) => panelReminderAction(item, "erledigt", event.currentTarget)),
+            button2("Löschen", (event) => panelReminderAction(item, "loeschen", event.currentTarget), "wtp-danger")
+          );
+        }
+      }
+      if (entry.art === "team") {
+        const sichtbar = describeSichtbarFuer(entry.eintrag.sichtbarFuer, ich?.personen || []);
+        main.append(el4("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
+        if (entry.eintrag.eigen && ich?.ich?.darfTeam) {
+          actions.append(
+            button2("Bearbeiten", () => {
+              teamEditing = entry.eintrag;
+              renderPanel();
+            }),
+            button2("Löschen", async (event) => {
+              const control = event.currentTarget;
+              control.disabled = true;
+              try {
+                await client().loeschen("team", entry.eintrag.id);
+                team.eintraege = team.eintraege.filter((item) => item.id !== entry.eintrag.id);
+                renderPanel("Gelöscht.");
+              } catch (error) {
+                control.disabled = false;
+                renderPanel(errorText(error), true);
+              }
+            }, "wtp-danger")
+          );
+        }
+      }
+      if (entry.art === "wvl") {
+        const list = el4("ul", {}, entry.wvl.map((item) => el4("li", {}, [
+          el4("a", { href: matchHref(item.matchId), textContent: item.kandidat }),
+          document.createTextNode(` · ${item.arbeitgeber}${item.kamStatus ? ` · ${KAM_STATUS_LABELS2[item.kamStatus] || item.kamStatus}` : ""}`)
+        ])));
+        main.append(el4("details", {}, [el4("summary", { textContent: "Matches anzeigen" }), list]));
+      }
+      const element2 = el4("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
+      if (actions.childElementCount) element2.append(actions);
+      element2.dataset.art = entry.art;
+      return element2;
+    }
+    async function panelReminderAction(item, action, control) {
+      control.disabled = true;
+      try {
+        const entry = item.reminder;
+        if (action === "loeschen") {
+          await client().loeschen("reminder", entry.id);
+          replaceReminder(null, entry.id);
+        } else {
+          replaceReminder(await client().speichern("reminder", { id: entry.id, daten: entry.daten, faelligUm: entry.faelligUm, erledigt: true }) || { ...entry, erledigtAm: now().toISOString() });
+        }
+      } catch (error) {
+        control.disabled = false;
+        renderPanel(errorText(error), true);
+      }
+    }
+    function teamForm() {
+      const editing = teamEditing && teamEditing.id ? teamEditing : null;
+      const daten0 = editing?.daten || {};
+      const sichtbar0 = parseSichtbarFuer(editing?.sichtbarFuer || "alle");
+      const tag = el4("input", { type: "date", value: daten0.tag || berlinDay2(now()) });
+      const uhrzeit = el4("input", { type: "time", value: daten0.uhrzeit || "", title: "Leer lassen für den ganzen Tag" });
+      const text = el4("textarea", { value: daten0.text || "", maxLength: 500, placeholder: "z. B. 10:00 Teamrunde, danach Feedbacks nachfassen" });
+      const art = el4("select", {}, [
+        el4("option", { value: "alle", textContent: "Alle" }),
+        el4("option", { value: "team", textContent: "Ein Team" }),
+        el4("option", { value: "personen", textContent: "Einzelne Personen" })
+      ]);
+      art.value = sichtbar0.art || "alle";
+      const teamSelect = el4("select", {}, (ich?.teams || []).map((item) => el4("option", { value: item.name, textContent: item.name })));
+      if (sichtbar0.team) teamSelect.value = sichtbar0.team;
+      const people = el4("div", { className: "wtp-people" }, (ich?.personen || []).map((person) => {
+        const box = el4("input", { type: "checkbox", value: String(person.id), checked: sichtbar0.personen.includes(String(person.id)) });
+        box.style.height = "auto";
+        return el4("label", {}, [box, document.createTextNode(person.name)]);
+      }));
+      const syncArt = () => {
+        teamSelect.hidden = art.value !== "team";
+        people.hidden = art.value !== "personen";
+      };
+      art.addEventListener("change", syncArt);
+      syncArt();
+      const save = button2(editing ? "Änderung speichern" : "Eintragen", async () => {
+        const sichtbarFuer = buildSichtbarFuer({ art: art.value, team: teamSelect.value, personen: [...people.querySelectorAll("input:checked")].map((box) => box.value) });
+        const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value.trim(), sichtbarFuer };
+        const problem = validateTeamDraft(draft);
+        if (problem) {
+          renderStatus(problem, true);
+          return;
+        }
+        save.disabled = true;
+        renderStatus("Speichert …");
+        try {
+          const saved = await client().speichern("team", { ...editing ? { id: editing.id } : {}, daten: { tag: draft.tag, uhrzeit: draft.uhrzeit, text: draft.text }, sichtbarFuer });
+          team.eintraege = [...team.eintraege.filter((item) => item.id !== editing?.id), { ...saved || {}, eigen: true }];
+          teamEditing = null;
+          renderPanel(editing ? "Geändert." : "Eingetragen.");
+        } catch (error) {
+          save.disabled = false;
+          renderStatus(errorText(error), true);
+        }
+      }, "wtp-primary");
+      return el4("div", { className: "wtp-form" }, [
+        el4("div", { className: "wtp-grid" }, [
+          el4("label", { textContent: "Tag" }),
+          tag,
+          el4("label", { textContent: "Uhrzeit" }),
+          uhrzeit,
+          el4("label", { textContent: "Sichtbar für" }),
+          el4("div", {}, [art, teamSelect])
+        ]),
+        people,
+        el4("div", { style: "margin-top:8px" }, [text]),
+        el4("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button2("Abbrechen", () => {
+          teamEditing = null;
+          renderPanel();
+        })])
+      ]);
+    }
+    function renderStatus(text, isError = false) {
+      const status = owned(IDS8.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
+      if (!status) return;
+      status.textContent = text;
+      status.classList.toggle("wtp-error", isError);
+    }
+    function renderPanel(message = "", isError = false) {
+      const panel = owned(IDS8.panel);
+      if (!panel) return;
+      const day = berlinDay2(now());
+      const close = button2("×", closePanel, "wtp-icon");
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const head = el4("div", { className: "wtp-head" }, [
+        el4("div", {}, [el4("h2", {}, [document.createTextNode("Heute"), helpTip("tagesplan-timeline")]), el4("div", { className: "wtp-muted", textContent: formatDayHeading(day) })]),
+        close
+      ]);
+      const status = el4("div", { className: `wtp-status${isError ? " wtp-error" : ""}`, textContent: message });
+      const entries = timelineEntries({
+        day,
+        termine: werkia.day === day ? werkia.termine : [],
+        wvl: werkia.day === day ? werkia.wvl : [],
+        reminder: daten.reminder,
+        team: team.eintraege
+      });
+      const list = el4("div", {}, entries.map(entryElement));
+      const loading = !werkia.loaded && !werkia.error;
+      const empty = !entries.length && !loading ? el4("div", { className: "wtp-muted", style: "padding:12px 0", textContent: "Für heute steht nichts an." }) : null;
+      const errors = sourceErrors().map((text) => el4("div", { className: "wtp-status wtp-error", textContent: text }));
+      const parts = [status, ...errors, list, empty];
+      if (ich?.ich?.darfTeam) {
+        parts.push(el4("h3", { textContent: "Team-Eintrag" }));
+        parts.push(teamEditing ? teamForm() : button2("Neuer Team-Eintrag", () => {
+          teamEditing = {};
+          renderPanel();
+        }));
+      } else if (ichError && !daten.error) {
+        parts.push(el4("div", { className: "wtp-muted", textContent: `Rechte für Team-Einträge nicht geladen: ${ichError}` }));
+      }
+      panel.textContent = "";
+      panel.append(head, el4("div", { className: "wtp-body" }, parts));
+    }
+    function placeButton() {
+      if (!isTargetPage9()) {
+        owned(IDS8.button)?.remove();
+        return;
+      }
+      const slot = findSlot(document);
+      const existing = owned(IDS8.button);
+      if (existing && slot && existing.parentElement === slot.parent) {
+        let next = existing.nextElementSibling;
+        while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
+        if (next === slot.before) return;
+      }
+      if (existing && !slot) return;
+      existing?.remove();
+      if (!slot) return;
+      ensureStyle3();
+      const heute = button2("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
+      heute.id = IDS8.button;
+      heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
+      heute.dataset.werkiaTagesplanOwner = sourcePath;
+      const look = nativeLookFrom(slot.sample);
+      if (look) {
+        heute.className = "wtp-native";
+        Object.assign(heute.style, look.style);
+        const svg = icon(TODAY_ICON, look.iconSize);
+        svg.style.marginRight = look.iconGap;
+        heute.prepend(svg);
+      } else {
+        heute.className = "wtp-own";
+      }
+      let before = slot.before;
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id)) before = before.previousElementSibling;
+      slot.parent.insertBefore(heute, before);
+    }
+    function refreshViews() {
+      renderPopup();
+      decorateRows();
+      if (owned(IDS8.panel) && !teamEditing) renderPanel();
+    }
+    async function tick() {
+      const time = now().getTime();
+      const jobs = [];
+      if (werkia.day && werkia.day !== berlinDay2(now())) werkia.nextAt = 0;
+      if (time >= werkia.nextAt) jobs.push(loadWerkia());
+      if (time >= daten.nextAt) jobs.push(loadReminder());
+      if (jobs.length) {
+        await Promise.all(jobs);
+        refreshViews();
+      } else renderPopup();
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (owned(IDS8.dialog)) {
+        event.stopPropagation();
+        closeDialog();
+        return;
+      }
+      if (owned(IDS8.panel)) {
+        event.stopPropagation();
+        closePanel();
+      }
+    }, true);
+    runtime.addWindowListener("storage", (event) => {
+      if (event.key === GESEHEN_KEY) renderPopup();
+    });
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: Heute (Tages-Timeline)`, () => openPanel());
+      } catch {
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        placeButton();
+        decorateRows();
+      }, 250);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.setInterval(() => {
+      tick().catch(() => {
+      });
+    }, TICK_MS2);
+    runtime.addCleanup?.(() => {
+      owned(IDS8.button)?.remove();
+      owned(IDS8.popup)?.remove();
+      closeDialog();
+      closePanel();
+      document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element2) => {
+        if (element2.dataset.werkiaTagesplanOwner === sourcePath) element2.remove();
+      });
+    });
+    schedule();
+    tick().catch(() => {
+    });
+    return { tick, openPanel, openReminderDialog, state: { werkia, daten, team } };
+  }
+
+  // src/features/tagesplan.js
+  function executeTagesplan2(runtime, options = {}) {
+    return executeTagesplan(runtime, {
+      routes: [ROUTES.kamMyMatches],
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      toolboxName: "KAM-Toolbox",
+      helpTip: (topicId) => topicId === "tagesplan-timeline" ? kamHelp.tip("tagesplan-timeline") : kamHelp.tip("tagesplan-reminder"),
+      sourcePath: "kam/toolbox/src/features/tagesplan.js",
+      ...options
     });
   }
 
@@ -10886,7 +15462,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID7 = "werkia-om-notes-template-style";
+  var STYLE_ID10 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -10955,11 +15531,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID7)) {
+    if (document.getElementById(STYLE_ID10)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID7;
+    style.id = STYLE_ID10;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -11012,7 +15588,7 @@ ${next}`;
     const rootRect = positioningRoot.getBoundingClientRect();
     const omRect = anchor.getBoundingClientRect();
     const toolbarHeight = toolbar.getBoundingClientRect().height;
-    const saveButton = [...documentRef.querySelectorAll("button")].find((button2) => /speichern/i.test(button2.textContent || ""));
+    const saveButton = [...documentRef.querySelectorAll("button")].find((button3) => /speichern/i.test(button3.textContent || ""));
     const actionBar = saveButton?.closest('footer, [class*="Actions"], [class*="Toolbar"]') || saveButton?.parentElement;
     const actionBarTop = actionBar?.getBoundingClientRect().top;
     const bottomLimit = Number.isFinite(actionBarTop) && actionBarTop > omRect.top ? actionBarTop - 8 : viewportHeight ? viewportHeight - 8 : omRect.bottom;
@@ -11034,8 +15610,8 @@ ${next}`;
       if (!field || !toolbar) {
         return;
       }
-      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button2) => {
-        button2.classList.toggle("is-active", hasOmNote(field.value, button2.title));
+      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button3) => {
+        button3.classList.toggle("is-active", hasOmNote(field.value, button3.title));
       });
     }
     function write(nextValue) {
@@ -11119,14 +15695,14 @@ ${next}`;
         const chips = document.createElement("div");
         chips.className = "werkia-om-notes-chips";
         OM_NOTE_TEMPLATES.filter((template) => template.group === groupName).forEach((template) => {
-          const button2 = document.createElement("button");
-          button2.type = "button";
-          button2.className = "werkia-om-notes-chip";
-          button2.textContent = template.label;
-          button2.title = template.value;
-          button2.classList.toggle("is-active", hasOmNote(field.value, template.value));
-          button2.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
-          chips.appendChild(button2);
+          const button3 = document.createElement("button");
+          button3.type = "button";
+          button3.className = "werkia-om-notes-chip";
+          button3.textContent = template.label;
+          button3.title = template.value;
+          button3.classList.toggle("is-active", hasOmNote(field.value, template.value));
+          button3.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
+          chips.appendChild(button3);
         });
         group.appendChild(chips);
         groups.appendChild(group);
@@ -11193,7 +15769,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID7)?.remove();
+      document.getElementById(STYLE_ID10)?.remove();
     });
     renderToolbar();
   }
@@ -11213,7 +15789,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID8 = "werkia-urgent-vacancy-style";
+      const STYLE_ID11 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -11352,9 +15928,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID8)) return;
+        if (document.getElementById(STYLE_ID11)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID8;
+        style.id = STYLE_ID11;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -11445,6 +16021,7 @@ ${next}`;
     { id: "update-check", execute: (runtime) => updateCheck(runtime, { label: "KAM", fileName: "KAM-Toolbox.user.js" }) },
     { id: "kam-suite-bulk-match-actions", execute: executeBulkMatchActions2 },
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
+    { id: "kam-suite-employer-notes", execute: executeKamEmployerNotes },
     { id: "kam-suite-vacancy-city-badges", execute: executeVacancyCityBadges },
     { id: "kam-suite-cem-status-line", execute: executeCemStatusLine },
     { id: "kam-suite-cem-status-filter", execute: executeCemStatusFilter },
@@ -11464,11 +16041,17 @@ ${next}`;
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
     { id: "kam-suite-slack-exports", execute: executeSlackExports2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
+    { id: "kam-suite-slack-dm", execute: executeSlackDm2 },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
     { id: "filter-presets", execute: executeFilterPresets },
+    // Haengt sich in die Leiste der Filtervorlagen, deshalb danach.
+    { id: "focus-modes", execute: executeFocusModes },
     { id: "vertretungen", execute: executeVertretungen2 },
     { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
+    { id: "prio-liste", execute: executePrioListe2 },
+    { id: "tagesplan", execute: executeTagesplan2 },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
+    { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
     { id: "om-notes-templates", execute: (runtime) => executeOmNotesTemplates(runtime, { helpTip: () => kamHelp.tip("om-notes-templates", { tone: "dark" }) }) },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule }
   ], location.hostname));

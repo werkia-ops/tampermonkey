@@ -14,6 +14,7 @@ Enthaltene Funktionen:
 - Kleine ?-Knoepfe an Dialogen, Leisten und Panels erklaeren die jeweilige Funktion. Der Hilfe-Knopf unten links und der Tampermonkey-Menueeintrag oeffnen eine Uebersicht aller Funktionen mit Kennzeichnung, ob sie nur anzeigen oder Daten aendern.
 - Setzt Wiedervorlagedatum und KAM-Status fuer die angehakten Zeilen der Matches-Liste gleichzeitig (Haken-Liste nach Arbeitgeber gruppiert). Bei Out werden offene Terminvorschlaege abgelehnt. "Alle weiterleiten" leitet alle Terminvorschlaege mit Status Vorschlag der angehakten Matches weiter. "Vergangene ablehnen" lehnt Terminvorschlaege mit Status Vorschlag ab, deren Termine alle in der Vergangenheit liegen.
 - Zeigt bei jedem Arbeitgeber ein Badge zur Kontakthaeufigkeit (z. B. "Direkter Kontakt", "Kein Kontakt").
+- AG-Notizen mit Tags (Matches, AP, Vakanzen, Prozess) als Arbeitgeberkommentar. Im Matchkommentar-Dialog stehen seitlich die letzten Notizen mit Tag Matches, darunter speichert "Als AG-Notiz speichern" den Text aus dem Kommentarfeld mit den gewählten Tags am Arbeitgeber statt am Match. In Meine Matches zeigen Chips hinter der AG Response Rate die Notizen mit Tag AP und Prozess, das Vakanz-Panel die mit Tag Vakanzen.
 - Zeigt in Meine Matches unter dem KAM Status den CEM Status und die zustaendige CEM-Person. Ein Klick auf den Namen kopiert ihn.
 - Technische Hintergrundfunktion ohne eigene Anzeige - merkt sich Kandidat/Vakanz des offenen Fragebogens fuer andere Funktionen.
 - Blendet neben dem OM-Fragebogen ein Panel mit den oeffentlichen Vakanzangaben ein ("Zustaendigkeiten", "Dein Profil").
@@ -27,13 +28,18 @@ Enthaltene Funktionen:
 - Haken "Prio" im Terminvorschlag-Dialog: schreibt #prio in die Notizen des Termins, die VT Automatik postet VTA/VTV/VTS des Matches dann mit :alert11:.
 - Sendet VTA und VTV direkt aus dem Match über Zapier nach Slack. VTV enthält Kandidat, Arbeitgeber, Termin und CEM-Erwähnung.
 - Zwei Knoepfe im VTA/VTV-Block der Terminspalte in Meine Matches (ohne Termin dort allein): "Dringend" markiert die Vakanz ueber den Slack-Bot der dringenden Vakanzen und zeigt den aktuellen Zustand, "Push" postet eine Push Request in #push-requests.
+- Knopf „An CEM“ je Match in Meine Matches: schickt der CEM-Person des Kandidaten (und ihrer Vertretung) über den OPS-Bot eine Slack-DM mit Kandidat, Vakanz, Match-Link und optionalem Kommentar, unter deinem Namen. Der Dialog zeigt vorher, wer sie bekommt.
 - Liest den Betreff einer geoeffneten Outlook-Bewerbungsmail, findet den passenden Match per GraphQL und setzt KAM Status auf "Out" inkl. Pflichtgrund - offene Terminvorschlaege werden ebenfalls abgelehnt.
 - Ueberdeckt in der Vakanzliste die Statusspalte mit einem Dropdown, das den Vakanz-Status direkt speichert. "Alle ändern" im Spaltenkopf setzt den Status fuer die angehakten sichtbaren Vakanzen gemeinsam.
 - Fuegt im Arbeitgeberprofil OM-Flag-Vorlagen direkt am Feld OM Notes ein.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.
 - Knopf "Vertretungen" neben den Filter-Knöpfen von Meine Matches und im Tampermonkey-Menü: trägt Vertretungen ein, die VT Automatik, VT Bot und VT-Status-Hinweis zusätzlich taggen. Gespeichert im n8n-Workflow Vertretungen.
+- Knopf „Heute“ in Meine Matches: Seitenleiste mit bestätigten Terminen, heute fälligen WVL, eigenen Remindern und Team-Einträgen der Leitung. Glocke je Match-Zeile setzt einen Reminder (Zeit + Text). Auf jeder Adminpanel-Seite erinnert ein Popup an fällige Reminder, Termine in 15 Minuten und die WVL des Tages. Reminder und Team-Einträge liegen im n8n-Workflow Toolbox-Daten.
 - Dropdown ueber der Liste mit gespeicherten Filterkombinationen. "Aktuellen Filter speichern" uebernimmt Filter, Sortierung und Seitengroesse der Ansicht; Vorlagen liegen lokal im Browser und ueberstehen Toolbox-Updates.
+- Leiste ueber dem Editor im Matchkommentar-Dialog: Kuerzel-Knoepfe (tne, VTA, AV ...) fuegen den ausgeschriebenen Text ein oder speichern nach Bestaetigung eine AG-Notiz mit Tag [Matches]. Beim Tippen eines Kuerzels schlaegt ein Popup den Text vor, Tab uebernimmt. Reiter "Vorlagen" fuer eigene lange Texte, pro Person in den Toolbox-Daten gespeichert. Am Match aendert sich nichts.
+- Focus-Modes in Meine Matches neben den Filtervorlagen: ein Klick setzt Filter, Sortierung und eine hervorgehobene Spalte. Fester Modus "VTA-Session" zeigt die VT-Anfragen mit der Terminspalte vorn. Eigene Modi lassen sich aus dem aktuellen Filter speichern, "Verlassen" stellt die vorige Ansicht wieder her.
 - Erwähnt man im Kommentar-Editor jemanden, der heute vertreten wird, kommt die Vertretung als zweite Erwähnung direkt dahinter. Wer sie wieder löscht, bekommt sie nicht erneut. Ohne Toolbox taggt der n8n-Workflow Vertretungen Erwähnungen per Folgekommentar nach.
+- Prio-Liste in Meine Matches: Knopf "Prio-Liste" oben rechts klappt ein Panel mit den heute markierten Arbeitgebern auf. Markieren per Stern vor dem Arbeitgeber oder im Panel, abhaken, Notiz bearbeiten. Um 17:30 ein Fenster zum Tagesabschluss, Offenes wandert auf den nächsten Arbeitstag. Schalter "Prio zuerst" sortiert die Zeilen der Seite. Gespeichert pro Person über Toolbox-Daten, lesbar für die heutige Vertretung.
 
 ## CEM Toolbox
 
@@ -63,7 +69,10 @@ Enthaltene Funktionen:
 - Haken "Prio" im Terminvorschlag-Dialog: schreibt #prio in die Notizen des Termins, die VT Automatik postet VTA/VTV/VTS des Matches dann mit :alert11:.
 - Knopf "WA" in Meine Matches und Meine Kandidaten: fuellt eine WhatsApp-Vorlage mit Kandidaten- und Matchdaten, laesst sie fuer diese Nachricht bearbeiten und kopiert sie.
 - Zeigt in Meine Matches und Meine Kandidaten unter dem Matchkommentar-Knopf "CEM To Do: 1", wenn OM einen Kommentar mit "CEM To Do:" geschrieben hat, den noch keine "CEM:"-Antwort erledigt. Im Matchkommentar-Dialog ist das To Do rot umrandet; Knoepfe ueber dem Textfeld schreiben die Antwort (ist/sind da mit Match senden oder nicht senden, angefragt, Abhaken).
+- AG-Notizen im Matchkommentar-Dialog: seitlich die letzten Arbeitgeberkommentare mit Tag Matches, darunter speichert "Als AG-Notiz speichern" den Text aus dem Kommentarfeld mit den gewählten Tags (Matches, AP, Vakanzen, Prozess) am Arbeitgeber statt am Match.
 - Erwähnt man im Kommentar-Editor jemanden, der heute vertreten wird, kommt die Vertretung als zweite Erwähnung direkt dahinter. Wer sie wieder löscht, bekommt sie nicht erneut. Ohne Toolbox taggt der n8n-Workflow Vertretungen Erwähnungen per Folgekommentar nach.
+- Knopf „An KAM“ je Match in Meine Matches und Meine Kandidaten: schickt der KAM-Person des Arbeitgebers (und ihrer Vertretung) über den OPS-Bot eine Slack-DM mit Kandidat, Vakanz, Match-Link und optionalem Kommentar, unter deinem Namen. Der Dialog zeigt vorher, wer sie bekommt.
+- Tooltip mit der Bedeutung, wenn die Maus im Matchkommentar-Dialog oder in AG-Notizen über einem KAM-Kürzel steht (tne, VTA, SA …).
 
 ## OBC Toolbox
 

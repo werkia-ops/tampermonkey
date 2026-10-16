@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.8.166
+// @version      1.8.210
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2894,13 +2894,13 @@
   }
 
   // ../../shared/js/werkia-questionnaire/company-flag.js
-  function isFlaggedCompany2(value) {
+  function isFlaggedCompany(value) {
     return /\bga[\s-]?tec\b/i.test(value || "");
   }
   function isFlaggedQuestionnaire(dialog) {
     if (!dialog) return false;
     const employerName = getQuestionnaireHeaderValue(dialog, "Arbeitgeber");
-    if (isFlaggedCompany2(employerName)) return true;
+    if (isFlaggedCompany(employerName)) return true;
     const omNotes = findValue(dialog, "Zusätzliche Information - OM")?.innerText || "";
     return clean(omNotes).includes(clean(COMPANY_FLAG_TEXT));
   }
@@ -7614,7 +7614,7 @@
       const STYLE_ID3 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
-      const MATCH_PRESENT_ROW_CLASS3 = "werkia-cem-match-present-row";
+      const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
       const POTENTIAL_MATCHES_ROUTE3 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
       const FINGERPRINT_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_fingerprint_v1";
@@ -7767,7 +7767,7 @@
       }
       function applyHighlight(row, urgent) {
         const existingBadge = row.querySelector(`.${BADGE_CLASS2}`);
-        if (row.classList.contains(MATCH_PRESENT_ROW_CLASS3)) {
+        if (row.matches(MATCH_PRESENT_ROW_SELECTOR)) {
           if (row.classList.contains(ROW_CLASS2) || existingBadge) removeHighlight(row);
           return;
         }

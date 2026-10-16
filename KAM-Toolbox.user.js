@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.10.206
+// @version      1.10.210
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -15883,7 +15883,7 @@ ${next}`;
       const STYLE_ID11 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
-      const MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
+      const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
       const POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
       const FINGERPRINT_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_fingerprint_v1";
@@ -16036,7 +16036,7 @@ ${next}`;
       }
       function applyHighlight(row, urgent) {
         const existingBadge = row.querySelector(`.${BADGE_CLASS}`);
-        if (row.classList.contains(MATCH_PRESENT_ROW_CLASS)) {
+        if (row.matches(MATCH_PRESENT_ROW_SELECTOR)) {
           if (row.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row);
           return;
         }

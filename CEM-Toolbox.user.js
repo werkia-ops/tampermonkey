@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.13.204
+// @version      1.13.210
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -3040,7 +3040,7 @@
       const STYLE_ID8 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
-      const MATCH_PRESENT_ROW_CLASS3 = "werkia-cem-match-present-row";
+      const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
       const POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
       const FINGERPRINT_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_fingerprint_v1";
@@ -3193,7 +3193,7 @@
       }
       function applyHighlight(row, urgent) {
         const existingBadge = row.querySelector(`.${BADGE_CLASS2}`);
-        if (row.classList.contains(MATCH_PRESENT_ROW_CLASS3)) {
+        if (row.matches(MATCH_PRESENT_ROW_SELECTOR)) {
           if (row.classList.contains(ROW_CLASS2) || existingBadge) removeHighlight(row);
           return;
         }

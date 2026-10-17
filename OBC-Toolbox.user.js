@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.9.218
+// @version      1.9.222
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -14,6 +14,7 @@
 // @grant        unsafeWindow
 // @grant        GM_registerMenuCommand
 // @connect      api.werkia.de
+// @connect      hooks.werkia-ops.de
 // @connect      srv-a1.tail4b9d62.ts.net
 // @connect      werkia.de
 // @connect      nominatim.openstreetmap.org
@@ -6770,7 +6771,7 @@
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
   var REQUEST_TIMEOUT_MS = 15e3;
   var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {

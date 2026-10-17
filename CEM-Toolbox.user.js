@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.13.210
+// @version      1.13.222
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -17,6 +17,7 @@
 // @connect      nominatim.openstreetmap.org
 // @connect      router.project-osrm.org
 // @connect      raw.githubusercontent.com
+// @connect      hooks.werkia-ops.de
 // @connect      srv-a1.tail4b9d62.ts.net
 // @updateURL    https://raw.githubusercontent.com/willywerkia/tampermonkey/main/CEM-Toolbox.user.js
 // @downloadURL  https://raw.githubusercontent.com/willywerkia/tampermonkey/main/CEM-Toolbox.user.js
@@ -8463,7 +8464,7 @@
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
   var REQUEST_TIMEOUT_MS = 15e3;
   var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
@@ -11386,7 +11387,7 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL2 = "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
   var REQUEST_TIMEOUT_MS2 = 2e4;
   var MAX_COMMENT = 1500;
   var OFFLINE_MESSAGE2 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";

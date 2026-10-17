@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.10.210
+// @version      1.10.222
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -20,6 +20,7 @@
 // @connect      router.project-osrm.org
 // @connect      raw.githubusercontent.com
 // @connect      hooks.zapier.com
+// @connect      hooks.werkia-ops.de
 // @connect      srv-a1.tail4b9d62.ts.net
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/KAM.svg
 // @updateURL    https://raw.githubusercontent.com/willywerkia/tampermonkey/main/KAM-Toolbox.user.js
@@ -9274,7 +9275,7 @@
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL = "https://srv-a1.tail4b9d62.ts.net/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
   var REQUEST_TIMEOUT_MS = 2e4;
   var MAX_COMMENT = 1500;
   var OFFLINE_MESSAGE = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
@@ -11774,7 +11775,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL2 = "https://srv-a1.tail4b9d62.ts.net/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
   var REQUEST_TIMEOUT_MS2 = 15e3;
   var OFFLINE_MESSAGE2 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
@@ -12378,7 +12379,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL3 = "https://srv-a1.tail4b9d62.ts.net/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
   var REQUEST_TIMEOUT_MS3 = 15e3;
   var OFFLINE_MESSAGE3 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaToolboxDatenMe {

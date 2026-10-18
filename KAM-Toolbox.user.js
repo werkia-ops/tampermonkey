@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.12.225
+// @version      1.12.227
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -11278,7 +11278,7 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/outlook-assistent/core.js
-  var WEBHOOK_URL2 = "https://srv-a1.tail4b9d62.ts.net/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
   var REQUEST_TIMEOUT_MS2 = 2e4;
   var OFFLINE_MESSAGE2 = "Der Toolbox-Server ist gerade nicht erreichbar.";
   var PRESELECT_FROM = 0.8;

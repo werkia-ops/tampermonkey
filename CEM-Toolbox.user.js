@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.13.222
+// @version      1.13.228
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -18,7 +18,6 @@
 // @connect      router.project-osrm.org
 // @connect      raw.githubusercontent.com
 // @connect      hooks.werkia-ops.de
-// @connect      srv-a1.tail4b9d62.ts.net
 // @updateURL    https://raw.githubusercontent.com/willywerkia/tampermonkey/main/CEM-Toolbox.user.js
 // @downloadURL  https://raw.githubusercontent.com/willywerkia/tampermonkey/main/CEM-Toolbox.user.js
 // ==/UserScript==

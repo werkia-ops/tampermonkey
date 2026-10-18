@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.9.222
+// @version      1.9.228
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -15,7 +15,6 @@
 // @grant        GM_registerMenuCommand
 // @connect      api.werkia.de
 // @connect      hooks.werkia-ops.de
-// @connect      srv-a1.tail4b9d62.ts.net
 // @connect      werkia.de
 // @connect      nominatim.openstreetmap.org
 // @connect      router.project-osrm.org

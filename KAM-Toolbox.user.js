@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.12.227
+// @version      1.12.228
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -21,7 +21,6 @@
 // @connect      raw.githubusercontent.com
 // @connect      hooks.zapier.com
 // @connect      hooks.werkia-ops.de
-// @connect      srv-a1.tail4b9d62.ts.net
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/KAM.svg
 // @updateURL    https://raw.githubusercontent.com/willywerkia/tampermonkey/main/KAM-Toolbox.user.js
 // @downloadURL  https://raw.githubusercontent.com/willywerkia/tampermonkey/main/KAM-Toolbox.user.js

@@ -39,6 +39,7 @@ Enthaltene Funktionen:
 - Knopf „@CEM“ in der Werkzeugleiste des Matchkommentar-Dialogs: erwähnt die CEM-Person des Kandidaten am Cursor. Rechtsklick öffnet die Auswahl aller CEM-Personen mit Suchfeld. Abgeschickt wird wie immer mit dem Pfeil.
 - Focus-Modes in Meine Matches neben den Filtervorlagen: ein Klick setzt Filter, Sortierung und eine hervorgehobene Spalte. Fester Modus "VTA-Session" zeigt die VT-Anfragen mit der Terminspalte vorn. Eigene Modi lassen sich aus dem aktuellen Filter speichern, "Verlassen" stellt die vorige Ansicht wieder her.
 - Erwähnt man im Kommentar-Editor jemanden, der heute vertreten wird, kommt die Vertretung als zweite Erwähnung direkt dahinter. Wer sie wieder löscht, bekommt sie nicht erneut. Ohne Toolbox taggt der n8n-Workflow Vertretungen Erwähnungen per Folgekommentar nach.
+- In Outlook Web: zur geöffneten Mail eines Arbeitgebers der Vorschlag aus dem n8n-Workflow KAM Mail Assistent (Status, Grund, Kommentar mit CEM-Erwähnung, WVL, AG-Notiz). Blauer Knopf unten rechts, jede Aktion einzeln abwählbar, „Übernehmen“ schreibt mit der eigenen Anmeldung.
 - Prio-Liste in Meine Matches: Knopf "Prio-Liste" oben rechts klappt ein Panel mit den heute markierten Arbeitgebern auf. Markieren per Stern vor dem Arbeitgeber oder im Panel, abhaken, Notiz bearbeiten. Um 17:30 ein Fenster zum Tagesabschluss, Offenes wandert auf den nächsten Arbeitstag. Schalter "Prio zuerst" sortiert die Zeilen der Seite. Gespeichert pro Person über Toolbox-Daten, lesbar für die heutige Vertretung.
 
 ## CEM Toolbox

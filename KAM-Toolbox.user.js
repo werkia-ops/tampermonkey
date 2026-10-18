@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.10.224
+// @version      1.12.225
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1537,22 +1537,22 @@
     };
     function tip(topicId, { tone = "light" } = {}) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
-      const button3 = document.createElement("button");
-      button3.type = "button";
-      button3.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
-      button3.setAttribute("aria-label", tipLabel(topic));
-      button3.title = tipLabel(topic);
-      button3.textContent = "?";
-      return styled(button3, tipStyle(tone));
+      const button4 = document.createElement("button");
+      button4.type = "button";
+      button4.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
+      button4.setAttribute("aria-label", tipLabel(topic));
+      button4.title = tipLabel(topic);
+      button4.textContent = "?";
+      return styled(button4, tipStyle(tone));
     }
     function tipHtml(topicId, options) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
       return buildTipHtml(namespace, topic, options);
     }
     function ownTipFrom(target) {
-      const button3 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
-      const parsed = parseTipAttributeValue(button3?.getAttribute(HELP_ATTRIBUTE));
-      return parsed?.namespace === namespace ? { button: button3, topicId: parsed.topicId } : null;
+      const button4 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
+      const parsed = parseTipAttributeValue(button4?.getAttribute(HELP_ATTRIBUTE));
+      return parsed?.namespace === namespace ? { button: button4, topicId: parsed.topicId } : null;
     }
     const popover = () => document.getElementById(popoverId);
     function closePopover2() {
@@ -1763,9 +1763,9 @@
       const onAdmin = dockHosts.test(location.hostname || "");
       const { here } = splitTopicsByLocation(topics, { hash: location.hash || "", hostname: location.hostname || "" });
       let dock = document.getElementById(DOCK_ID);
-      let button3 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
+      let button4 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
       if (!onAdmin || !here.length) {
-        button3?.remove();
+        button4?.remove();
         if (dock && !dock.children.length) dock.remove();
         return;
       }
@@ -1783,8 +1783,8 @@
         dock.id = DOCK_ID;
         document.body.appendChild(dock);
       }
-      if (!button3) {
-        button3 = el2("button", {
+      if (!button4) {
+        button4 = el2("button", {
           display: "inline-flex",
           alignItems: "center",
           gap: "6px",
@@ -1798,9 +1798,9 @@
           font: `600 12px/1 ${FONT2}`,
           cursor: "pointer"
         });
-        button3.type = "button";
-        button3.setAttribute("data-werkia-help-dock-button", namespace);
-        button3.title = `Was macht die ${toolboxName} auf dieser Seite?`;
+        button4.type = "button";
+        button4.setAttribute("data-werkia-help-dock-button", namespace);
+        button4.title = `Was macht die ${toolboxName} auf dieser Seite?`;
         const mark2 = el2("span", {
           display: "inline-flex",
           alignItems: "center",
@@ -1812,9 +1812,9 @@
           color: "#fff",
           font: `700 12px/1 ${FONT2}`
         }, "?");
-        button3.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
-        button3.addEventListener("click", () => openOverview());
-        dock.appendChild(button3);
+        button4.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
+        button4.addEventListener("click", () => openOverview());
+        dock.appendChild(button4);
       }
     }
     function install(runtime, { dock = true, menu = true, dockHostPattern } = {}) {
@@ -2641,15 +2641,15 @@
     }
     function updateSaveState() {
       if (!state) return;
-      const button3 = state.panel.querySelector(".werkia-agn-save");
+      const button4 = state.panel.querySelector(".werkia-agn-save");
       const disabled = state.saving || !state.employerId;
-      if (button3.disabled !== disabled) button3.disabled = disabled;
+      if (button4.disabled !== disabled) button4.disabled = disabled;
     }
     async function save() {
       if (!state || state.saving) return;
       const current = state;
       const editor = current.dialog.querySelector(EDITOR_SELECTOR);
-      const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button3) => button3.dataset.tag);
+      const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button4) => button4.dataset.tag);
       const text = editor ? editorText(editor) : "";
       if (!text) {
         setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
@@ -2665,7 +2665,7 @@
       try {
         await current.provider.create(current.employerId, tags, text);
         if (state !== current) return;
-        current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button3) => button3.setAttribute("aria-pressed", "false"));
+        current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button4) => button4.setAttribute("aria-pressed", "false"));
         setStatus(tags.length ? `Als AG-Notiz gespeichert (${tags.join(", ")}).` : "Als AG-Notiz gespeichert.", "ok");
       } catch (error) {
         console.warn("[AG-Notizen]", error);
@@ -2695,14 +2695,14 @@
         });
         tags.appendChild(toggle);
       }
-      const button3 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
-      button3.type = "button";
-      button3.addEventListener("click", (event) => {
+      const button4 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
+      button4.type = "button";
+      button4.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
       const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
-      write.append(head, tags, button3, element(document, "div", "werkia-agn-status"), hint);
+      write.append(head, tags, button4, element(document, "div", "werkia-agn-status"), hint);
       panel.append(list.element, write);
       return { panel, list };
     }
@@ -2763,9 +2763,9 @@
       }, 200);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
-      if (!button3) return;
-      const row = button3.closest("tr");
+      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button4) return;
+      const row = button4.closest("tr");
       clicked = { matchId: matchIdFromRow(row), employerId: employerIdFromRow(row) };
       schedule();
     }, true);
@@ -3057,11 +3057,11 @@
     const currentPicker = () => document.querySelector(pickerSelector);
     function updateButton() {
       const wrap2 = currentWrap();
-      const button3 = wrap2?.querySelector(`.${PREFIX}-btn`);
-      if (!button3) return;
+      const button4 = wrap2?.querySelector(`.${PREFIX}-btn`);
+      if (!button4) return;
       const title = buttonTitle(config.kind, view.state, view.person);
-      if (button3.title !== title) button3.title = title;
-      if (button3.dataset.state !== view.state) button3.dataset.state = view.state;
+      if (button4.title !== title) button4.title = title;
+      if (button4.dataset.state !== view.state) button4.dataset.state = view.state;
       const msg = wrap2.querySelector(`.${PREFIX}-msg`);
       if (view.message && !msg) wrap2.appendChild(el3("span", { class: `${PREFIX}-msg`, role: "status", text: view.message }));
       else if (msg && !view.message) msg.remove();
@@ -3103,8 +3103,8 @@
       if (currentPicker()?.contains(node) || currentWrap()?.contains(node)) return;
       closePicker();
     }
-    function positionPicker(box, button3) {
-      const rect = button3.getBoundingClientRect();
+    function positionPicker(box, button4) {
+      const rect = button4.getBoundingClientRect();
       const height = box.offsetHeight || 320;
       const width = box.offsetWidth || 260;
       const below = rect.bottom + 4;
@@ -3215,14 +3215,14 @@
       });
     }
     runtime.addDocumentListener("click", (event) => {
-      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
-      if (!button3) return;
-      const row = button3.closest("tr");
+      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      if (!button4) return;
+      const row = button4.closest("tr");
       clickedMatchId = matchIdFromHref2(row?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
     }, true);
     function mountWrap(dialog) {
       ensureStyle();
-      const button3 = el3("button", {
+      const button4 = el3("button", {
         type: "button",
         class: `${PREFIX}-btn`,
         text: config.button,
@@ -3233,7 +3233,7 @@
       const wrap2 = el3(
         "span",
         { class: `${PREFIX}-wrap`, role: "group", "aria-label": `${config.short}-Person erwähnen`, dataset: { kind: config.kind } },
-        button3,
+        button4,
         helpTip()
       );
       wrap2.dataset.mode = isDark(dialog) ? "dark" : "light";
@@ -3586,7 +3586,8 @@
       steps: [
         "Die Bewerbungsmail oder eine Antwort darauf öffnen. Der Button erscheint, wenn „Bewerbung“ im Betreff steht oder unsere Bewerbungsmail mit Kurzprofil im Text zitiert ist.",
         "Den „KAM“-Knopf und dann „Match outen“ klicken. Die Toolbox sucht Arbeitgeber und Match. Gibt es mehrere Treffer, wählst du den richtigen aus. „im AP prüfen“ öffnet ihn zur Kontrolle.",
-        "Den Grund wählen und die Rückfrage bestätigen."
+        "Den Grund wählen. Darunter steht die Antwort des Arbeitgebers ohne den zitierten Verlauf: Sie geht als Matchkommentar mit, damit das CEM den Grund nachlesen kann. Text ändern oder Haken entfernen geht vorher.",
+        "Die Rückfrage bestätigen."
       ],
       notes: [
         "Bei Mails von CBRE GWS IFM Industrie GmbH zeigt die Karte zusätzlich „An CBRE senden“: ein Formular mit den Kandidatendaten für CBREs softgarden-Import. Kälteschein (groß/klein) und ggf. Geschlecht wählst du selbst; die Stellen-ID merkt sich die Toolbox pro Vakanz.",
@@ -3595,6 +3596,26 @@
         "Lässt sich aus der Mail kein Arbeitgeber ablesen, trägst du ihn im Dialog selbst ein.",
         "Gleichnamige Kandidaten (etwa bei RVM nur mit Vornamen) unterscheidet die Toolbox über PLZ, Deutschkenntnisse und Ausbildung aus dem Kurzprofil. Treffer sind mit „✓ PLZ“, „✓ Deutsch“, „✓ Ausbildung“ markiert. „Alle zeigen“ hebt die Eingrenzung auf.",
         "Dafür braucht es eine Anmeldung am Adminpanel. Fehlt sie, öffnet sich kurz ein Fenster auf admin.werkia.de."
+      ]
+    },
+    {
+      id: "outlook-assistent",
+      title: "Vorschläge zur Mail (Outlook-Assistent)",
+      page: "Outlook › Mail eines Arbeitgebers",
+      hosts: [/(^|\.)outlook\.(office\.com|cloud\.microsoft)$/i],
+      kind: "write",
+      summary: "Zu Mails von Arbeitgebern macht der Outlook-Assistent Vorschläge: KAM-Status, Grund, Matchkommentar mit CEM-Erwähnung, WVL, AG-Notiz. Liegt einer vor, erscheint unten rechts der blaue Knopf „Vorschlag: …“. Nichts wird ohne deinen Klick ins Adminpanel geschrieben.",
+      steps: [
+        "Die Mail öffnen. Gibt es einen Vorschlag, zeigt der blaue Knopf die erkannte Mailart und wie sicher sie ist.",
+        "Knopf klicken. Je Match stehen die Vorschläge einzeln da. Haken setzen oder entfernen, Status, Grund, Text und Datum kannst du ändern. Vorausgewählt ist nur, was sicher erkannt wurde.",
+        "„Übernehmen“ zeigt noch einmal, was geschrieben wird, und schreibt es mit deiner Anmeldung. „Alles ablehnen“ schreibt nichts und markiert den Vorschlag als erledigt."
+      ],
+      notes: [
+        "Bei Absagen geht der Mailtext des Arbeitgebers mit in den Matchkommentar, damit das CEM den Grund nachlesen kann.",
+        "Out lehnt wie beim Outen offene Terminvorschläge ab und löscht die WVL.",
+        "Einen Antwortentwurf legt der Assistent in Outlook unter Entwürfe ab. Gesendet wird von Hand.",
+        "Vakanz pausieren und Termine anlegen macht der Assistent nicht, dafür gibt es einen Link ins Adminpanel.",
+        "„Staging“ im Knopf heißt: Testdaten, geschrieben wird in staging-admin.werkia.de."
       ]
     }
   ];
@@ -3607,9 +3628,9 @@
   // ../../shared/js/admin-panel-reload.js
   var ADMIN_PANEL_RELOAD_SELECTOR = 'header button[aria-label="Neu laden"]';
   function reloadAdminPanel(documentRef = document) {
-    const button3 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
-    if (!button3 || button3.disabled) return false;
-    button3.click();
+    const button4 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
+    if (!button4 || button4.disabled) return false;
+    button4.click();
     return true;
   }
 
@@ -3929,17 +3950,17 @@
     function installButton(header, id, label, title, onClick) {
       if (!header || document.getElementById(id)) return;
       injectStyle();
-      const button3 = document.createElement("button");
-      button3.id = id;
-      button3.type = "button";
-      button3.textContent = label;
-      button3.title = title;
-      button3.addEventListener("click", (event) => {
+      const button4 = document.createElement("button");
+      button4.id = id;
+      button4.type = "button";
+      button4.textContent = label;
+      button4.title = title;
+      button4.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         onClick();
       });
-      header.appendChild(button3);
+      header.appendChild(button4);
     }
     return {
       state,
@@ -4128,7 +4149,7 @@
       team,
       isTargetPage: isTargetPage8,
       getRequest,
-      ids: IDS9,
+      ids: IDS10,
       fields,
       columns,
       statusOptions,
@@ -4208,13 +4229,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS9,
-      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
+      ids: IDS10,
+      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -4354,13 +4375,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS9.feedbackShortcuts;
+      shortcuts.id = IDS10.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -4660,10 +4681,10 @@
     function installHeaderButtons() {
       if (!isTargetPage8()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -5387,14 +5408,14 @@
       }
     }
     function nameButton(name) {
-      const button3 = document.createElement("button");
-      button3.type = "button";
-      button3.className = `${LINE_CLASS}__name`;
-      button3.title = "CEM-Namen kopieren";
+      const button4 = document.createElement("button");
+      button4.type = "button";
+      button4.className = `${LINE_CLASS}__name`;
+      button4.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button3.append(label, icon2(COPY_ICON_PATH));
-      return button3;
+      button4.append(label, icon2(COPY_ICON_PATH));
+      return button4;
     }
     function renderState(matchId) {
       const info = infoByMatchId.get(matchId);
@@ -5489,20 +5510,20 @@
       }, 150);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button3 = event.target.closest?.(`.${LINE_CLASS}__name`);
-      if (!button3) return;
+      const button4 = event.target.closest?.(`.${LINE_CLASS}__name`);
+      if (!button4) return;
       event.preventDefault();
       event.stopPropagation();
-      const name = button3.querySelector("span")?.textContent || "";
+      const name = button4.querySelector("span")?.textContent || "";
       if (!name) return;
       copyText(name).then(() => {
-        button3.dataset.copied = "true";
-        button3.title = "Kopiert";
-        button3.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
+        button4.dataset.copied = "true";
+        button4.title = "Kopiert";
+        button4.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
         runtime.setTimeout(() => {
-          delete button3.dataset.copied;
-          button3.title = "CEM-Namen kopieren";
-          button3.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH));
+          delete button4.dataset.copied;
+          button4.title = "CEM-Namen kopieren";
+          button4.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -6007,14 +6028,14 @@
       const title = document.createElement("strong");
       title.textContent = label;
       const chips = options.map((option) => {
-        const button3 = document.createElement("button");
-        button3.type = "button";
-        button3.dataset.value = option.value;
-        button3.textContent = option.label;
+        const button4 = document.createElement("button");
+        button4.type = "button";
+        button4.dataset.value = option.value;
+        button4.textContent = option.label;
         const chipTone = tone(option.value);
-        if (chipTone) button3.dataset.tone = chipTone;
-        button3.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
-        return button3;
+        if (chipTone) button4.dataset.tone = chipTone;
+        button4.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
+        return button4;
       });
       const reset = document.createElement("button");
       reset.type = "button";
@@ -6027,9 +6048,9 @@
     }
     function syncBar(bar) {
       const selected = selectedStatuses(currentFilter(), field);
-      bar.querySelectorAll("button[data-value]").forEach((button3) => {
-        const pressed = String(selected.includes(button3.dataset.value));
-        if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
+      bar.querySelectorAll("button[data-value]").forEach((button4) => {
+        const pressed = String(selected.includes(button4.dataset.value));
+        if (button4.getAttribute("aria-pressed") !== pressed) button4.setAttribute("aria-pressed", pressed);
       });
       const reset = bar.querySelector(`.${BAR_CLASS}-reset`);
       if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
@@ -6114,9 +6135,9 @@
     const context = getQuestionnaireContext();
     function captureContext(event) {
       if (!isTargetPage5()) return;
-      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button3) return;
-      const row = button3.closest("tr");
+      const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button4) return;
+      const row = button4.closest("tr");
       if (!row) return;
       const next = buildQuestionnaireContext(row);
       Object.assign(context, next || EMPTY_CONTEXT);
@@ -6182,7 +6203,7 @@
       if (/Matchkommentare/i.test(text)) return false;
       if (/Kandidat Dateien/i.test(text)) return false;
       const labels = new Set(
-        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el6) => (el6.innerText || "").trim())
+        [...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((el7) => (el7.innerText || "").trim())
       );
       const count = QUESTIONNAIRE_LABELS.filter((l) => labels.has(l)).length;
       const hasHeader = labels.has("Kandidat") && labels.has("Job");
@@ -6379,9 +6400,9 @@
     }
     async function handleQuestionnaireButtonClick(event) {
       if (!isTargetPage5()) return;
-      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button3) return;
-      const row = button3.closest("tr");
+      const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button4) return;
+      const row = button4.closest("tr");
       if (!row) return;
       const vacancyLink = row.querySelector('a[href*="werkia.de/bewerben/"]');
       const uuid = vacancyLink?.href.match(/bewerben\/([a-f0-9-]{36})/i)?.[1] || "";
@@ -6763,7 +6784,7 @@
   }
   function getDialogLabelTexts(dialog) {
     if (!dialog) return [];
-    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el6) => (el6.innerText || el6.textContent || "").trim()).filter(Boolean);
+    return [...dialog.querySelectorAll("span.ra-field p span, span.MuiStack-root p span, div.MuiStack-root p span")].map((el7) => (el7.innerText || el7.textContent || "").trim()).filter(Boolean);
   }
   function isQuestionnaireDialog(dialog, { strictMode = true, fold: fold2 = false, labels = QUESTIONNAIRE_LABELS2 } = {}) {
     if (!dialog) return false;
@@ -6800,7 +6821,7 @@
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return null;
     const field = mode === "last" ? fields[fields.length - 1] : fields[0];
-    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el6) => (el6.innerText || el6.textContent || "").trim()) || null;
+    return [...field.querySelectorAll(VALUE_SELECTOR)].find((el7) => (el7.innerText || el7.textContent || "").trim()) || null;
   }
   function findValueAllowEmpty(dialog, labelText, mode = "first", { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
@@ -6818,11 +6839,11 @@
   function getPositionEls(dialog, labelText, { fold: fold2 = false } = {}) {
     const fields = getFieldsByLabel(dialog, labelText, { fold: fold2 });
     if (!fields.length) return [];
-    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el6) => (el6.innerText || el6.textContent || "").trim() && normalize6(el6.innerText || el6.textContent, fold2) !== "berufsausbildung");
+    return [...fields[0].querySelectorAll(VALUE_SELECTOR)].filter((el7) => (el7.innerText || el7.textContent || "").trim() && normalize6(el7.innerText || el7.textContent, fold2) !== "berufsausbildung");
   }
   function getQuestionnaireHeaderValue(dialog, labelText, { fold: fold2 = false } = {}) {
     const field = getFieldsByLabel(dialog, labelText, { fold: fold2 })[0];
-    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el6) => el6.textContent?.trim() && normalize6(el6.textContent, fold2) !== normalize6(labelText, fold2)) : null;
+    const value = field ? [...field.querySelectorAll(`${VALUE_SELECTOR}, a, .MuiChip-label`)].find((el7) => el7.textContent?.trim() && normalize6(el7.textContent, fold2) !== normalize6(labelText, fold2)) : null;
     if (value?.textContent?.trim()) return value.textContent.trim();
     const lines = (dialog.innerText || dialog.textContent || "").split("\n").map((line) => line.trim()).filter(Boolean);
     const labelIndex = lines.findIndex((line) => normalize6(line, fold2) === normalize6(labelText, fold2));
@@ -6844,7 +6865,7 @@
   function comparisonValue(value, original, options = {}) {
     return original && isOwnMarkedValue(value, original, options) ? original : value;
   }
-  function mark(el6, color, title = "", options = {}) {
+  function mark(el7, color, title = "", options = {}) {
     const {
       markAttr = DEFAULT_MARK_ATTR,
       originalAttr = DEFAULT_ORIGINAL_ATTR,
@@ -6853,24 +6874,24 @@
       prefixByColor = null,
       dedupeAttr = null
     } = options;
-    if (!el6) return;
+    if (!el7) return;
     if (dedupeAttr) {
       const signature = `${color}|${title}`;
-      if (el6.dataset[dedupeAttr] === signature) return;
-      el6.dataset[dedupeAttr] = signature;
+      if (el7.dataset[dedupeAttr] === signature) return;
+      el7.dataset[dedupeAttr] = signature;
     }
-    if (!el6.dataset[originalAttr]) el6.dataset[originalAttr] = el6.innerText || "";
-    el6.dataset[markAttr] = "true";
-    el6.style.background = color;
-    el6.style.color = "#000";
-    el6.style.padding = "4px 6px";
-    el6.style.borderRadius = "4px";
-    el6.style.fontWeight = fontWeight;
-    el6.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
-    if (title) el6.title = title;
-    const original = el6.dataset[originalAttr];
+    if (!el7.dataset[originalAttr]) el7.dataset[originalAttr] = el7.innerText || "";
+    el7.dataset[markAttr] = "true";
+    el7.style.background = color;
+    el7.style.color = "#000";
+    el7.style.padding = "4px 6px";
+    el7.style.borderRadius = "4px";
+    el7.style.fontWeight = fontWeight;
+    el7.style.boxShadow = boxShadowColors.includes(color) ? "0 0 0 2px rgba(255,0,0,0.35)" : "";
+    if (title) el7.title = title;
+    const original = el7.dataset[originalAttr];
     const prefix = prefixByColor?.[color];
-    el6.innerText = prefix ? `${prefix}${original}` : original;
+    el7.innerText = prefix ? `${prefix}${original}` : original;
   }
   function clearMarks(root = document, options = {}) {
     const {
@@ -6878,19 +6899,19 @@
       originalAttr = DEFAULT_ORIGINAL_ATTR,
       dedupeAttr = null
     } = options;
-    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el6) => {
-      const original = el6.dataset[originalAttr];
-      if (original && isOwnMarkedValue(el6.innerText || "", original, options)) el6.innerText = original;
-      el6.style.background = "";
-      el6.style.color = "";
-      el6.style.padding = "";
-      el6.style.borderRadius = "";
-      el6.style.fontWeight = "";
-      el6.style.boxShadow = "";
-      el6.title = "";
-      delete el6.dataset[markAttr];
-      delete el6.dataset[originalAttr];
-      if (dedupeAttr) delete el6.dataset[dedupeAttr];
+    root.querySelectorAll(`[data-${camelToKebab(markAttr)}="true"]`).forEach((el7) => {
+      const original = el7.dataset[originalAttr];
+      if (original && isOwnMarkedValue(el7.innerText || "", original, options)) el7.innerText = original;
+      el7.style.background = "";
+      el7.style.color = "";
+      el7.style.padding = "";
+      el7.style.borderRadius = "";
+      el7.style.fontWeight = "";
+      el7.style.boxShadow = "";
+      el7.title = "";
+      delete el7.dataset[markAttr];
+      delete el7.dataset[originalAttr];
+      if (dedupeAttr) delete el7.dataset[dedupeAttr];
     });
   }
 
@@ -6925,8 +6946,8 @@
   }
   function executeQuestionnaireEvaluation(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-evaluation.js");
-    function mark2(el6, color, title = "") {
-      mark(el6, color, title, MARK_OPTIONS);
+    function mark2(el7, color, title = "") {
+      mark(el7, color, title, MARK_OPTIONS);
     }
     function clearMarks2() {
       clearMarks(document, MARK_OPTIONS);
@@ -6977,20 +6998,20 @@
       return { status: "send" };
     }
     function compareRecognition(dialog) {
-      const el6 = findValue(dialog, "Recognition status");
-      if (!el6) return { status: "send" };
-      const v = clean(el6.innerText);
+      const el7 = findValue(dialog, "Recognition status");
+      if (!el7) return { status: "send" };
+      const v = clean(el7.innerText);
       if (v.includes("ja, ist anerkannt")) {
-        mark2(el6, GREEN, "Anerkennung: Ja");
+        mark2(el7, GREEN, "Anerkennung: Ja");
         return { status: "send" };
       }
       if (v.includes("in anerkennung")) {
-        mark2(el6, YELLOW, "In Anerkennung");
-        return { status: "unclear", detail: `Recognition status: ${el6.innerText}` };
+        mark2(el7, YELLOW, "In Anerkennung");
+        return { status: "unclear", detail: `Recognition status: ${el7.innerText}` };
       }
       if (v.includes("noch nicht beantragt")) {
-        mark2(el6, RED, "Noch nicht beantragt");
-        return { status: "no-send", detail: `Recognition status: ${el6.innerText}` };
+        mark2(el7, RED, "Noch nicht beantragt");
+        return { status: "no-send", detail: `Recognition status: ${el7.innerText}` };
       }
       return { status: "send" };
     }
@@ -7039,8 +7060,8 @@
       return { status: "send" };
     }
     function comparePositions(dialog) {
-      const empEls = getPositionEls(dialog, "Position").map((el6) => ({ el: el6, value: clean(el6.innerText) }));
-      const candEls = getPositionEls(dialog, "Positionen").map((el6) => ({ el: el6, value: clean(el6.innerText) }));
+      const empEls = getPositionEls(dialog, "Position").map((el7) => ({ el: el7, value: clean(el7.innerText) }));
+      const candEls = getPositionEls(dialog, "Positionen").map((el7) => ({ el: el7, value: clean(el7.innerText) }));
       if (!empEls.length) return { status: "send" };
       if (!candEls.length) return { status: "unclear", detail: `Positionen: ${empEls.map((p) => p.value).join(", ")} → leer` };
       let anyGreen = false;
@@ -7200,7 +7221,7 @@
     function currentFieldSignature(dialog) {
       return [...dialog.querySelectorAll("span.ra-field")].map((field) => {
         const label = field.querySelector("p span")?.innerText?.trim() || "";
-        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el6) => comparisonValue2(el6.innerText ?? el6.textContent ?? "", el6.dataset[ORIGINAL_TEXT])).join("|");
+        const values = [...field.querySelectorAll("span.MuiTypography-body2, a, .MuiChip-label")].map((el7) => comparisonValue2(el7.innerText ?? el7.textContent ?? "", el7.dataset[ORIGINAL_TEXT])).join("|");
         return `${label}=${values}`;
       }).join(";");
     }
@@ -7850,8 +7871,8 @@
     }
     function captureQuestionnaireClick(event) {
       if (!isTargetPage5()) return;
-      const button3 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
-      if (!button3) return;
+      const button4 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
+      if (!button4) return;
       if (!context.key) return;
       scheduleUpdate();
       waitForQuestionnaireDialog(context.key);
@@ -7909,19 +7930,19 @@
       const dialog = candidateFilesDialog();
       if (!dialog || dialog.querySelector(".werkia-kam-candidate-open")) return;
       const candidateId = pendingCandidateId;
-      const button3 = document.createElement("button");
-      button3.className = "werkia-kam-candidate-open";
-      button3.type = "button";
-      button3.textContent = "Kandidatenansicht öffnen ↗";
-      button3.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
-      button3.addEventListener("click", (event) => {
+      const button4 = document.createElement("button");
+      button4.className = "werkia-kam-candidate-open";
+      button4.type = "button";
+      button4.textContent = "Kandidatenansicht öffnen ↗";
+      button4.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
+      button4.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         openCandidateViewPopup(candidateId);
       });
       const title = dialog.querySelector(".MuiDialogTitle-root");
-      if (title) title.insertAdjacentElement("afterend", button3);
-      else dialog.prepend(button3);
+      if (title) title.insertAdjacentElement("afterend", button4);
+      else dialog.prepend(button4);
     }
     function installCandidateFileHooks() {
       document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element2) => element2.remove());
@@ -7971,16 +7992,16 @@
 
   // src/features/kam-suite/status-effects.js
   var STATUS_SELECTOR = ".MuiSelect-root";
-  function getSelectData(el6) {
-    const input = el6.querySelector("input.MuiSelect-nativeInput");
-    const combo = el6.querySelector('[role="combobox"]');
+  function getSelectData(el7) {
+    const input = el7.querySelector("input.MuiSelect-nativeInput");
+    const combo = el7.querySelector('[role="combobox"]');
     return {
       value: input?.value || "",
       text: combo?.textContent?.trim() || ""
     };
   }
-  function getState(el6) {
-    const { value, text } = getSelectData(el6);
+  function getState(el7) {
+    const { value, text } = getSelectData(el7);
     if (value === "process" || text === "Senden") return "process";
     if (value === "hired" || text === "Hired") return "hired";
     return value || text || "empty";
@@ -7990,23 +8011,23 @@
     const lastStates = /* @__PURE__ */ new WeakMap();
     let initialized = false;
     function initSelectStates() {
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el6) => {
-        lastStates.set(el6, getState(el6));
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el7) => {
+        lastStates.set(el7, getState(el7));
       });
       initialized = true;
     }
-    function flashGreen(el6) {
-      const inner = el6.querySelector('[role="combobox"]') || el6;
-      el6.style.transition = "all 0.2s ease";
-      el6.style.backgroundColor = "#bbf7d0";
-      el6.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
+    function flashGreen(el7) {
+      const inner = el7.querySelector('[role="combobox"]') || el7;
+      el7.style.transition = "all 0.2s ease";
+      el7.style.backgroundColor = "#bbf7d0";
+      el7.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.45)";
       inner.style.transition = "all 0.2s ease";
       inner.style.backgroundColor = "#bbf7d0";
       inner.style.color = "#14532d";
       inner.style.fontWeight = "700";
       runtime.setTimeout(() => {
-        el6.style.backgroundColor = "";
-        el6.style.boxShadow = "";
+        el7.style.backgroundColor = "";
+        el7.style.boxShadow = "";
         inner.style.backgroundColor = "";
         inner.style.color = "";
         inner.style.fontWeight = "";
@@ -8179,24 +8200,24 @@
     }
     function checkSelects() {
       if (!initialized) return;
-      document.querySelectorAll(STATUS_SELECTOR).forEach((el6) => {
-        const currentState = getState(el6);
-        if (!lastStates.has(el6)) {
-          lastStates.set(el6, currentState);
+      document.querySelectorAll(STATUS_SELECTOR).forEach((el7) => {
+        const currentState = getState(el7);
+        if (!lastStates.has(el7)) {
+          lastStates.set(el7, currentState);
           return;
         }
-        const lastState = lastStates.get(el6);
+        const lastState = lastStates.get(el7);
         if (currentState !== lastState) {
           if (currentState === "process") {
-            flashGreen(el6);
+            flashGreen(el7);
             showAnotherOneText();
             fireConfetti();
           }
           if (currentState === "hired") {
-            flashGreen(el6);
+            flashGreen(el7);
             showHiredCelebration();
           }
-          lastStates.set(el6, currentState);
+          lastStates.set(el7, currentState);
         }
       });
     }
@@ -8293,7 +8314,7 @@
       const candidate = rightLinks[0];
       if (!candidate) return null;
       const row = candidate.closest("div") || candidate.parentElement;
-      const prio = [...row.querySelectorAll("span, div, button")].find((el6) => /^[A-F]\d*$/i.test((el6.innerText || "").trim()));
+      const prio = [...row.querySelectorAll("span, div, button")].find((el7) => /^[A-F]\d*$/i.test((el7.innerText || "").trim()));
       return prio || candidate;
     }
     function ensureBox() {
@@ -8589,7 +8610,7 @@
     location: { names: ["location", "locationId", "appointmentLocation"], label: "Standort", fallbackIndex: 2 }
   };
   function getAppointments(root = document) {
-    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el6) => el6.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
+    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el7) => el7.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
   }
   function hasAppointmentFields(dialog) {
     return Boolean(dialog?.querySelector?.(APPOINTMENT_INPUT_SELECTOR));
@@ -8623,14 +8644,14 @@
   }
   function executeAppointmentCopyPaste(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/appointment-copy-paste.js");
-    function isVisible2(element2) {
+    function isVisible3(element2) {
       if (!element2) return false;
       const rect = element2.getBoundingClientRect();
       const style = window.getComputedStyle(element2);
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function appointmentDialog() {
-      return [...document.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => isVisible2(dialog) && hasAppointmentFields(dialog)).at(-1) || null;
+      return [...document.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => isVisible3(dialog) && hasAppointmentFields(dialog)).at(-1) || null;
     }
     function appointmentArrayRoot(dialog) {
       return [...dialog.querySelectorAll(".RaArrayInput-root")].find((root) => root.querySelector(APPOINTMENT_INPUT_SELECTOR)) || null;
@@ -8648,9 +8669,9 @@
       }
     }
     function termToast(text) {
-      const el6 = document.createElement("div");
-      el6.textContent = text;
-      el6.style.cssText = `
+      const el7 = document.createElement("div");
+      el7.textContent = text;
+      el7.style.cssText = `
       position: fixed;
       bottom: 24px;
       right: 24px;
@@ -8661,22 +8682,22 @@
       z-index: 99999999;
       font-size: 14px;
     `;
-      document.body.appendChild(el6);
-      runtime.setTimeout(() => el6.remove(), 2200);
+      document.body.appendChild(el7);
+      runtime.setTimeout(() => el7.remove(), 2200);
     }
-    function setValue(el6, value) {
-      el6.focus();
+    function setValue(el7, value) {
+      el7.focus();
       const inputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
       const textareaSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-      if (el6.tagName === "TEXTAREA") {
-        textareaSetter?.call(el6, value);
+      if (el7.tagName === "TEXTAREA") {
+        textareaSetter?.call(el7, value);
       } else {
-        inputSetter?.call(el6, value);
+        inputSetter?.call(el7, value);
       }
-      el6.dispatchEvent(new Event("input", { bubbles: true }));
-      el6.dispatchEvent(new Event("change", { bubbles: true }));
-      el6.dispatchEvent(new Event("blur", { bubbles: true }));
-      el6.blur();
+      el7.dispatchEvent(new Event("input", { bubbles: true }));
+      el7.dispatchEvent(new Event("change", { bubbles: true }));
+      el7.dispatchEvent(new Event("blur", { bubbles: true }));
+      el7.blur();
     }
     function setPicker(root, value) {
       const values = parseAppointmentValue(value);
@@ -8738,7 +8759,7 @@
       if (!select) return;
       select.click();
       await new Promise((resolve) => runtime.setTimeout(resolve, 300));
-      const option = [...document.querySelectorAll('[role="option"], .MuiMenuItem-root')].find((o) => isVisible2(o) && o.innerText.trim() === text.trim());
+      const option = [...document.querySelectorAll('[role="option"], .MuiMenuItem-root')].find((o) => isVisible3(o) && o.innerText.trim() === text.trim());
       if (option) option.click();
     }
     async function waitFor(check, timeoutMs = 2500, intervalMs = 80) {
@@ -8754,7 +8775,7 @@
     }
     function removeAppointmentButton(root) {
       const buttons = [...root?.querySelectorAll('.RaSimpleFormIterator-line button[class*="button-remove-"], .RaSimpleFormIterator-line button.button-remove, .RaSimpleFormIterator-line button[aria-label="Entfernen"], .RaSimpleFormIterator-line button[aria-label="Löschen"]') || []];
-      return buttons.filter(isVisible2).at(-1) || buttons.at(-1) || null;
+      return buttons.filter(isVisible3).at(-1) || buttons.at(-1) || null;
     }
     async function ensureAppointmentCount(dialog, targetCount) {
       const target = Math.max(0, targetCount);
@@ -9100,28 +9121,28 @@
       document.head.appendChild(style);
     }
     const post = (payload) => postJson(webhookUrl, payload);
-    function applyState(button3, { state, label, title, disabled = false }) {
-      if (button3.dataset.busy === "true") return;
-      if (button3.textContent !== label) button3.textContent = label;
-      if (button3.title !== title) button3.title = title;
-      if (button3.dataset.state !== state) button3.dataset.state = state;
-      if (button3.disabled !== disabled) button3.disabled = disabled;
+    function applyState(button4, { state, label, title, disabled = false }) {
+      if (button4.dataset.busy === "true") return;
+      if (button4.textContent !== label) button4.textContent = label;
+      if (button4.title !== title) button4.title = title;
+      if (button4.dataset.state !== state) button4.dataset.state = state;
+      if (button4.disabled !== disabled) button4.disabled = disabled;
     }
-    function flash(button3, text) {
-      button3.dataset.busy = "true";
-      button3.textContent = text;
+    function flash(button4, text) {
+      button4.dataset.busy = "true";
+      button4.textContent = text;
       runtime.setTimeout(() => {
-        delete button3.dataset.busy;
+        delete button4.dataset.busy;
         render();
       }, 1500);
     }
-    async function onUrgentClick(button3, jobPositionId, matchId) {
+    async function onUrgentClick(button4, jobPositionId, matchId) {
       const urgency = urgencyIndex.get(jobPositionId);
       const { state } = urgentButtonState(urgency, loadStore().pending[jobPositionId]);
       if (state === "loading" || state === "pending") return;
       const target = !urgency.urgent;
       if (!target && !window.confirm(STOP_URGENT_CONFIRM_TEXT)) return;
-      button3.disabled = true;
+      button4.disabled = true;
       try {
         await post({ type: target ? "DRINGEND" : "NICHT_DRINGEND", jobPositionId, matchId });
         updateStore((store) => {
@@ -9131,22 +9152,22 @@
         schedulePendingPoll();
       } catch (error) {
         console.warn("[KAM Dringend]", error);
-        flash(button3, "Fehler");
+        flash(button4, "Fehler");
       }
     }
-    async function onPushClick(button3, jobPositionId, matchId) {
+    async function onPushClick(button4, jobPositionId, matchId) {
       const sentAt = loadStore().pushSent[jobPositionId];
       if (sentAt && !window.confirm(pushResendConfirmText(sentAt))) return;
-      button3.disabled = true;
+      button4.disabled = true;
       try {
         await post({ type: "PUSH", jobPositionId, matchId });
         updateStore((store) => {
           store.pushSent[jobPositionId] = (/* @__PURE__ */ new Date()).toISOString();
         });
-        flash(button3, "Gesendet");
+        flash(button4, "Gesendet");
       } catch (error) {
         console.warn("[KAM Push Request]", error);
-        flash(button3, "Fehler");
+        flash(button4, "Fehler");
       }
     }
     function placeBar(row, bar) {
@@ -9427,7 +9448,7 @@
       style.textContent = CSS;
       document.head.appendChild(style);
     }
-    function el6(tag, props = {}, children = []) {
+    function el7(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {
         if (key === "className") element2.className = value;
@@ -9450,19 +9471,19 @@
       const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
       if (existing?.dataset.matchId === target.matchId) return;
       existing?.remove();
-      const button3 = el6("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
-      button3.dataset.matchId = target.matchId;
-      button3.dataset.werkiaSlackDmOwner = sourcePath;
-      button3.addEventListener("click", (event) => {
+      const button4 = el7("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
+      button4.dataset.matchId = target.matchId;
+      button4.dataset.werkiaSlackDmOwner = sourcePath;
+      button4.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         openDialog(target.matchId);
       });
-      target.cell.appendChild(button3);
+      target.cell.appendChild(button4);
     }
     function removeButtons() {
-      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button3) => {
-        if (button3.dataset.werkiaSlackDmOwner === sourcePath) button3.remove();
+      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button4) => {
+        if (button4.dataset.werkiaSlackDmOwner === sourcePath) button4.remove();
       });
     }
     function closeDialog() {
@@ -9487,17 +9508,17 @@
     function renderPreview(dialog, preview) {
       const details = dialog.querySelector("dl");
       details.replaceChildren();
-      const row = (label, value) => details.append(el6("dt", { text: label }), el6("dd", {}, value));
+      const row = (label, value) => details.append(el7("dt", { text: label }), el7("dd", {}, value));
       row("Kandidat", preview.kandidat || "–");
       row("Vakanz", vacancyLine(preview) || "–");
-      row("Match", el6("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
+      row("Match", el7("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
       const recipients = preview.empfaenger || [];
       const reachable = recipients.filter((entry) => entry.erreichbar);
-      const list = el6("span");
-      if (!recipients.length) list.append(el6("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
+      const list = el7("span");
+      if (!recipients.length) list.append(el7("span", { className: "sd-warn", text: "Niemand. Du bist selbst zuständig." }));
       recipients.forEach((entry, index) => {
         if (index) list.append(document.createTextNode(", "));
-        list.append(el6("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
+        list.append(el7("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
       });
       row("An", list);
       return reachable.length > 0;
@@ -9505,28 +9526,28 @@
     async function openDialog(matchId) {
       closeDialog();
       ensureStyle4();
-      const comment = el6("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
-      const count = el6("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
+      const comment = el7("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const count = el7("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
       });
-      const sendButton = el6("button", { type: "button", className: "sd-primary", text: "Senden" });
+      const sendButton = el7("button", { type: "button", className: "sd-primary", text: "Senden" });
       sendButton.disabled = true;
       const tip = helpTip ? helpTip() : null;
-      const card = el6("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
-        el6("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
-        el6("div", { className: "sd-head" }, [el6("h2", { text: `${config.label} schicken` }), tip]),
-        el6("dl", {}, [el6("dt", { text: "Match" }), el6("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el6("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
+      const card = el7("div", { className: "sd-card", role: "dialog", "aria-modal": "true", "aria-label": `${config.label} schicken` }, [
+        el7("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
+        el7("div", { className: "sd-head" }, [el7("h2", { text: `${config.label} schicken` }), tip]),
+        el7("dl", {}, [el7("dt", { text: "Match" }), el7("dd", { className: "sd-muted", text: "Wird geladen …" })]),
+        el7("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
-        el6("div", { className: "sd-status" }),
-        el6("div", { className: "sd-foot" }, [
-          el6("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
+        el7("div", { className: "sd-status" }),
+        el7("div", { className: "sd-foot" }, [
+          el7("button", { type: "button", className: "sd-secondary", text: "Abbrechen", onclick: closeDialog }),
           sendButton
         ])
       ]);
-      const dialog = el6("div", { id: IDS3.dialog }, card);
+      const dialog = el7("div", { id: IDS3.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -9696,6 +9717,9 @@
   var EMPLOYERS_BY_NAME_QUERY = `query OutenEmployersByName($filter: EmployerFilter) {
   items: allEmployers(filter: $filter) { id name __typename }
 }`;
+  var CREATE_MATCH_COMMENT_MUTATION = `mutation OutenMatchComment($matchId: UUID!, $text: String!) {
+  data: createMatchComment(matchId: $matchId, text: $text) { id __typename }
+}`;
   var MATCHES_BY_EMPLOYER_QUERY = `query OutenMatchesByEmployer($filter: MatchFilter, $page: Int, $perPage: Int, $sortField: String, $sortOrder: String) {
   total: _allMatchesMeta(page: $page, perPage: $perPage, filter: $filter) { count }
   items: allMatches(filter: $filter, page: $page, perPage: $perPage, sortField: $sortField, sortOrder: $sortOrder) {
@@ -9768,6 +9792,36 @@
   function isCompleteOutResult(result) {
     const interviews = result?.interviews || {};
     return Boolean(result?.wvlCleared) && !interviews.listFailed && interviews.declined === (interviews.total || 0);
+  }
+  var QUOTE_START_RES = [
+    /^[ \t]*-{2,}[ \t]*(?:Original Message|Ursprüngliche Nachricht|Originalnachricht|Weitergeleitete Nachricht|Forwarded message)[ \t]*-{2,}/im,
+    /^[ \t]*(?:Von|From):[ \t].*\n(?:.*\n){0,3}?[ \t]*(?:Gesendet|Sent|Datum|Date):/im,
+    /^[ \t]*Am\b.{4,160}\bschrieb\b.{0,200}:[ \t]*$/im,
+    /^[ \t]*On\b.{4,160}\bwrote:[ \t]*$/im
+  ];
+  var OUT_MAIL_COMMENT_MAX_CHARS = 5e3;
+  function replyTextFromMailBody(bodyText) {
+    const text = String(bodyText || "").replace(/\r\n?/g, "\n").replace(/ /g, " ");
+    let end = text.length;
+    for (const re of QUOTE_START_RES) {
+      const match = re.exec(text);
+      if (match && match.index < end) end = match.index;
+    }
+    return text.slice(0, end).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function outMailCommentDraft(bodyText) {
+    const reply = replyTextFromMailBody(bodyText);
+    if (!reply || hasApplicationProfile(parseProfileFromMailBody(reply))) return "";
+    return reply.length > OUT_MAIL_COMMENT_MAX_CHARS ? `${reply.slice(0, OUT_MAIL_COMMENT_MAX_CHARS).trimEnd()} …` : reply;
+  }
+  function outMailCommentHtml({ reasonLabel = "", mailText = "" } = {}) {
+    const head = `Out aus Outlook${reasonLabel ? ` (Grund: ${escapeHtml(reasonLabel)})` : ""}. Mail des Arbeitgebers:`;
+    const paragraphs2 = String(mailText || "").trim().split(/\n{2,}/).map((block) => block.split("\n").map((line) => escapeHtml(line.trim())).join("<br>")).filter(Boolean);
+    return [head, ...paragraphs2].map((paragraph) => `<p>${paragraph}</p>`).join("");
+  }
+  function describeOutCommentResult(comment) {
+    if (!comment?.attempted) return "";
+    return comment.saved ? " Mailtext als Matchkommentar gespeichert." : " Mailtext konnte nicht als Matchkommentar gespeichert werden.";
   }
   function stripSubjectPrefixes(subject) {
     let value = String(subject || "").trim();
@@ -9992,6 +10046,14 @@
     const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element2) => (element2.getAttribute("title") || element2.textContent || "").trim()).filter(Boolean);
     return [...new Set(subjects)];
   }
+  function readOutMailCommentDraft() {
+    const containers = [...document.querySelectorAll(MAIL_BODY_SELECTORS.join(","))].filter(isVisible);
+    for (const container of containers) {
+      const draft = outMailCommentDraft(container.innerText || "");
+      if (draft) return draft;
+    }
+    return "";
+  }
   function readMailContext() {
     return { subjects: readSubjectsFromReadingPane(), bodyText: readMailBodyText() };
   }
@@ -10049,11 +10111,11 @@
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS4 = 35e3;
+    const REQUEST_TIMEOUT_MS5 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS4);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS5);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -10182,6 +10244,10 @@
       const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
       return { total: interviewIds.length, declined: interviewIds.length - errors.length, listFailed: false, errors };
     }
+    async function createOutMailComment(matchId, html) {
+      const result = await graphqlRequestWithRetry(CREATE_MATCH_COMMENT_MUTATION, { matchId, text: html }, { mutation: true });
+      if (!result?.data?.id) throw new Error("Matchkommentar wurde nicht bestätigt");
+    }
     async function setMatchOut(matchId, kamFeedback) {
       const result = await graphqlRequestWithRetry(UPDATE_MATCH_STATUS_WITH_FEEDBACK_MUTATION, { id: matchId, kamStatus: "out", kamFeedback }, { mutation: true });
       const match = result?.data;
@@ -10199,7 +10265,7 @@
         interviews: interviewResult
       };
     }
-    function styled2(node, styles) {
+    function styled3(node, styles) {
       Object.assign(node.style, styles);
       return node;
     }
@@ -10207,11 +10273,11 @@
       const head = document.createElement("div");
       head.textContent = titleText;
       head.appendChild(kamHelp.tip("outlook-match-outen", { tone: "dark" }));
-      return styled2(head, { display: "flex", alignItems: "center", padding: "16px 18px", color: "#fff", background: "#ef6c00", fontSize: "17px", fontWeight: "700" });
+      return styled3(head, { display: "flex", alignItems: "center", padding: "16px 18px", color: "#fff", background: "#ef6c00", fontSize: "17px", fontWeight: "700" });
     }
     function buildBody(children) {
       const body = document.createElement("div");
-      styled2(body, { padding: "18px", display: "grid", gap: "12px", font: "14px/1.4 Arial,sans-serif", color: "#222" });
+      styled3(body, { padding: "18px", display: "grid", gap: "12px", font: "14px/1.4 Arial,sans-serif", color: "#222" });
       children.forEach((child) => {
         if (child) body.appendChild(child);
       });
@@ -10219,7 +10285,7 @@
     }
     function buildNote(parts, { error = false } = {}) {
       const note = document.createElement("div");
-      styled2(note, { padding: "10px", borderRadius: "5px", background: error ? "#fdecea" : "#f5f5f5", color: error ? "#b3261e" : "#444" });
+      styled3(note, { padding: "10px", borderRadius: "5px", background: error ? "#fdecea" : "#f5f5f5", color: error ? "#b3261e" : "#444" });
       (Array.isArray(parts) ? parts : [parts]).forEach((part) => {
         if (part && typeof part === "object") {
           const anchor = document.createElement("a");
@@ -10227,7 +10293,7 @@
           anchor.href = part.href;
           anchor.target = "_blank";
           anchor.rel = "noopener";
-          styled2(anchor, { color: "#0b5cab" });
+          styled3(anchor, { color: "#0b5cab" });
           note.appendChild(anchor);
         } else {
           note.appendChild(document.createTextNode(String(part ?? "")));
@@ -10237,15 +10303,15 @@
     }
     function buildActions(children) {
       const actions = document.createElement("div");
-      styled2(actions, { display: "flex", justifyContent: "flex-end", gap: "8px" });
+      styled3(actions, { display: "flex", justifyContent: "flex-end", gap: "8px" });
       children.forEach((child) => actions.appendChild(child));
       return actions;
     }
     function buildSplitActions(leftChildren, rightChildren) {
       const row = document.createElement("div");
-      styled2(row, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
+      styled3(row, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
       const left = document.createElement("div");
-      styled2(left, { display: "flex", gap: "8px" });
+      styled3(left, { display: "flex", gap: "8px" });
       leftChildren.forEach((child) => left.appendChild(child));
       row.append(left, buildActions(rightChildren));
       return row;
@@ -10255,7 +10321,7 @@
       btn.type = "button";
       btn.textContent = label;
       if (action) btn.dataset.action = action;
-      styled2(btn, {
+      styled3(btn, {
         padding: "8px 13px",
         border: primary ? "1px solid #ef6c00" : "1px solid #aaa",
         borderRadius: "5px",
@@ -10268,15 +10334,15 @@
     }
     function setButtonDisabled(btn, disabled) {
       btn.disabled = disabled;
-      styled2(btn, { opacity: disabled ? ".55" : "1", cursor: disabled ? "wait" : "pointer" });
+      styled3(btn, { opacity: disabled ? ".55" : "1", cursor: disabled ? "wait" : "pointer" });
     }
     function buildList() {
       const list = document.createElement("div");
-      return styled2(list, { display: "grid", gap: "6px", maxHeight: "260px", overflowY: "auto", border: "1px solid #ddd", borderRadius: "6px", padding: "8px" });
+      return styled3(list, { display: "grid", gap: "6px", maxHeight: "260px", overflowY: "auto", border: "1px solid #ddd", borderRadius: "6px", padding: "8px" });
     }
     function buildOptionRow({ name, index, checked, labelText, href, linkLabel = "im AP prüfen" }) {
       const option = document.createElement("label");
-      styled2(option, { display: "flex", alignItems: "flex-start", gap: "8px", padding: "6px", borderRadius: "5px", fontWeight: "400", cursor: "pointer" });
+      styled3(option, { display: "flex", alignItems: "flex-start", gap: "8px", padding: "6px", borderRadius: "5px", fontWeight: "400", cursor: "pointer" });
       const radio = document.createElement("input");
       radio.type = "radio";
       radio.name = name;
@@ -10291,13 +10357,13 @@
         anchor.href = href;
         anchor.target = "_blank";
         anchor.rel = "noopener";
-        styled2(anchor, { marginLeft: "auto", fontSize: "12px", color: "#0b5cab", whiteSpace: "nowrap" });
+        styled3(anchor, { marginLeft: "auto", fontSize: "12px", color: "#0b5cab", whiteSpace: "nowrap" });
         option.appendChild(anchor);
       }
       return { option, radio };
     }
     function styleDialogFrame(dialog) {
-      styled2(dialog, {
+      styled3(dialog, {
         width: "min(520px, calc(100vw - 32px))",
         border: "0",
         borderRadius: "10px",
@@ -10316,7 +10382,7 @@
         launcher.title = "KAM-Toolbox: Bewerbungsmail erkannt";
         launcher.setAttribute("aria-label", "KAM-Toolbox öffnen");
         launcher.setAttribute("aria-expanded", "false");
-        styled2(launcher, {
+        styled3(launcher, {
           position: "fixed",
           right: "20px",
           bottom: "20px",
@@ -10356,7 +10422,7 @@
         popover.id = IDS4.popover;
         popover.setAttribute("role", "dialog");
         popover.setAttribute("aria-label", "KAM-Toolbox");
-        styled2(popover, {
+        styled3(popover, {
           position: "fixed",
           right: "20px",
           bottom: "84px",
@@ -10382,7 +10448,7 @@
         return row;
       };
       const head = document.createElement("div");
-      styled2(head, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", color: "#fff", background: "#ef6c00", fontWeight: "700" });
+      styled3(head, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", color: "#fff", background: "#ef6c00", fontWeight: "700" });
       const title = document.createElement("span");
       title.textContent = "Bewerbungsmail erkannt";
       title.appendChild(kamHelp.tip("outlook-match-outen", { tone: "dark" }));
@@ -10390,7 +10456,7 @@
       closeBtn.type = "button";
       closeBtn.textContent = "×";
       closeBtn.setAttribute("aria-label", "Schließen");
-      styled2(closeBtn, { border: "0", background: "transparent", color: "#fff", fontSize: "20px", lineHeight: "1", cursor: "pointer" });
+      styled3(closeBtn, { border: "0", background: "transparent", color: "#fff", fontSize: "20px", lineHeight: "1", cursor: "pointer" });
       closeBtn.addEventListener("click", closePopover2);
       head.append(title, closeBtn);
       const outenBtn = buildButton("Match outen", { action: "outen", primary: true });
@@ -10412,7 +10478,7 @@
         line("Arbeitgeber", summary.employerName),
         buildActions(actions)
       ]);
-      styled2(body, { padding: "12px 14px", gap: "6px" });
+      styled3(body, { padding: "12px 14px", gap: "6px" });
       popover.replaceChildren(head, body);
     }
     function isDialogClosed(dialog) {
@@ -10589,7 +10655,7 @@
       });
       if (preselected < 0) {
         setButtonDisabled(continueBtn, true);
-        styled2(continueBtn, { cursor: "not-allowed" });
+        styled3(continueBtn, { cursor: "not-allowed" });
         radios.forEach((radio) => radio.addEventListener("change", () => setButtonDisabled(continueBtn, false)));
       }
       const leftActions = [];
@@ -10627,7 +10693,7 @@
       const select = document.createElement("select");
       select.name = "outFeedback";
       select.required = true;
-      styled2(select, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" });
+      styled3(select, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" });
       const chooseOption = document.createElement("option");
       chooseOption.value = "__choose__";
       chooseOption.textContent = "Bitte auswählen";
@@ -10639,21 +10705,41 @@
         select.appendChild(option);
       });
       const label = document.createElement("label");
-      styled2(label, { display: "grid", gap: "5px", fontWeight: "700" });
+      styled3(label, { display: "grid", gap: "5px", fontWeight: "700" });
       label.append("Grund", select);
+      const commentDraft = readOutMailCommentDraft();
+      const commentToggle = document.createElement("input");
+      commentToggle.type = "checkbox";
+      commentToggle.name = "outMailComment";
+      commentToggle.checked = Boolean(commentDraft);
+      const commentToggleLabel = document.createElement("label");
+      styled3(commentToggleLabel, { display: "flex", alignItems: "center", gap: "6px", fontWeight: "700" });
+      commentToggleLabel.append(commentToggle, "Mailtext als Matchkommentar (für CEM)");
+      const commentText = document.createElement("textarea");
+      commentText.name = "outMailCommentText";
+      commentText.rows = 6;
+      commentText.value = commentDraft;
+      commentText.placeholder = "Kein Antworttext erkannt – hier einfügen oder den Haken entfernen.";
+      styled3(commentText, { boxSizing: "border-box", width: "100%", padding: "8px", border: "1px solid #bbb", borderRadius: "5px", font: "13px/1.4 Arial,sans-serif", resize: "vertical" });
+      commentText.addEventListener("input", () => {
+        if (commentText.value.trim()) commentToggle.checked = true;
+      });
+      const commentBox = document.createElement("div");
+      styled3(commentBox, { display: "grid", gap: "5px" });
+      commentBox.append(commentToggleLabel, commentText);
       const statusEl = document.createElement("div");
       statusEl.textContent = "Bitte einen Grund auswählen.";
       const setStatus = (text, tone = "") => {
         statusEl.textContent = text;
         const color = tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222";
-        styled2(statusEl, { color });
+        styled3(statusEl, { color });
       };
       const openMatchLink = document.createElement("a");
       openMatchLink.textContent = "Match in Meine Matches öffnen";
       openMatchLink.href = kamMyMatchesUrl({ candidateId: match.candidateId, employerId: state.employer.id });
       openMatchLink.target = "_blank";
       openMatchLink.rel = "noopener";
-      styled2(openMatchLink, {
+      styled3(openMatchLink, {
         padding: "8px 13px",
         border: "1px solid #aaa",
         borderRadius: "5px",
@@ -10678,17 +10764,30 @@
           setStatus("Bitte einen Grund auswählen.", "error");
           return;
         }
-        if (!window.confirm(`${candidateFullName(match) || state.parsed.candidateName} bei ${state.employer.name} auf KAM Status „Out“ setzen? Grund: „${reason.label}“.`)) return;
+        if (!window.confirm(`${candidateFullName(match) || state.parsed.candidateName} bei ${state.employer.name} auf KAM Status „Out“ setzen? Grund: „${reason.label}“.${commentToggle.checked && commentText.value.trim() ? " Der Mailtext kommt als Matchkommentar dazu." : ""}`)) return;
+        const mailText = commentToggle.checked ? commentText.value.trim() : "";
         select.disabled = true;
+        commentToggle.disabled = true;
+        commentText.disabled = true;
         setButtonDisabled(closeBtn, true);
         setButtonDisabled(applyBtn, true);
         setStatus("Setze KAM Status „Out“ …", "busy");
         setBusy(dialog, true);
         try {
           const result = await setMatchOut(state.matchId, resolveOutFeedbackText(reason));
+          const comment = { attempted: Boolean(mailText), saved: false };
+          if (mailText) {
+            try {
+              await createOutMailComment(state.matchId, outMailCommentHtml({ reasonLabel: reason.label, mailText }));
+              comment.saved = true;
+            } catch {
+              comment.saved = false;
+            }
+          }
           setBusy(dialog, false);
-          const complete = isCompleteOutResult(result);
-          setStatus(complete ? describeOutResult(result) : `${describeOutResult(result)} Bitte den Rest im Adminpanel nachholen.`, complete ? "ok" : "busy");
+          const complete = isCompleteOutResult(result) && (!comment.attempted || comment.saved);
+          const summary = `${describeOutResult(result)}${describeOutCommentResult(comment)}`;
+          setStatus(complete ? summary : `${summary} Bitte den Rest im Adminpanel nachholen.`, complete ? "ok" : "busy");
           applyBtn.dataset.completed = "true";
           applyBtn.textContent = "Fertig – schließen";
           setButtonDisabled(applyBtn, false);
@@ -10696,6 +10795,8 @@
         } catch (error) {
           setBusy(dialog, false);
           select.disabled = false;
+          commentToggle.disabled = false;
+          commentText.disabled = false;
           setButtonDisabled(closeBtn, false);
           setButtonDisabled(applyBtn, false);
           if (isAuthError(error)) {
@@ -10707,7 +10808,7 @@
       });
       dialog.replaceChildren(
         buildHead("Match Outen – Grund"),
-        buildBody([buildNote(noteText), label, statusEl, buildSplitActions([openMatchLink], [closeBtn, applyBtn])])
+        buildBody([buildNote(noteText), label, commentBox, statusEl, buildSplitActions([openMatchLink], [closeBtn, applyBtn])])
       );
       dialog.addEventListener("close", () => dialog.remove(), { once: true });
     }
@@ -10750,7 +10851,7 @@
       const fieldStyle = { boxSizing: "border-box", width: "100%", padding: "8px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" };
       const labelled = (labelText, control) => {
         const label = document.createElement("label");
-        styled2(label, { display: "grid", gap: "4px", fontWeight: "700" });
+        styled3(label, { display: "grid", gap: "4px", fontWeight: "700" });
         label.append(labelText, control);
         return label;
       };
@@ -10758,7 +10859,7 @@
         const element2 = document.createElement("input");
         element2.type = "text";
         element2.value = value || "";
-        return styled2(element2, fieldStyle);
+        return styled3(element2, fieldStyle);
       };
       const select = (options, value) => {
         const element2 = document.createElement("select");
@@ -10769,7 +10870,7 @@
           element2.appendChild(option);
         });
         element2.value = value;
-        return styled2(element2, fieldStyle);
+        return styled3(element2, fieldStyle);
       };
       const fields = {
         firstName: input(candidate.firstName || match.candidate?.firstName),
@@ -10784,7 +10885,7 @@
         note: input("")
       };
       const grid = document.createElement("div");
-      styled2(grid, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 10px" });
+      styled3(grid, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 10px" });
       grid.append(
         labelled("Vorname", fields.firstName),
         labelled("Nachname", fields.lastName),
@@ -10798,7 +10899,7 @@
         labelled("Weitere Angaben (optional)", fields.note)
       );
       const preview = document.createElement("pre");
-      styled2(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
+      styled3(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
       const values = () => Object.fromEntries(Object.entries(fields).map(([key, element2]) => [key, element2.value]));
       const updatePreview = () => {
         const current = values();
@@ -10819,7 +10920,7 @@ ${buildCbreBody(current)}`;
       const statusEl = document.createElement("div");
       const setStatus = (text, tone = "") => {
         statusEl.textContent = text;
-        styled2(statusEl, { color: tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222" });
+        styled3(statusEl, { color: tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222" });
       };
       const closeBtn = buildButton("Abbrechen", { action: "close" });
       const applyBtn = buildButton("Weiterleitung erstellen", { action: "apply", primary: true });
@@ -10863,12 +10964,12 @@ ${buildCbreBody(current)}`;
     async function openBccField() {
       const existing = visibleElement(COMPOSE_SELECTORS.bcc);
       if (existing) return existing;
-      const button3 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element2) => {
+      const button4 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element2) => {
         const label = `${element2.getAttribute("aria-label") || ""} ${element2.getAttribute("title") || ""}`;
         return (element2.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
       });
-      if (!button3) return null;
-      button3.click();
+      if (!button4) return null;
+      button4.click();
       return waitForElement(COMPOSE_SELECTORS.bcc, 3e3);
     }
     function visibleElement(selector) {
@@ -11021,7 +11122,7 @@ ${buildCbreBody(current)}`;
       toast.setAttribute("role", "status");
       toast.title = "Klicken zum Schließen";
       toast.textContent = text;
-      styled2(toast, {
+      styled3(toast, {
         position: "fixed",
         right: "20px",
         bottom: "84px",
@@ -11059,9 +11160,9 @@ ${buildCbreBody(current)}`;
         const input = document.createElement("input");
         input.type = "text";
         input.value = value || "";
-        styled2(input, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit" });
+        styled3(input, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit" });
         const label = document.createElement("label");
-        styled2(label, { display: "grid", gap: "5px", fontWeight: "700" });
+        styled3(label, { display: "grid", gap: "5px", fontWeight: "700" });
         label.append(labelText, input);
         return { label, input };
       };
@@ -11172,6 +11273,581 @@ ${buildCbreBody(current)}`;
     runtime.addCleanup(() => {
       removeLauncher();
       document.getElementById(IDS4.dialog)?.remove();
+    });
+    scheduleCheck();
+  }
+
+  // src/features/outlook-assistent/core.js
+  var WEBHOOK_URL2 = "https://srv-a1.tail4b9d62.ts.net/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var REQUEST_TIMEOUT_MS2 = 2e4;
+  var OFFLINE_MESSAGE2 = "Der Toolbox-Server ist gerade nicht erreichbar.";
+  var PRESELECT_FROM = 0.8;
+  var MAILART_LABELS = {
+    absage: "Absage",
+    interesse: "Interesse / Einladung",
+    termin_zusage: "Terminzusage",
+    termin_absage: "Terminabsage / Verschiebung",
+    feedback: "Feedback nach VT",
+    unterlagen: "Unterlagen angefragt",
+    vertrag: "Vertrag / Startdatum",
+    stelle_besetzt: "Stelle besetzt",
+    neuer_bedarf: "Neuer Bedarf",
+    ap_wechsel: "AP-Wechsel / Urlaub",
+    rueckfrage: "Rückfrage",
+    kein_bezug: "Kein Bezug zu Matches"
+  };
+  var KAM_STATUS_LABELS2 = {
+    pending: "Ausstehend",
+    with_cem: "Bei CEM",
+    interview_request: "VT-Anfrage",
+    interview_conducted: "Stattgefundenes VT",
+    interview_feedback: "VT Feedback",
+    hot_case: "Hot Case",
+    hot_hot_case: "Hot Hot Case",
+    hired: "Hired",
+    out: "Out",
+    match_mail_sent: "MM gesendet"
+  };
+  function reasonOption(value) {
+    return OUT_FEEDBACK_OPTIONS.find((option) => option.value === value) || null;
+  }
+  function owaIdFromUrl(href) {
+    const match = /\/id\/([^/?#]+)/.exec(String(href || ""));
+    if (!match) return "";
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+  function percent(value) {
+    return `${Math.round((Number(value) || 0) * 100)} %`;
+  }
+  function parseWebhookResponse(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Mail-Assistent: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+    const post = (payload) => new Promise((resolve, reject) => {
+      const auth = getAuth() || {};
+      if (!auth.bearer) {
+        reject(new Error("Noch keine Anmeldung aus dem Adminpanel erfasst. Bitte einmal admin.werkia.de öffnen."));
+        return;
+      }
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify({ ...payload, auth: { bearer: auth.bearer, fingerprint: auth.fingerprint || "" } }),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseWebhookResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+      });
+    });
+    return {
+      holen: ({ owaId, betreff, absender }) => post({ op: "holen", owaId, betreff, absender }),
+      erledigt: ({ schluessel, entscheidungen }) => post({ op: "erledigt", schluessel, entscheidungen }),
+      ausfuehren: ({ postfach, operationen }) => post({ op: "ausfuehren", postfach, operationen })
+    };
+  }
+  var matchOf = (vorschlag, index) => (vorschlag?.matches || [])[index] || null;
+  var preselect = (entry) => Boolean(entry?.matchId) && (Number(entry?.sicherheit) || 0) >= PRESELECT_FROM;
+  function buildChoices(vorschlag, { mailText = "" } = {}) {
+    const choices = [];
+    (vorschlag?.matches || []).forEach((entry, index) => {
+      const known = Boolean(entry.matchId);
+      const current = entry.kamStatusAktuell ?? entry.kamStatusBisher ?? "";
+      if (entry.kam_status) {
+        const same = current === entry.kam_status;
+        choices.push({
+          key: `m${index}-status`,
+          art: "status",
+          match: index,
+          kamStatus: entry.kam_status,
+          outGrund: entry.out_grund || "",
+          aktiv: preselect(entry) && !same && (entry.kam_status !== "out" || Boolean(reasonOption(entry.out_grund))),
+          moeglich: known,
+          hinweis: same ? `Steht schon auf ${KAM_STATUS_LABELS2[current] || current}.` : ""
+        });
+      }
+      if (entry.kommentar || entry.kam_status === "out" && mailText) {
+        choices.push({
+          key: `m${index}-kommentar`,
+          art: "kommentar",
+          match: index,
+          kommentar: entry.kommentar || "",
+          cem: entry.cem_erwaehnen && entry.cem?.id ? entry.cem : null,
+          // Bei Absagen geht der Mailtext für CEM mit (wie beim Outen aus Outlook).
+          mailtext: entry.kam_status === "out" ? mailText : "",
+          aktiv: preselect(entry),
+          moeglich: known,
+          hinweis: entry.cem_erwaehnen && !entry.cem?.id ? "Keine CEM-Person am Kandidaten eingetragen." : ""
+        });
+      }
+      if (entry.wvl) {
+        choices.push({ key: `m${index}-wvl`, art: "wvl", match: index, wvl: entry.wvl, aktiv: preselect(entry), moeglich: known, hinweis: "" });
+      }
+    });
+    const employerId = vorschlag?.arbeitgeber?.[0]?.id || (vorschlag?.matches || []).find((entry) => entry.employerId)?.employerId || "";
+    if (vorschlag?.ag_notiz?.text) {
+      choices.push({
+        key: "ag-notiz",
+        art: "agNotiz",
+        employerId,
+        tags: [...vorschlag.ag_notiz.tags || []],
+        text: vorschlag.ag_notiz.text,
+        aktiv: (Number(vorschlag.sicherheit) || 0) >= PRESELECT_FROM && Boolean(employerId),
+        moeglich: Boolean(employerId),
+        hinweis: ""
+      });
+    }
+    return choices;
+  }
+  function mentionHtml(person) {
+    const id = escapeHtml(person.id);
+    const label = escapeHtml(person.label);
+    return `<a data-type="mention" href="#/Employee/${id}/show" class="mention" data-id="${id}" data-label="${label}" data-resource="Employee">@${label}</a>`;
+  }
+  var paragraphs = (text) => String(text || "").trim().split(/\n{2,}/).map((block) => block.split("\n").map((line) => escapeHtml(line.trim())).join("<br>")).filter(Boolean).map((block) => `<p>${block}</p>`);
+  function commentHtml({ kommentar = "", cem = null, mailtext = "" }) {
+    const head = `${cem ? `${mentionHtml(cem)} ` : ""}${escapeHtml(String(kommentar || "").trim())}`.trim();
+    const parts = head ? [`<p>${head}</p>`] : [];
+    if (String(mailtext || "").trim()) parts.push("<p>Mail des Arbeitgebers:</p>", ...paragraphs(mailtext));
+    return parts.join("");
+  }
+  function buildOperations(vorschlag, choices) {
+    const operations = [];
+    for (const choice of choices) {
+      if (!choice.aktiv || !choice.moeglich) continue;
+      const entry = choice.match === void 0 ? null : matchOf(vorschlag, choice.match);
+      const who = entry?.kandidat || "Match";
+      if (choice.art === "status") {
+        if (choice.kamStatus === "out") {
+          const reason = reasonOption(choice.outGrund);
+          if (!reason) continue;
+          operations.push({ key: choice.key, beschreibung: `${who}: Out (${reason.label})`, query: UPDATE_MATCH_STATUS_WITH_FEEDBACK_MUTATION, variables: { id: entry.matchId, kamStatus: "out", kamFeedback: resolveOutFeedbackText(reason) } });
+        } else {
+          operations.push({ key: choice.key, beschreibung: `${who}: ${KAM_STATUS_LABELS2[choice.kamStatus] || choice.kamStatus}`, query: UPDATE_MATCH_STATUS_MUTATION, variables: { id: entry.matchId, kamStatus: choice.kamStatus } });
+        }
+        if (statusClearsWvl(choice.kamStatus)) {
+          operations.push({ key: `${choice.key}-wvl`, beschreibung: `${who}: WVL gelöscht`, query: UPDATE_MATCH_WVL_MUTATION, variables: { id: entry.matchId, kamFollowUpDate: null } });
+        }
+      } else if (choice.art === "kommentar") {
+        const text = commentHtml(choice);
+        if (!text) continue;
+        operations.push({ key: choice.key, beschreibung: `${who}: Matchkommentar${choice.cem ? ` mit @${choice.cem.label}` : ""}`, query: CREATE_MATCH_COMMENT_MUTATION, variables: { matchId: entry.matchId, text } });
+      } else if (choice.art === "wvl") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(choice.wvl || ""))) continue;
+        operations.push({ key: choice.key, beschreibung: `${who}: WVL ${choice.wvl}`, query: UPDATE_MATCH_WVL_MUTATION, variables: { id: entry.matchId, kamFollowUpDate: choice.wvl } });
+      } else if (choice.art === "agNotiz") {
+        if (!String(choice.text || "").trim()) continue;
+        operations.push({ key: choice.key, beschreibung: `AG-Notiz ${(choice.tags || []).map((tag) => `[${tag}]`).join("")}`, query: CREATE_EMPLOYER_COMMENT_MUTATION, variables: { comment: noteToHtml(choice.tags, choice.text), employerId: choice.employerId } });
+      }
+    }
+    return operations;
+  }
+  function decisions(choices, results = /* @__PURE__ */ new Map()) {
+    return choices.map((choice) => ({
+      key: choice.key,
+      art: choice.art,
+      angenommen: Boolean(choice.aktiv && choice.moeglich),
+      ok: results.has(choice.key) ? results.get(choice.key) : null
+    }));
+  }
+
+  // src/features/outlook-assistent/index.js
+  var SOURCE = "kam/toolbox/src/features/outlook-assistent/index.js";
+  var HOSTS = ["outlook.office.com", "outlook.cloud.microsoft"];
+  var IDS5 = { pill: "werkia-mail-assistent-pill", dialog: "werkia-mail-assistent-dialog" };
+  var MAIL_BODY_SELECTORS2 = ['div[aria-label="Nachrichtentext"]', 'div[aria-label="Message body"]', 'div[role="document"]'];
+  var STATUS_CHOICES = ["interview_request", "interview_conducted", "interview_feedback", "hot_case", "hot_hot_case", "out"];
+  var ADMIN = "https://admin.werkia.de/#";
+  var isVisible2 = (element2) => element2.getClientRects().length > 0;
+  function styled2(node, styles) {
+    Object.assign(node.style, styles);
+    return node;
+  }
+  function el4(tag, styles = {}, text = "") {
+    const node = styled2(document.createElement(tag), styles);
+    if (text) node.textContent = text;
+    return node;
+  }
+  function button2(label, { primary = false } = {}) {
+    const node = el4("button", {
+      padding: "7px 12px",
+      borderRadius: "5px",
+      cursor: "pointer",
+      fontWeight: "600",
+      font: "600 13px Arial,sans-serif",
+      border: primary ? "1px solid #1d4ed8" : "1px solid #aaa",
+      background: primary ? "#1d4ed8" : "#fff",
+      color: primary ? "#fff" : "#222"
+    }, label);
+    node.type = "button";
+    return node;
+  }
+  function readSubject() {
+    const heading = [...document.querySelectorAll('[id$="_SUBJECT"]')].find(isVisible2);
+    return heading ? String(heading.getAttribute("title") || heading.textContent || "").trim() : "";
+  }
+  function readMailText() {
+    for (const container of [...document.querySelectorAll(MAIL_BODY_SELECTORS2.join(","))].filter(isVisible2)) {
+      const draft = outMailCommentDraft(container.innerText || "");
+      if (draft) return draft;
+    }
+    return "";
+  }
+  function executeOutlookAssistent(runtime, options = {}) {
+    runtime.registerSource(SOURCE);
+    if (!HOSTS.includes(location.hostname)) return;
+    const client = options.client || createAssistentClient({
+      request: typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : () => {
+        throw new Error("GM_xmlhttpRequest fehlt.");
+      },
+      getAuth: getKamGraphqlAuth
+    });
+    const cache = /* @__PURE__ */ new Map();
+    let current = { key: "", result: null };
+    let disabled = false;
+    function removePill() {
+      document.getElementById(IDS5.pill)?.remove();
+    }
+    function renderPill(result) {
+      const vorschlag = result?.vorschlag;
+      if (!result?.gefunden || !vorschlag || result.mailart === "kein_bezug") {
+        removePill();
+        return;
+      }
+      let pill = document.getElementById(IDS5.pill);
+      if (!pill) {
+        pill = el4("button", {
+          position: "fixed",
+          right: "88px",
+          bottom: "27px",
+          zIndex: "2147483000",
+          height: "40px",
+          padding: "0 14px",
+          borderRadius: "20px",
+          border: "0",
+          cursor: "pointer",
+          font: "600 13px Arial,sans-serif",
+          color: "#fff",
+          boxShadow: "0 4px 16px rgba(0,0,0,.25)"
+        });
+        pill.id = IDS5.pill;
+        pill.type = "button";
+        pill.addEventListener("click", () => openDialog(current.result));
+        document.body.appendChild(pill);
+      }
+      const done = result.status === "erledigt";
+      const staging = result.umgebung === "staging" ? " · Staging" : "";
+      pill.textContent = done ? `Vorschlag erledigt${staging}` : `Vorschlag: ${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${staging}`;
+      styled2(pill, { background: done ? "#6b7280" : "#1d4ed8" });
+    }
+    function choiceRow(choice, vorschlag, onChange) {
+      const row = el4("div", { display: "grid", gap: "6px", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", background: choice.moeglich ? "#fff" : "#f9fafb" });
+      const head = el4("label", { display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" });
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = choice.aktiv && choice.moeglich;
+      box.disabled = !choice.moeglich;
+      box.addEventListener("change", () => {
+        choice.aktiv = box.checked;
+        onChange();
+      });
+      const titles = { status: "KAM-Status", kommentar: "Matchkommentar", wvl: "WVL", agNotiz: "AG-Notiz" };
+      head.append(box, titles[choice.art] || choice.art);
+      row.appendChild(head);
+      const touch = () => {
+        box.checked = choice.moeglich;
+        choice.aktiv = choice.moeglich;
+        onChange();
+      };
+      if (choice.art === "status") {
+        const status = document.createElement("select");
+        STATUS_CHOICES.forEach((value) => status.append(new Option(KAM_STATUS_LABELS2[value], value, false, value === choice.kamStatus)));
+        const reason = document.createElement("select");
+        reason.append(new Option("Grund wählen", ""));
+        OUT_FEEDBACK_OPTIONS.forEach((option) => reason.append(new Option(option.label, option.value, false, option.value === choice.outGrund)));
+        const sync = () => {
+          reason.hidden = status.value !== "out";
+        };
+        status.addEventListener("change", () => {
+          choice.kamStatus = status.value;
+          sync();
+          touch();
+        });
+        reason.addEventListener("change", () => {
+          choice.outGrund = reason.value;
+          touch();
+        });
+        sync();
+        const line = el4("div", { display: "flex", gap: "6px", flexWrap: "wrap" });
+        line.append(status, reason);
+        row.appendChild(line);
+      } else if (choice.art === "kommentar") {
+        const text = el4("textarea", { width: "100%", boxSizing: "border-box", font: "13px/1.4 Arial,sans-serif" });
+        text.rows = 2;
+        text.value = choice.kommentar;
+        text.addEventListener("input", () => {
+          choice.kommentar = text.value;
+        });
+        row.appendChild(text);
+        if (choice.cem) {
+          const cem = el4("label", { display: "flex", gap: "6px", alignItems: "center" });
+          const cemBox = document.createElement("input");
+          cemBox.type = "checkbox";
+          cemBox.checked = true;
+          const person = choice.cem;
+          cemBox.addEventListener("change", () => {
+            choice.cem = cemBox.checked ? person : null;
+          });
+          cem.append(cemBox, `@${person.label} erwähnen`);
+          row.appendChild(cem);
+        }
+        if (choice.mailtext) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "Mailtext des Arbeitgebers kommt mit (für CEM)";
+          const mail = el4("textarea", { width: "100%", boxSizing: "border-box", font: "12px/1.4 Arial,sans-serif" });
+          mail.rows = 5;
+          mail.value = choice.mailtext;
+          mail.addEventListener("input", () => {
+            choice.mailtext = mail.value;
+          });
+          details.append(summary, mail);
+          row.appendChild(details);
+        }
+      } else if (choice.art === "wvl") {
+        const date = document.createElement("input");
+        date.type = "date";
+        date.value = choice.wvl;
+        date.addEventListener("change", () => {
+          choice.wvl = date.value;
+          touch();
+        });
+        row.appendChild(date);
+      } else if (choice.art === "agNotiz") {
+        const tags = el4("div", { display: "flex", gap: "10px", flexWrap: "wrap" });
+        NOTE_TAGS.forEach((tag) => {
+          const label = el4("label", { display: "flex", gap: "4px", alignItems: "center" });
+          const tagBox = document.createElement("input");
+          tagBox.type = "checkbox";
+          tagBox.checked = choice.tags.includes(tag.id);
+          tagBox.addEventListener("change", () => {
+            choice.tags = tagBox.checked ? [.../* @__PURE__ */ new Set([...choice.tags, tag.id])] : choice.tags.filter((id) => id !== tag.id);
+          });
+          label.append(tagBox, tag.label || tag.id);
+          tags.appendChild(label);
+        });
+        const text = el4("textarea", { width: "100%", boxSizing: "border-box", font: "13px/1.4 Arial,sans-serif" });
+        text.rows = 2;
+        text.value = choice.text;
+        text.addEventListener("input", () => {
+          choice.text = text.value;
+        });
+        row.append(tags, text);
+      }
+      if (choice.hinweis) row.appendChild(el4("div", { color: "#92400e", fontSize: "12px" }, choice.hinweis));
+      if (!choice.moeglich) row.appendChild(el4("div", { color: "#6b7280", fontSize: "12px" }, "Kein Match zugeordnet, nur zur Info."));
+      return row;
+    }
+    function matchBlock(entry, index, choices, onChange) {
+      const block = el4("div", { display: "grid", gap: "6px" });
+      const status = KAM_STATUS_LABELS2[entry.kamStatusAktuell ?? entry.kamStatusBisher] || "ohne KAM-Status";
+      const title = el4("div", { fontWeight: "700" });
+      if (entry.matchId) {
+        const link = el4("a", { color: "#1d4ed8" }, entry.kandidat || "Match");
+        link.href = `${ADMIN}/Match/${entry.matchId}/show`;
+        link.target = "_blank";
+        link.rel = "noopener";
+        title.append(link, ` – ${entry.vakanz || ""} (${status})`);
+      } else {
+        title.textContent = "Kandidat nicht zugeordnet";
+      }
+      block.append(title, el4("div", { color: "#4b5563", fontSize: "12px" }, `${entry.begruendung || ""} · Sicherheit ${percent(entry.sicherheit)}`));
+      choices.filter((choice) => choice.match === index).forEach((choice) => block.appendChild(choiceRow(choice, entry, onChange)));
+      return block;
+    }
+    async function declineInterviews(request, matchId) {
+      const data = await request(ALL_INTERVIEWS_QUERY, { filter: { matchId, statuses: OPEN_INTERVIEW_STATUSES }, page: 0, perPage: 100, sortField: "status", sortOrder: "ASC" });
+      const ids = openInterviewIds(data?.items || []);
+      for (const id of ids) await request(UPDATE_INTERVIEW_MUTATION, { id, status: "declined" });
+      return ids.length;
+    }
+    async function execute(result, operations) {
+      const outcome = /* @__PURE__ */ new Map();
+      const lines = [];
+      if (result.umgebung === "staging") {
+        const response = await client.ausfuehren({ postfach: result.postfach, operationen: operations.map(({ query, variables }) => ({ query, variables })) });
+        operations.forEach((operation, index) => {
+          const ok = Boolean(response.ergebnisse?.[index]?.ok);
+          outcome.set(operation.key, ok);
+          lines.push(`${ok ? "✓" : "✗"} ${operation.beschreibung}${ok ? "" : `: ${response.ergebnisse?.[index]?.fehler || "Fehler"}`}`);
+        });
+        return { outcome, lines };
+      }
+      const { request } = getKamGraphqlAdapter();
+      for (const operation of operations) {
+        try {
+          await request(operation.query, operation.variables);
+          outcome.set(operation.key, true);
+          lines.push(`✓ ${operation.beschreibung}`);
+          if (operation.variables?.kamStatus === "out") {
+            const declined = await declineInterviews(request, operation.variables.id).catch(() => -1);
+            lines.push(declined < 0 ? "✗ offene Terminvorschläge nicht geladen, bitte im Adminpanel prüfen" : `✓ ${declined} offene Terminvorschläge abgelehnt`);
+          }
+        } catch (error) {
+          outcome.set(operation.key, false);
+          lines.push(`✗ ${operation.beschreibung}: ${error.message}`);
+        }
+      }
+      return { outcome, lines };
+    }
+    function openDialog(result) {
+      if (!result?.vorschlag) return;
+      document.getElementById(IDS5.dialog)?.remove();
+      const { vorschlag } = result;
+      const choices = buildChoices(vorschlag, { mailText: readMailText() });
+      const dialog = el4("dialog", { width: "min(620px, calc(100vw - 32px))", maxHeight: "calc(100vh - 48px)", border: "0", borderRadius: "10px", padding: "0", boxShadow: "0 12px 45px rgba(0,0,0,.3)", font: "14px/1.4 Arial,sans-serif", color: "#222" });
+      dialog.id = IDS5.dialog;
+      const head = el4("div", { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", color: "#fff", background: "#1d4ed8", fontWeight: "700" });
+      const title = el4("span", {}, `${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${result.umgebung === "staging" ? " · Staging" : ""}`);
+      title.appendChild(kamHelp.tip("outlook-assistent", { tone: "dark" }));
+      const close = el4("button", { border: "0", background: "transparent", color: "#fff", fontSize: "20px", cursor: "pointer" }, "×");
+      close.type = "button";
+      close.setAttribute("aria-label", "Schließen");
+      close.addEventListener("click", () => dialog.close());
+      head.append(title, close);
+      const body = el4("div", { padding: "14px 16px", display: "grid", gap: "12px", overflowY: "auto", maxHeight: "calc(100vh - 170px)" });
+      body.appendChild(el4("div", {}, vorschlag.zusammenfassung || ""));
+      const employer = (vorschlag.arbeitgeber || []).map((entry) => entry.name).filter(Boolean).join(" / ");
+      if (employer) body.appendChild(el4("div", { color: "#4b5563" }, `Arbeitgeber: ${employer}`));
+      if (result.status === "erledigt") body.appendChild(el4("div", { color: "#92400e" }, `Schon erledigt${result.erledigt?.von ? ` von ${result.erledigt.von}` : ""}. Du kannst trotzdem noch etwas übernehmen.`));
+      const status = el4("div", { whiteSpace: "pre-line", fontSize: "13px" });
+      const applyBtn = button2("Übernehmen", { primary: true });
+      const rejectBtn = button2("Alles ablehnen");
+      const refresh = () => {
+        const count = buildOperations(vorschlag, choices).length;
+        applyBtn.textContent = count ? `Übernehmen (${count})` : "Übernehmen";
+        applyBtn.disabled = !count;
+      };
+      (vorschlag.matches || []).forEach((entry, index) => body.appendChild(matchBlock(entry, index, choices, refresh)));
+      const noteChoice = choices.find((choice) => choice.art === "agNotiz");
+      if (noteChoice) body.appendChild(choiceRow(noteChoice, null, refresh));
+      if (vorschlag.vakanz_pausieren) {
+        const info = el4("div", { color: "#92400e" }, "Die Mail klingt nach „Stelle besetzt“. Vakanz bitte im Adminpanel pausieren. ");
+        const jobId = (vorschlag.matches || []).find((entry) => entry.jobPositionId)?.jobPositionId;
+        if (jobId) {
+          const link = el4("a", { color: "#1d4ed8" }, "Vakanz öffnen");
+          link.href = `${ADMIN}/JobPosition/${jobId}`;
+          link.target = "_blank";
+          link.rel = "noopener";
+          info.appendChild(link);
+        }
+        body.appendChild(info);
+      }
+      if (vorschlag.antwortentwurf) {
+        const box = el4("div", { display: "grid", gap: "4px", padding: "8px 10px", background: "#f3f4f6", borderRadius: "6px" });
+        box.append(el4("strong", {}, "Antwortentwurf (liegt in Outlook unter Entwürfe, wenn das Postfach freigegeben ist)"), el4("div", { whiteSpace: "pre-wrap" }, vorschlag.antwortentwurf));
+        body.appendChild(box);
+      }
+      const footer = el4("div", { display: "flex", justifyContent: "flex-end", gap: "8px", padding: "10px 16px", borderTop: "1px solid #e5e7eb" });
+      footer.append(rejectBtn, applyBtn);
+      body.appendChild(status);
+      applyBtn.addEventListener("click", async () => {
+        const operations = buildOperations(vorschlag, choices);
+        if (!operations.length) return;
+        if (!window.confirm(`Ins Adminpanel${result.umgebung === "staging" ? " (Staging)" : ""} schreiben?
+
+${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) return;
+        applyBtn.disabled = true;
+        rejectBtn.disabled = true;
+        status.textContent = "Schreibe …";
+        try {
+          const { outcome, lines } = await execute(result, operations);
+          status.textContent = lines.join("\n");
+          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices, outcome) }).catch(() => {
+          });
+          result.status = "erledigt";
+          renderPill(result);
+        } catch (error) {
+          status.textContent = `Fehlgeschlagen: ${error.message}`;
+          applyBtn.disabled = false;
+        }
+        rejectBtn.disabled = false;
+      });
+      rejectBtn.addEventListener("click", async () => {
+        choices.forEach((choice) => {
+          choice.aktiv = false;
+        });
+        try {
+          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices) });
+          result.status = "erledigt";
+          renderPill(result);
+          dialog.close();
+        } catch (error) {
+          status.textContent = `Fehlgeschlagen: ${error.message}`;
+        }
+      });
+      refresh();
+      dialog.append(head, body, footer);
+      dialog.addEventListener("close", () => dialog.remove(), { once: true });
+      document.body.appendChild(dialog);
+      dialog.showModal();
+    }
+    let scheduled = false;
+    function mailKey() {
+      return `${location.href}#${readSubject()}`;
+    }
+    async function check() {
+      const key = mailKey();
+      if (key === current.key) return;
+      current = { key, result: null };
+      const betreff = readSubject();
+      const owaId = owaIdFromUrl(location.href);
+      if (!betreff && !owaId) {
+        removePill();
+        return;
+      }
+      if (disabled) return;
+      if (!cache.has(key)) {
+        cache.set(key, client.holen({ owaId, betreff, absender: "" }).catch((error) => {
+          if (/keine Vorschläge/.test(error.message)) disabled = true;
+          return null;
+        }));
+      }
+      const result = await cache.get(key);
+      if (current.key !== key) return;
+      current.result = result;
+      renderPill(result);
+    }
+    function scheduleCheck() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        check();
+      }, 700);
+    }
+    runtime.createMutationObserver(scheduleCheck).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addCleanup(() => {
+      removePill();
+      document.getElementById(IDS5.dialog)?.remove();
     });
     scheduleCheck();
   }
@@ -11445,7 +12121,7 @@ ${buildCbreBody(current)}`;
 
   // src/features/focus-modes/index.js
   var SOURCE_PATH = "kam/toolbox/src/features/focus-modes/index.js";
-  var IDS5 = {
+  var IDS6 = {
     group: "werkia-focus-group",
     bar: "werkia-focus-bar",
     select: "werkia-focus-select",
@@ -11503,33 +12179,33 @@ ${buildCbreBody(current)}`;
       return mePromise;
     };
     function ensureStyle4() {
-      if (document.getElementById(IDS5.style)) return;
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS5.style;
+      style.id = IDS6.style;
       style.textContent = `
-      #${IDS5.group}, #${IDS5.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS5.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS5.group}.is-active, #${IDS5.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS5.group} > strong, #${IDS5.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS5.group}.is-active > strong, #${IDS5.bar}.is-active > strong { color:#b85400; }
-      #${IDS5.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS5.group} button, #${IDS5.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS5.group} button:hover, #${IDS5.bar} button:hover { background:#f4f4f5; }
-      #${IDS5.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS5.leave}:hover { background:#b85400 !important; }
-      #${IDS5.group} [hidden], #${IDS5.bar} [hidden] { display:none !important; }
+      #${IDS6.group}, #${IDS6.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS6.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS6.group}.is-active, #${IDS6.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS6.group} > strong, #${IDS6.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS6.group}.is-active > strong, #${IDS6.bar}.is-active > strong { color:#b85400; }
+      #${IDS6.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS6.group} button, #${IDS6.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS6.group} button:hover, #${IDS6.bar} button:hover { background:#f4f4f5; }
+      #${IDS6.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS6.leave}:hover { background:#b85400 !important; }
+      #${IDS6.group} [hidden], #${IDS6.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS5.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS5.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS5.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS5.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS5.dialog} input[type=text], #${IDS5.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS5.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS5.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS5.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS5.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS6.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS6.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS6.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS6.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS6.dialog} input[type=text], #${IDS6.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS6.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS6.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS6.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS6.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -11565,13 +12241,13 @@ ${buildCbreBody(current)}`;
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS5.dialog)?.remove();
+      document.getElementById(IDS6.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS5.dialog;
+      overlay.id = IDS6.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -11648,7 +12324,7 @@ ${buildCbreBody(current)}`;
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS5.select;
+      select.id = IDS6.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       select.addEventListener("change", () => {
         const mode = allModes().find((entry) => entry.id === select.value);
@@ -11657,19 +12333,19 @@ ${buildCbreBody(current)}`;
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS5.leave;
+      leaveButton.id = IDS6.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS5.save;
+      saveButton.id = IDS6.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS5.remove;
+      removeButton.id = IDS6.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -11681,14 +12357,14 @@ ${buildCbreBody(current)}`;
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS5.group);
-      let ownBar = document.getElementById(IDS5.bar);
+      let group = document.getElementById(IDS6.group);
+      let ownBar = document.getElementById(IDS6.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS5.group;
+        group.id = IDS6.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -11698,7 +12374,7 @@ ${buildCbreBody(current)}`;
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS5.bar;
+      ownBar.id = IDS6.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
@@ -11735,8 +12411,8 @@ ${buildCbreBody(current)}`;
     function render() {
       if (!isTargetPage8()) {
         clearColumnFocus(document);
-        document.getElementById(IDS5.group)?.remove();
-        document.getElementById(IDS5.bar)?.remove();
+        document.getElementById(IDS6.group)?.remove();
+        document.getElementById(IDS6.bar)?.remove();
         closeDialog();
         return;
       }
@@ -11756,9 +12432,9 @@ ${buildCbreBody(current)}`;
       if (!container) return;
       const isActive = Boolean(mode);
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS5.select}`), own, mode?.id || "");
-      setHidden(container.querySelector(`#${IDS5.leave}`), !isActive);
-      setHidden(container.querySelector(`#${IDS5.remove}`), !isActive || Boolean(mode?.builtIn));
+      fillSelect(container.querySelector(`#${IDS6.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS6.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS6.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -11775,9 +12451,9 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS2 = 15e3;
-  var OFFLINE_MESSAGE2 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS3 = 15e3;
+  var OFFLINE_MESSAGE3 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
   me: currentEmployee { id __typename }
 }`;
@@ -11820,7 +12496,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createVertretungenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+  function createVertretungenClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -11835,8 +12511,8 @@ ${buildCbreBody(current)}`;
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
       });
     });
   }
@@ -11857,7 +12533,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/vertretungen/index.js
-  var IDS6 = {
+  var IDS7 = {
     button: "werkia-vertretungen-button",
     bar: "werkia-vertretungen-bar",
     dialog: "werkia-vertretungen-dialog",
@@ -11903,7 +12579,7 @@ ${buildCbreBody(current)}`;
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && /^filter hinzuf/i.test(element2.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS7.button && /^filter hinzuf/i.test(element2.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -11911,7 +12587,7 @@ ${buildCbreBody(current)}`;
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && element2.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS7.button && element2.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -11938,56 +12614,56 @@ ${buildCbreBody(current)}`;
       return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
     };
     function ensureStyle4() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS7.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS7.style;
       style.textContent = `
-      #${IDS6.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS6.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS6.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS6.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS6.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS6.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS6.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS6.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS6.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS6.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS6.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS6.dialog} .wv-admins { margin-top:16px; }
-      #${IDS6.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS6.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS6.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS6.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS6.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS6.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS6.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS6.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS6.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS6.dialog} select, #${IDS6.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS6.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS6.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS6.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS6.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS6.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS6.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS6.dialog} .wv-status.wv-error { color:#a02334; }
+      #${IDS7.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS7.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS7.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS7.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS7.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS7.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS7.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS7.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS7.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS7.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS7.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS7.dialog} .wv-admins { margin-top:16px; }
+      #${IDS7.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS7.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS7.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS7.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS7.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS7.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS7.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS7.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS7.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS7.dialog} select, #${IDS7.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS7.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS7.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS7.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS7.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS7.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS7.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS7.dialog} .wv-status.wv-error { color:#a02334; }
     `;
       document.head.appendChild(style);
     }
-    function el6(tag, props = {}, children = []) {
+    function el7(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       Object.assign(element2, props);
       element2.append(...children.filter((child) => child !== null && child !== void 0));
       return element2;
     }
-    function button3(text, onClick, className = "") {
-      return el6("button", { type: "button", textContent: text, className, onclick: onClick });
+    function button4(text, onClick, className = "") {
+      return el7("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
       let timer = null;
-      const element2 = button3(label, () => {
+      const element2 = button4(label, () => {
         if (!armed) {
           armed = true;
           element2.textContent = question;
@@ -12013,17 +12689,17 @@ ${buildCbreBody(current)}`;
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function closeDialog() {
-      owned(IDS6.dialog)?.remove();
+      owned(IDS7.dialog)?.remove();
       editing = null;
     }
     function setStatus(text, isError = false) {
-      const status = owned(IDS6.dialog)?.querySelector(".wv-status");
+      const status = owned(IDS7.dialog)?.querySelector(".wv-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
+      owned(IDS7.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
         element2.disabled = busy;
       });
     }
@@ -12045,27 +12721,27 @@ ${buildCbreBody(current)}`;
       }
     }
     function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el6("select");
-      select.append(el6("option", { value: "", textContent: "Bitte wählen …" }));
+      const select = el7("select");
+      select.append(el7("option", { value: "", textContent: "Bitte wählen …" }));
       for (const person of people) {
-        select.append(el6("option", { value: person.id, textContent: person.name }));
+        select.append(el7("option", { value: person.id, textContent: person.name }));
       }
       select.value = value || "";
       if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
       return select;
     }
     function entryRow(entry) {
-      const who = el6("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el6("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el6("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const who = el7("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el7("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el7("span", { className: "wv-badge", textContent: "läuft" }) : null;
       const actions = entry.darfBearbeiten ? [
-        button3("Bearbeiten", () => {
+        button4("Bearbeiten", () => {
           editing = entry;
           render();
         }, "wv-secondary"),
         confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
-      const row = el6("li", {}, [who, when, badge, ...actions]);
+      const row = el7("li", {}, [who, when, badge, ...actions]);
       if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
       return row;
     }
@@ -12074,9 +12750,9 @@ ${buildCbreBody(current)}`;
       const { ich } = state;
       const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
       const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el6("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el6("input", { type: "date", value: editing ? editing.bis : today, min: today });
-      const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+      const von = el7("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el7("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const save = button4(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
         const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
         const problem = validateDraft(ich, draft, today);
         if (problem) {
@@ -12085,50 +12761,50 @@ ${buildCbreBody(current)}`;
         }
         run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
       });
-      const cancel = editing ? button3("Abbrechen", () => {
+      const cancel = editing ? button4("Abbrechen", () => {
         editing = null;
         render();
       }, "wv-secondary") : null;
       return [
-        el6("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el6("div", { className: "wv-form" }, [
-          el6("label", { textContent: "Abwesend" }),
+        el7("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el7("div", { className: "wv-form" }, [
+          el7("label", { textContent: "Abwesend" }),
           abwesend,
-          el6("label", { textContent: "Vertretung" }),
+          el7("label", { textContent: "Vertretung" }),
           vertretung,
-          el6("label", { textContent: "Von" }),
+          el7("label", { textContent: "Von" }),
           von,
-          el6("label", { textContent: "Bis (einschließlich)" }),
+          el7("label", { textContent: "Bis (einschließlich)" }),
           bis
         ]),
-        el6("div", { className: "wv-actions" }, [save, cancel])
+        el7("div", { className: "wv-actions" }, [save, cancel])
       ];
     }
     function adminSection() {
       const { ich } = state;
       const admins = state.admins || [];
-      const list = el6("ul");
+      const list = el7("ul");
       admins.forEach((admin) => {
         const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el6("li", {}, [el6("span", { className: "wv-who", textContent: admin.name }), remove]));
+        list.append(el7("li", {}, [el7("span", { className: "wv-who", textContent: admin.name }), remove]));
       });
       const parts = [
-        el6("summary", { textContent: `Admins (${admins.length})` }),
-        el6("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        el7("summary", { textContent: `Admins (${admins.length})` }),
+        el7("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
         list
       ];
       if (ich.darfAlles) {
         const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
-        const add = button3("Als Admin eintragen", () => {
+        const add = button4("Als Admin eintragen", () => {
           if (!candidate.value) {
             setStatus("Bitte auswählen, wer Admin werden soll.", true);
             return;
           }
           run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
         }, "wv-secondary");
-        parts.push(el6("div", { className: "wv-actions" }, [candidate, add]));
+        parts.push(el7("div", { className: "wv-actions" }, [candidate, add]));
       }
-      const details = el6("details", { className: "wv-admins" }, parts);
+      const details = el7("details", { className: "wv-admins" }, parts);
       details.open = adminsOpen;
       details.addEventListener("toggle", () => {
         adminsOpen = details.open;
@@ -12136,68 +12812,68 @@ ${buildCbreBody(current)}`;
       return details;
     }
     function card() {
-      return owned(IDS6.dialog)?.querySelector(".wv-body");
+      return owned(IDS7.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
       if (!target) return;
       target.textContent = "";
       const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el6("ul");
-      if (!state.eintraege.length) list.append(el6("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      const list = el7("ul");
+      if (!state.eintraege.length) list.append(el7("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
       state.eintraege.forEach((entry) => list.append(entryRow(entry)));
       const tip = helpTip?.();
       target.append(
-        el6("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el6("p", { textContent: intro }),
+        el7("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el7("p", { textContent: intro }),
         list,
         ...form(),
         adminSection(),
-        el6("div", { className: "wv-status" }),
-        el6("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
+        el7("div", { className: "wv-status" }),
+        el7("div", { className: "wv-actions" }, [button4("Schließen", closeDialog, "wv-secondary")])
       );
     }
     async function openDialog() {
       closeDialog();
       ensureStyle4();
-      const overlay = el6("div", { id: IDS6.dialog });
+      const overlay = el7("div", { id: IDS7.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const close = button3("×", closeDialog, "wv-close");
+      const close = button4("×", closeDialog, "wv-close");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const target = el6("div", { className: "wv-body" }, [
-        el6("h2", { textContent: "Vertretungen" }),
-        el6("div", { className: "wv-status", textContent: "Lädt …" })
+      const target = el7("div", { className: "wv-body" }, [
+        el7("h2", { textContent: "Vertretungen" }),
+        el7("div", { className: "wv-status", textContent: "Lädt …" })
       ]);
-      overlay.append(el6("div", { className: "wv-card" }, [close, target]));
+      overlay.append(el7("div", { className: "wv-card" }, [close, target]));
       document.body.appendChild(overlay);
       try {
         await refresh();
       } catch (error) {
         setStatus(error.message || String(error), true);
-        target.append(el6("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
+        target.append(el7("div", { className: "wv-actions" }, [button4("Schließen", closeDialog, "wv-secondary")]));
       }
     }
     function placeButton() {
       if (!isTargetPage8()) {
-        owned(IDS6.button)?.remove();
-        owned(IDS6.bar)?.remove();
+        owned(IDS7.button)?.remove();
+        owned(IDS7.bar)?.remove();
         return;
       }
       ensureStyle4();
       const slot = findSlot(document);
-      const existing = owned(IDS6.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
+      const existing = owned(IDS7.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS7.bar)) return;
       existing?.remove();
-      const vertretungenButton = button3("Vertretungen", openDialog);
-      vertretungenButton.id = IDS6.button;
+      const vertretungenButton = button4("Vertretungen", openDialog);
+      vertretungenButton.id = IDS7.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (slot) {
-        owned(IDS6.bar)?.remove();
+        owned(IDS7.bar)?.remove();
         const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
@@ -12219,15 +12895,15 @@ ${buildCbreBody(current)}`;
         return;
       }
       vertretungenButton.className = "wv-own";
-      owned(IDS6.bar)?.remove();
+      owned(IDS7.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el6("div", { id: IDS6.bar }, [vertretungenButton]);
+      const bar = el7("div", { id: IDS7.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS6.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS7.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -12249,8 +12925,8 @@ ${buildCbreBody(current)}`;
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     runtime.addCleanup?.(() => {
-      owned(IDS6.button)?.remove();
-      owned(IDS6.bar)?.remove();
+      owned(IDS7.button)?.remove();
+      owned(IDS7.bar)?.remove();
       closeDialog();
     });
     schedule();
@@ -12379,9 +13055,9 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
-  var REQUEST_TIMEOUT_MS3 = 15e3;
-  var OFFLINE_MESSAGE3 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS4 = 15e3;
+  var OFFLINE_MESSAGE4 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
@@ -12406,7 +13082,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -12421,8 +13097,8 @@ ${buildCbreBody(current)}`;
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
       });
     });
   }
@@ -12442,7 +13118,7 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL3 }) {
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL4 }) {
     const post = createToolboxDatenRequest({ request, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
@@ -12525,8 +13201,8 @@ ${buildCbreBody(current)}`;
     const today = berlinDay2(now);
     return lastShownDay !== today && berlinTime(now) >= REVIEW_TIME && openCount > 0;
   }
-  function reviewSaves(entries, decisions, today = berlinDay2()) {
-    const get = (id) => decisions instanceof Map ? decisions.get(id) : decisions?.[id];
+  function reviewSaves(entries, decisions2, today = berlinDay2()) {
+    const get = (id) => decisions2 instanceof Map ? decisions2.get(id) : decisions2?.[id];
     const saves = [];
     for (const entry of entries) {
       const decision = get(entry.id);
@@ -12550,7 +13226,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/prio-liste/index.js
-  var IDS7 = {
+  var IDS8 = {
     button: "werkia-prio-button",
     bar: "werkia-prio-bar",
     panel: "werkia-prio-panel",
@@ -12668,29 +13344,29 @@ ${buildCbreBody(current)}`;
     const today = () => berlinDay2(now());
     const collapsed = () => store.get(STORAGE_KEYS.collapsed) === "1";
     const prioFirst = () => store.get(STORAGE_KEYS.prioFirst) === "1";
-    function el6(tag, props = {}, children = []) {
+    function el7(tag, props = {}, children = []) {
       const element2 = document.createElement(tag);
       Object.assign(element2, props);
       element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element2;
     }
-    const button3 = (text, onClick, className = "", title = "") => el6("button", { type: "button", textContent: text, className, title, onclick: onClick });
+    const button4 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
     function ensureStyle4() {
-      if (document.getElementById(IDS7.style)) return;
-      const style = el6("style", { id: IDS7.style });
-      const P = `#${IDS7.panel}`;
-      const R = `#${IDS7.review}`;
+      if (document.getElementById(IDS8.style)) return;
+      const style = el7("style", { id: IDS8.style });
+      const P = `#${IDS8.panel}`;
+      const R = `#${IDS8.review}`;
       style.textContent = `
-      #${IDS7.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
-      #${IDS7.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS7.button}.wp-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS7.button}.wp-native svg { flex:none; fill:currentColor; }
-      #${IDS7.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS7.button}[data-active="1"] { color:${T.accentInk} !important; }
+      #${IDS8.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
+      #${IDS8.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS8.button}.wp-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS8.button}.wp-native svg { flex:none; fill:currentColor; }
+      #${IDS8.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.button}[data-active="1"] { color:${T.accentInk} !important; }
       ${P}, ${R} .wp-card { box-sizing:border-box; color:${T.ink}; background:${T.surface}; border:1px solid ${T.line}; border-radius:10px; box-shadow:${T.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
-      #${IDS7.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS7.tab}:hover { border-color:${T.accent}; }
-      #${IDS7.tab} svg { width:14px; height:14px; fill:currentColor; }
+      #${IDS8.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.tab}:hover { border-color:${T.accent}; }
+      #${IDS8.tab} svg { width:14px; height:14px; fill:currentColor; }
       ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
       ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T.line}; }
       ${P} .wp-title { font-weight:650; font-size:13px; }
@@ -12847,7 +13523,7 @@ ${buildCbreBody(current)}`;
     }
     function slotBefore(slot) {
       let before = slot.before;
-      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS7.button) {
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS8.button) {
         before = before.previousElementSibling;
       }
       return before;
@@ -12858,7 +13534,7 @@ ${buildCbreBody(current)}`;
     }
     function placeButton() {
       const slot = findSlot(document);
-      let existing = owned(IDS7.button);
+      let existing = owned(IDS8.button);
       if (existing && slot) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -12866,17 +13542,17 @@ ${buildCbreBody(current)}`;
           existing.remove();
           existing = null;
         }
-      } else if (existing && !slot && existing.parentElement?.id !== IDS7.bar) {
+      } else if (existing && !slot && existing.parentElement?.id !== IDS8.bar) {
         existing.remove();
         existing = null;
       }
       if (!existing) {
-        const prioButton = button3("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
-        prioButton.id = IDS7.button;
+        const prioButton = button4("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
+        prioButton.id = IDS8.button;
         prioButton.dataset.werkiaPrioOwner = sourcePath;
-        prioButton.append(el6("span", { className: "wp-label" }));
+        prioButton.append(el7("span", { className: "wp-label" }));
         if (slot) {
-          owned(IDS7.bar)?.remove();
+          owned(IDS8.bar)?.remove();
           const look = nativeLookFrom(slot.sample);
           if (look) {
             prioButton.className = "wp-native";
@@ -12890,8 +13566,8 @@ ${buildCbreBody(current)}`;
           const anchor = findListAnchor(document);
           if (!anchor?.parentElement) return;
           prioButton.className = "wp-own";
-          owned(IDS7.bar)?.remove();
-          const bar = el6("div", { id: IDS7.bar }, [prioButton]);
+          owned(IDS8.bar)?.remove();
+          const bar = el7("div", { id: IDS8.bar }, [prioButton]);
           bar.dataset.werkiaPrioOwner = sourcePath;
           anchor.parentElement.insertBefore(bar, anchor);
         }
@@ -12920,16 +13596,16 @@ ${buildCbreBody(current)}`;
       tick();
     }
     function placeTab() {
-      let tab = owned(IDS7.tab);
+      let tab = owned(IDS8.tab);
       if (!collapsed()) {
         tab?.remove();
         return;
       }
       if (!tab) {
-        tab = button3("", togglePanel, "", "Prio-Liste öffnen");
-        tab.id = IDS7.tab;
+        tab = button4("", togglePanel, "", "Prio-Liste öffnen");
+        tab.id = IDS8.tab;
         tab.dataset.werkiaPrioOwner = sourcePath;
-        tab.append(starIcon("14px"), el6("span", { className: "wp-label" }));
+        tab.append(starIcon("14px"), el7("span", { className: "wp-label" }));
         document.body.appendChild(tab);
       }
       const label = tab.querySelector(".wp-label");
@@ -12937,14 +13613,14 @@ ${buildCbreBody(current)}`;
       if (label.textContent !== text) label.textContent = text;
     }
     function placePanel2() {
-      let panel = owned(IDS7.panel);
+      let panel = owned(IDS8.panel);
       placeTab();
       if (collapsed()) {
         panel?.remove();
         return;
       }
       if (!panel) {
-        panel = el6("div", { id: IDS7.panel });
+        panel = el7("div", { id: IDS8.panel });
         panel.dataset.werkiaPrioOwner = sourcePath;
         panel.setAttribute("role", "region");
         panel.setAttribute("aria-label", "Prio-Liste");
@@ -12964,23 +13640,23 @@ ${buildCbreBody(current)}`;
         extrasCache.set(employerId, element3);
       }
       const element2 = extrasCache.get(employerId);
-      return element2 ? el6("div", { className: "wp-extra" }, [element2]) : null;
+      return element2 ? el7("div", { className: "wp-extra" }, [element2]) : null;
     }
     function entryItem(entry, readOnly) {
-      const check = el6("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
+      const check = el7("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
       check.addEventListener("change", () => saveEntry(entry, { erledigt: check.checked }));
-      const name = el6("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
-      const tag = entry.uebertragen ? el6("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
-      const actions = readOnly ? el6("span") : el6("span", { className: "wp-actions" }, [
-        button3("✎", () => {
+      const name = el7("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
+      const tag = entry.uebertragen ? el7("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
+      const actions = readOnly ? el7("span") : el7("span", { className: "wp-actions" }, [
+        button4("✎", () => {
           editingId = entry.id;
           renderPanel();
         }, "wp-icon", "Notiz bearbeiten"),
-        button3("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
+        button4("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
       ]);
-      const parts = [check, el6("div", {}, [name, tag]), actions];
+      const parts = [check, el7("div", {}, [name, tag]), actions];
       if (editingId === entry.id && !readOnly) {
-        const input = el6("input", { type: "text", value: entry.notiz, placeholder: "Kurze Notiz", maxLength: 300 });
+        const input = el7("input", { type: "text", value: entry.notiz, placeholder: "Kurze Notiz", maxLength: 300 });
         const save = () => {
           editingId = "";
           saveEntry(entry, { notiz: input.value.trim() });
@@ -12997,13 +13673,13 @@ ${buildCbreBody(current)}`;
             renderPanel();
           }
         });
-        parts.push(el6("div", { className: "wp-edit" }, [input, button3("Speichern", save, "wp-btn wp-primary")]));
+        parts.push(el7("div", { className: "wp-edit" }, [input, button4("Speichern", save, "wp-btn wp-primary")]));
         runtime.setTimeout(() => input.focus(), 0);
       } else if (entry.notiz) {
-        parts.push(el6("div", { className: "wp-notiz", textContent: entry.notiz }));
+        parts.push(el7("div", { className: "wp-notiz", textContent: entry.notiz }));
       }
       parts.push(extrasFor(entry.employerId));
-      return el6("li", { className: entry.erledigt ? "wp-done" : "" }, parts);
+      return el7("li", { className: entry.erledigt ? "wp-done" : "" }, parts);
     }
     function pageEmployers() {
       const onList = prioEmployerIds(entries, today());
@@ -13016,20 +13692,20 @@ ${buildCbreBody(current)}`;
     }
     function addForm() {
       const choices = pageEmployers();
-      if (!choices.length) return el6("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
-      const select = el6("select", { disabled: busy }, [el6("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
-      choices.forEach(([id, name]) => select.append(el6("option", { value: id, textContent: name })));
-      const add = button3("Hinzufügen", () => {
+      if (!choices.length) return el7("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
+      const select = el7("select", { disabled: busy }, [el7("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
+      choices.forEach(([id, name]) => select.append(el7("option", { value: id, textContent: name })));
+      const add = button4("Hinzufügen", () => {
         if (!select.value) return;
         addEmployer(select.value, select.selectedOptions[0].textContent);
       }, "wp-btn", "Auf die heutige Prio-Liste setzen");
       add.disabled = busy;
-      return el6("div", { className: "wp-add" }, [select, add]);
+      return el7("div", { className: "wp-add" }, [select, add]);
     }
     function viewSelect() {
       if (!absent.length) return null;
-      const select = el6("select", { title: "Wessen Liste anzeigen" }, [el6("option", { value: "", textContent: "Meine Liste" })]);
-      absent.forEach((person) => select.append(el6("option", { value: person.id, textContent: `Liste von ${person.name || "vertretener Person"} (Vertretung)` })));
+      const select = el7("select", { title: "Wessen Liste anzeigen" }, [el7("option", { value: "", textContent: "Meine Liste" })]);
+      absent.forEach((person) => select.append(el7("option", { value: person.id, textContent: `Liste von ${person.name || "vertretener Person"} (Vertretung)` })));
       select.value = view;
       select.addEventListener("change", () => {
         view = select.value;
@@ -13040,51 +13716,51 @@ ${buildCbreBody(current)}`;
       return select;
     }
     function renderPanel() {
-      const panel = owned(IDS7.panel);
+      const panel = owned(IDS8.panel);
       if (!panel) return;
       const day = today();
       const tip = helpTip?.() || null;
-      const close = button3("–", togglePanel, "wp-icon", "Einklappen");
-      const head = el6("div", { className: "wp-head" }, [el6("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el6("span", { style: "flex:1" }), close]);
-      const sw = el6("input", { type: "checkbox", checked: prioFirst() });
+      const close = button4("–", togglePanel, "wp-icon", "Einklappen");
+      const head = el7("div", { className: "wp-head" }, [el7("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el7("span", { style: "flex:1" }), close]);
+      const sw = el7("input", { type: "checkbox", checked: prioFirst() });
       sw.addEventListener("change", () => {
         store.set(STORAGE_KEYS.prioFirst, sw.checked ? "1" : "0");
         renderRows();
       });
-      const switchRow = el6("label", { className: "wp-switch", title: "Zeilen dieser Seite mit Arbeitgebern der Prio-Liste nach oben" }, [sw, document.createTextNode("Prio zuerst")]);
-      const body = el6("div", { className: "wp-body" });
-      const status = el6("div", { className: `wp-status${error ? " wp-error" : ""}`, textContent: error || message });
+      const switchRow = el7("label", { className: "wp-switch", title: "Zeilen dieser Seite mit Arbeitgebern der Prio-Liste nach oben" }, [sw, document.createTextNode("Prio zuerst")]);
+      const body = el7("div", { className: "wp-body" });
+      const status = el7("div", { className: `wp-status${error ? " wp-error" : ""}`, textContent: error || message });
       if (view) {
         const state = foreign.get(view) || { entries: [], loading: true, error: "" };
         const person = absent.find((item) => item.id === view);
-        if (state.loading) body.append(el6("p", { className: "wp-hint", textContent: "Lädt …" }));
-        else if (state.error) body.append(el6("div", { className: "wp-status wp-error", textContent: state.error }));
+        if (state.loading) body.append(el7("p", { className: "wp-hint", textContent: "Lädt …" }));
+        else if (state.error) body.append(el7("div", { className: "wp-status wp-error", textContent: state.error }));
         else {
           const list = entriesForDay(state.entries, day);
-          body.append(el6("p", { className: "wp-hint", textContent: `Nur lesen: Prio-Liste von ${person?.name || "der vertretenen Person"}.` }));
-          if (!list.length) body.append(el6("p", { className: "wp-hint", textContent: "Heute steht nichts drauf." }));
-          else body.append(el6("ul", {}, list.map((entry) => entryItem(entry, true))));
+          body.append(el7("p", { className: "wp-hint", textContent: `Nur lesen: Prio-Liste von ${person?.name || "der vertretenen Person"}.` }));
+          if (!list.length) body.append(el7("p", { className: "wp-hint", textContent: "Heute steht nichts drauf." }));
+          else body.append(el7("ul", {}, list.map((entry) => entryItem(entry, true))));
         }
         panel.replaceChildren(head, body);
         return;
       }
-      if (!loaded && !error) body.append(el6("p", { className: "wp-hint", textContent: "Lädt …" }));
+      if (!loaded && !error) body.append(el7("p", { className: "wp-hint", textContent: "Lädt …" }));
       if (!loaded && error) {
-        body.append(status, el6("div", { className: "wp-add" }, [button3("Erneut laden", () => load2({ force: true }), "wp-btn")]));
+        body.append(status, el7("div", { className: "wp-add" }, [button4("Erneut laden", () => load2({ force: true }), "wp-btn")]));
         panel.replaceChildren(head, switchRow, body);
         return;
       }
       if (loaded) {
         const list = entriesForDay(entries, day);
-        if (!list.length) body.append(el6("p", { className: "wp-hint", textContent: "Heute steht noch nichts auf der Liste." }));
-        else body.append(el6("ul", {}, list.map((entry) => entryItem(entry, false))));
+        if (!list.length) body.append(el7("p", { className: "wp-hint", textContent: "Heute steht noch nichts auf der Liste." }));
+        else body.append(el7("ul", {}, list.map((entry) => entryItem(entry, false))));
         body.append(addForm());
         const later = laterEntries(entries, day);
         const open = openEntries(entries, day);
         const footer = [];
         if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay2(later[0].tag)}). `));
-        if (open.length) footer.push(button3("Tag abschließen …", () => openReview(), "wp-link"));
-        if (footer.length) body.append(el6("p", { className: "wp-hint" }, footer));
+        if (open.length) footer.push(button4("Tag abschließen …", () => openReview(), "wp-link"));
+        if (footer.length) body.append(el7("p", { className: "wp-hint" }, footer));
         body.append(status);
       }
       panel.replaceChildren(head, switchRow, body);
@@ -13105,7 +13781,7 @@ ${buildCbreBody(current)}`;
         if (!ready) continue;
         let star = employer.link.previousElementSibling;
         if (!star?.classList?.contains(STAR_CLASS)) {
-          star = el6("button", { type: "button", className: STAR_CLASS });
+          star = el7("button", { type: "button", className: STAR_CLASS });
           star.dataset.werkiaPrioOwner = sourcePath;
           star.append(starIcon());
           star.addEventListener("click", (event) => {
@@ -13157,7 +13833,7 @@ ${buildCbreBody(current)}`;
       wasSorted = on;
     }
     function closeReview() {
-      owned(IDS7.review)?.remove();
+      owned(IDS8.review)?.remove();
     }
     function openReview() {
       closeReview();
@@ -13165,24 +13841,24 @@ ${buildCbreBody(current)}`;
       const open = openEntries(entries, day);
       if (!open.length) return;
       ensureStyle4();
-      const decisions = new Map(open.map((entry) => [entry.id, "morgen"]));
-      const status = el6("div", { className: "wp-status" });
+      const decisions2 = new Map(open.map((entry) => [entry.id, "morgen"]));
+      const status = el7("div", { className: "wp-status" });
       const items = open.map((entry) => {
-        const seg = el6("span", { className: "wp-seg" });
+        const seg = el7("span", { className: "wp-seg" });
         const choices = [["erledigt", "Erledigt"], ["morgen", "Auf morgen"]].map(([value, label]) => {
-          const choice = button3(label, () => {
-            decisions.set(entry.id, value);
+          const choice = button4(label, () => {
+            decisions2.set(entry.id, value);
             seg.querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === choice)));
           });
-          choice.setAttribute("aria-pressed", String(decisions.get(entry.id) === value));
+          choice.setAttribute("aria-pressed", String(decisions2.get(entry.id) === value));
           return choice;
         });
         seg.append(...choices);
         const sub = [entry.uebertragen ? `übertragen vom ${formatDay2(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
-        return el6("li", {}, [el6("div", { className: "wp-who" }, [el6("b", { textContent: entry.employerName }), sub ? el6("span", { textContent: sub }) : null]), seg]);
+        return el7("li", {}, [el7("div", { className: "wp-who" }, [el7("b", { textContent: entry.employerName }), sub ? el7("span", { textContent: sub }) : null]), seg]);
       });
-      const save = button3("Übernehmen", async () => {
-        const saves = reviewSaves(open, decisions, day);
+      const save = button4("Übernehmen", async () => {
+        const saves = reviewSaves(open, decisions2, day);
         save.disabled = true;
         status.className = "wp-status";
         status.textContent = "Speichert …";
@@ -13204,18 +13880,18 @@ ${buildCbreBody(current)}`;
         }
         closeReview();
       }, "wp-btn wp-primary");
-      const later = button3("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
-      const card = el6("div", { className: "wp-card" });
+      const later = button4("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
+      const card = el7("div", { className: "wp-card" });
       card.setAttribute("role", "dialog");
       card.setAttribute("aria-label", "Prio-Liste: Tag abschließen");
       card.append(
-        el6("h2", { textContent: "Prio-Liste: Tag abschließen" }),
-        el6("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
-        el6("ul", {}, items),
+        el7("h2", { textContent: "Prio-Liste: Tag abschließen" }),
+        el7("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
+        el7("ul", {}, items),
         status,
-        el6("div", { className: "wp-foot" }, [later, save])
+        el7("div", { className: "wp-foot" }, [later, save])
       );
-      const overlay = el6("div", { id: IDS7.review }, [card]);
+      const overlay = el7("div", { id: IDS8.review }, [card]);
       overlay.dataset.werkiaPrioOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeReview();
@@ -13229,16 +13905,16 @@ ${buildCbreBody(current)}`;
       if (!reviewDue({ now: date, lastShownDay, openCount: 1 })) return;
       await load2();
       if (!loaded) return;
-      if (owned(IDS7.review)) return;
+      if (owned(IDS8.review)) return;
       store.set(STORAGE_KEYS.reviewDay, day);
       if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
     }
     function tick() {
       if (!isTargetPage8()) {
-        owned(IDS7.button)?.remove();
-        owned(IDS7.bar)?.remove();
-        owned(IDS7.panel)?.remove();
-        owned(IDS7.tab)?.remove();
+        owned(IDS8.button)?.remove();
+        owned(IDS8.bar)?.remove();
+        owned(IDS8.panel)?.remove();
+        owned(IDS8.tab)?.remove();
         return;
       }
       ensureStyle4();
@@ -13246,7 +13922,7 @@ ${buildCbreBody(current)}`;
       placePanel2();
       renderRows();
       const pageKey = pageEmployers().map(([id]) => id).join(",");
-      const panel = owned(IDS7.panel);
+      const panel = owned(IDS8.panel);
       if (panel && pageKey !== lastPageKey && !panel.contains(document.activeElement)) {
         lastPageKey = pageKey;
         renderPanel();
@@ -13265,7 +13941,7 @@ ${buildCbreBody(current)}`;
       }, 200);
     };
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS7.review)) return;
+      if (event.key !== "Escape" || !owned(IDS8.review)) return;
       event.stopPropagation();
       closeReview();
     }, true);
@@ -13278,10 +13954,10 @@ ${buildCbreBody(current)}`;
       checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
     }, REVIEW_CHECK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS7.button)?.remove();
-      owned(IDS7.bar)?.remove();
-      owned(IDS7.panel)?.remove();
-      owned(IDS7.tab)?.remove();
+      owned(IDS8.button)?.remove();
+      owned(IDS8.bar)?.remove();
+      owned(IDS8.panel)?.remove();
+      owned(IDS8.tab)?.remove();
       closeReview();
       document.querySelectorAll(`.${STAR_CLASS}`).forEach((star) => {
         if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
@@ -13389,7 +14065,7 @@ ${buildCbreBody(current)}`;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS9 = {
+    const IDS10 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -13401,9 +14077,9 @@ ${buildCbreBody(current)}`;
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS9.style)) return;
+      if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
-      style.id = IDS9.style;
+      style.id = IDS10.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -13574,8 +14250,8 @@ ${buildCbreBody(current)}`;
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS9.dialog, style: IDS9.dialogStyle, status: IDS9.dialogStatus },
-      buttonIds: [IDS9.bulkButton],
+      ids: { dialog: IDS10.dialog, style: IDS10.dialogStyle, status: IDS10.dialogStatus },
+      buttonIds: [IDS10.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -13650,7 +14326,7 @@ ${buildCbreBody(current)}`;
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS9.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS10.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -13672,8 +14348,8 @@ ${buildCbreBody(current)}`;
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS9.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS9.dialog)?.remove();
+      document.getElementById(IDS10.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS10.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -13688,8 +14364,8 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS9.style)?.remove();
-      document.getElementById(IDS9.dialogStyle)?.remove();
+      document.getElementById(IDS10.style)?.remove();
+      document.getElementById(IDS10.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
@@ -14042,7 +14718,7 @@ ${buildCbreBody(current)}`;
       return null;
     }
   }
-  function el4(tag, props = {}, ...children) {
+  function el5(tag, props = {}, ...children) {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
       if (value === void 0 || value === null || value === false) continue;
@@ -14186,10 +14862,10 @@ ${buildCbreBody(current)}`;
     function renderBar() {
       const bar = currentBar();
       if (!bar) return;
-      const tabs = el4(
+      const tabs = el5(
         "div",
         { class: `${PREFIX2}-tabs` },
-        GROUPS2.map((group2) => el4("button", {
+        GROUPS2.map((group2) => el5("button", {
           type: "button",
           class: `${PREFIX2}-tab`,
           "aria-pressed": String(activeTab === group2.id),
@@ -14198,7 +14874,7 @@ ${buildCbreBody(current)}`;
           onmousedown: keepFocus2,
           onclick: () => selectTab(group2.id)
         })),
-        el4("button", {
+        el5("button", {
           type: "button",
           class: `${PREFIX2}-tab`,
           "aria-pressed": String(activeTab === TEMPLATES_TAB),
@@ -14207,7 +14883,7 @@ ${buildCbreBody(current)}`;
           onmousedown: keepFocus2,
           onclick: () => selectTab(TEMPLATES_TAB)
         }),
-        el4("span", { class: `${PREFIX2}-help` }, helpTip())
+        el5("span", { class: `${PREFIX2}-help` }, helpTip())
       );
       const parts = [tabs];
       const group = GROUPS2.find((item) => item.id === activeTab);
@@ -14222,7 +14898,7 @@ ${buildCbreBody(current)}`;
       renderBar();
     }
     function renderKeys(group) {
-      return el4("div", { class: `${PREFIX2}-keys` }, group.items.map((item) => el4("button", {
+      return el5("div", { class: `${PREFIX2}-keys` }, group.items.map((item) => el5("button", {
         type: "button",
         class: `${PREFIX2}-key`,
         title: buttonTitle2(item),
@@ -14235,7 +14911,7 @@ ${buildCbreBody(current)}`;
             openMenu(item, event.currentTarget);
           }
         }
-      }, item.label, item.optionen.length ? el4("i", { "aria-hidden": "true", text: "▾" }) : null)));
+      }, item.label, item.optionen.length ? el5("i", { "aria-hidden": "true", text: "▾" }) : null)));
     }
     function closeMenu() {
       currentBar()?.querySelector(`.${PREFIX2}-menu`)?.remove();
@@ -14244,10 +14920,10 @@ ${buildCbreBody(current)}`;
       const bar = currentBar();
       if (!bar) return;
       closeMenu();
-      const menu = el4(
+      const menu = el5(
         "div",
         { class: `${PREFIX2}-menu`, role: "menu", "aria-label": `Varianten zu ${item.label}` },
-        menuOptions(item).map((text) => el4("button", {
+        menuOptions(item).map((text) => el5("button", {
           type: "button",
           role: "menuitem",
           text,
@@ -14290,29 +14966,29 @@ ${buildCbreBody(current)}`;
       if (activeTab === TEMPLATES_TAB) renderBar();
     }
     function renderTemplates() {
-      const box = el4("div", { class: `${PREFIX2}-templates` });
+      const box = el5("div", { class: `${PREFIX2}-templates` });
       if (templates.state === "loading" || templates.state === "idle") {
-        box.append(el4("span", { class: `${PREFIX2}-status`, text: "Vorlagen werden geladen …" }));
+        box.append(el5("span", { class: `${PREFIX2}-status`, text: "Vorlagen werden geladen …" }));
         return box;
       }
       if (templates.state === "error") {
-        box.append(el4(
+        box.append(el5(
           "div",
           { class: `${PREFIX2}-row` },
-          el4("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: templates.error }),
-          el4("button", { type: "button", class: `${PREFIX2}-link`, text: "Erneut versuchen", onclick: loadTemplates })
+          el5("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: templates.error }),
+          el5("button", { type: "button", class: `${PREFIX2}-link`, text: "Erneut versuchen", onclick: loadTemplates })
         ));
         return box;
       }
       if (!templates.items.length && !form) {
-        box.append(el4("span", { class: `${PREFIX2}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
+        box.append(el5("span", { class: `${PREFIX2}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
       }
       for (const template of templates.items) {
         if (form?.id === template.id) continue;
-        box.append(el4(
+        box.append(el5(
           "div",
           { class: `${PREFIX2}-template` },
-          el4("button", {
+          el5("button", {
             type: "button",
             class: `${PREFIX2}-key`,
             title: template.text,
@@ -14324,11 +15000,11 @@ ${buildCbreBody(current)}`;
               if (editor) insertIntoEditor(editor, template.text);
             }
           }),
-          el4("button", { type: "button", class: `${PREFIX2}-link`, text: "Ändern", onclick: () => openForm(template) })
+          el5("button", { type: "button", class: `${PREFIX2}-link`, text: "Ändern", onclick: () => openForm(template) })
         ));
       }
       if (form) box.append(renderForm());
-      else box.append(el4("div", {}, el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
+      else box.append(el5("div", {}, el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
       return box;
     }
     function openForm(template) {
@@ -14351,21 +15027,21 @@ ${buildCbreBody(current)}`;
           renderBar();
         }
       };
-      return el4(
+      return el5(
         "div",
         { class: `${PREFIX2}-form` },
-        el4("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
-        el4("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
-        form.error ? el4("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: form.error }) : null,
-        el4(
+        el5("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
+        el5("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
+        form.error ? el5("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: form.error }) : null,
+        el5(
           "div",
           { class: `${PREFIX2}-row` },
-          el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
-          el4("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
+          el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
+          el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
             form = null;
             renderBar();
           } }),
-          form.id ? el4("button", {
+          form.id ? el5("button", {
             type: "button",
             class: `${PREFIX2}-btn`,
             dataset: { tone: "danger", action: "template-delete" },
@@ -14444,7 +15120,7 @@ ${buildCbreBody(current)}`;
       if (!bar) {
         ensureStyle3();
         form = null;
-        bar = el4("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
+        bar = el5("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
         bar.dataset.mode = isDark2(dialog) ? "dark" : "light";
         box.parentElement?.insertBefore(bar, box);
         renderBar();
@@ -14488,7 +15164,7 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/tagesplan/core.js
   var TERMIN_VORLAUF_MS = 15 * 60 * 1e3;
   var WVL_OHNE_STATUS = ["out", "hired"];
-  var KAM_STATUS_LABELS2 = {
+  var KAM_STATUS_LABELS3 = {
     pending: "Ausstehend",
     with_cem: "Bei CEM",
     interview_request: "VT-Anfrage",
@@ -14767,7 +15443,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/tagesplan/index.js
-  var IDS8 = {
+  var IDS9 = {
     style: "werkia-tagesplan-style",
     button: "werkia-tagesplan-button",
     panel: "werkia-tagesplan-panel",
@@ -14798,7 +15474,7 @@ ${buildCbreBody(current)}`;
     svg.append(shape);
     return svg;
   }
-  function el5(tag, props = {}, children = []) {
+  function el6(tag, props = {}, children = []) {
     const element2 = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
       if (key === "style") element2.style.cssText = value;
@@ -14808,8 +15484,8 @@ ${buildCbreBody(current)}`;
     element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
     return element2;
   }
-  function button2(text, onClick, className = "wtp-secondary") {
-    return el5("button", { type: "button", textContent: text, className, onclick: onClick });
+  function button3(text, onClick, className = "wtp-secondary") {
+    return el6("button", { type: "button", textContent: text, className, onclick: onClick });
   }
   var CSS2 = `
   .wtp { --plane:#fafafa; --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
@@ -14836,42 +15512,42 @@ ${buildCbreBody(current)}`;
   .wtp .wtp-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .wtp .wtp-grid { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
   .wtp ul { list-style:none; margin:0; padding:0; }
-  #${IDS8.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS8.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
-  #${IDS8.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
-  #${IDS8.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
-  #${IDS8.panel} .wtp-title { font-weight:600; }
-  #${IDS8.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
-  #${IDS8.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
-  #${IDS8.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
-  #${IDS8.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
-  #${IDS8.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
-  #${IDS8.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
-  #${IDS8.panel} .wtp-late { color:var(--bad); font-weight:600; }
-  #${IDS8.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
-  #${IDS8.panel} details summary { cursor:pointer; color:var(--ink-2); }
-  #${IDS8.panel} details li { padding:3px 0; }
-  #${IDS8.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
-  #${IDS8.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
-  #${IDS8.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
-  #${IDS8.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
-  #${IDS8.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.popup} .wtp-item:last-of-type { border-bottom:0; }
-  #${IDS8.popup} .wtp-title { font-weight:600; }
-  #${IDS8.popup} .wtp-row { margin-top:6px; }
-  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-  #${IDS8.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
-  #${IDS8.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.dialog} li span { flex:1; }
+  #${IDS9.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS9.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
+  #${IDS9.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
+  #${IDS9.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
+  #${IDS9.panel} .wtp-title { font-weight:600; }
+  #${IDS9.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
+  #${IDS9.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
+  #${IDS9.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
+  #${IDS9.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
+  #${IDS9.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
+  #${IDS9.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
+  #${IDS9.panel} .wtp-late { color:var(--bad); font-weight:600; }
+  #${IDS9.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
+  #${IDS9.panel} details summary { cursor:pointer; color:var(--ink-2); }
+  #${IDS9.panel} details li { padding:3px 0; }
+  #${IDS9.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+  #${IDS9.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
+  #${IDS9.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
+  #${IDS9.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
+  #${IDS9.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.popup} .wtp-item:last-of-type { border-bottom:0; }
+  #${IDS9.popup} .wtp-title { font-weight:600; }
+  #${IDS9.popup} .wtp-row { margin-top:6px; }
+  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+  #${IDS9.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
+  #${IDS9.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.dialog} li span { flex:1; }
   .${ROW_BUTTON_CLASS} { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-left:4px; padding:0; border:0; border-radius:50%; background:transparent; color:#8b8b94; cursor:pointer; vertical-align:middle; }
   .${ROW_BUTTON_CLASS}:hover { background:#f4f4f5; color:#52525b; }
   .${ROW_BUTTON_CLASS} svg { fill:currentColor; }
   .${ROW_BUTTON_CLASS}.wtp-has { color:#ef6c00; }
-  #${IDS8.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-  #${IDS8.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
-  #${IDS8.button}.wtp-native svg { flex:none; fill:currentColor; }
-  #${IDS8.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
+  #${IDS9.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+  #${IDS9.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
+  #${IDS9.button}.wtp-native svg { flex:none; fill:currentColor; }
+  #${IDS9.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
 `;
   function executeTagesplan(runtime, {
     routes = [],
@@ -14906,8 +15582,8 @@ ${buildCbreBody(current)}`;
       return element2;
     };
     function ensureStyle4() {
-      if (document.getElementById(IDS8.style)) return;
-      document.head.appendChild(el5("style", { id: IDS8.style, textContent: CSS2 }));
+      if (document.getElementById(IDS9.style)) return;
+      document.head.appendChild(el6("style", { id: IDS9.style, textContent: CSS2 }));
     }
     function readGesehen() {
       try {
@@ -15031,35 +15707,35 @@ ${buildCbreBody(current)}`;
     }
     function popupItem(item) {
       const parts = [
-        el5("div", { className: "wtp-title", textContent: item.titel }),
-        item.text ? el5("div", { className: "wtp-muted", textContent: item.text }) : null
+        el6("div", { className: "wtp-title", textContent: item.titel }),
+        item.text ? el6("div", { className: "wtp-muted", textContent: item.text }) : null
       ];
-      const actions = el5("div", { className: "wtp-row" });
-      if (item.matchId) actions.append(el5("a", { href: matchHref(item.matchId), textContent: "Match öffnen" }));
+      const actions = el6("div", { className: "wtp-row" });
+      if (item.matchId) actions.append(el6("a", { href: matchHref(item.matchId), textContent: "Match öffnen" }));
       if (item.art === "reminder") {
-        const later = el5("select", { title: "Später erinnern" }, [
-          el5("option", { value: "", textContent: "Später …" }),
-          ...SCHLUMMER_OPTIONEN.map((option) => el5("option", { value: option.id, textContent: option.label }))
+        const later = el6("select", { title: "Später erinnern" }, [
+          el6("option", { value: "", textContent: "Später …" }),
+          ...SCHLUMMER_OPTIONEN.map((option) => el6("option", { value: option.id, textContent: option.label }))
         ]);
         later.addEventListener("change", () => {
           if (later.value) reminderAction(item, later.value, later);
         });
-        const erledigt = button2("Erledigt", (event) => reminderAction(item, "erledigt", event.currentTarget), "wtp-primary");
-        const loeschen = button2("Löschen", (event) => reminderAction(item, "loeschen", event.currentTarget), "wtp-danger");
+        const erledigt = button3("Erledigt", (event) => reminderAction(item, "erledigt", event.currentTarget), "wtp-primary");
+        const loeschen = button3("Löschen", (event) => reminderAction(item, "loeschen", event.currentTarget), "wtp-danger");
         actions.append(erledigt, later, loeschen);
       } else {
-        actions.append(button2("OK", () => markGesehen(item.key), "wtp-primary"));
+        actions.append(button3("OK", () => markGesehen(item.key), "wtp-primary"));
       }
-      const close = button2("×", () => markGesehen(item.key), "wtp-icon");
+      const close = button3("×", () => markGesehen(item.key), "wtp-icon");
       close.title = "Ausblenden";
       close.style.float = "right";
-      const element2 = el5("div", { className: "wtp-item" }, [close, ...parts, actions, el5("div", { className: "wtp-status" })]);
+      const element2 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
       element2.dataset.key = item.key;
       return element2;
     }
     function renderPopup() {
       const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
-      const existing = owned(IDS8.popup);
+      const existing = owned(IDS9.popup);
       if (!items.length) {
         existing?.remove();
         return;
@@ -15067,11 +15743,11 @@ ${buildCbreBody(current)}`;
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
       ensureStyle4();
-      const popup = existing || own(el5("div", { id: IDS8.popup, role: "alert" }));
+      const popup = existing || own(el6("div", { id: IDS9.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
       popup.append(
-        el5("h2", {}, [document.createTextNode("Erinnerung"), helpTip("tagesplan-reminder")]),
+        el6("h2", {}, [document.createTextNode("Erinnerung"), helpTip("tagesplan-reminder")]),
         ...items.map(popupItem)
       );
       if (!existing) document.body.appendChild(popup);
@@ -15097,31 +15773,31 @@ ${buildCbreBody(current)}`;
       return `${new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" }).format(date)} ${time}`;
     }
     function closeDialog() {
-      owned(IDS8.dialog)?.remove();
+      owned(IDS9.dialog)?.remove();
     }
     function openReminderDialog(matchId) {
       closeDialog();
       ensureStyle4();
-      const overlay = own(el5("div", { id: IDS8.dialog }));
+      const overlay = own(el6("div", { id: IDS9.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const body = el5("div", { className: "wtp-body" });
-      const close = button2("×", closeDialog, "wtp-icon");
+      const body = el6("div", { className: "wtp-body" });
+      const close = button3("×", closeDialog, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.style.cssText = "position:absolute;top:10px;right:10px;";
-      overlay.append(el5("div", { className: "wtp-card" }, [close, body]));
+      overlay.append(el6("div", { className: "wtp-card" }, [close, body]));
       document.body.appendChild(overlay);
-      const status = el5("div", { className: "wtp-status" });
+      const status = el6("div", { className: "wtp-status" });
       const setStatus = (text, isError = false) => {
         status.textContent = text;
         status.classList.toggle("wtp-error", isError);
       };
       const render = () => {
         body.textContent = "";
-        const list = el5("ul");
+        const list = el6("ul");
         openReminders(matchId).forEach((entry) => {
-          const remove = button2("Löschen", async () => {
+          const remove = button3("Löschen", async () => {
             remove.disabled = true;
             try {
               await client().loeschen("reminder", entry.id);
@@ -15133,13 +15809,13 @@ ${buildCbreBody(current)}`;
               setStatus(errorText(error), true);
             }
           }, "wtp-danger");
-          list.append(el5("li", {}, [el5("strong", { textContent: formatWhen(entry.faelligUm) }), el5("span", { textContent: entry.daten?.text || "" }), remove]));
+          list.append(el6("li", {}, [el6("strong", { textContent: formatWhen(entry.faelligUm) }), el6("span", { textContent: entry.daten?.text || "" }), remove]));
         });
         const preset = defaultReminderInput(now());
-        const tag = el5("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
-        const uhrzeit = el5("input", { type: "time", value: preset.uhrzeit, step: 300 });
-        const text = el5("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
-        const save = button2("Reminder speichern", async () => {
+        const tag = el6("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
+        const uhrzeit = el6("input", { type: "time", value: preset.uhrzeit, step: 300 });
+        const text = el6("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
+        const save = button3("Reminder speichern", async () => {
           const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value };
           const problem = validateReminderDraft(draft, now());
           if (problem) {
@@ -15167,12 +15843,12 @@ ${buildCbreBody(current)}`;
           if (event.key === "Enter") save.click();
         });
         body.append(
-          el5("h2", {}, [document.createTextNode("Reminder zum Match"), helpTip("tagesplan-reminder")]),
-          el5("h3", { textContent: "Offen" }),
-          openReminders(matchId).length ? list : el5("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
-          el5("h3", { textContent: "Neuer Reminder" }),
-          el5("div", { className: "wtp-grid" }, [el5("label", { textContent: "Wann" }), el5("div", { className: "wtp-row" }, [tag, uhrzeit]), el5("label", { textContent: "Woran" }), text]),
-          el5("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button2("Schließen", closeDialog)]),
+          el6("h2", {}, [document.createTextNode("Reminder zum Match"), helpTip("tagesplan-reminder")]),
+          el6("h3", { textContent: "Offen" }),
+          openReminders(matchId).length ? list : el6("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
+          el6("h3", { textContent: "Neuer Reminder" }),
+          el6("div", { className: "wtp-grid" }, [el6("label", { textContent: "Wann" }), el6("div", { className: "wtp-row" }, [tag, uhrzeit]), el6("label", { textContent: "Woran" }), text]),
+          el6("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button3("Schließen", closeDialog)]),
           status
         );
         text.focus?.();
@@ -15190,7 +15866,7 @@ ${buildCbreBody(current)}`;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
           ensureStyle4();
-          rowButton = el5("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
+          rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
             event.preventDefault();
@@ -15210,13 +15886,13 @@ ${buildCbreBody(current)}`;
       }
     }
     function closePanel() {
-      owned(IDS8.panel)?.remove();
+      owned(IDS9.panel)?.remove();
       teamEditing = null;
     }
     async function openPanel() {
       ensureStyle4();
-      if (!owned(IDS8.panel)) {
-        const panel = own(el5("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
+      if (!owned(IDS9.panel)) {
+        const panel = own(el6("aside", { id: IDS9.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
       }
       renderPanel("Lädt …");
@@ -15231,37 +15907,37 @@ ${buildCbreBody(current)}`;
     }
     function entryElement(entry) {
       const tagLabel = { termin: "Termin", reminder: "Reminder", team: "Team", wvl: "WVL" }[entry.art];
-      const tag = el5("span", { className: `wtp-tag wtp-tag-${entry.art}`, textContent: tagLabel });
-      const time = el5("div", { className: entry.ueberfaellig ? "wtp-time wtp-late" : "wtp-time", textContent: entry.ueberfaellig ? "fällig" : entry.uhrzeit || "ganzer Tag" });
+      const tag = el6("span", { className: `wtp-tag wtp-tag-${entry.art}`, textContent: tagLabel });
+      const time = el6("div", { className: entry.ueberfaellig ? "wtp-time wtp-late" : "wtp-time", textContent: entry.ueberfaellig ? "fällig" : entry.uhrzeit || "ganzer Tag" });
       if (!entry.uhrzeit && !entry.ueberfaellig) time.classList.add("wtp-muted");
-      const main = el5("div", {}, [el5("div", { className: "wtp-title" }, [tag, document.createTextNode(entry.titel)])]);
-      const actions = el5("div", { className: "wtp-actions" });
+      const main = el6("div", {}, [el6("div", { className: "wtp-title" }, [tag, document.createTextNode(entry.titel)])]);
+      const actions = el6("div", { className: "wtp-actions" });
       if (entry.art === "termin") {
-        if (entry.detail) main.append(el5("div", { className: "wtp-muted", textContent: entry.detail }));
-        if (entry.ort) main.append(el5("div", { className: "wtp-muted", textContent: entry.ort }));
-        main.append(el5("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+        if (entry.detail) main.append(el6("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.ort) main.append(el6("div", { className: "wtp-muted", textContent: entry.ort }));
+        main.append(el6("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
       }
       if (entry.art === "reminder") {
-        if (entry.detail) main.append(el5("div", { className: "wtp-muted", textContent: entry.detail }));
-        if (entry.matchId) main.append(el5("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
+        if (entry.detail) main.append(el6("div", { className: "wtp-muted", textContent: entry.detail }));
+        if (entry.matchId) main.append(el6("a", { href: matchHref(entry.matchId), textContent: "Match öffnen" }));
         if (!entry.erledigt) {
           const item = { reminder: entry.eintrag };
           actions.append(
-            button2("Erledigt", (event) => panelReminderAction(item, "erledigt", event.currentTarget)),
-            button2("Löschen", (event) => panelReminderAction(item, "loeschen", event.currentTarget), "wtp-danger")
+            button3("Erledigt", (event) => panelReminderAction(item, "erledigt", event.currentTarget)),
+            button3("Löschen", (event) => panelReminderAction(item, "loeschen", event.currentTarget), "wtp-danger")
           );
         }
       }
       if (entry.art === "team") {
         const sichtbar = describeSichtbarFuer(entry.eintrag.sichtbarFuer, ich?.personen || []);
-        main.append(el5("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
+        main.append(el6("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
         if (entry.eintrag.eigen && ich?.ich?.darfTeam) {
           actions.append(
-            button2("Bearbeiten", () => {
+            button3("Bearbeiten", () => {
               teamEditing = entry.eintrag;
               renderPanel();
             }),
-            button2("Löschen", async (event) => {
+            button3("Löschen", async (event) => {
               const control = event.currentTarget;
               control.disabled = true;
               try {
@@ -15277,13 +15953,13 @@ ${buildCbreBody(current)}`;
         }
       }
       if (entry.art === "wvl") {
-        const list = el5("ul", {}, entry.wvl.map((item) => el5("li", {}, [
-          el5("a", { href: matchHref(item.matchId), textContent: item.kandidat }),
-          document.createTextNode(` · ${item.arbeitgeber}${item.kamStatus ? ` · ${KAM_STATUS_LABELS2[item.kamStatus] || item.kamStatus}` : ""}`)
+        const list = el6("ul", {}, entry.wvl.map((item) => el6("li", {}, [
+          el6("a", { href: matchHref(item.matchId), textContent: item.kandidat }),
+          document.createTextNode(` · ${item.arbeitgeber}${item.kamStatus ? ` · ${KAM_STATUS_LABELS3[item.kamStatus] || item.kamStatus}` : ""}`)
         ])));
-        main.append(el5("details", {}, [el5("summary", { textContent: "Matches anzeigen" }), list]));
+        main.append(el6("details", {}, [el6("summary", { textContent: "Matches anzeigen" }), list]));
       }
-      const element2 = el5("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
+      const element2 = el6("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
       if (actions.childElementCount) element2.append(actions);
       element2.dataset.art = entry.art;
       return element2;
@@ -15307,21 +15983,21 @@ ${buildCbreBody(current)}`;
       const editing = teamEditing && teamEditing.id ? teamEditing : null;
       const daten0 = editing?.daten || {};
       const sichtbar0 = parseSichtbarFuer(editing?.sichtbarFuer || "alle");
-      const tag = el5("input", { type: "date", value: daten0.tag || berlinDay2(now()) });
-      const uhrzeit = el5("input", { type: "time", value: daten0.uhrzeit || "", title: "Leer lassen für den ganzen Tag" });
-      const text = el5("textarea", { value: daten0.text || "", maxLength: 500, placeholder: "z. B. 10:00 Teamrunde, danach Feedbacks nachfassen" });
-      const art = el5("select", {}, [
-        el5("option", { value: "alle", textContent: "Alle" }),
-        el5("option", { value: "team", textContent: "Ein Team" }),
-        el5("option", { value: "personen", textContent: "Einzelne Personen" })
+      const tag = el6("input", { type: "date", value: daten0.tag || berlinDay2(now()) });
+      const uhrzeit = el6("input", { type: "time", value: daten0.uhrzeit || "", title: "Leer lassen für den ganzen Tag" });
+      const text = el6("textarea", { value: daten0.text || "", maxLength: 500, placeholder: "z. B. 10:00 Teamrunde, danach Feedbacks nachfassen" });
+      const art = el6("select", {}, [
+        el6("option", { value: "alle", textContent: "Alle" }),
+        el6("option", { value: "team", textContent: "Ein Team" }),
+        el6("option", { value: "personen", textContent: "Einzelne Personen" })
       ]);
       art.value = sichtbar0.art || "alle";
-      const teamSelect = el5("select", {}, (ich?.teams || []).map((item) => el5("option", { value: item.name, textContent: item.name })));
+      const teamSelect = el6("select", {}, (ich?.teams || []).map((item) => el6("option", { value: item.name, textContent: item.name })));
       if (sichtbar0.team) teamSelect.value = sichtbar0.team;
-      const people = el5("div", { className: "wtp-people" }, (ich?.personen || []).map((person) => {
-        const box = el5("input", { type: "checkbox", value: String(person.id), checked: sichtbar0.personen.includes(String(person.id)) });
+      const people = el6("div", { className: "wtp-people" }, (ich?.personen || []).map((person) => {
+        const box = el6("input", { type: "checkbox", value: String(person.id), checked: sichtbar0.personen.includes(String(person.id)) });
         box.style.height = "auto";
-        return el5("label", {}, [box, document.createTextNode(person.name)]);
+        return el6("label", {}, [box, document.createTextNode(person.name)]);
       }));
       const syncArt = () => {
         teamSelect.hidden = art.value !== "team";
@@ -15329,7 +16005,7 @@ ${buildCbreBody(current)}`;
       };
       art.addEventListener("change", syncArt);
       syncArt();
-      const save = button2(editing ? "Änderung speichern" : "Eintragen", async () => {
+      const save = button3(editing ? "Änderung speichern" : "Eintragen", async () => {
         const sichtbarFuer = buildSichtbarFuer({ art: art.value, team: teamSelect.value, personen: [...people.querySelectorAll("input:checked")].map((box) => box.value) });
         const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value.trim(), sichtbarFuer };
         const problem = validateTeamDraft(draft);
@@ -15349,41 +16025,41 @@ ${buildCbreBody(current)}`;
           renderStatus(errorText(error), true);
         }
       }, "wtp-primary");
-      return el5("div", { className: "wtp-form" }, [
-        el5("div", { className: "wtp-grid" }, [
-          el5("label", { textContent: "Tag" }),
+      return el6("div", { className: "wtp-form" }, [
+        el6("div", { className: "wtp-grid" }, [
+          el6("label", { textContent: "Tag" }),
           tag,
-          el5("label", { textContent: "Uhrzeit" }),
+          el6("label", { textContent: "Uhrzeit" }),
           uhrzeit,
-          el5("label", { textContent: "Sichtbar für" }),
-          el5("div", {}, [art, teamSelect])
+          el6("label", { textContent: "Sichtbar für" }),
+          el6("div", {}, [art, teamSelect])
         ]),
         people,
-        el5("div", { style: "margin-top:8px" }, [text]),
-        el5("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button2("Abbrechen", () => {
+        el6("div", { style: "margin-top:8px" }, [text]),
+        el6("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button3("Abbrechen", () => {
           teamEditing = null;
           renderPanel();
         })])
       ]);
     }
     function renderStatus(text, isError = false) {
-      const status = owned(IDS8.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
+      const status = owned(IDS9.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wtp-error", isError);
     }
     function renderPanel(message = "", isError = false) {
-      const panel = owned(IDS8.panel);
+      const panel = owned(IDS9.panel);
       if (!panel) return;
       const day = berlinDay2(now());
-      const close = button2("×", closePanel, "wtp-icon");
+      const close = button3("×", closePanel, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
-      const head = el5("div", { className: "wtp-head" }, [
-        el5("div", {}, [el5("h2", {}, [document.createTextNode("Heute"), helpTip("tagesplan-timeline")]), el5("div", { className: "wtp-muted", textContent: formatDayHeading(day) })]),
+      const head = el6("div", { className: "wtp-head" }, [
+        el6("div", {}, [el6("h2", {}, [document.createTextNode("Heute"), helpTip("tagesplan-timeline")]), el6("div", { className: "wtp-muted", textContent: formatDayHeading(day) })]),
         close
       ]);
-      const status = el5("div", { className: `wtp-status${isError ? " wtp-error" : ""}`, textContent: message });
+      const status = el6("div", { className: `wtp-status${isError ? " wtp-error" : ""}`, textContent: message });
       const entries = timelineEntries({
         day,
         termine: werkia.day === day ? werkia.termine : [],
@@ -15391,30 +16067,30 @@ ${buildCbreBody(current)}`;
         reminder: daten.reminder,
         team: team.eintraege
       });
-      const list = el5("div", {}, entries.map(entryElement));
+      const list = el6("div", {}, entries.map(entryElement));
       const loading = !werkia.loaded && !werkia.error;
-      const empty = !entries.length && !loading ? el5("div", { className: "wtp-muted", style: "padding:12px 0", textContent: "Für heute steht nichts an." }) : null;
-      const errors = sourceErrors().map((text) => el5("div", { className: "wtp-status wtp-error", textContent: text }));
+      const empty = !entries.length && !loading ? el6("div", { className: "wtp-muted", style: "padding:12px 0", textContent: "Für heute steht nichts an." }) : null;
+      const errors = sourceErrors().map((text) => el6("div", { className: "wtp-status wtp-error", textContent: text }));
       const parts = [status, ...errors, list, empty];
       if (ich?.ich?.darfTeam) {
-        parts.push(el5("h3", { textContent: "Team-Eintrag" }));
-        parts.push(teamEditing ? teamForm() : button2("Neuer Team-Eintrag", () => {
+        parts.push(el6("h3", { textContent: "Team-Eintrag" }));
+        parts.push(teamEditing ? teamForm() : button3("Neuer Team-Eintrag", () => {
           teamEditing = {};
           renderPanel();
         }));
       } else if (ichError && !daten.error) {
-        parts.push(el5("div", { className: "wtp-muted", textContent: `Rechte für Team-Einträge nicht geladen: ${ichError}` }));
+        parts.push(el6("div", { className: "wtp-muted", textContent: `Rechte für Team-Einträge nicht geladen: ${ichError}` }));
       }
       panel.textContent = "";
-      panel.append(head, el5("div", { className: "wtp-body" }, parts));
+      panel.append(head, el6("div", { className: "wtp-body" }, parts));
     }
     function placeButton() {
       if (!isTargetPage8()) {
-        owned(IDS8.button)?.remove();
+        owned(IDS9.button)?.remove();
         return;
       }
       const slot = findSlot(document);
-      const existing = owned(IDS8.button);
+      const existing = owned(IDS9.button);
       if (existing && slot && existing.parentElement === slot.parent) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -15424,8 +16100,8 @@ ${buildCbreBody(current)}`;
       existing?.remove();
       if (!slot) return;
       ensureStyle4();
-      const heute = button2("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
-      heute.id = IDS8.button;
+      const heute = button3("Heute", () => owned(IDS9.panel) ? closePanel() : openPanel(), "");
+      heute.id = IDS9.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
       heute.dataset.werkiaTagesplanOwner = sourcePath;
       const look = nativeLookFrom(slot.sample);
@@ -15445,7 +16121,7 @@ ${buildCbreBody(current)}`;
     function refreshViews() {
       renderPopup();
       decorateRows();
-      if (owned(IDS8.panel) && !teamEditing) renderPanel();
+      if (owned(IDS9.panel) && !teamEditing) renderPanel();
     }
     async function tick() {
       const time = now().getTime();
@@ -15460,12 +16136,12 @@ ${buildCbreBody(current)}`;
     }
     runtime.addWindowListener("keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (owned(IDS8.dialog)) {
+      if (owned(IDS9.dialog)) {
         event.stopPropagation();
         closeDialog();
         return;
       }
-      if (owned(IDS8.panel)) {
+      if (owned(IDS9.panel)) {
         event.stopPropagation();
         closePanel();
       }
@@ -15500,8 +16176,8 @@ ${buildCbreBody(current)}`;
       });
     }, CLOCK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS8.button)?.remove();
-      owned(IDS8.popup)?.remove();
+      owned(IDS9.button)?.remove();
+      owned(IDS9.popup)?.remove();
       closeDialog();
       closePanel();
       document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element2) => {
@@ -15680,7 +16356,7 @@ ${next}`;
     const rootRect = positioningRoot.getBoundingClientRect();
     const omRect = anchor.getBoundingClientRect();
     const toolbarHeight = toolbar.getBoundingClientRect().height;
-    const saveButton = [...documentRef.querySelectorAll("button")].find((button3) => /speichern/i.test(button3.textContent || ""));
+    const saveButton = [...documentRef.querySelectorAll("button")].find((button4) => /speichern/i.test(button4.textContent || ""));
     const actionBar = saveButton?.closest('footer, [class*="Actions"], [class*="Toolbar"]') || saveButton?.parentElement;
     const actionBarTop = actionBar?.getBoundingClientRect().top;
     const bottomLimit = Number.isFinite(actionBarTop) && actionBarTop > omRect.top ? actionBarTop - 8 : viewportHeight ? viewportHeight - 8 : omRect.bottom;
@@ -15702,8 +16378,8 @@ ${next}`;
       if (!field || !toolbar) {
         return;
       }
-      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button3) => {
-        button3.classList.toggle("is-active", hasOmNote(field.value, button3.title));
+      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button4) => {
+        button4.classList.toggle("is-active", hasOmNote(field.value, button4.title));
       });
     }
     function write(nextValue) {
@@ -15787,14 +16463,14 @@ ${next}`;
         const chips = document.createElement("div");
         chips.className = "werkia-om-notes-chips";
         OM_NOTE_TEMPLATES.filter((template) => template.group === groupName).forEach((template) => {
-          const button3 = document.createElement("button");
-          button3.type = "button";
-          button3.className = "werkia-om-notes-chip";
-          button3.textContent = template.label;
-          button3.title = template.value;
-          button3.classList.toggle("is-active", hasOmNote(field.value, template.value));
-          button3.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
-          chips.appendChild(button3);
+          const button4 = document.createElement("button");
+          button4.type = "button";
+          button4.className = "werkia-om-notes-chip";
+          button4.textContent = template.label;
+          button4.title = template.value;
+          button4.classList.toggle("is-active", hasOmNote(field.value, template.value));
+          button4.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
+          chips.appendChild(button4);
         });
         group.appendChild(chips);
         groups.appendChild(group);
@@ -16134,6 +16810,7 @@ ${next}`;
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
+    { id: "outlook-assistent", execute: executeOutlookAssistent },
     { id: "filter-presets", execute: executeFilterPresets },
     // Haengt sich in die Leiste der Filtervorlagen, deshalb danach.
     { id: "focus-modes", execute: executeFocusModes },

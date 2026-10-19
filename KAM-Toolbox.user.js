@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.244
+// @version      1.14.245
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12816,6 +12816,7 @@ ${buildCbreBody(current)}`;
       const close = el4("button", { border: "0", background: "transparent", color: "#fff", fontSize: "20px", cursor: "pointer" }, "×");
       close.type = "button";
       close.setAttribute("aria-label", "Schließen");
+      close.autofocus = true;
       close.addEventListener("click", () => dialog.close());
       head.append(title, close);
       const body = el4("div", { padding: "14px 16px", display: "grid", gap: "12px", overflowY: "auto", maxHeight: "calc(100vh - 170px)" });

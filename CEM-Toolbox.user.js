@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.17.248
+// @version      1.17.250
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -3155,7 +3155,7 @@
   }
 
   // ../../shared/js/employer-notes/index.js
-  var STYLE_ID3 = "werkia-agn-style-v3";
+  var STYLE_ID3 = "werkia-agn-style-v4";
   var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
   var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
   var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
@@ -3181,20 +3181,21 @@
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
 .werkia-agn-panel[data-mode="read"] { display: block; }
-.werkia-agn-panel[data-mode="read"] .werkia-agn-list { max-height: 120px; overflow: auto; }
-.werkia-agn-panel[data-mode="read"] .werkia-agn-note { background: #f4f4f5; border-color: #e4e4e7; cursor: default; }
-.werkia-agn-panel[data-mode="read"] .werkia-agn-text { color: #3f3f46; }
+.werkia-agn-panel .werkia-agn-list { max-height: 120px; overflow: auto; }
+.werkia-agn-panel .werkia-agn-note { background: #f4f4f5; border-color: #e4e4e7; cursor: default; }
+.werkia-agn-panel .werkia-agn-text { color: #3f3f46; }
 .werkia-agn-more { margin-top: 6px; padding: 0; border: 0; background: transparent; color: #b85400; font: 600 11.5px/1.4 ${FONT3}; cursor: pointer; }
 .werkia-agn-more[hidden] { display: none; }
 .werkia-agn-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
-.werkia-agn-write { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.werkia-agn-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.werkia-agn-toggle { height: 26px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-write { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.werkia-agn-write .werkia-agn-head { margin: 0; }
+.werkia-agn-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.werkia-agn-toggle { height: 22px; padding: 0 8px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 11.5px/1 ${FONT3}; cursor: pointer; }
 .werkia-agn-toggle[aria-pressed="true"] { border-color: #ef6c00; background: #fff3e8; color: #b85400; }
-.werkia-agn-save { height: 30px; padding: 0 12px; border: 1px solid #09090b; border-radius: 8px; background: #09090b; color: #fff; font: 600 12px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-save { height: 24px; margin-left: auto; padding: 0 10px; border: 1px solid #09090b; border-radius: 6px; background: #09090b; color: #fff; font: 600 11.5px/1 ${FONT3}; cursor: pointer; }
 .werkia-agn-save:disabled { opacity: .45; cursor: default; }
-.werkia-agn-hint { color: #8b8b94; font-size: 12px; }
-.werkia-agn-status { min-height: 16px; font-size: 11.5px; color: #52525b; }
+.werkia-agn-status { font-size: 11.5px; color: #52525b; }
+.werkia-agn-status:empty { display: none; }
 .werkia-agn-status[data-tone="ok"] { color: #0a7c0a; }
 .werkia-agn-status[data-tone="error"] { color: #b52f2f; }
 `;
@@ -3444,14 +3445,15 @@
         });
         tags.appendChild(toggle);
       }
-      const button2 = element2(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
+      const button2 = element2(document, "button", "werkia-agn-save", "Speichern");
       button2.type = "button";
+      button2.title = "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.";
       button2.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
-      const hint = element2(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
-      write.append(head, tags, button2, element2(document, "div", "werkia-agn-status"), hint);
+      tags.appendChild(button2);
+      write.append(head, tags, element2(document, "div", "werkia-agn-status"));
       panel.append(list.element, write);
       return { panel, list };
     }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.16.246
+// @version      1.17.247
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4760,7 +4760,7 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID13 = "werkia-urgent-vacancy-style";
+      const STYLE_ID14 = "werkia-urgent-vacancy-style";
       const ROW_CLASS3 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -4899,9 +4899,9 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID13)) return;
+        if (document.getElementById(STYLE_ID14)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID13;
+        style.id = STYLE_ID14;
         style.textContent = `
       .${ROW_CLASS3} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background: #fff3cd !important; }
@@ -5816,6 +5816,59 @@
       }
       requestAnimationFrame(animate);
     }
+    function launchTears() {
+      const canvas = document.createElement("canvas");
+      canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99999999;";
+      document.body.appendChild(canvas);
+      const context = canvas.getContext("2d");
+      if (!context) {
+        canvas.remove();
+        return;
+      }
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const faces = ["😢", "😭"];
+      const drops = Array.from({ length: 40 }, () => ({
+        x: canvas.width / 2 + (Math.random() - 0.5) * 500,
+        y: canvas.height / 2 - 120 - Math.random() * 80,
+        vx: (Math.random() - 0.5) * 6,
+        vy: -(Math.random() * 8 + 2),
+        size: Math.random() * 18 + 26,
+        face: faces[Math.floor(Math.random() * faces.length)],
+        rot: (Math.random() - 0.5) * 30,
+        rotV: (Math.random() - 0.5) * 3,
+        gravity: 0.25 + Math.random() * 0.1,
+        opacity: 1
+      }));
+      let frame = 0;
+      function animate() {
+        frame += 1;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        drops.forEach((drop) => {
+          drop.x += drop.vx;
+          drop.vy += drop.gravity;
+          drop.y += drop.vy;
+          drop.rot += drop.rotV;
+          drop.vx *= 0.99;
+          if (frame > 50) drop.opacity -= 0.015;
+          if (drop.opacity <= 0) return;
+          alive = true;
+          context.save();
+          context.translate(drop.x, drop.y);
+          context.rotate(drop.rot * Math.PI / 180);
+          context.globalAlpha = Math.max(0, drop.opacity);
+          context.font = `${drop.size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(drop.face, 0, 0);
+          context.restore();
+        });
+        if (alive && frame < 170) requestAnimationFrame(animate);
+        else canvas.remove();
+      }
+      requestAnimationFrame(animate);
+    }
     runtime.createMutationObserver(colorSelects).observe(document.body, { childList: true, subtree: true });
     runtime.addDocumentListener("click", (event) => {
       const option = event.target.closest('li[role="option"]');
@@ -5823,7 +5876,7 @@
       const text = (option.textContent || "").trim();
       if (!getCemStatusColor(text) || text === lastSelectText) return;
       lastSelectText = text;
-      runtime.setTimeout(launchConfetti, 200);
+      runtime.setTimeout(text === "Out" ? launchTears : launchConfetti, 200);
       runtime.setTimeout(() => {
         lastSelectText = "";
       }, 2e3);
@@ -6966,7 +7019,7 @@
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID13 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID14 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
     const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
@@ -6982,9 +7035,9 @@
     let working = false;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID13)) return;
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -7189,6 +7242,46 @@
     });
   }
 
+  // src/features/cem-vta-pills.js
+  var SOURCE = "cem/toolbox/src/features/cem-vta-pills.js";
+  var MARK2 = "data-werkia-cem-vta-pill";
+  var STYLE_ID7 = "werkia-cem-vta-pill-style";
+  var OPEN_LABELS = /* @__PURE__ */ new Set(["Vorschlag", "Weitergeleitet"]);
+  function isOpenCemVtaChip(chip) {
+    if (!OPEN_LABELS.has(String(chip.getAttribute("aria-label") || "").trim())) return false;
+    const texts = [...chip.querySelectorAll("p")].map((p) => (p.textContent || "").trim());
+    return texts.length > 1 && texts[texts.length - 1] === "CEM";
+  }
+  function executeCemVtaPills(runtime) {
+    runtime.registerSource(SOURCE);
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID7)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID7;
+      style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }`;
+      document.head.appendChild(style);
+    }
+    function mark() {
+      document.querySelectorAll(".MuiChip-root[aria-label]").forEach((chip) => {
+        const open = isOpenCemVtaChip(chip);
+        if (open && !chip.hasAttribute(MARK2)) chip.setAttribute(MARK2, "");
+        else if (!open && chip.hasAttribute(MARK2)) chip.removeAttribute(MARK2);
+      });
+    }
+    let scheduled = false;
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        mark();
+      }, 150);
+    }
+    ensureStyle4();
+    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
+    mark();
+  }
+
   // src/features/vacancy-candidate-info/candidate-table.js
   var CANDIDATE_ROW_SELECTOR = "tbody.RaDataTable-tbody tr.RaDataTable-row, tbody.datatable-body tr.RaDataTable-row";
   var CANDIDATE_LINK_PATTERN = /#\/Candidate\/([0-9a-f-]+)\/show/i;
@@ -7322,12 +7415,12 @@
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID13 = `${SCRIPT_ID}-style`;
+    const STYLE_ID14 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID13)) return;
+      if (document2.getElementById(STYLE_ID14)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -7726,7 +7819,7 @@
   var CANDIDATE_STATUS_ID = "werkia-bulk-ofm-candidate-status";
   var FORM_CONTROLS_ID = "werkia-bulk-ofm-form-controls";
   var FORM_STATUS_ID = "werkia-bulk-ofm-form-status";
-  var STYLE_ID7 = "werkia-bulk-ofm-style";
+  var STYLE_ID8 = "werkia-bulk-ofm-style";
   var DATE_REMOVE_SELECTOR = 'button.button-remove[class*="button-remove-employers."][class*=".interview.dates-"][aria-label="Entfernen"]';
   var OFFLINE_MATCH_FORM_SELECTOR = '[data-testid="create-offline-match-form"]';
   var MATCH_PRESENT_ROW_CLASS2 = "werkia-cem-match-present-row";
@@ -7801,9 +7894,9 @@
     return [...new Set(matches.filter((match) => match?.hasExistingSentMatch).map((match) => match.employerId))];
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID7)) return;
+    if (document.getElementById(STYLE_ID8)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID7;
+    style.id = STYLE_ID8;
     style.textContent = `
     .${BULK_CHECKBOX_CLASS} { display:inline-flex; align-items:center; margin-right:var(--apt-space-2,8px); color:var(--apt-color-text-muted,#6b6775); font:600 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
     .${BULK_CHECKBOX_CLASS} input { width:18px; height:18px; accent-color:var(--apt-color-primary,#6d4aff); cursor:pointer; }
@@ -7821,7 +7914,7 @@
     document.getElementById(CANDIDATE_STATUS_ID)?.remove();
     document.getElementById(FORM_CONTROLS_ID)?.remove();
     document.getElementById(FORM_STATUS_ID)?.remove();
-    document.getElementById(STYLE_ID7)?.remove();
+    document.getElementById(STYLE_ID8)?.remove();
   }
   function showStatus(id, message, anchor) {
     let status2 = document.getElementById(id);
@@ -10578,7 +10671,7 @@
   // src/features/focus-candidates.js
   var ROUTE = "CEM/MyCandidates";
   var HIDDEN_ATTRIBUTE2 = "data-werkia-focus-hidden";
-  var STYLE_ID8 = "werkia-cem-focus-candidates-style";
+  var STYLE_ID9 = "werkia-cem-focus-candidates-style";
   var INFO_ID = "werkia-cem-focus-candidates-info";
   var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
   var CACHE_TTL_MS2 = 5 * 60 * 1e3;
@@ -10625,9 +10718,9 @@
     let loading = null;
     const isTargetPage3 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       tr[${HIDDEN_ATTRIBUTE2}] { display:none !important; }
       #${INFO_ID} { margin:0 0 8px; color:#52525b; font:400 12px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
@@ -10824,7 +10917,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID9 = "werkia-match-status-filter-style";
+  var STYLE_ID10 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -10842,9 +10935,9 @@
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage3 = () => route.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID9)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -10939,7 +11032,7 @@
 
   // src/features/kam-status-filter-expanded.js
   var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
-  var STYLE_ID10 = "werkia-cem-expanded-kam-filter-style";
+  var STYLE_ID11 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var CANDIDATE_LINK_SELECTOR5 = 'a[href*="#/Candidate/"]';
@@ -10971,9 +11064,9 @@
     let loading = null;
     const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       /* pointer-events/z-index: in der Filterzeile kam live kein Klick an
          (Text-Cursor, Text markierbar), 2026-10-12. pointer-events wird
@@ -12624,7 +12717,7 @@
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS3 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID13 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID14 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -12632,9 +12725,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID13)) return;
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS3} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -14326,7 +14419,7 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/cem-todo/index.js
-  var STYLE_ID11 = "werkia-cem-todo-style";
+  var STYLE_ID12 = "werkia-cem-todo-style";
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
@@ -14361,9 +14454,9 @@ Trotzdem speichern?`)) return void 0;
     let dialogSeen = false;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID11)) return;
+      if (document.getElementById(STYLE_ID12)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID11;
+      style.id = STYLE_ID12;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
       [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
@@ -15089,7 +15182,7 @@ Trotzdem speichern?`)) return void 0;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID12 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID13 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -15125,9 +15218,9 @@ Trotzdem speichern?`)) return void 0;
     }
   }
   function ensureStyle3(doc) {
-    if (doc.getElementById(STYLE_ID12)) return;
+    if (doc.getElementById(STYLE_ID13)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID12;
+    style.id = STYLE_ID13;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -15262,6 +15355,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "cem-ofm-questionnaire-evaluation", execute: executeQuestionnaireEvaluation },
     { id: "cem-ofm-route-calculation", execute: executeRouteCalculation },
     { id: "commute-badges", execute: executeCommuteBadges2 },
+    { id: "cem-vta-pills", execute: executeCemVtaPills },
     { id: "vacancy-candidate-info", execute: executeVacancyCandidateInfo },
     { id: "offline-match-bulk", execute: executeOfflineMatchBulk },
     { id: "filter-presets", execute: executeFilterPresets },

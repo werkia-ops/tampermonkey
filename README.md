@@ -63,6 +63,7 @@ Enthaltene Funktionen:
 - Vergleicht Fragebogen-Antworten mit den Vakanzanforderungen und zeigt eine farbige Match-Empfehlung an.
 - Berechnet beim offenen Fragebogen Fahrzeit und Strecke zwischen Kandidatenwohnort und Arbeitsort, zeigt die Vakanzart und bei ortsgebundenen Vakanzen ab 50 Min einen Totenkopf.
 - Zeigt auf Potenzielle Matches in jeder Zeile die Fahrzeit vom Kandidatenwohnort zur Vakanz und die Vakanzart (Start von Zuhause, Landes-/bundesweit, Montage). Ortsgebundene Vakanzen ab 50 Min Fahrzeit bekommen einen Totenkopf. Die Routen laden nacheinander im Hintergrund und bleiben eine Woche im Browser gespeichert.
+- Gibt Terminpills von CEM-VTAs (Vorschlag oder Weitergeleitet) eine feine Umrandung; bestätigte Termine haben keine.
 - Ergaenzt die Kandidatenliste einer Vakanz um Zusatzinfos je Kandidat (Reisebereitschaft, Status, Registrierungsdatum, Telefonnummer) und eine Anruf-Empfehlung.
 - Erlaubt auf Potenzielle Matches die Auswahl mehrerer Arbeitgeber und vorhandener Jobs für ein gemeinsames Offline-Match-Formular. Bei einem Arbeitgeber mit vorhandenem Match ist vor dem Öffnen eine Bestätigung nötig; Terminvorschläge lassen sich gesammelt löschen.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.

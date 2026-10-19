@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.17.250
+// @version      1.18.251
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4656,6 +4656,7 @@
         "Im Dropdown „Focus-Mode“ über der Liste einen Modus wählen.",
         "„Nur AG mit Kontakt“ blendet alle Matches aus, deren Arbeitgeber keinen direkten oder indirekten Kontakt hat (Badge „Schnelle Rückmeldung“ oder „Verzögerte Rückmeldung“). Deine übrigen Filter bleiben stehen.",
         "„Nur AG mit direktem Kontakt“ macht dasselbe, lässt aber nur „Schnelle Rückmeldung“ (direkter Kontakt) durch.",
+        "In Meine Kandidaten zeigen „Ampel: nur Grün“, „… Gelb“ und „… Rot“ nur Kandidaten mit dieser Ampelfarbe, über alle Seiten der Liste (siehe Ampel).",
         "In Meine Kandidaten zeigen die aufgeklappten Match-Tabellen dann nur diese Matches. Kandidaten ohne ein solches Match werden auf der aktuellen Seite ausgeblendet; über der Liste steht, wie viele.",
         "„Verlassen“ nimmt den Arbeitgeberfilter wieder heraus."
       ],
@@ -4716,6 +4717,28 @@
         "Die Liste gilt für alle in CEM und ist für alle sichtbar. Ein- und austragen können nur Admins, dieselben wie bei den Vertretungen; im Dialog steht, wer einen Arbeitgeber eingetragen hat.",
         "Die Toolbox lädt die Liste höchstens alle 10 Minuten neu. Eigene Änderungen sind sofort zu sehen, die von anderen nach spätestens 10 Minuten oder nach einem Neuladen der Seite.",
         "Die lila Markierung „[Absprache vor OFM]“ ist eine eigene Regel und bleibt daneben bestehen."
+      ]
+    },
+    {
+      id: "cem-ampel",
+      title: "Ampel und NEW je Kandidat",
+      page: "CEM › Meine Kandidaten",
+      routes: [ROUTES.cemMyCandidates],
+      kind: "external",
+      summary: "Vor jedem Kandidatennamen steht ein Kreis in Grün, Gelb oder Rot: Wie gut läuft es mit diesem Kandidaten? Der Grund steht im Tooltip. Ein dickes „NEW“ hinter dem Namen heißt: Seit der Zuteilung hattest du noch keinen Kontakt.",
+      steps: [
+        "Mit der Maus auf den Kreis zeigen, um den Grund zu sehen, z. B. „Hot Case“, „Bestätigter VT am 21.10.“ oder „7 Werktage ohne Kontakt“.",
+        "Auf den Kreis klicken, um die Farbe selbst zu setzen (Grün, Gelb, Rot) oder zurück auf „Automatisch“ zu stellen. Eine selbst gesetzte Farbe hat einen gestrichelten Rand.",
+        "Im Focus-Mode „Ampel: nur Grün“ (bzw. Gelb, Rot) zeigt die Liste nur noch Kandidaten dieser Farbe, über alle Seiten. „Verlassen“ hebt das wieder auf."
+      ],
+      notes: [
+        "Grün: ein Match ist Hot Case (KAM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
+        "Gelb: nach den ersten 7 Werktagen kein Hot Case, kein bestätigter VT, kein KAM-VTA, aber noch Matches in Onboarding (oder noch keine Matches).",
+        "Rot: Kandidat inaktiv, alle Matches out, oder 7 Werktage ohne Kontakt von dir. Kontakt heißt: dein Matchkommentar auf einem Match des Kandidaten oder dein Anruf (sipgate).",
+        "Werktage sind Montag bis Freitag, Feiertage zählen mit.",
+        "Eine selbst gesetzte Farbe gilt, bis 7 Werktage ab dem Setzen bzw. ab deinem letzten Kontakt vergangen sind, danach rechnet die Ampel wieder selbst. „Inaktiv“ und „alle Matches out“ machen sie sofort rot.",
+        "Setzen können der CEM des Kandidaten und Admins (dieselben wie bei den Vertretungen). Gespeichert wird im n8n-Workflow CEM Ampel, mit Name und Zeitpunkt.",
+        "Die Toolbox lädt die Ampeln höchstens alle 5 Minuten neu, eigene Änderungen sind sofort zu sehen."
       ]
     },
     {
@@ -7033,7 +7056,7 @@
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
-    const RETRY_MS4 = 60 * 1e3;
+    const RETRY_MS5 = 60 * 1e3;
     let scheduled = false;
     function ensureStyles2() {
       if (document.getElementById(STYLE_ID14)) return;
@@ -7211,7 +7234,7 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS4) {
+        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS5) {
           enqueue(item.candidateId);
         }
       }
@@ -8695,7 +8718,7 @@
       team,
       isTargetPage: isTargetPage3,
       getRequest,
-      ids: IDS8,
+      ids: IDS9,
       fields,
       columns,
       statusOptions,
@@ -8775,13 +8798,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS8,
-      buttonIds: [IDS8.button, IDS8.statusButton, IDS8.forwardButton, IDS8.declinePastButton],
+      ids: IDS9,
+      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS8.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS8.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -8921,13 +8944,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS8.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS8.feedbackShortcuts;
+      shortcuts.id = IDS9.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -9227,10 +9250,10 @@
     function installHeaderButtons() {
       if (!isTargetPage3()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS8.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS8.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS8.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS8.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -10355,7 +10378,7 @@
     employerCache = null
   }) {
     runtime.registerSource(sourcePath);
-    const IDS8 = makeIds(idPrefix);
+    const IDS9 = makeIds(idPrefix);
     const { defaultScope, leaveHash, modeHash, modeMatchesState, pickScope } = core;
     const isTargetPage3 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -10376,33 +10399,33 @@
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle4() {
-      if (document.getElementById(IDS8.style)) return;
+      if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
-      style.id = IDS8.style;
+      style.id = IDS9.style;
       style.textContent = `
-      #${IDS8.group}, #${IDS8.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS8.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS8.group}.is-active, #${IDS8.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS8.group} > strong, #${IDS8.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS8.group}.is-active > strong, #${IDS8.bar}.is-active > strong { color:#b85400; }
-      #${IDS8.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS8.group} button, #${IDS8.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS8.group} button:hover, #${IDS8.bar} button:hover { background:#f4f4f5; }
-      #${IDS8.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS8.leave}:hover { background:#b85400 !important; }
-      #${IDS8.group} [hidden], #${IDS8.bar} [hidden] { display:none !important; }
+      #${IDS9.group}, #${IDS9.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS9.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS9.group}.is-active, #${IDS9.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS9.group} > strong, #${IDS9.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS9.group}.is-active > strong, #${IDS9.bar}.is-active > strong { color:#b85400; }
+      #${IDS9.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS9.group} button, #${IDS9.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS9.group} button:hover, #${IDS9.bar} button:hover { background:#f4f4f5; }
+      #${IDS9.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS9.leave}:hover { background:#b85400 !important; }
+      #${IDS9.group} [hidden], #${IDS9.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS8.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS8.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS8.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS8.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS8.dialog} input[type=text], #${IDS8.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS8.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS8.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS8.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS8.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS9.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS9.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS9.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS9.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS9.dialog} input[type=text], #${IDS9.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS9.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS9.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS9.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS9.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -10439,13 +10462,13 @@
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS8.dialog)?.remove();
+      document.getElementById(IDS9.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS8.dialog;
+      overlay.id = IDS9.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -10522,7 +10545,7 @@
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS8.select;
+      select.id = IDS9.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       const warm = () => {
         if (hasContactMode()) employers.prefetch();
@@ -10536,19 +10559,19 @@
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS8.leave;
+      leaveButton.id = IDS9.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS8.save;
+      saveButton.id = IDS9.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS8.remove;
+      removeButton.id = IDS9.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -10560,14 +10583,14 @@
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS8.group);
-      let ownBar = document.getElementById(IDS8.bar);
+      let group = document.getElementById(IDS9.group);
+      let ownBar = document.getElementById(IDS9.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS8.group;
+        group.id = IDS9.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -10577,7 +10600,7 @@
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS8.bar;
+      ownBar.id = IDS9.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
@@ -10617,8 +10640,8 @@
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
-          document.getElementById(IDS8.group)?.remove();
-          document.getElementById(IDS8.bar)?.remove();
+          document.getElementById(IDS9.group)?.remove();
+          document.getElementById(IDS9.bar)?.remove();
           closeDialog();
         }
         return;
@@ -10654,9 +10677,9 @@
       if (!container) return;
       const isActive = Boolean(mode);
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS8.select}`), own, mode?.id || "");
-      setHidden(container.querySelector(`#${IDS8.leave}`), !isActive);
-      setHidden(container.querySelector(`#${IDS8.remove}`), !isActive || Boolean(mode?.builtIn));
+      fillSelect(container.querySelector(`#${IDS9.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS9.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -10731,7 +10754,7 @@
     `;
       document.head.appendChild(style);
     }
-    function candidateRows() {
+    function candidateRows2() {
       return [...document.querySelectorAll("tbody tr.RaDataTable-row")].filter((row2) => !row2.parentElement?.closest("tr")).map((row2) => {
         const id = candidateIdFromHref2(row2.querySelector(CANDIDATE_LINK_SELECTOR4)?.getAttribute("href"));
         const next = row2.nextElementSibling;
@@ -10791,7 +10814,7 @@
         return;
       }
       ensureStyle4();
-      const entries = candidateRows();
+      const entries = candidateRows2();
       const missing = entries.map((entry) => entry.id).filter((id) => !fresh(keyOf(contacts, id)));
       const ready = !missing.length;
       let hidden = 0;
@@ -10820,6 +10843,159 @@
     scheduleRender();
   }
 
+  // ../../shared/js/kpi-charts/theme.js
+  var TOKENS = {
+    light: {
+      plane: "#fafafa",
+      surface: "#ffffff",
+      surfaceSunken: "#f4f4f5",
+      ink: "#09090b",
+      inkSecondary: "#52525b",
+      inkMuted: "#8b8b94",
+      line: "#e4e4e7",
+      lineStrong: "#d4d4d8",
+      accent: "#ef6c00",
+      accentUi: "#ef6c00",
+      cat1: "#ef6c00",
+      cat2: "#2f7ed8",
+      cat3: "#0e8145",
+      accentInk: "#b85400",
+      accentSoft: "#fff3e8",
+      navy: "#284e75",
+      good: "#0ca30c",
+      goodInk: "#0a7c0a",
+      bad: "#d03b3b",
+      badInk: "#b52f2f",
+      warn: "#d4a106",
+      warnInk: "#8a6700",
+      track: "#ececee",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(9,9,11,.28)"
+    },
+    dark: {
+      plane: "#09090b",
+      surface: "#111113",
+      surfaceSunken: "#18181b",
+      ink: "#fafafa",
+      inkSecondary: "#a1a1aa",
+      inkMuted: "#71717a",
+      line: "#232326",
+      lineStrong: "#303034",
+      accent: "#d86f0e",
+      accentUi: "#ff8a33",
+      cat1: "#d86f0e",
+      cat2: "#4a90e2",
+      cat3: "#199f5c",
+      accentInk: "#ff9a4d",
+      accentSoft: "#26170b",
+      navy: "#7ea6d4",
+      good: "#0ca30c",
+      goodInk: "#3fbf3f",
+      bad: "#d03b3b",
+      badInk: "#e86a6a",
+      warn: "#d4a106",
+      warnInk: "#e6bb3a",
+      track: "#1f1f23",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(0,0,0,.8)"
+    }
+  };
+  function tokensFor(mode) {
+    return TOKENS[mode] || TOKENS.light;
+  }
+
+  // src/features/cem-ampel/core.js
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/cem-ampel/d1d7ad22-6ac6-47c2-89f3-1fdba7ea1cf5";
+  var REQUEST_TIMEOUT_MS = 2e4;
+  var OFFLINE_MESSAGE = "Der Server für die CEM-Ampel ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CACHE_MS5 = 5 * 60 * 1e3;
+  var RETRY_MS2 = 60 * 1e3;
+  var MAX_IDS = 100;
+  var AMPEL_MARKER = "werkiaAmpel";
+  var CURRENT_EMPLOYEE_QUERY = `query WerkiaCemAmpelMe {
+  me: currentEmployee { id __typename }
+}`;
+  var T = tokensFor("light");
+  var FARBEN = {
+    gruen: { label: "Grün", fill: T.good, ring: T.goodInk },
+    gelb: { label: "Gelb", fill: "#f2c200", ring: T.warnInk },
+    rot: { label: "Rot", fill: T.bad, ring: T.badInk }
+  };
+  var FARB_IDS = Object.keys(FARBEN);
+  var THEME = T;
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function parseResponse(status2, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`CEM-Ampel: unerwartete Antwort (HTTP ${status2}).`);
+  }
+  function createAmpelClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+      });
+    });
+  }
+  function candidateIdFromHref3(href) {
+    const id = String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function chunks(ids, size = MAX_IDS) {
+    const out = [];
+    for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+    return out;
+  }
+  function dotTitle(entry) {
+    if (!entry?.farbe) return entry?.grund || "";
+    const lines = [`Ampel ${FARBEN[entry.farbe].label}: ${entry.grund}`];
+    if (entry.manuell && entry.automatisch) lines.push(`Automatisch wäre: ${FARBEN[entry.automatisch.farbe]?.label || "–"} (${entry.automatisch.grund})`);
+    lines.push(entry.darfSetzen ? "Klicken, um die Farbe zu setzen." : "Klicken für Details.");
+    return lines.join("\n");
+  }
+  var NEW_TITLE = "Neu: Seit der Zuteilung hattest du noch keinen Kontakt (Matchkommentar oder Anruf).";
+  function markerFarbe(value) {
+    const list = Array.isArray(value) ? value : [value];
+    return list.map(String).find((farbe) => FARB_IDS.includes(farbe)) || "";
+  }
+  function listScope(filter = {}) {
+    const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE.test(id)).map((id) => id.toLowerCase()) : [];
+    const statuses = Array.isArray(filter.statuses) ? filter.statuses.map(String) : [];
+    return { cemEmployeeIds: [...new Set(ids)].sort(), statuses: [...new Set(statuses)].sort() };
+  }
+  var scopeKey = (scope) => `${scope.cemEmployeeIds.join(",")}|${scope.statuses.join(",")}`;
+  var AMPEL_MODES = FARB_IDS.map((farbe) => ({
+    id: `ampel-${farbe}`,
+    name: `Ampel: nur ${FARBEN[farbe].label}`,
+    description: `Nur Kandidaten mit ${FARBEN[farbe].label.toLowerCase()}er Ampel, über alle Seiten`,
+    filter: { [AMPEL_MARKER]: [farbe] },
+    keepFilter: true,
+    sort: "",
+    order: "",
+    perPage: 0,
+    column: "",
+    front: false,
+    builtIn: true
+  }));
+
   // src/features/focus-modes.js
   var SOURCE_PATH = "cem/toolbox/src/features/focus-modes.js";
   var STORAGE_KEY2 = "werkia_cem_focus_modes_v1";
@@ -10829,6 +11005,7 @@
   var SCOPE_KEYS = ["cemEmployeeIds", "interviewCreatorTeam"];
   var CEM_ROLE_NAME = "CEM";
   var BUILT_IN_MODES = [EMPLOYER_CONTACT_MODE, DIRECT_CONTACT_MODE];
+  var CANDIDATES_BUILT_IN_MODES = [...BUILT_IN_MODES, ...AMPEL_MODES];
   var COLUMN_LABELS = {
     matchInterview: "Termin",
     cemStatus: "CEM Status",
@@ -10882,7 +11059,7 @@
     executeFocusModes(runtime, {
       sourcePath: SOURCE_PATH,
       core: CEM_CANDIDATES_FOCUS_CORE,
-      builtInModes: BUILT_IN_MODES,
+      builtInModes: CANDIDATES_BUILT_IN_MODES,
       storageKey: CANDIDATES_STORAGE_KEY,
       activeKey: CANDIDATES_ACTIVE_KEY,
       idPrefix: "werkia-cem-cand-focus",
@@ -11255,10 +11432,10 @@
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS = 15e3;
-  var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS2 = 15e3;
+  var OFFLINE_MESSAGE2 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVertretungenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay(date = /* @__PURE__ */ new Date()) {
@@ -11289,7 +11466,7 @@
     if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
     return "";
   }
-  function parseResponse(status2, text) {
+  function parseResponse2(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -11300,7 +11477,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+  function createVertretungenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -11310,13 +11487,13 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse(response.status, response.responseText));
+            resolve(parseResponse2(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
       });
     });
   }
@@ -11484,7 +11661,7 @@
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -11749,15 +11926,15 @@
   }
 
   // ../../shared/js/cem-vta-sperre/core.js
-  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/cem-vta-sperre/fb2a848c-9946-4216-9da8-5ec69e3a752f";
-  var REQUEST_TIMEOUT_MS2 = 15e3;
-  var OFFLINE_MESSAGE2 = "Der Server für die VTA-Sperrliste ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/cem-vta-sperre/fb2a848c-9946-4216-9da8-5ec69e3a752f";
+  var REQUEST_TIMEOUT_MS3 = 15e3;
+  var OFFLINE_MESSAGE3 = "Der Server für die VTA-Sperrliste ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var LABEL_TEXT = "Keine CEM-VTA";
-  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaCemVtaSperreMe {
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaCemVtaSperreMe {
   me: currentEmployee { id __typename }
 }`;
-  var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-  function parseResponse2(status2, text) {
+  var UUID_RE2 = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  function parseResponse3(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -11768,7 +11945,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Sperrliste: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createSperreClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+  function createSperreClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -11778,13 +11955,13 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse2(response.status, response.responseText));
+            resolve(parseResponse3(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
       });
     });
   }
@@ -11793,7 +11970,7 @@
   }
   function employerIdFromHref2(href) {
     const match = String(href || "").match(/#\/Employer\/([0-9a-f-]{36})/i);
-    return match && UUID_RE.test(match[1]) ? match[1].toLowerCase() : "";
+    return match && UUID_RE2.test(match[1]) ? match[1].toLowerCase() : "";
   }
   function createLookup(entries = []) {
     const byId2 = /* @__PURE__ */ new Map();
@@ -11840,10 +12017,10 @@
   var ROW_CLASS2 = "werkia-cem-vta-sperre-row";
   var LABEL_CLASS = "werkia-cem-vta-sperre-label";
   var VERTRETUNGEN_BUTTON_ID = "werkia-vertretungen-button";
-  var CACHE_MS5 = 10 * 60 * 1e3;
-  var RETRY_MS2 = 60 * 1e3;
+  var CACHE_MS6 = 10 * 60 * 1e3;
+  var RETRY_MS3 = 60 * 1e3;
   var CONFIRM_MS2 = 4e3;
-  var T = {
+  var T2 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -11895,44 +12072,44 @@
       style.id = IDS5.style;
       const d = `#${IDS5.dialog}`;
       style.textContent = `
-      .${ROW_CLASS2} { outline:2px solid ${T.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T.bad} !important; }
-      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T.badSoft} !important; }
-      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T.badHover} !important; }
-      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
-      .${LABEL_CLASS}:hover { background:${T.badInk}; }
+      .${ROW_CLASS2} { outline:2px solid ${T2.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T2.bad} !important; }
+      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T2.badSoft} !important; }
+      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T2.badHover} !important; }
+      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T2.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
+      .${LABEL_CLASS}:hover { background:${T2.badInk}; }
       .${LABEL_CLASS} svg { width:14px; height:14px; fill:currentColor; }
       #${IDS5.button}.wcs-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS5.button}.wcs-native:hover { background:rgba(0,0,0,.04); }
       #${IDS5.button}.wcs-native svg { flex:none; fill:currentColor; }
-      #${IDS5.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T.line}; border-radius:8px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS5.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T2.line}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
       ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T.line}; border-radius:12px; background:${T.surface}; color:${T.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
-      ${d} .wcs-close:hover { background:${T.sunken}; }
+      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T2.line}; border-radius:12px; background:${T2.surface}; color:${T2.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T2.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wcs-close:hover { background:${T2.sunken}; }
       ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
-      ${d} h3 { margin:18px 0 8px; color:${T.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
-      ${d} p { margin:0 0 10px; color:${T.ink2}; font-size:12px; }
-      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T.line}; }
-      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${d} h3 { margin:18px 0 8px; color:${T2.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T2.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T2.line}; }
+      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
       ${d} .wcs-who { flex:1; min-width:0; }
       ${d} .wcs-name { font-weight:600; }
       ${d} .wcs-name a { color:inherit; text-decoration:none; }
       ${d} .wcs-name a:hover { text-decoration:underline; }
-      ${d} .wcs-meta { color:${T.muted}; font-size:11px; }
-      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T.badSoft}; color:${T.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wcs-meta { color:${T2.muted}; font-size:11px; }
+      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T2.badSoft}; color:${T2.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
       ${d} .wcs-row { display:flex; gap:8px; align-items:center; }
       ${d} .wcs-reason { margin:10px 0 8px; }
-      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T.lineStrong}; border-radius:8px; background:${T.surface}; color:${T.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
-      ${d} input:focus { outline:2px solid ${T.accent}; outline-offset:-1px; }
-      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T2.lineStrong}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} input:focus { outline:2px solid ${T2.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T2.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
       ${d} button:disabled { cursor:default; opacity:.6; }
-      ${d} button.wcs-secondary { border:1px solid ${T.line}; background:${T.surface}; color:${T.ink}; }
-      ${d} button.wcs-secondary:hover { background:${T.sunken}; }
-      ${d} button.wcs-danger { background:${T.badSoft}; color:${T.badInk}; }
-      ${d} button.wcs-danger:hover { background:${T.badHover}; }
+      ${d} button.wcs-secondary { border:1px solid ${T2.line}; background:${T2.surface}; color:${T2.ink}; }
+      ${d} button.wcs-secondary:hover { background:${T2.sunken}; }
+      ${d} button.wcs-danger { background:${T2.badSoft}; color:${T2.badInk}; }
+      ${d} button.wcs-danger:hover { background:${T2.badHover}; }
       ${d} .wcs-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T.ink2}; font-size:12px; }
-      ${d} .wcs-status.wcs-error { color:${T.badInk}; }
+      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T2.ink2}; font-size:12px; }
+      ${d} .wcs-status.wcs-error { color:${T2.badInk}; }
     `;
       document.head.appendChild(style);
     }
@@ -11978,7 +12155,7 @@
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -12006,8 +12183,8 @@
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
-      if (failedAt && Date.now() - failedAt < RETRY_MS2) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS6) return Promise.resolve(cache);
+      if (failedAt && Date.now() - failedAt < RETRY_MS3) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[CEM-VTA-Sperre] Liste nicht geladen:", error?.message || error);
         return cache;
@@ -12287,10 +12464,372 @@
     });
   }
 
+  // src/features/cem-ampel/rewrite.js
+  var NO_MATCH_ID2 = "00000000-0000-0000-0000-000000000000";
+  var INSTALLED_FLAG3 = "__werkiaCemAmpelRewrite";
+  function bodyHasMarker2(body) {
+    return typeof body === "string" && body.includes(`"${AMPEL_MARKER}"`);
+  }
+  function usesCandidateFilter(operation) {
+    return typeof operation?.query === "string" && /:\s*CandidateFilter\b/.test(operation.query);
+  }
+  function markedFilters(node, found = []) {
+    if (Array.isArray(node)) node.forEach((item) => markedFilters(item, found));
+    else if (node && typeof node === "object") {
+      if (Object.prototype.hasOwnProperty.call(node, AMPEL_MARKER)) found.push(node);
+      Object.keys(node).forEach((key) => {
+        if (key !== AMPEL_MARKER) markedFilters(node[key], found);
+      });
+    }
+    return found;
+  }
+  function rewriteVariables2(node, farbenFor, withIds) {
+    if (Array.isArray(node)) return node.map((item) => rewriteVariables2(item, farbenFor, withIds));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== AMPEL_MARKER) out[key] = rewriteVariables2(node[key], farbenFor, withIds);
+    });
+    if (!withIds || !Object.prototype.hasOwnProperty.call(node, AMPEL_MARKER)) return out;
+    const farbe = markerFarbe(node[AMPEL_MARKER]);
+    const farben = farbenFor(node);
+    let ids = farbe && farben ? farben[farbe] || [] : [];
+    if (Array.isArray(out.ids) && out.ids.length) {
+      const within = new Set(out.ids.map((id) => String(id).toLowerCase()));
+      ids = ids.filter((id) => within.has(id));
+    }
+    out.ids = ids.length ? ids : [NO_MATCH_ID2];
+    return out;
+  }
+  function rewriteBody2(body, farbenFor) {
+    const payload = JSON.parse(body);
+    const rewrite = (operation) => {
+      if (!operation || typeof operation !== "object") return operation;
+      return { ...operation, variables: rewriteVariables2(operation.variables, farbenFor, usesCandidateFilter(operation)) };
+    };
+    return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
+  }
+  function installAmpelRewrite({ pageWindow, loadFarben, onError = () => {
+  } }) {
+    if (!pageWindow || pageWindow[INSTALLED_FLAG3] || typeof pageWindow.fetch !== "function") return false;
+    pageWindow[INSTALLED_FLAG3] = true;
+    const originalFetch = pageWindow.fetch;
+    pageWindow.fetch = function werkiaCemAmpelFetch(input, init) {
+      const body = init?.body;
+      const url = typeof input === "string" ? input : input?.url;
+      if (!bodyHasMarker2(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      let filters = [];
+      try {
+        filters = markedFilters(JSON.parse(body));
+      } catch {
+        return originalFetch.call(pageWindow, input, init);
+      }
+      return Promise.all(filters.map((filter) => loadFarben(listScope(filter)).catch((error) => {
+        onError(error);
+        return null;
+      }))).then((results) => {
+        const byFilter = new Map(filters.map((filter, index) => [JSON.stringify(listScope(filter)), results[index]]));
+        const farbenFor = (filter) => byFilter.get(JSON.stringify(listScope(filter))) || null;
+        return originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody2(body, farbenFor) }));
+      });
+    };
+    return true;
+  }
+
+  // src/features/cem-ampel/index.js
+  var SOURCE_PATH2 = "cem/toolbox/src/features/cem-ampel/index.js";
+  var ROUTE_RE = /^#\/CEM\/MyCandidates(?:[/?]|$)/i;
+  var IDS6 = { style: "werkia-cem-ampel-style", menu: "werkia-cem-ampel-menu", info: "werkia-cem-ampel-info" };
+  var DOT_CLASS = "werkia-cem-ampel-dot";
+  var NEW_CLASS = "werkia-cem-ampel-new";
+  var OWNER_ATTR = "data-werkia-cem-ampel";
+  function candidateRows(root = document) {
+    return [...root.querySelectorAll("tbody tr.RaDataTable-row")].filter((row2) => !row2.parentElement?.closest("tr")).map((row2) => {
+      const link = row2.querySelector(':scope > td.column-lastName a[href*="#/Candidate/"]');
+      const id = candidateIdFromHref3(link?.getAttribute("href") || link?.href);
+      return id ? { row: row2, link, id } : null;
+    }).filter(Boolean);
+  }
+  function executeCemAmpel(runtime, {
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow
+  } = {}) {
+    runtime.registerSource(SOURCE_PATH2);
+    const post = createAmpelClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    const known = /* @__PURE__ */ new Map();
+    const lists = /* @__PURE__ */ new Map();
+    let failedAt = 0;
+    let loading = null;
+    let listError = "";
+    const isTargetPage3 = () => ROUTE_RE.test(location.hash || "");
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getCemGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    const call = async (payload) => post({ ...payload, employeeId: await loadMyId() });
+    function loadFarben(scope) {
+      const key = scopeKey(scope);
+      const cached = lists.get(key);
+      if (cached && Date.now() - cached.at < CACHE_MS5) return cached.promise;
+      const promise = call({ action: "liste", ...scope }).then((data) => {
+        listError = "";
+        return data.farben;
+      });
+      lists.set(key, { at: Date.now(), promise });
+      promise.catch(() => lists.delete(key));
+      return promise;
+    }
+    installAmpelRewrite({
+      pageWindow,
+      loadFarben,
+      onError: (error) => {
+        listError = error?.message || String(error);
+        console.warn("[CEM-Ampel] Fokus-Modus ohne Liste:", listError);
+        scheduleRender();
+      }
+    });
+    const fresh = (id) => {
+      const hit = known.get(id);
+      return hit && Date.now() - hit.at < CACHE_MS5 ? hit : null;
+    };
+    async function loadStatus(ids) {
+      loading = (async () => {
+        for (const part of chunks(ids)) {
+          const data = await call({ action: "status", candidateIds: part });
+          const at = Date.now();
+          (data.kandidaten || []).forEach((entry) => known.set(String(entry.id).toLowerCase(), { at, entry }));
+          part.forEach((id) => {
+            if (!known.has(id)) known.set(id, { at, entry: null });
+          });
+        }
+        failedAt = 0;
+      })();
+      try {
+        await loading;
+      } catch (error) {
+        failedAt = Date.now();
+        console.warn("[CEM-Ampel] Status nicht geladen:", error?.message || error);
+      } finally {
+        loading = null;
+        scheduleRender();
+      }
+    }
+    function ensureStyle4() {
+      if (document.getElementById(IDS6.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS6.style;
+      const font = '"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+      const m = `#${IDS6.menu}`;
+      style.textContent = `
+      .${DOT_CLASS} { display:inline-block; box-sizing:border-box; width:20px; height:20px; min-width:20px; margin:0 8px 0 0; padding:0; border:2px solid; border-radius:50%; cursor:pointer; vertical-align:middle; box-shadow:0 1px 3px rgba(9,9,11,.35), inset 0 2px 3px rgba(255,255,255,.45); transition:transform .1s ease; }
+      .${DOT_CLASS}:hover { transform:scale(1.15); }
+      .${DOT_CLASS}:focus-visible { outline:2px solid ${THEME.accent}; outline-offset:2px; }
+      .${DOT_CLASS}[data-manuell="true"] { outline:2px dashed ${THEME.inkSecondary}; outline-offset:2px; }
+      ${FARB_IDS.map((farbe) => `.${DOT_CLASS}[data-farbe="${farbe}"] { background:${FARBEN[farbe].fill}; border-color:${FARBEN[farbe].ring}; }`).join("\n      ")}
+      .${NEW_CLASS} { display:inline-block; margin:0 0 0 8px; padding:2px 7px; border-radius:5px; background:${THEME.accent}; color:#fff; font:800 12px/1.25 ${font}; letter-spacing:.06em; vertical-align:middle; box-shadow:0 1px 2px rgba(9,9,11,.3); cursor:default; }
+      #${IDS6.info} { margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
+      ${m} { position:absolute; z-index:2147483000; width:280px; box-sizing:border-box; padding:12px; border:1px solid ${THEME.line}; border-radius:12px; background:${THEME.surface}; color:${THEME.ink}; box-shadow:${THEME.shadowRaised}; font:400 13px/1.4 ${font}; }
+      ${m} h3 { display:flex; align-items:center; gap:6px; margin:0 0 6px; color:${THEME.inkSecondary}; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+      ${m} p { margin:0 0 8px; }
+      ${m} .wca-meta { color:${THEME.inkMuted}; font-size:12px; }
+      ${m} .wca-options { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+      ${m} button { display:flex; align-items:center; gap:10px; width:100%; min-height:32px; padding:5px 10px; border:1px solid ${THEME.line}; border-radius:8px; background:${THEME.surface}; color:${THEME.ink}; cursor:pointer; font:600 13px/1 ${font}; text-align:left; }
+      ${m} button:hover { background:${THEME.surfaceSunken}; }
+      ${m} button:disabled { cursor:default; opacity:.6; }
+      ${m} button.is-current { border-color:${THEME.accent}; background:${THEME.accentSoft}; }
+      ${m} .wca-swatch { width:16px; height:16px; box-sizing:border-box; border:2px solid; border-radius:50%; }
+      ${m} .wca-auto { width:16px; height:16px; box-sizing:border-box; border:2px dashed ${THEME.inkMuted}; border-radius:50%; }
+      ${m} .wca-status { min-height:16px; margin-top:8px; color:${THEME.inkSecondary}; font-size:12px; }
+      ${m} .wca-status.is-error { color:${THEME.badInk}; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
+    }
+    function closeMenu() {
+      document.getElementById(IDS6.menu)?.remove();
+    }
+    function openMenu(dot, id) {
+      closeMenu();
+      const entry = known.get(id)?.entry;
+      if (!entry) return;
+      const status2 = el4("div", { className: "wca-status" });
+      const setStatus = (text, isError = false) => {
+        status2.textContent = text;
+        status2.classList.toggle("is-error", isError);
+      };
+      const option = (farbe, label2, swatch2) => {
+        const current = farbe === null ? !entry.manuell : entry.manuell?.farbe === farbe;
+        const button2 = el4("button", { type: "button", className: current ? "is-current" : "", disabled: !entry.darfSetzen }, [swatch2, document.createTextNode(label2)]);
+        button2.addEventListener("click", async () => {
+          menu.querySelectorAll("button").forEach((b) => {
+            b.disabled = true;
+          });
+          setStatus("Speichert …");
+          try {
+            const data = await call({ action: "setzen", candidateId: id, farbe });
+            if (data.kandidat) known.set(id, { at: Date.now(), entry: data.kandidat });
+            else known.delete(id);
+            lists.clear();
+            closeMenu();
+            scheduleRender();
+          } catch (error) {
+            menu.querySelectorAll("button").forEach((b) => {
+              b.disabled = !entry.darfSetzen;
+            });
+            setStatus(error?.message || String(error), true);
+          }
+        });
+        return button2;
+      };
+      const swatch = (farbe) => {
+        const span = el4("span", { className: "wca-swatch" });
+        span.style.background = FARBEN[farbe].fill;
+        span.style.borderColor = FARBEN[farbe].ring;
+        return span;
+      };
+      const tip = cemHelp.tip("cem-ampel");
+      const auto = entry.automatisch;
+      const menu = el4("div", { id: IDS6.menu }, [
+        el4("h3", {}, [document.createTextNode(`Ampel ${FARBEN[entry.farbe]?.label || ""}`), tip]),
+        el4("p", { textContent: entry.grund }),
+        entry.manuell && auto ? el4("p", { className: "wca-meta", textContent: `Automatisch wäre: ${FARBEN[auto.farbe]?.label} (${auto.grund})` }) : null,
+        entry.neu ? el4("p", { className: "wca-meta", textContent: "Seit der Zuteilung noch kein Kontakt." }) : null,
+        el4("div", { className: "wca-options" }, [
+          ...FARB_IDS.map((farbe) => option(farbe, FARBEN[farbe].label, swatch(farbe))),
+          option(null, "Automatisch", el4("span", { className: "wca-auto" }))
+        ]),
+        el4("p", {
+          className: "wca-meta",
+          textContent: entry.darfSetzen ? "Eine gesetzte Farbe gilt 7 Werktage ab dem Setzen bzw. dem letzten Kontakt, danach wieder automatisch. Inaktiv und „alle Matches out“ werden immer rot." : "Setzen können nur der CEM des Kandidaten und Admins."
+        }),
+        status2
+      ]);
+      menu.setAttribute(OWNER_ATTR, SOURCE_PATH2);
+      menu.dataset.candidateId = id;
+      menu.addEventListener("click", (event) => event.stopPropagation());
+      document.body.appendChild(menu);
+      const box = dot.getBoundingClientRect();
+      const left = Math.min(window.scrollX + box.left, window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 8);
+      menu.style.left = `${Math.max(8, left)}px`;
+      menu.style.top = `${window.scrollY + box.bottom + 6}px`;
+    }
+    function createDot(id) {
+      const dot = el4("button", { type: "button", className: DOT_CLASS });
+      dot.dataset.candidateId = id;
+      dot.setAttribute("aria-label", "Ampel");
+      const swallow = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      dot.addEventListener("mousedown", (event) => event.stopPropagation());
+      dot.addEventListener("click", (event) => {
+        swallow(event);
+        if (document.getElementById(IDS6.menu)?.dataset.candidateId === id) {
+          closeMenu();
+          return;
+        }
+        openMenu(dot, id);
+      });
+      return dot;
+    }
+    function paint({ row: row2, link, id }) {
+      const entry = known.get(id)?.entry || null;
+      let dot = row2.querySelector(`.${DOT_CLASS}`);
+      let badge = row2.querySelector(`.${NEW_CLASS}`);
+      if (!entry?.farbe) {
+        dot?.remove();
+        badge?.remove();
+        return;
+      }
+      if (!dot || dot.dataset.candidateId !== id) {
+        dot?.remove();
+        dot = createDot(id);
+        link.parentElement.insertBefore(dot, link);
+      }
+      const title = dotTitle(entry);
+      if (dot.dataset.farbe !== entry.farbe) dot.dataset.farbe = entry.farbe;
+      if (dot.dataset.manuell !== String(Boolean(entry.manuell))) dot.dataset.manuell = String(Boolean(entry.manuell));
+      if (dot.title !== title) dot.title = title;
+      if (entry.neu && !badge) {
+        badge = el4("span", { className: NEW_CLASS, textContent: "NEW", title: NEW_TITLE });
+        link.after(badge);
+      } else if (!entry.neu && badge) badge.remove();
+    }
+    function setInfo(rows) {
+      let info = document.getElementById(IDS6.info);
+      const marked = /werkiaAmpel/.test(decodeURIComponent(location.hash || ""));
+      const text = marked && listError ? `Ampel-Filter: ${listError} Die Liste bleibt leer, bis der Server wieder antwortet.` : "";
+      if (!text) {
+        info?.remove();
+        return;
+      }
+      const table = rows[0]?.row.closest("table") || document.querySelector("table");
+      if (!table?.parentElement) return;
+      if (!info) {
+        info = el4("div", { id: IDS6.info });
+        table.parentElement.insertBefore(info, table);
+      }
+      if (info.textContent !== text) info.textContent = text;
+    }
+    function clear() {
+      document.querySelectorAll(`.${DOT_CLASS}, .${NEW_CLASS}`).forEach((element5) => element5.remove());
+      document.getElementById(IDS6.info)?.remove();
+      closeMenu();
+    }
+    function render() {
+      if (!isTargetPage3()) {
+        clear();
+        return;
+      }
+      ensureStyle4();
+      const rows = candidateRows(document);
+      setInfo(rows);
+      rows.forEach(paint);
+      const missing = [...new Set(rows.map((entry) => entry.id).filter((id) => !fresh(id)))];
+      if (missing.length && !loading && !(failedAt && Date.now() - failedAt < RETRY_MS2)) loadStatus(missing);
+    }
+    let scheduled = false;
+    function scheduleRender() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    }
+    runtime.addWindowListener("click", (event) => {
+      const menu = document.getElementById(IDS6.menu);
+      if (menu && !menu.contains(event.target) && !event.target?.closest?.(`.${DOT_CLASS}`)) closeMenu();
+    }, true);
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key === "Escape" && document.getElementById(IDS6.menu)) {
+        event.stopPropagation();
+        closeMenu();
+      }
+    }, true);
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    runtime.addCleanup?.(clear);
+    scheduleRender();
+  }
+
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
-  var RETRY_MS3 = 60 * 1e3;
+  var RETRY_MS4 = 60 * 1e3;
   var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
   function tiptapOf3(element5) {
     try {
@@ -12321,12 +12860,12 @@
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
-      if (fresh || Date.now() - failedAt < RETRY_MS3) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS4) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
             if (!myId) {
-              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
               myId = String(data2?.me?.id || "");
             }
             if (!myId) throw new Error("Eigene Mitarbeiter-ID fehlt.");
@@ -13571,95 +14110,95 @@
   }
 
   // src/features/wa-templates/index.js
-  var SOURCE_PATH2 = "cem/toolbox/src/features/wa-templates/index.js";
-  var ROUTE_RE = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
+  var SOURCE_PATH3 = "cem/toolbox/src/features/wa-templates/index.js";
+  var ROUTE_RE2 = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
   var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
   var CANDIDATE_ID_RE = /#\/Candidate\/([0-9a-f-]{36})/i;
   var BUTTON_CLASS = "werkia-wa-button";
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
-  var IDS6 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
-  var CACHE_MS6 = 2 * 60 * 1e3;
+  var IDS7 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
+  var CACHE_MS7 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
   .${CELL_CLASS} .${BUTTON_CLASS} { margin:0; }
   .${CELL_CLASS} { width:1%; white-space:nowrap; padding-left:4px !important; padding-right:4px !important; text-align:center; }
   th.${CELL_CLASS} { font-weight:500; }
   .${BUTTON_CLASS}:hover { background:#1f9a6b; color:#fff; }
-  #${IDS6.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
-  #${IDS6.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS6.menu} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS6.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
-  #${IDS6.dialog} .wa-head button { cursor:pointer; }
-  #${IDS6.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
-  #${IDS6.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
-  #${IDS6.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
-  #${IDS6.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
-  #${IDS6.dialog} select, #${IDS6.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS6.dialog} select:focus, #${IDS6.dialog} textarea:focus { outline:2px solid #b6a4ff; }
-  #${IDS6.dialog} textarea { min-height:440px; resize:vertical; }
-  #${IDS6.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-  #${IDS6.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
-  #${IDS6.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
-  #${IDS6.dialog} .wa-loading { color:#6b6775; }
-  #${IDS6.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
-  #${IDS6.dialog} .wa-foot button, #${IDS6.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
-  #${IDS6.dialog} .wa-primary:hover { background:#5535d6; }
-  #${IDS6.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
-  #${IDS6.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS6.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
-  #${IDS6.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
-  #${IDS6.menu} button.wa-action { color:#6d4aff; font-weight:600; }
-  #${IDS6.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
-  #${IDS6.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
-  #${IDS6.menu} .wa-group-items { padding-left:8px; }
-  #${IDS6.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS6.context} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS6.context} button.wa-delete { color:#c23f3f; }
-  #${IDS6.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
-  #${IDS6.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS6.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
-  #${IDS6.confirm} p { margin:0; padding:16px 18px; }
-  #${IDS6.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
-  #${IDS6.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS6.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
-  #${IDS6.confirm} .wa-delete-solid:hover { background:#a83232; }
-  #${IDS6.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
-  #${IDS6.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS6.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
-  #${IDS6.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
-  #${IDS6.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
-  #${IDS6.dialog} .wa-note { color:#6b6775; font-size:12px; }
-  #${IDS6.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
-  #${IDS6.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
-  #${IDS6.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
-  #${IDS6.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
-  #${IDS6.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
-  #${IDS6.dialog} .wa-move { padding:4px 9px !important; }
-  #${IDS6.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
-  #${IDS6.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
-  #${IDS6.dialog} .wa-spacer { flex:1; }
-  #${IDS6.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #${IDS6.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
+  #${IDS7.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS7.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
+  #${IDS7.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS7.menu} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS7.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS7.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
+  #${IDS7.dialog} .wa-head button { cursor:pointer; }
+  #${IDS7.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
+  #${IDS7.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
+  #${IDS7.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
+  #${IDS7.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
+  #${IDS7.dialog} select, #${IDS7.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS7.dialog} select:focus, #${IDS7.dialog} textarea:focus { outline:2px solid #b6a4ff; }
+  #${IDS7.dialog} textarea { min-height:440px; resize:vertical; }
+  #${IDS7.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  #${IDS7.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
+  #${IDS7.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
+  #${IDS7.dialog} .wa-loading { color:#6b6775; }
+  #${IDS7.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
+  #${IDS7.dialog} .wa-foot button, #${IDS7.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS7.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
+  #${IDS7.dialog} .wa-primary:hover { background:#5535d6; }
+  #${IDS7.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
+  #${IDS7.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS7.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
+  #${IDS7.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
+  #${IDS7.menu} button.wa-action { color:#6d4aff; font-weight:600; }
+  #${IDS7.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
+  #${IDS7.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
+  #${IDS7.menu} .wa-group-items { padding-left:8px; }
+  #${IDS7.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS7.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS7.context} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS7.context} button.wa-delete { color:#c23f3f; }
+  #${IDS7.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
+  #${IDS7.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS7.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS7.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
+  #${IDS7.confirm} p { margin:0; padding:16px 18px; }
+  #${IDS7.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
+  #${IDS7.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS7.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS7.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
+  #${IDS7.confirm} .wa-delete-solid:hover { background:#a83232; }
+  #${IDS7.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
+  #${IDS7.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS7.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
+  #${IDS7.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  #${IDS7.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS7.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
+  #${IDS7.dialog} .wa-note { color:#6b6775; font-size:12px; }
+  #${IDS7.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
+  #${IDS7.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
+  #${IDS7.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
+  #${IDS7.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
+  #${IDS7.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
+  #${IDS7.dialog} .wa-move { padding:4px 9px !important; }
+  #${IDS7.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
+  #${IDS7.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
+  #${IDS7.dialog} .wa-spacer { flex:1; }
+  #${IDS7.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #${IDS7.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
 `;
   function executeWaTemplates(runtime) {
-    runtime.registerSource(SOURCE_PATH2);
+    runtime.registerSource(SOURCE_PATH3);
     const cache = /* @__PURE__ */ new Map();
     let syncTimer = null;
     let toastTimer = null;
     function ensureStyle4() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS7.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS7.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
@@ -13667,7 +14206,7 @@
       const entry = cache.get(key);
       if (entry && entry.expiresAt > Date.now()) return entry.promise;
       const promise = load2();
-      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS6 });
+      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS7 });
       promise.catch(() => cache.delete(key));
       return promise;
     }
@@ -13752,7 +14291,7 @@
       closeMenu();
     }
     function sync() {
-      if (!ROUTE_RE.test(location.hash)) {
+      if (!ROUTE_RE2.test(location.hash)) {
         removeAll();
         return;
       }
@@ -13770,14 +14309,14 @@
     let activeMenu = null;
     let followFrame = 0;
     function closeMenu() {
-      document.getElementById(IDS6.menu)?.remove();
+      document.getElementById(IDS7.menu)?.remove();
       activeMenu = null;
       closeContextMenu();
     }
     function openMenu(button2, target) {
       closeMenu();
       const menu = document.createElement("div");
-      menu.id = IDS6.menu;
+      menu.id = IDS7.menu;
       const place = () => {
         const rect = button2.getBoundingClientRect();
         const height = menu.offsetHeight;
@@ -13840,11 +14379,11 @@
       activeMenu = { button: button2, place };
     }
     function closeContextMenu() {
-      document.getElementById(IDS6.context)?.remove();
+      document.getElementById(IDS7.context)?.remove();
     }
     function openContextMenu(event, template) {
       closeContextMenu();
-      const context = element5("div", { id: IDS6.context });
+      const context = element5("div", { id: IDS7.context });
       const editButton = element5("button", { type: "button", textContent: "Bearbeiten" });
       editButton.addEventListener("click", () => {
         closeMenu();
@@ -13862,9 +14401,9 @@
       Object.assign(context.style, { left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` });
     }
     function confirmDelete(template, onDeleted) {
-      document.getElementById(IDS6.confirm)?.remove();
+      document.getElementById(IDS7.confirm)?.remove();
       const close = () => {
-        document.getElementById(IDS6.confirm)?.remove();
+        document.getElementById(IDS7.confirm)?.remove();
         window.removeEventListener("keydown", onKey, true);
       };
       const onKey = (keyEvent) => {
@@ -13874,7 +14413,7 @@
       };
       const cancelButton = element5("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const deleteButton = element5("button", { type: "button", className: "wa-delete-solid", textContent: "Löschen" });
-      const overlay = element5("div", { id: IDS6.confirm }, [element5("div", { className: "wa-card" }, [
+      const overlay = element5("div", { id: IDS7.confirm }, [element5("div", { className: "wa-card" }, [
         element5("h2", { textContent: "Vorlage löschen?" }),
         element5("p", { textContent: `Möchtest du die Vorlage „${template.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.` }),
         element5("div", { className: "wa-foot" }, [cancelButton, deleteButton])
@@ -13893,14 +14432,14 @@
       cancelButton.focus();
     }
     function onDocumentClick(event) {
-      const context = document.getElementById(IDS6.context);
+      const context = document.getElementById(IDS7.context);
       if (context?.contains(event.target)) return;
       closeContextMenu();
-      const menu = document.getElementById(IDS6.menu);
+      const menu = document.getElementById(IDS7.menu);
       if (menu && !menu.contains(event.target)) closeMenu();
     }
     function onDocumentScroll(event) {
-      const menu = document.getElementById(IDS6.menu);
+      const menu = document.getElementById(IDS7.menu);
       if (!menu || event.target instanceof Node && menu.contains(event.target)) return;
       closeContextMenu();
       if (followFrame) return;
@@ -13923,7 +14462,7 @@
       return node;
     }
     function closeDialog() {
-      document.getElementById(IDS6.dialog)?.remove();
+      document.getElementById(IDS7.dialog)?.remove();
       document.removeEventListener("keydown", onDialogKey, true);
     }
     function onDialogKey(event) {
@@ -13958,7 +14497,7 @@
       const cancelButton = element5("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const card = element5("div", { className: "wa-card" }, [head, body, element5("div", { className: "wa-foot" }, [cancelButton, copyButton])]);
       makeDraggable(card, head);
-      const overlay = element5("div", { id: IDS6.dialog }, [card]);
+      const overlay = element5("div", { id: IDS7.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -14094,7 +14633,7 @@ Trotzdem kopieren?`)) return;
       const foot = element5("div", { className: "wa-foot" });
       const card = element5("div", { className: "wa-card" }, [head, body, foot]);
       makeDraggable(card, head);
-      const overlay = element5("div", { id: IDS6.dialog }, [card]);
+      const overlay = element5("div", { id: IDS7.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -14277,9 +14816,9 @@ Trotzdem speichern?`)) return void 0;
       }
     }
     function showNotice(message) {
-      document.getElementById(IDS6.toast)?.remove();
+      document.getElementById(IDS7.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
-      const toast = element5("div", { id: IDS6.toast, textContent: message });
+      const toast = element5("div", { id: IDS7.toast, textContent: message });
       document.body.appendChild(toast);
       toastTimer = runtime.setTimeout(() => {
         toastTimer = null;
@@ -14287,10 +14826,10 @@ Trotzdem speichern?`)) return void 0;
       }, 4e3);
     }
     function showToast(template, context, text) {
-      document.getElementById(IDS6.toast)?.remove();
+      document.getElementById(IDS7.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
       const preview = text.split("\n").filter((line) => line.trim()).slice(0, 2).join("\n");
-      const toast = element5("div", { id: IDS6.toast }, [
+      const toast = element5("div", { id: IDS7.toast }, [
         element5("div", { textContent: `✓ Kopiert: ${template.label}${context.candidateFirstName ? ` für ${context.candidateFirstName}` : ""}` }),
         element5("div", { className: "wa-preview", textContent: preview })
       ]);
@@ -14313,9 +14852,9 @@ Trotzdem speichern?`)) return void 0;
       if (followFrame) window.cancelAnimationFrame(followFrame);
       removeAll();
       closeDialog();
-      document.getElementById(IDS6.confirm)?.remove();
-      document.getElementById(IDS6.toast)?.remove();
-      document.getElementById(IDS6.style)?.remove();
+      document.getElementById(IDS7.confirm)?.remove();
+      document.getElementById(IDS7.toast)?.remove();
+      document.getElementById(IDS7.style)?.remove();
     });
     scheduleSync();
   }
@@ -14717,19 +15256,19 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS3 = 2e4;
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS4 = 2e4;
   var MAX_COMMENT = 1500;
-  var OFFLINE_MESSAGE3 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE4 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
   var DIRECTIONS = {
     AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
     AN_KAM: { id: "AN_KAM", label: "An KAM", role: "KAM", title: "Match an die KAM-Person des Arbeitgebers schicken (Slack-DM)" }
   };
-  var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function matchIdFromHref5(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE2.test(id) ? id : "";
+    return UUID_RE3.test(id) ? id : "";
   }
   function buildPayload({ action, direction, matchId, comment = "", auth, testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
@@ -14746,7 +15285,7 @@ Trotzdem speichern?`)) return void 0;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse3(status2, text) {
+  function parseResponse4(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -14758,7 +15297,7 @@ Trotzdem speichern?`)) return void 0;
     if (status2 === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createSlackDmClient({ request, getAuth, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createSlackDmClient({ request, getAuth, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
@@ -14775,13 +15314,13 @@ Trotzdem speichern?`)) return void 0;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse3(response.status, response.responseText));
+            resolve(parseResponse4(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
       });
     });
   }
@@ -14807,40 +15346,40 @@ Trotzdem speichern?`)) return void 0;
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
-  var IDS7 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var IDS8 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
   var FONT6 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
   .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT6}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT6}; color:#09090b; -webkit-font-smoothing:antialiased; }
-  #${IDS7.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS7.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
-  #${IDS7.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS7.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT6}; }
-  #${IDS7.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS7.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
-  #${IDS7.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS7.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
-  #${IDS7.dialog} dd a { color:#b85400; text-decoration:none; }
-  #${IDS7.dialog} dd a:hover { text-decoration:underline; }
-  #${IDS7.dialog} .sd-muted { color:#8b8b94; }
-  #${IDS7.dialog} .sd-warn { color:#8a6700; }
-  #${IDS7.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS7.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT6}; resize:vertical; }
-  #${IDS7.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
-  #${IDS7.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
-  #${IDS7.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
-  #${IDS7.dialog} .sd-status.sd-error { color:#b52f2f; }
-  #${IDS7.dialog} .sd-status.sd-ok { color:#0a7c0a; }
-  #${IDS7.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS7.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT6}; }
-  #${IDS7.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
-  #${IDS7.dialog} .sd-secondary:hover { background:#f4f4f5; }
-  #${IDS7.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
-  #${IDS7.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
-  #${IDS7.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT6}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS8.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS8.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS8.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS8.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT6}; }
+  #${IDS8.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS8.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS8.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS8.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS8.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS8.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS8.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS8.dialog} .sd-warn { color:#8a6700; }
+  #${IDS8.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS8.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT6}; resize:vertical; }
+  #${IDS8.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS8.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS8.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS8.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS8.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS8.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS8.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT6}; }
+  #${IDS8.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS8.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS8.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS8.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS8.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
 `;
   function executeSlackDm(runtime, {
     routes = [],
@@ -14863,9 +15402,9 @@ Trotzdem speichern?`)) return void 0;
     let closeTimer = null;
     const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
     function ensureStyle4() {
-      if (document.getElementById(IDS7.style)) return;
+      if (document.getElementById(IDS8.style)) return;
       const style = document.createElement("style");
-      style.id = IDS7.style;
+      style.id = IDS8.style;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
@@ -14912,7 +15451,7 @@ Trotzdem speichern?`)) return void 0;
         runtime.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      document.getElementById(IDS7.dialog)?.remove();
+      document.getElementById(IDS8.dialog)?.remove();
       document.removeEventListener("keydown", onKeydown, true);
     }
     function onKeydown(event) {
@@ -14947,7 +15486,7 @@ Trotzdem speichern?`)) return void 0;
     async function openDialog(matchId) {
       closeDialog();
       ensureStyle4();
-      const comment = el4("textarea", { id: `${IDS7.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const comment = el4("textarea", { id: `${IDS8.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el4("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
@@ -14959,7 +15498,7 @@ Trotzdem speichern?`)) return void 0;
         el4("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
         el4("div", { className: "sd-head" }, [el4("h2", { text: `${config.label} schicken` }), tip]),
         el4("dl", {}, [el4("dt", { text: "Match" }), el4("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el4("label", { for: `${IDS7.dialog}-comment`, text: "Kommentar" }),
+        el4("label", { for: `${IDS8.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
         el4("div", { className: "sd-status" }),
@@ -14968,7 +15507,7 @@ Trotzdem speichern?`)) return void 0;
           sendButton
         ])
       ]);
-      const dialog = el4("div", { id: IDS7.dialog }, card);
+      const dialog = el4("div", { id: IDS8.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -15024,7 +15563,7 @@ Trotzdem speichern?`)) return void 0;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       closeDialog();
       removeButtons();
-      document.getElementById(IDS7.style)?.remove();
+      document.getElementById(IDS8.style)?.remove();
     });
     scheduleSync();
   }
@@ -15185,7 +15724,7 @@ Trotzdem speichern?`)) return void 0;
 
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
-  var OWNER_ATTR = "data-werkia-shortcut-explain";
+  var OWNER_ATTR2 = "data-werkia-shortcut-explain";
   var STYLE_ID13 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
@@ -15236,8 +15775,8 @@ Trotzdem speichern?`)) return void 0;
   function executeShortcutExplainer(runtime, { sourcePath } = {}) {
     if (sourcePath) runtime.registerSource(sourcePath);
     const root = document.documentElement;
-    if (root.hasAttribute(OWNER_ATTR)) return;
-    root.setAttribute(OWNER_ATTR, "");
+    if (root.hasAttribute(OWNER_ATTR2)) return;
+    root.setAttribute(OWNER_ATTR2, "");
     let shown = "";
     let last = 0;
     function hide() {
@@ -15368,6 +15907,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "kam-status-filter-expanded", execute: executeKamStatusFilterExpanded },
     { id: "vertretungen", execute: executeVertretungen2 },
     { id: "cem-vta-sperre", execute: executeCemVtaSperre2 },
+    { id: "cem-ampel", execute: executeCemAmpel },
     { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule },
     // Last on purpose: this feature tints rows on the same route as

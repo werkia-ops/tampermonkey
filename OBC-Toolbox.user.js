@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.242
+// @version      1.10.248
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -7646,7 +7646,6 @@
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
     const RETRY_MS2 = 60 * 1e3;
-    let working = false;
     let scheduled = false;
     function ensureStyles2() {
       if (document.getElementById(STYLE_ID3)) return;
@@ -7732,32 +7731,35 @@
       queue.push(candidateId);
       work();
     }
-    async function work() {
-      if (working) return;
-      working = true;
+    const WORKERS = 8;
+    let workers = 0;
+    async function computeCandidate(candidateId) {
       try {
-        while (queue.length) {
-          const candidateId = queue.shift();
-          try {
-            const jobIds = currentItems().filter((item) => item.candidateId === candidateId && isRowVisible(item.row)).map((item) => item.jobId);
-            jobIds.forEach((jobId) => attempts.set(`${candidateId}|${jobId}`, Date.now()));
-            if (jobIds.length) {
-              const provider = getProvider();
-              const [candidateLocation, jobs] = await Promise.all([
-                provider.loadCandidateLocation(candidateId),
-                provider.loadJobs(jobIds)
-              ]);
-              const locations = [...jobs.values()].map((job) => job?.location).filter(Boolean);
-              if (candidateLocation && locations.length) await getRoutesFromCandidate(candidateLocation, locations);
-            }
-          } catch (error) {
-            console.warn("[Werkia Fahrzeit] Routen nicht berechenbar:", candidateId, error);
-          }
-          queued.delete(candidateId);
-          scheduleRender();
+        const jobIds = currentItems().filter((item) => item.candidateId === candidateId && isRowVisible(item.row)).map((item) => item.jobId);
+        jobIds.forEach((jobId) => attempts.set(`${candidateId}|${jobId}`, Date.now()));
+        if (jobIds.length) {
+          const provider = getProvider();
+          const [candidateLocation, jobs] = await Promise.all([
+            provider.loadCandidateLocation(candidateId),
+            provider.loadJobs(jobIds)
+          ]);
+          const locations = [...jobs.values()].map((job) => job?.location).filter(Boolean);
+          if (candidateLocation && locations.length) await getRoutesFromCandidate(candidateLocation, locations);
         }
-      } finally {
-        working = false;
+      } catch (error) {
+        console.warn("[Werkia Fahrzeit] Routen nicht berechenbar:", candidateId, error);
+      }
+      queued.delete(candidateId);
+      scheduleRender();
+    }
+    function work() {
+      while (workers < WORKERS && queue.length) {
+        const candidateId = queue.shift();
+        workers += 1;
+        computeCandidate(candidateId).finally(() => {
+          workers -= 1;
+          work();
+        });
       }
     }
     function candidateLocationFor(provider, candidateId) {

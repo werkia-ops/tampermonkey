@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.239
+// @version      1.10.240
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -7521,6 +7521,8 @@
   // ../../shared/js/route-commute/list-badges.js
   var POTENTIAL_MATCHES_ROUTE2 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
   var REVERSE_MATCHES_ROUTE = /^#\/OnlineMatches\/ReverseMatches(?:\?|$)/i;
+  var OM_MATCHES_ROUTE = /^#\/OnlineMatches\/(?:AllMatches|MyMatches)(?:[/?]|$)/i;
+  var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
   var LEVEL_STYLES2 = {
@@ -7540,13 +7542,22 @@
     const href = getJobLinkFromRow(row)?.getAttribute("href") || "";
     return href.match(/#\/JobPosition\/([a-f0-9-]{36})(?:[/?]|$)/i)?.[1]?.toLowerCase() || "";
   }
+  function getCandidateIdFromLink(link) {
+    return String(link?.getAttribute("href") || "").match(/#\/Candidate\/([a-f0-9-]{36})(?:[/?]|$)/i)?.[1]?.toLowerCase() || "";
+  }
+  function getCandidateIdFromOmMatchRow(row) {
+    const own = row?.querySelector(CANDIDATE_LINK_SELECTOR);
+    if (own) return getCandidateIdFromLink(own);
+    const mainRow = row?.closest("tr.RaDataTable-expandRow, .RaDataTable-expandRow")?.closest("tr")?.previousElementSibling;
+    return getCandidateIdFromLink(mainRow?.querySelector(CANDIDATE_LINK_SELECTOR));
+  }
   function getCandidateIdFromExpandRow(expandRow) {
     return String(expandRow?.id || "").match(/^Candidate-([a-f0-9-]{36})-expand$/i)?.[1]?.toLowerCase() || "";
   }
   var PAGES2 = [
     {
       key: "potentialMatches",
-      hideSkulls: true,
+      skullMode: "hide",
       matches: (hash) => POTENTIAL_MATCHES_ROUTE2.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute4();
@@ -7556,6 +7567,20 @@
           jobId: getJobIdFromRow(row),
           host: () => row.querySelector("td.column-jobPositionId") || row.querySelector("td") || row
         }));
+      }
+    },
+    {
+      key: "omMatches",
+      skullMode: "emphasize",
+      matches: (hash) => OM_MATCHES_ROUTE.test(hash),
+      collect() {
+        const items = [];
+        for (const row of document.querySelectorAll(ROW_SELECTOR2)) {
+          const link = getJobLinkFromRow(row);
+          if (!link || link.closest("tr") !== row) continue;
+          items.push({ row, candidateId: getCandidateIdFromOmMatchRow(row), jobId: getJobIdFromRow(row), host: () => link.closest("td") || row });
+        }
+        return items;
       }
     },
     {
@@ -7588,6 +7613,8 @@
     const STYLE_ID3 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
+    const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
+    const bigSkullUrl = options.bigSkullUrl || "";
     const BAR_CLASS = `werkia-${namespace}-commute-hidden-bar`;
     const OWNED_SELECTOR = `.${BADGE_CLASS2}, .${BAR_CLASS}`;
     let showHidden = false;
@@ -7608,6 +7635,10 @@
       tr[${SKULL_ATTR}] { opacity:.45;filter:grayscale(.6);transition:opacity .15s ease,filter .15s ease; }
       tr[${SKULL_ATTR}]:hover, tr[${SKULL_ATTR}]:focus-within { opacity:1;filter:none; }
       tr[${HIDDEN_ATTR}] { display:none !important; }
+      tr[${BIG_ATTR}] > td { background:#ffe3e3 !important;box-shadow:inset 0 3px #c92a2a,inset 0 -3px #c92a2a !important; }
+      tr[${BIG_ATTR}] > td:first-child { box-shadow:inset 6px 0 #c92a2a,inset 0 3px #c92a2a,inset 0 -3px #c92a2a !important; }
+      tr[${BIG_ATTR}] .${BADGE_CLASS2} { gap:8px;padding:6px 14px 6px 8px;border-width:2px;border-color:#991b1b;font-size:15px;font-weight:900;white-space:normal; }
+      tr[${BIG_ATTR}] .${BADGE_CLASS2}::before { content:"${bigSkullUrl ? "" : "💀"}";flex:0 0 auto;width:64px;height:64px;font-size:56px;line-height:64px;text-align:center;${bigSkullUrl ? `background:url("${bigSkullUrl}") center/contain no-repeat;` : ""} }
       .${BAR_CLASS} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e03131;border-radius:8px;background:#fff5f5;color:#8f1d1d;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
       .${BAR_CLASS} button { margin-left:auto;padding:3px 10px;border:1px solid #c92a2a;border-radius:6px;background:#fff;color:#8f1d1d;font:inherit;cursor:pointer; }
     `;
@@ -7617,6 +7648,7 @@
       document.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       document.querySelectorAll(`tr[${SKULL_ATTR}]`).forEach((row) => row.removeAttribute(SKULL_ATTR));
       document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row) => row.removeAttribute(HIDDEN_ATTR));
+      document.querySelectorAll(`tr[${BIG_ATTR}]`).forEach((row) => row.removeAttribute(BIG_ATTR));
       document.querySelectorAll(`.${BAR_CLASS}`).forEach((bar) => bar.remove());
       queue.length = 0;
       queued.clear();
@@ -7626,13 +7658,16 @@
       if (!badge) {
         badge = document.createElement("span");
         badge.className = BADGE_CLASS2;
+        badge.dataset.werkiaOwned = "true";
         item.host().appendChild(badge);
       }
       if (badge.textContent !== view.text) badge.textContent = view.text;
       if (badge.dataset.level !== view.level) badge.dataset.level = view.level;
       if (badge.title !== view.title) badge.title = view.title;
-      if (view.skull) item.row.setAttribute(SKULL_ATTR, "");
+      if (view.skull && !view.big) item.row.setAttribute(SKULL_ATTR, "");
       else item.row.removeAttribute(SKULL_ATTR);
+      if (view.big) item.row.setAttribute(BIG_ATTR, "");
+      else item.row.removeAttribute(BIG_ATTR);
       if (view.hide && !showHidden) item.row.setAttribute(HIDDEN_ATTR, "");
       else item.row.removeAttribute(HIDDEN_ATTR);
     }
@@ -7756,7 +7791,10 @@
         }
         const entry = job && candidateLocation ? getCachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : null;
         const view = describeCommute(commuteClass, entry);
-        view.hide = Boolean(page.hideSkulls && view.skull && isSurelyLocal(job));
+        const sure = Boolean(view.skull && isSurelyLocal(job));
+        view.hide = page.skullMode === "hide" && sure;
+        view.big = page.skullMode === "emphasize" && sure;
+        if (view.big) view.text = view.text.replace(/^💀 /, "Ortsgebunden · ");
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
@@ -7764,7 +7802,7 @@
           enqueue(item.candidateId);
         }
       }
-      if (page.hideSkulls) renderHiddenBar(items, hiddenCount);
+      if (page.skullMode === "hide") renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {
       if (scheduled) return;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.16.239
+// @version      1.16.240
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6852,6 +6852,8 @@
   // ../../shared/js/route-commute/list-badges.js
   var POTENTIAL_MATCHES_ROUTE5 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
   var REVERSE_MATCHES_ROUTE = /^#\/OnlineMatches\/ReverseMatches(?:\?|$)/i;
+  var OM_MATCHES_ROUTE = /^#\/OnlineMatches\/(?:AllMatches|MyMatches)(?:[/?]|$)/i;
+  var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var ROW_SELECTOR = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
   var LEVEL_STYLES = {
@@ -6871,13 +6873,22 @@
     const href = getJobLinkFromRow(row2)?.getAttribute("href") || "";
     return href.match(/#\/JobPosition\/([a-f0-9-]{36})(?:[/?]|$)/i)?.[1]?.toLowerCase() || "";
   }
+  function getCandidateIdFromLink(link) {
+    return String(link?.getAttribute("href") || "").match(/#\/Candidate\/([a-f0-9-]{36})(?:[/?]|$)/i)?.[1]?.toLowerCase() || "";
+  }
+  function getCandidateIdFromOmMatchRow(row2) {
+    const own = row2?.querySelector(CANDIDATE_LINK_SELECTOR);
+    if (own) return getCandidateIdFromLink(own);
+    const mainRow = row2?.closest("tr.RaDataTable-expandRow, .RaDataTable-expandRow")?.closest("tr")?.previousElementSibling;
+    return getCandidateIdFromLink(mainRow?.querySelector(CANDIDATE_LINK_SELECTOR));
+  }
   function getCandidateIdFromExpandRow(expandRow) {
     return String(expandRow?.id || "").match(/^Candidate-([a-f0-9-]{36})-expand$/i)?.[1]?.toLowerCase() || "";
   }
   var PAGES2 = [
     {
       key: "potentialMatches",
-      hideSkulls: true,
+      skullMode: "hide",
       matches: (hash) => POTENTIAL_MATCHES_ROUTE5.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute2();
@@ -6887,6 +6898,20 @@
           jobId: getJobIdFromRow(row2),
           host: () => row2.querySelector("td.column-jobPositionId") || row2.querySelector("td") || row2
         }));
+      }
+    },
+    {
+      key: "omMatches",
+      skullMode: "emphasize",
+      matches: (hash) => OM_MATCHES_ROUTE.test(hash),
+      collect() {
+        const items = [];
+        for (const row2 of document.querySelectorAll(ROW_SELECTOR)) {
+          const link = getJobLinkFromRow(row2);
+          if (!link || link.closest("tr") !== row2) continue;
+          items.push({ row: row2, candidateId: getCandidateIdFromOmMatchRow(row2), jobId: getJobIdFromRow(row2), host: () => link.closest("td") || row2 });
+        }
+        return items;
       }
     },
     {
@@ -6919,6 +6944,8 @@
     const STYLE_ID13 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
+    const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
+    const bigSkullUrl = options.bigSkullUrl || "";
     const BAR_CLASS4 = `werkia-${namespace}-commute-hidden-bar`;
     const OWNED_SELECTOR = `.${BADGE_CLASS2}, .${BAR_CLASS4}`;
     let showHidden = false;
@@ -6939,6 +6966,10 @@
       tr[${SKULL_ATTR}] { opacity:.45;filter:grayscale(.6);transition:opacity .15s ease,filter .15s ease; }
       tr[${SKULL_ATTR}]:hover, tr[${SKULL_ATTR}]:focus-within { opacity:1;filter:none; }
       tr[${HIDDEN_ATTR}] { display:none !important; }
+      tr[${BIG_ATTR}] > td { background:#ffe3e3 !important;box-shadow:inset 0 3px #c92a2a,inset 0 -3px #c92a2a !important; }
+      tr[${BIG_ATTR}] > td:first-child { box-shadow:inset 6px 0 #c92a2a,inset 0 3px #c92a2a,inset 0 -3px #c92a2a !important; }
+      tr[${BIG_ATTR}] .${BADGE_CLASS2} { gap:8px;padding:6px 14px 6px 8px;border-width:2px;border-color:#991b1b;font-size:15px;font-weight:900;white-space:normal; }
+      tr[${BIG_ATTR}] .${BADGE_CLASS2}::before { content:"${bigSkullUrl ? "" : "💀"}";flex:0 0 auto;width:64px;height:64px;font-size:56px;line-height:64px;text-align:center;${bigSkullUrl ? `background:url("${bigSkullUrl}") center/contain no-repeat;` : ""} }
       .${BAR_CLASS4} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e03131;border-radius:8px;background:#fff5f5;color:#8f1d1d;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
       .${BAR_CLASS4} button { margin-left:auto;padding:3px 10px;border:1px solid #c92a2a;border-radius:6px;background:#fff;color:#8f1d1d;font:inherit;cursor:pointer; }
     `;
@@ -6948,6 +6979,7 @@
       document.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       document.querySelectorAll(`tr[${SKULL_ATTR}]`).forEach((row2) => row2.removeAttribute(SKULL_ATTR));
       document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row2) => row2.removeAttribute(HIDDEN_ATTR));
+      document.querySelectorAll(`tr[${BIG_ATTR}]`).forEach((row2) => row2.removeAttribute(BIG_ATTR));
       document.querySelectorAll(`.${BAR_CLASS4}`).forEach((bar) => bar.remove());
       queue.length = 0;
       queued.clear();
@@ -6957,13 +6989,16 @@
       if (!badge) {
         badge = document.createElement("span");
         badge.className = BADGE_CLASS2;
+        badge.dataset.werkiaOwned = "true";
         item.host().appendChild(badge);
       }
       if (badge.textContent !== view.text) badge.textContent = view.text;
       if (badge.dataset.level !== view.level) badge.dataset.level = view.level;
       if (badge.title !== view.title) badge.title = view.title;
-      if (view.skull) item.row.setAttribute(SKULL_ATTR, "");
+      if (view.skull && !view.big) item.row.setAttribute(SKULL_ATTR, "");
       else item.row.removeAttribute(SKULL_ATTR);
+      if (view.big) item.row.setAttribute(BIG_ATTR, "");
+      else item.row.removeAttribute(BIG_ATTR);
       if (view.hide && !showHidden) item.row.setAttribute(HIDDEN_ATTR, "");
       else item.row.removeAttribute(HIDDEN_ATTR);
     }
@@ -7087,7 +7122,10 @@
         }
         const entry = job && candidateLocation ? getCachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : null;
         const view = describeCommute(commuteClass, entry);
-        view.hide = Boolean(page.hideSkulls && view.skull && isSurelyLocal(job));
+        const sure = Boolean(view.skull && isSurelyLocal(job));
+        view.hide = page.skullMode === "hide" && sure;
+        view.big = page.skullMode === "emphasize" && sure;
+        if (view.big) view.text = view.text.replace(/^💀 /, "Ortsgebunden · ");
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
@@ -7095,7 +7133,7 @@
           enqueue(item.candidateId);
         }
       }
-      if (page.hideSkulls) renderHiddenBar(items, hiddenCount);
+      if (page.skullMode === "hide") renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {
       if (scheduled) return;
@@ -8524,7 +8562,7 @@
   // ../../shared/js/bulk-match-actions/index.js
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
-  var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
+  var CANDIDATE_LINK_SELECTOR2 = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
@@ -8599,10 +8637,10 @@
       };
     }
     function candidateNameFromRow(row2) {
-      const own = row2.querySelector(CANDIDATE_LINK_SELECTOR);
+      const own = row2.querySelector(CANDIDATE_LINK_SELECTOR2);
       if (own) return normalize4(own.textContent);
       const parentRow = row2.closest("table")?.closest("tr")?.previousElementSibling;
-      return normalize4(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
+      return normalize4(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR2)?.textContent);
     }
     function labelFromRow(row2) {
       const candidate = candidateNameFromRow(row2);
@@ -9165,7 +9203,7 @@
     status: "werkia-cem-candidate-bulk-status"
   };
   var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
-  var CANDIDATE_LINK_SELECTOR2 = 'a[href*="#/Candidate/"]';
+  var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
   var CANDIDATE_STATUS_OPTIONS = [
     { value: "onboarding", label: "Onboarding" },
     { value: "follow_up", label: "Follow up" },
@@ -9213,7 +9251,7 @@
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
       return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
-        const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR2}`);
+        const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR3}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
         return id ? { id, name: normalize6(link.textContent) || id } : null;
       }).filter((candidate) => candidate && !seen.has(candidate.id) && seen.add(candidate.id));
@@ -10517,7 +10555,7 @@
   var HIDDEN_ATTRIBUTE2 = "data-werkia-focus-hidden";
   var STYLE_ID8 = "werkia-cem-focus-candidates-style";
   var INFO_ID = "werkia-cem-focus-candidates-info";
-  var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
+  var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
   var CACHE_TTL_MS2 = 5 * 60 * 1e3;
   var OPEN_CEM_STATUSES = [
     "onboarding",
@@ -10573,7 +10611,7 @@
     }
     function candidateRows() {
       return [...document.querySelectorAll("tbody tr.RaDataTable-row")].filter((row2) => !row2.parentElement?.closest("tr")).map((row2) => {
-        const id = candidateIdFromHref2(row2.querySelector(CANDIDATE_LINK_SELECTOR3)?.getAttribute("href"));
+        const id = candidateIdFromHref2(row2.querySelector(CANDIDATE_LINK_SELECTOR4)?.getAttribute("href"));
         const next = row2.nextElementSibling;
         const panel = next && !next.classList.contains("RaDataTable-row") ? next : null;
         return { row: row2, panel, id };
@@ -10879,7 +10917,7 @@
   var STYLE_ID10 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
-  var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
+  var CANDIDATE_LINK_SELECTOR5 = 'a[href*="#/Candidate/"]';
   var CACHE_TTL_MS3 = 5 * 60 * 1e3;
   var BATCH_SIZE2 = 25;
   var OPTIONS = optionsFromLabels(KAM_STATUS_LABELS);
@@ -10940,7 +10978,7 @@
     }
     function candidateKey(table) {
       const expandRow = table.closest("tr");
-      const candidateHref = expandRow?.previousElementSibling?.querySelector(CANDIDATE_LINK_SELECTOR4)?.getAttribute("href");
+      const candidateHref = expandRow?.previousElementSibling?.querySelector(CANDIDATE_LINK_SELECTOR5)?.getAttribute("href");
       return candidateHref || expandRow?.id || "";
     }
     function filterFormFor(table) {

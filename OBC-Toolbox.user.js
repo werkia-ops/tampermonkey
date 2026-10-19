@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.240
+// @version      1.10.242
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -4542,10 +4542,30 @@
   var OSRM_TABLE_TIMEOUT_MS = 1e4;
   var OSM_GAP_MS = 1100;
   var TABLE_CHUNK_SIZE = 50;
+  var OWN_ROUTING_SERVER = "https://hooks.werkia-ops.de/osrm-87074b56f424a1c4";
+  var OWN_REQUEST_TIMEOUT_MS = 4e3;
+  var OWN_TABLE_TIMEOUT_MS = 6e3;
+  var OWN_SERVER_PAUSE_MS = 5 * 60 * 1e3;
+  var ownServerPausedUntil = 0;
   var ROUTING_SERVERS = [
+    OWN_ROUTING_SERVER,
     "https://router.project-osrm.org",
     "https://routing.openstreetmap.de/routed-car"
   ];
+  function activeRoutingServers() {
+    return Date.now() < ownServerPausedUntil ? ROUTING_SERVERS.filter((server) => server !== OWN_ROUTING_SERVER) : ROUTING_SERVERS;
+  }
+  function isClientError(error) {
+    return String(error?.message || "") === "HTTP 400";
+  }
+  function noteServerError(server, error) {
+    if (server !== OWN_ROUTING_SERVER || isClientError(error)) return;
+    ownServerPausedUntil = Date.now() + OWN_SERVER_PAUSE_MS;
+  }
+  function fetchFromRoutingServer(server, url, { publicTimeoutMs, ownTimeoutMs }) {
+    if (server === OWN_ROUTING_SERVER) return fetchJsonWithTimeout(url, ownTimeoutMs);
+    return runThroughOsmGate(() => fetchJsonWithTimeout(url, publicTimeoutMs));
+  }
   function isRouteDistanceEntryExpired(entry) {
     if (!entry?.time) return true;
     let ttl = ROUTE_DISTANCE_CACHE_TTL;
@@ -4694,22 +4714,24 @@
     let lastError = null;
     for (const variant of OSRM_QUERY_VARIANTS) {
       try {
-        const data = await runThroughOsmGate(() => fetchJsonWithTimeout(`${baseUrl}?${overview}&${variant}&steps=false`, OSRM_REQUEST_TIMEOUT_MS));
+        const data = await fetchFromRoutingServer(server, `${baseUrl}?${overview}&${variant}&steps=false`, { publicTimeoutMs: OSRM_REQUEST_TIMEOUT_MS, ownTimeoutMs: OWN_REQUEST_TIMEOUT_MS });
         const bundle = pickFastestAndShortestRoute(data);
         return bundle ? { ...bundle, source: `${server}/route` } : null;
       } catch (error) {
         lastError = error;
+        if (!isClientError(error)) break;
       }
     }
     if (lastError) throw lastError;
     return null;
   }
   async function routeBetween(from, to, approx, withPreview) {
-    for (const server of ROUTING_SERVERS) {
+    for (const server of activeRoutingServers()) {
       try {
         const bundle = await requestRouteBundle(server, from, to, { withPreview });
         if (bundle) return { ...bundle, quality: "exact", approx };
       } catch (error) {
+        noteServerError(server, error);
         console.warn("[Werkia Route] OSRM-Server nicht erreichbar:", server, error?.message || error);
       }
     }
@@ -4744,7 +4766,7 @@
     const coords = [from, ...targets].map((point) => `${point.lon},${point.lat}`).join(";");
     const destinations = targets.map((_, index) => index + 1).join(";");
     const url = `${server}/table/v1/driving/${coords}?sources=0&destinations=${destinations}&annotations=duration,distance`;
-    const data = await runThroughOsmGate(() => fetchJsonWithTimeout(url, OSRM_TABLE_TIMEOUT_MS));
+    const data = await fetchFromRoutingServer(server, url, { publicTimeoutMs: OSRM_TABLE_TIMEOUT_MS, ownTimeoutMs: OWN_TABLE_TIMEOUT_MS });
     if (data?.code && data.code !== "Ok") throw new Error(`OSRM ${data.code}`);
     const durations = data?.durations?.[0];
     if (!Array.isArray(durations) || durations.length !== targets.length) throw new Error("OSRM-Tabelle unvollstaendig");
@@ -4752,10 +4774,11 @@
     return targets.map((_, index) => ({ duration: durations[index], distance: distances[index] }));
   }
   async function fetchTableRow(from, targets) {
-    for (const server of ROUTING_SERVERS) {
+    for (const server of activeRoutingServers()) {
       try {
         return { cells: await requestTableRow(server, from, targets), source: `${server}/table` };
       } catch (error) {
+        noteServerError(server, error);
         console.warn("[Werkia Route] OSRM-Tabelle nicht erreichbar:", server, error?.message || error);
       }
     }

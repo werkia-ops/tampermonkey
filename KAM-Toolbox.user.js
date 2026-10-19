@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.241
+// @version      1.14.242
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -8538,10 +8538,29 @@
   var ROUTE_GEOCODE_CACHE_TTL = 30 * 24 * 60 * 60 * 1e3;
   var OSRM_REQUEST_TIMEOUT_MS = 5e3;
   var OSM_GAP_MS = 1100;
+  var OWN_ROUTING_SERVER = "https://hooks.werkia-ops.de/osrm-87074b56f424a1c4";
+  var OWN_REQUEST_TIMEOUT_MS = 4e3;
+  var OWN_SERVER_PAUSE_MS = 5 * 60 * 1e3;
+  var ownServerPausedUntil = 0;
   var ROUTING_SERVERS = [
+    OWN_ROUTING_SERVER,
     "https://router.project-osrm.org",
     "https://routing.openstreetmap.de/routed-car"
   ];
+  function activeRoutingServers() {
+    return Date.now() < ownServerPausedUntil ? ROUTING_SERVERS.filter((server) => server !== OWN_ROUTING_SERVER) : ROUTING_SERVERS;
+  }
+  function isClientError(error) {
+    return String(error?.message || "") === "HTTP 400";
+  }
+  function noteServerError(server, error) {
+    if (server !== OWN_ROUTING_SERVER || isClientError(error)) return;
+    ownServerPausedUntil = Date.now() + OWN_SERVER_PAUSE_MS;
+  }
+  function fetchFromRoutingServer(server, url, { publicTimeoutMs, ownTimeoutMs }) {
+    if (server === OWN_ROUTING_SERVER) return fetchJsonWithTimeout(url, ownTimeoutMs);
+    return runThroughOsmGate(() => fetchJsonWithTimeout(url, publicTimeoutMs));
+  }
   function isRouteDistanceEntryExpired(entry) {
     if (!entry?.time) return true;
     let ttl = ROUTE_DISTANCE_CACHE_TTL;
@@ -8690,22 +8709,24 @@
     let lastError = null;
     for (const variant of OSRM_QUERY_VARIANTS) {
       try {
-        const data = await runThroughOsmGate(() => fetchJsonWithTimeout(`${baseUrl}?${overview}&${variant}&steps=false`, OSRM_REQUEST_TIMEOUT_MS));
+        const data = await fetchFromRoutingServer(server, `${baseUrl}?${overview}&${variant}&steps=false`, { publicTimeoutMs: OSRM_REQUEST_TIMEOUT_MS, ownTimeoutMs: OWN_REQUEST_TIMEOUT_MS });
         const bundle = pickFastestAndShortestRoute(data);
         return bundle ? { ...bundle, source: `${server}/route` } : null;
       } catch (error) {
         lastError = error;
+        if (!isClientError(error)) break;
       }
     }
     if (lastError) throw lastError;
     return null;
   }
   async function routeBetween(from, to, approx, withPreview) {
-    for (const server of ROUTING_SERVERS) {
+    for (const server of activeRoutingServers()) {
       try {
         const bundle = await requestRouteBundle(server, from, to, { withPreview });
         if (bundle) return { ...bundle, quality: "exact", approx };
       } catch (error) {
+        noteServerError(server, error);
         console.warn("[Werkia Route] OSRM-Server nicht erreichbar:", server, error?.message || error);
       }
     }

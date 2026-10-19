@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.235
+// @version      1.14.236
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -4685,6 +4685,7 @@
         "„VTA-Session“ zeigt die VT-Anfragen wie der Schalter „Anfragen“ und stellt die Terminspalte nach vorn.",
         "„Feedbacks einholen“ zeigt die Matches im KAM-Status „VT Feedback“, die am längsten wartenden zuerst, mit der Terminspalte vorn.",
         "„Nur AG mit Kontakt“ blendet alle Matches aus, deren Arbeitgeber bei „AG Response Rate“ nicht „Direkter Kontakt“ oder „Indirekter Kontakt“ hat. Deine übrigen Filter bleiben stehen.",
+        "„Nur AG mit direktem Kontakt“ macht dasselbe, lässt aber nur „Direkter Kontakt“ durch.",
         "„Verlassen“ bringt die Ansicht von vorher zurück."
       ],
       notes: [
@@ -6046,6 +6047,12 @@
     const saved = result?.data;
     if (saved?.id !== employerId || normalize4(saved.directContact) !== normalize4(value)) {
       throw new Error("Speichern wurde von der API nicht bestätigt");
+    }
+    try {
+      globalThis.window?.dispatchEvent(new CustomEvent("werkia:employer-contact-changed", {
+        detail: { employerId, directContact: normalize4(saved.directContact) }
+      }));
+    } catch {
     }
     return normalize4(saved.directContact);
   }
@@ -12932,6 +12939,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     front: false,
     builtIn: true
   };
+  var DIRECT_CONTACT_MODE = {
+    ...EMPLOYER_CONTACT_MODE,
+    id: "ag-direkter-kontakt",
+    name: "Nur AG mit direktem Kontakt",
+    description: "Nur Matches von Arbeitgebern mit direktem Kontakt",
+    filter: { [CONTACT_MARKER]: ["direct_contact"] }
+  };
   var STALE_EMPLOYER_IDS = 100;
   function hasStaleEmployerIds(filter) {
     return Array.isArray(filter?.employerIds) && filter.employerIds.length > STALE_EMPLOYER_IDS;
@@ -12961,6 +12975,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return rest;
     }
     function defaultScope2(me) {
+      if (typeof defaults === "function") return defaults(me);
       const scope = { ...defaults.filter };
       const hasRole2 = (me?.roles || []).some((role) => role?.name === defaults.roleName);
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
@@ -13068,11 +13083,103 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
   }
 
+  // ../../shared/js/focus-modes/employer-contact-cache.js
+  var CACHE_KEY2 = "werkia_focus_employer_contacts_v1";
+  var FRESH_MS = 5 * 60 * 1e3;
+  var MAX_STALE_MS = 24 * 60 * 60 * 1e3;
+  var CONTACT_CHANGED_EVENT = "werkia:employer-contact-changed";
+  function compact(employers, contacts) {
+    return (employers || []).filter((employer) => employer?.id && contacts.includes(employer.directContact)).map((employer) => ({ id: employer.id, directContact: employer.directContact, kamEmployeeId: employer.kamEmployeeId || "" }));
+  }
+  function parseStored(raw, now) {
+    try {
+      const parsed = JSON.parse(raw || "null");
+      if (!parsed || !Array.isArray(parsed.employers) || !Number.isFinite(parsed.at)) return null;
+      if (now - parsed.at > MAX_STALE_MS) return null;
+      return { at: parsed.at, employers: parsed.employers };
+    } catch {
+      return null;
+    }
+  }
+  function createEmployerContactCache({
+    request,
+    contacts = GOOD_EMPLOYER_CONTACTS,
+    storage = typeof localStorage === "undefined" ? null : localStorage,
+    now = () => Date.now()
+  }) {
+    let entry = null;
+    let refreshing = null;
+    const read = () => {
+      if (entry || !storage) return entry;
+      try {
+        entry = parseStored(storage.getItem(CACHE_KEY2), now());
+      } catch {
+        entry = null;
+      }
+      return entry;
+    };
+    const write = (next) => {
+      entry = next;
+      try {
+        storage?.setItem(CACHE_KEY2, JSON.stringify(next));
+      } catch {
+      }
+    };
+    function refresh() {
+      refreshing ||= Promise.resolve().then(() => fetchAllEmployerContacts(request)).then((employers) => {
+        write({ at: now(), employers: compact(employers, contacts) });
+        return entry.employers;
+      }).finally(() => {
+        refreshing = null;
+      });
+      return refreshing;
+    }
+    function load2() {
+      const current = read();
+      if (!current) return refresh();
+      if (now() - current.at > FRESH_MS) refresh().catch(() => {
+      });
+      return Promise.resolve(current.employers);
+    }
+    function prefetch() {
+      const current = read();
+      if (!current || now() - current.at > FRESH_MS) refresh().catch(() => {
+      });
+    }
+    function patch(employerId, directContact) {
+      const current = read();
+      if (!current || !employerId) return;
+      const others = current.employers.filter((employer) => employer.id !== employerId);
+      const before = current.employers.find((employer) => employer.id === employerId);
+      const employers = contacts.includes(directContact) ? [...others, { id: employerId, directContact, kamEmployeeId: before?.kamEmployeeId || "" }] : others;
+      write({ at: current.at, employers });
+      if (!before && contacts.includes(directContact)) refresh().catch(() => {
+      });
+    }
+    return { load: load2, prefetch, patch, refresh };
+  }
+
   // ../../shared/js/focus-modes/employer-contact-rewrite.js
   var NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
   var INSTALLED_FLAG2 = "__werkiaFocusEmployerContactRewrite";
   function bodyHasMarker(body) {
     return typeof body === "string" && body.includes(`"${CONTACT_MARKER}"`);
+  }
+  function markerFromHash(hash) {
+    const contacts = parseListState(hash).filter?.[CONTACT_MARKER];
+    return Array.isArray(contacts) && contacts.length ? contacts : null;
+  }
+  function usesMatchFilter(operation) {
+    return typeof operation?.query === "string" && /:\s*MatchFilter\b/.test(operation.query);
+  }
+  function stripMarker(node) {
+    if (Array.isArray(node)) return node.map(stripMarker);
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== CONTACT_MARKER) out[key] = stripMarker(node[key]);
+    });
+    return out;
   }
   function rewriteVariables(node, employers) {
     if (Array.isArray(node)) return node.map((item) => rewriteVariables(item, employers));
@@ -13087,9 +13194,18 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     out.employerIds = ids.length ? ids : [NO_MATCH_ID];
     return out;
   }
-  function rewriteBody(body, employers) {
+  function rewriteBody(body, employers, pageContacts = null) {
     const payload = JSON.parse(body);
-    const rewrite = (operation) => operation && typeof operation === "object" ? { ...operation, variables: rewriteVariables(operation.variables, employers) } : operation;
+    const rewrite = (operation) => {
+      if (!operation || typeof operation !== "object") return operation;
+      if (!usesMatchFilter(operation)) return { ...operation, variables: stripMarker(operation.variables) };
+      let variables = operation.variables;
+      const filter = variables?.filter;
+      if (pageContacts && filter && typeof filter === "object" && !(CONTACT_MARKER in filter)) {
+        variables = { ...variables, filter: { ...filter, [CONTACT_MARKER]: pageContacts } };
+      }
+      return { ...operation, variables: rewriteVariables(variables, employers) };
+    };
     return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
   }
   function installEmployerContactRewrite({ pageWindow, loadEmployers }) {
@@ -13099,8 +13215,14 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     pageWindow.fetch = function werkiaFocusEmployerContactFetch(input, init) {
       const body = init?.body;
       const url = typeof input === "string" ? input : input?.url;
-      if (!bodyHasMarker(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
-      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers) })));
+      let pageContacts = null;
+      try {
+        pageContacts = markerFromHash(pageWindow.location?.hash || "");
+      } catch {
+      }
+      const relevant = typeof body === "string" && (bodyHasMarker(body) || pageContacts && body.includes("MatchFilter"));
+      if (!relevant || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers, pageContacts) })));
     };
     return true;
   }
@@ -13172,7 +13294,6 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   }
 
   // ../../shared/js/focus-modes/index.js
-  var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
   function makeIds(prefix) {
     return {
       group: `${prefix}-group`,
@@ -13226,7 +13347,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     helpTip = () => null,
     idPrefix = "werkia-focus",
     pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow,
-    now = () => Date.now()
+    employerCache = null
   }) {
     runtime.registerSource(sourcePath);
     const IDS9 = makeIds(idPrefix);
@@ -13243,18 +13364,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       });
       return mePromise;
     };
-    let employers = null;
-    const loadEmployers = () => {
-      if (!employers || now() - employers.at > EMPLOYER_CACHE_MS) {
-        const promise = Promise.resolve().then(() => fetchAllEmployerContacts(request)).catch((error) => {
-          if (employers?.promise === promise) employers = null;
-          throw error;
-        });
-        employers = { at: now(), promise };
-      }
-      return employers.promise;
-    };
-    installEmployerContactRewrite({ pageWindow, loadEmployers });
+    const employers = employerCache || createEmployerContactCache({ request });
+    installEmployerContactRewrite({ pageWindow, loadEmployers: employers.load });
+    runtime.addWindowListener(CONTACT_CHANGED_EVENT, (event) => {
+      employers.patch(event?.detail?.employerId, event?.detail?.directContact);
+    });
+    const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle5() {
       if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
@@ -13404,6 +13519,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const select = document.createElement("select");
       select.id = IDS9.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
+      const warm = () => {
+        if (hasContactMode()) employers.prefetch();
+      };
+      select.addEventListener("focus", warm);
+      select.addEventListener("mousedown", warm);
       select.addEventListener("change", () => {
         const mode = allModes().find((entry) => entry.id === select.value);
         if (mode) activate(mode);
@@ -13509,12 +13629,20 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         return;
       }
       let active = readActive();
+      if (!active) {
+        const detected = BUILT_IN_MODES2.find((entry) => entry.keepFilter && modeMatchesState2(entry, state));
+        if (detected) {
+          active = { id: detected.id, previousHash: "" };
+          writeActive(active);
+        }
+      }
       let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
       if (active && !modeMatchesState2(mode, state)) {
         writeActive(null);
         active = null;
         mode = null;
       }
+      if (mode?.keepFilter) employers.prefetch();
       if (mode?.column) applyColumnFocus(document, mode);
       else clearColumnFocus(document);
       const container = ensureControls();
@@ -13596,7 +13724,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       front: true,
       builtIn: true
     },
-    EMPLOYER_CONTACT_MODE
+    EMPLOYER_CONTACT_MODE,
+    DIRECT_CONTACT_MODE
   ];
   var COLUMN_LABELS = {
     interview: "Termin",

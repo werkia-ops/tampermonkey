@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.15.235
+// @version      1.15.236
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4641,16 +4641,19 @@
     {
       id: "focus-modes",
       title: "Focus-Modes",
-      page: MY_MATCHES,
-      routes: onMyMatches,
+      page: "CEM › Meine Matches und Meine Kandidaten",
+      routes: [ROUTES.cemMyMatches, ROUTES.cemMyCandidates],
       kind: "local",
       summary: "Ein Focus-Mode stellt die Liste mit einem Klick auf eine Aufgabe ein: Filter, Sortierung und eine hervorgehobene Spalte.",
       steps: [
-        "Im Dropdown „Focus-Mode“ neben den Filtervorlagen einen Modus wählen.",
+        "Im Dropdown „Focus-Mode“ über der Liste einen Modus wählen.",
         "„Nur AG mit Kontakt“ blendet alle Matches aus, deren Arbeitgeber keinen direkten oder indirekten Kontakt hat (Badge „Schnelle Rückmeldung“ oder „Verzögerte Rückmeldung“). Deine übrigen Filter bleiben stehen.",
+        "„Nur AG mit direktem Kontakt“ macht dasselbe, lässt aber nur „Schnelle Rückmeldung“ (direkter Kontakt) durch.",
+        "In Meine Kandidaten zeigen die aufgeklappten Match-Tabellen dann nur diese Matches. Kandidaten ohne ein solches Match werden auf der aktuellen Seite ausgeblendet; über der Liste steht, wie viele.",
         "„Verlassen“ nimmt den Arbeitgeberfilter wieder heraus."
       ],
       notes: [
+        "Ausgeblendet wird nur auf der aktuellen Seite. Eine Seite kann deshalb weniger Kandidaten zeigen als eingestellt.",
         "Ändert jemand den Kontakt eines Arbeitgebers, wirkt das nach spätestens fünf Minuten oder nach Neuladen der Seite.",
         "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
       ]
@@ -4752,7 +4755,7 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID12 = "werkia-urgent-vacancy-style";
+      const STYLE_ID13 = "werkia-urgent-vacancy-style";
       const ROW_CLASS3 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -4891,9 +4894,9 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID12)) return;
+        if (document.getElementById(STYLE_ID13)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID12;
+        style.id = STYLE_ID13;
         style.textContent = `
       .${ROW_CLASS3} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background: #fff3cd !important; }
@@ -6901,7 +6904,7 @@
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID12 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID13 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
@@ -6911,9 +6914,9 @@
     let working = false;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID12)) return;
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -7202,12 +7205,12 @@
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID12 = `${SCRIPT_ID}-style`;
+    const STYLE_ID13 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID12)) return;
+      if (document2.getElementById(STYLE_ID13)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -9726,6 +9729,13 @@
     front: false,
     builtIn: true
   };
+  var DIRECT_CONTACT_MODE = {
+    ...EMPLOYER_CONTACT_MODE,
+    id: "ag-direkter-kontakt",
+    name: "Nur AG mit direktem Kontakt",
+    description: "Nur Matches von Arbeitgebern mit direktem Kontakt",
+    filter: { [CONTACT_MARKER]: ["direct_contact"] }
+  };
   var STALE_EMPLOYER_IDS = 100;
   function hasStaleEmployerIds(filter) {
     return Array.isArray(filter?.employerIds) && filter.employerIds.length > STALE_EMPLOYER_IDS;
@@ -9755,6 +9765,7 @@
       return rest;
     }
     function defaultScope(me) {
+      if (typeof defaults === "function") return defaults(me);
       const scope = { ...defaults.filter };
       const hasRole2 = (me?.roles || []).some((role) => role?.name === defaults.roleName);
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
@@ -9862,11 +9873,103 @@
     }
   }
 
+  // ../../shared/js/focus-modes/employer-contact-cache.js
+  var CACHE_KEY2 = "werkia_focus_employer_contacts_v1";
+  var FRESH_MS = 5 * 60 * 1e3;
+  var MAX_STALE_MS = 24 * 60 * 60 * 1e3;
+  var CONTACT_CHANGED_EVENT = "werkia:employer-contact-changed";
+  function compact(employers, contacts) {
+    return (employers || []).filter((employer) => employer?.id && contacts.includes(employer.directContact)).map((employer) => ({ id: employer.id, directContact: employer.directContact, kamEmployeeId: employer.kamEmployeeId || "" }));
+  }
+  function parseStored(raw, now) {
+    try {
+      const parsed = JSON.parse(raw || "null");
+      if (!parsed || !Array.isArray(parsed.employers) || !Number.isFinite(parsed.at)) return null;
+      if (now - parsed.at > MAX_STALE_MS) return null;
+      return { at: parsed.at, employers: parsed.employers };
+    } catch {
+      return null;
+    }
+  }
+  function createEmployerContactCache({
+    request,
+    contacts = GOOD_EMPLOYER_CONTACTS,
+    storage = typeof localStorage === "undefined" ? null : localStorage,
+    now = () => Date.now()
+  }) {
+    let entry = null;
+    let refreshing = null;
+    const read = () => {
+      if (entry || !storage) return entry;
+      try {
+        entry = parseStored(storage.getItem(CACHE_KEY2), now());
+      } catch {
+        entry = null;
+      }
+      return entry;
+    };
+    const write = (next) => {
+      entry = next;
+      try {
+        storage?.setItem(CACHE_KEY2, JSON.stringify(next));
+      } catch {
+      }
+    };
+    function refresh() {
+      refreshing ||= Promise.resolve().then(() => fetchAllEmployerContacts(request)).then((employers) => {
+        write({ at: now(), employers: compact(employers, contacts) });
+        return entry.employers;
+      }).finally(() => {
+        refreshing = null;
+      });
+      return refreshing;
+    }
+    function load2() {
+      const current = read();
+      if (!current) return refresh();
+      if (now() - current.at > FRESH_MS) refresh().catch(() => {
+      });
+      return Promise.resolve(current.employers);
+    }
+    function prefetch() {
+      const current = read();
+      if (!current || now() - current.at > FRESH_MS) refresh().catch(() => {
+      });
+    }
+    function patch(employerId, directContact) {
+      const current = read();
+      if (!current || !employerId) return;
+      const others = current.employers.filter((employer) => employer.id !== employerId);
+      const before = current.employers.find((employer) => employer.id === employerId);
+      const employers = contacts.includes(directContact) ? [...others, { id: employerId, directContact, kamEmployeeId: before?.kamEmployeeId || "" }] : others;
+      write({ at: current.at, employers });
+      if (!before && contacts.includes(directContact)) refresh().catch(() => {
+      });
+    }
+    return { load: load2, prefetch, patch, refresh };
+  }
+
   // ../../shared/js/focus-modes/employer-contact-rewrite.js
   var NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
   var INSTALLED_FLAG2 = "__werkiaFocusEmployerContactRewrite";
   function bodyHasMarker(body) {
     return typeof body === "string" && body.includes(`"${CONTACT_MARKER}"`);
+  }
+  function markerFromHash(hash) {
+    const contacts = parseListState(hash).filter?.[CONTACT_MARKER];
+    return Array.isArray(contacts) && contacts.length ? contacts : null;
+  }
+  function usesMatchFilter(operation) {
+    return typeof operation?.query === "string" && /:\s*MatchFilter\b/.test(operation.query);
+  }
+  function stripMarker(node) {
+    if (Array.isArray(node)) return node.map(stripMarker);
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== CONTACT_MARKER) out[key] = stripMarker(node[key]);
+    });
+    return out;
   }
   function rewriteVariables(node, employers) {
     if (Array.isArray(node)) return node.map((item) => rewriteVariables(item, employers));
@@ -9881,9 +9984,18 @@
     out.employerIds = ids.length ? ids : [NO_MATCH_ID];
     return out;
   }
-  function rewriteBody(body, employers) {
+  function rewriteBody(body, employers, pageContacts = null) {
     const payload = JSON.parse(body);
-    const rewrite = (operation) => operation && typeof operation === "object" ? { ...operation, variables: rewriteVariables(operation.variables, employers) } : operation;
+    const rewrite = (operation) => {
+      if (!operation || typeof operation !== "object") return operation;
+      if (!usesMatchFilter(operation)) return { ...operation, variables: stripMarker(operation.variables) };
+      let variables = operation.variables;
+      const filter = variables?.filter;
+      if (pageContacts && filter && typeof filter === "object" && !(CONTACT_MARKER in filter)) {
+        variables = { ...variables, filter: { ...filter, [CONTACT_MARKER]: pageContacts } };
+      }
+      return { ...operation, variables: rewriteVariables(variables, employers) };
+    };
     return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
   }
   function installEmployerContactRewrite({ pageWindow, loadEmployers }) {
@@ -9893,8 +10005,14 @@
     pageWindow.fetch = function werkiaFocusEmployerContactFetch(input, init) {
       const body = init?.body;
       const url = typeof input === "string" ? input : input?.url;
-      if (!bodyHasMarker(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
-      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers) })));
+      let pageContacts = null;
+      try {
+        pageContacts = markerFromHash(pageWindow.location?.hash || "");
+      } catch {
+      }
+      const relevant = typeof body === "string" && (bodyHasMarker(body) || pageContacts && body.includes("MatchFilter"));
+      if (!relevant || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers, pageContacts) })));
     };
     return true;
   }
@@ -9966,7 +10084,6 @@
   }
 
   // ../../shared/js/focus-modes/index.js
-  var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
   function makeIds(prefix) {
     return {
       group: `${prefix}-group`,
@@ -10020,7 +10137,7 @@
     helpTip = () => null,
     idPrefix = "werkia-focus",
     pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow,
-    now = () => Date.now()
+    employerCache = null
   }) {
     runtime.registerSource(sourcePath);
     const IDS8 = makeIds(idPrefix);
@@ -10037,18 +10154,12 @@
       });
       return mePromise;
     };
-    let employers = null;
-    const loadEmployers = () => {
-      if (!employers || now() - employers.at > EMPLOYER_CACHE_MS) {
-        const promise = Promise.resolve().then(() => fetchAllEmployerContacts(request)).catch((error) => {
-          if (employers?.promise === promise) employers = null;
-          throw error;
-        });
-        employers = { at: now(), promise };
-      }
-      return employers.promise;
-    };
-    installEmployerContactRewrite({ pageWindow, loadEmployers });
+    const employers = employerCache || createEmployerContactCache({ request });
+    installEmployerContactRewrite({ pageWindow, loadEmployers: employers.load });
+    runtime.addWindowListener(CONTACT_CHANGED_EVENT, (event) => {
+      employers.patch(event?.detail?.employerId, event?.detail?.directContact);
+    });
+    const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle4() {
       if (document.getElementById(IDS8.style)) return;
       const style = document.createElement("style");
@@ -10198,6 +10309,11 @@
       const select = document.createElement("select");
       select.id = IDS8.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
+      const warm = () => {
+        if (hasContactMode()) employers.prefetch();
+      };
+      select.addEventListener("focus", warm);
+      select.addEventListener("mousedown", warm);
       select.addEventListener("change", () => {
         const mode = allModes().find((entry) => entry.id === select.value);
         if (mode) activate(mode);
@@ -10303,12 +10419,20 @@
         return;
       }
       let active = readActive();
+      if (!active) {
+        const detected = BUILT_IN_MODES2.find((entry) => entry.keepFilter && modeMatchesState(entry, state));
+        if (detected) {
+          active = { id: detected.id, previousHash: "" };
+          writeActive(active);
+        }
+      }
       let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
       if (active && !modeMatchesState(mode, state)) {
         writeActive(null);
         active = null;
         mode = null;
       }
+      if (mode?.keepFilter) employers.prefetch();
       if (mode?.column) applyColumnFocus(document, mode);
       else clearColumnFocus(document);
       const container = ensureControls();
@@ -10333,13 +10457,163 @@
     scheduleRender();
   }
 
+  // src/features/focus-candidates.js
+  var ROUTE = "CEM/MyCandidates";
+  var HIDDEN_ATTRIBUTE2 = "data-werkia-focus-hidden";
+  var STYLE_ID8 = "werkia-cem-focus-candidates-style";
+  var INFO_ID = "werkia-cem-focus-candidates-info";
+  var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
+  var CACHE_TTL_MS2 = 5 * 60 * 1e3;
+  var OPEN_CEM_STATUSES = [
+    "onboarding",
+    "confirm_appointment",
+    "reminder_appointment",
+    "feedback_appointment",
+    "hot_case",
+    "hot_hot_case",
+    "interview_conducted"
+  ];
+  var CANDIDATE_MATCHES_QUERY = `query WerkiaFocusCandidateMatches($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) {
+    candidateId
+    connectionType
+    __typename
+  }
+}`;
+  function candidateIdFromHref2(href) {
+    return String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+  }
+  function candidateMatchFilter(candidateIds, employerIds) {
+    return {
+      candidateIds,
+      matched: true,
+      isInActiveCemOmStatuses: true,
+      candidateStatuses: ["cem", "active", "hired"],
+      cemStatuses: OPEN_CEM_STATUSES,
+      employerIds
+    };
+  }
+  function candidatesWithMatch(items) {
+    return new Set((items || []).filter((item) => item?.candidateId && item.connectionType !== "reverse").map((item) => item.candidateId));
+  }
+  function contactMarkerActive(hash) {
+    const contacts = parseListState(hash).filter?.[CONTACT_MARKER];
+    return Array.isArray(contacts) && contacts.length ? contacts : null;
+  }
+  function executeFocusCandidates(runtime, { request, employerCache }) {
+    runtime.registerSource("cem/toolbox/src/features/focus-candidates.js");
+    const known = /* @__PURE__ */ new Map();
+    const keyOf = (contacts, id) => `${contacts.join(",")}|${id}`;
+    let loading = null;
+    const isTargetPage3 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID8)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID8;
+      style.textContent = `
+      tr[${HIDDEN_ATTRIBUTE2}] { display:none !important; }
+      #${INFO_ID} { margin:0 0 8px; color:#52525b; font:400 12px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+    `;
+      document.head.appendChild(style);
+    }
+    function candidateRows() {
+      return [...document.querySelectorAll("tbody tr.RaDataTable-row")].filter((row2) => !row2.parentElement?.closest("tr")).map((row2) => {
+        const id = candidateIdFromHref2(row2.querySelector(CANDIDATE_LINK_SELECTOR3)?.getAttribute("href"));
+        const next = row2.nextElementSibling;
+        const panel = next && !next.classList.contains("RaDataTable-row") ? next : null;
+        return { row: row2, panel, id };
+      }).filter((entry) => entry.id);
+    }
+    function setHidden(element5, hidden) {
+      if (element5 && element5.hasAttribute(HIDDEN_ATTRIBUTE2) !== hidden) element5.toggleAttribute(HIDDEN_ATTRIBUTE2, hidden);
+    }
+    function clear() {
+      document.querySelectorAll(`[${HIDDEN_ATTRIBUTE2}]`).forEach((element5) => element5.removeAttribute(HIDDEN_ATTRIBUTE2));
+      document.getElementById(INFO_ID)?.remove();
+    }
+    function setInfo(entries, text) {
+      let info = document.getElementById(INFO_ID);
+      if (!text) {
+        info?.remove();
+        return;
+      }
+      const table = entries[0]?.row.closest("table");
+      if (!table?.parentElement) return;
+      if (!info) {
+        info = document.createElement("div");
+        info.id = INFO_ID;
+        table.parentElement.insertBefore(info, table);
+      }
+      if (info.textContent !== text) info.textContent = text;
+    }
+    const fresh = (key) => {
+      const entry = known.get(key);
+      return entry && Date.now() - entry.at < CACHE_TTL_MS2 ? entry : null;
+    };
+    async function load2(ids, contacts) {
+      loading = (async () => {
+        const employerIds = contactEmployerIds(await employerCache.load(), { contacts });
+        const result = await request(CANDIDATE_MATCHES_QUERY, { filter: candidateMatchFilter(ids, employerIds), perPage: 1e3 });
+        const withMatch = candidatesWithMatch(result?.items);
+        const at = Date.now();
+        ids.forEach((id) => known.set(keyOf(contacts, id), { has: withMatch.has(id), at }));
+      })();
+      try {
+        await loading;
+      } catch (error) {
+        console.warn("[Werkia CEM Focus-Mode Kandidaten]", error);
+        ids.forEach((id) => known.set(keyOf(contacts, id), { has: true, at: Date.now(), failed: true }));
+      } finally {
+        loading = null;
+        render();
+      }
+    }
+    function render() {
+      const contacts = isTargetPage3() ? contactMarkerActive(location.hash) : null;
+      const label2 = contacts?.length === 1 ? "Nur AG mit direktem Kontakt" : "Nur AG mit Kontakt";
+      if (!contacts) {
+        clear();
+        return;
+      }
+      ensureStyle4();
+      const entries = candidateRows();
+      const missing = entries.map((entry) => entry.id).filter((id) => !fresh(keyOf(contacts, id)));
+      const ready = !missing.length;
+      let hidden = 0;
+      entries.forEach(({ row: row2, panel, id }) => {
+        const hide = ready && known.get(keyOf(contacts, id))?.has === false;
+        setHidden(row2, hide);
+        setHidden(panel, hide);
+        if (hide) hidden += 1;
+      });
+      if (!ready) setInfo(entries, `${label2}: Kandidaten werden geprüft …`);
+      else if (entries.some(({ id }) => known.get(keyOf(contacts, id))?.failed)) setInfo(entries, `${label2}: Prüfung fehlgeschlagen, alle Kandidaten sichtbar.`);
+      else setInfo(entries, hidden ? `${label2}: ${hidden} von ${entries.length} Kandidaten dieser Seite ohne passendes Match ausgeblendet.` : "");
+      if (missing.length && !loading) load2([...new Set(missing)], contacts);
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
   // src/features/focus-modes.js
   var SOURCE_PATH = "cem/toolbox/src/features/focus-modes.js";
   var STORAGE_KEY2 = "werkia_cem_focus_modes_v1";
   var ACTIVE_KEY = "werkia_cem_focus_active_v1";
+  var CANDIDATES_STORAGE_KEY = "werkia_cem_candidates_focus_modes_v1";
+  var CANDIDATES_ACTIVE_KEY = "werkia_cem_candidates_focus_active_v1";
   var SCOPE_KEYS = ["cemEmployeeIds", "interviewCreatorTeam"];
   var CEM_ROLE_NAME = "CEM";
-  var BUILT_IN_MODES = [EMPLOYER_CONTACT_MODE];
+  var BUILT_IN_MODES = [EMPLOYER_CONTACT_MODE, DIRECT_CONTACT_MODE];
   var COLUMN_LABELS = {
     matchInterview: "Termin",
     cemStatus: "CEM Status",
@@ -10358,11 +10632,28 @@
       employeeKey: "cemEmployeeIds"
     }
   });
+  function localDate(date = /* @__PURE__ */ new Date()) {
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function candidatesDefaultScope(me, today = localDate()) {
+    const scope = { statuses: ["cem", "active"] };
+    const isCem = (me?.roles || []).some((role) => role?.name === CEM_ROLE_NAME);
+    if (isCem && me?.id) Object.assign(scope, { cemEmployeeIds: [me.id], interviewCreatorTeam: "kam", cemFollowUpDateTo: today });
+    return scope;
+  }
+  var CEM_CANDIDATES_FOCUS_CORE = createFocusModeCore({
+    routes: [ROUTE],
+    scopeKeys: SCOPE_KEYS,
+    defaults: (me) => candidatesDefaultScope(me)
+  });
   function executeFocusModes2(runtime, {
     request = (...args) => getCemGraphqlAdapter().request(...args),
     helpTip = () => cemHelp.tip("focus-modes"),
     ...options
   } = {}) {
+    const employerCache = options.employerCache || createEmployerContactCache({ request });
+    const shared = { request, helpTip, employerCache, ...options };
     executeFocusModes(runtime, {
       sourcePath: SOURCE_PATH,
       core: CEM_FOCUS_CORE,
@@ -10370,11 +10661,19 @@
       storageKey: STORAGE_KEY2,
       activeKey: ACTIVE_KEY,
       columnLabels: COLUMN_LABELS,
-      request,
-      helpTip,
       idPrefix: "werkia-cem-focus",
-      ...options
+      ...shared
     });
+    executeFocusModes(runtime, {
+      sourcePath: SOURCE_PATH,
+      core: CEM_CANDIDATES_FOCUS_CORE,
+      builtInModes: BUILT_IN_MODES,
+      storageKey: CANDIDATES_STORAGE_KEY,
+      activeKey: CANDIDATES_ACTIVE_KEY,
+      idPrefix: "werkia-cem-cand-focus",
+      ...shared
+    });
+    executeFocusCandidates(runtime, { request, employerCache });
   }
 
   // ../../shared/js/match-status-filter/core.js
@@ -10407,7 +10706,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID8 = "werkia-match-status-filter-style";
+  var STYLE_ID9 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -10425,9 +10724,9 @@
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage3 = () => route.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -10522,11 +10821,11 @@
 
   // src/features/kam-status-filter-expanded.js
   var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
-  var STYLE_ID9 = "werkia-cem-expanded-kam-filter-style";
+  var STYLE_ID10 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
-  var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
-  var CACHE_TTL_MS2 = 5 * 60 * 1e3;
+  var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
+  var CACHE_TTL_MS3 = 5 * 60 * 1e3;
   var BATCH_SIZE2 = 25;
   var OPTIONS = optionsFromLabels(KAM_STATUS_LABELS);
   var MATCH_KAM_STATUS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
@@ -10554,9 +10853,9 @@
     let loading = null;
     const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID9)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       /* pointer-events/z-index: in der Filterzeile kam live kein Klick an
          (Text-Cursor, Text markierbar), 2026-10-12. pointer-events wird
@@ -10586,7 +10885,7 @@
     }
     function candidateKey(table) {
       const expandRow = table.closest("tr");
-      const candidateHref = expandRow?.previousElementSibling?.querySelector(CANDIDATE_LINK_SELECTOR3)?.getAttribute("href");
+      const candidateHref = expandRow?.previousElementSibling?.querySelector(CANDIDATE_LINK_SELECTOR4)?.getAttribute("href");
       return candidateHref || expandRow?.id || "";
     }
     function filterFormFor(table) {
@@ -10598,7 +10897,7 @@
     const rowMatchId = (row2) => matchIdFromHref3(row2.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
     function freshStatus(matchId) {
       const entry = statusCache.get(matchId);
-      return entry && Date.now() - entry.at < CACHE_TTL_MS2 ? entry : null;
+      return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
     }
     async function loadStatuses(matchIds, { force = false } = {}) {
       if (loading) await loading;
@@ -12207,7 +12506,7 @@
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS3 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID12 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID13 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -12215,9 +12514,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID12)) return;
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS3} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -13909,7 +14208,7 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/cem-todo/index.js
-  var STYLE_ID10 = "werkia-cem-todo-style";
+  var STYLE_ID11 = "werkia-cem-todo-style";
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
@@ -13917,7 +14216,7 @@ Trotzdem speichern?`)) return void 0;
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var COMMENTS_BUTTON_SELECTOR3 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
-  var CACHE_TTL_MS3 = 3 * 60 * 1e3;
+  var CACHE_TTL_MS4 = 3 * 60 * 1e3;
   var BATCH_SIZE3 = 25;
   var MATCH_COMMENTS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
   items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
@@ -13944,9 +14243,9 @@ Trotzdem speichern?`)) return void 0;
     let dialogSeen = false;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle4() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
       [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
@@ -13968,7 +14267,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function fresh(matchId) {
       const entry = cache.get(matchId);
-      return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
+      return entry && Date.now() - entry.at < CACHE_TTL_MS4 ? entry : null;
     }
     async function load2(matchIds, { force = false } = {}) {
       if (loading) await loading;
@@ -14672,7 +14971,7 @@ Trotzdem speichern?`)) return void 0;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID11 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID12 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -14708,9 +15007,9 @@ Trotzdem speichern?`)) return void 0;
     }
   }
   function ensureStyle3(doc) {
-    if (doc.getElementById(STYLE_ID11)) return;
+    if (doc.getElementById(STYLE_ID12)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID11;
+    style.id = STYLE_ID12;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;

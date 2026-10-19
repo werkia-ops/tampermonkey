@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.248
+// @version      1.10.257
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -797,6 +797,7 @@
     kamStatus
     kamFeedback
     onlineMatchStatus
+    matchedAt
     __typename
   }
   total: _allMatchesMeta(page: $page, perPage: $perPage, filter: $filter) {
@@ -819,17 +820,28 @@
     if (!rawValue) return null;
     return { value: rawValue, label: CEM_STATUS_LABELS[rawValue] || rawValue };
   }
-  function sentAtFromRevisions(revisions) {
-    return (revisions || []).filter((revision) => /(?:^|\n)\s*-?\s*onlineMatchStatus:\s*(?:null|<unknown>|"[^"]+")\s*->\s*"process"/i.test(revision?.description || "")).map((revision) => revision.date).filter(Boolean).sort().at(0) || "";
+  var SENT_ONLINE_MATCH_STATUSES = ["process", "reverse_match_send", "portal_uploaded"];
+  var SENT_TRANSITION_RE = new RegExp(
+    `(?:^|\\n)\\s*-?\\s*onlineMatchStatus:\\s*(?:null|<unknown>|"[^"]+")\\s*->\\s*"(?:${SENT_ONLINE_MATCH_STATUSES.join("|")})"`,
+    "i"
+  );
+  function isSentOnlineMatchStatus(status) {
+    return SENT_ONLINE_MATCH_STATUSES.includes(String(status || ""));
   }
+  function sentAtFromRevisions(revisions) {
+    return (revisions || []).filter((revision) => SENT_TRANSITION_RE.test(revision?.description || "")).map((revision) => revision.date).filter(Boolean).sort().at(0) || "";
+  }
+  var CANDIDATE_MATCHES_TTL_MS = 60 * 1e3;
+  var SENT_AT_TTL_MS = 30 * 60 * 1e3;
+  var PAGE_SIZE = 100;
+  var EMPLOYER_BATCH = 25;
+  var REVISION_PARALLEL = 20;
   function createMatchProvider({ request }) {
-    const reverseLookupsInFlight = /* @__PURE__ */ new Map();
-    const currentSentEmployerLookupsInFlight = /* @__PURE__ */ new Map();
-    const sentEmployerLookupsInFlight = /* @__PURE__ */ new Map();
-    const matchSentAtLookupsInFlight = /* @__PURE__ */ new Map();
-    async function loadMatchSentAt(matchId) {
-      const existing = matchSentAtLookupsInFlight.get(matchId);
-      if (existing) return existing;
+    const candidateMatches = /* @__PURE__ */ new Map();
+    const sentAtByMatch = /* @__PURE__ */ new Map();
+    function loadMatchSentAt(matchId) {
+      const cached = sentAtByMatch.get(matchId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
       const promise = request(MATCH_REVISIONS_QUERY, {
         filter: { resource: "Match", recordId: matchId },
         page: 0,
@@ -837,23 +849,53 @@
         sortField: "date",
         sortOrder: "ASC"
       }).then((result) => sentAtFromRevisions(result?.items));
-      matchSentAtLookupsInFlight.set(matchId, promise);
-      try {
-        return await promise;
-      } finally {
-        matchSentAtLookupsInFlight.delete(matchId);
-      }
+      sentAtByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
+      promise.catch(() => sentAtByMatch.delete(matchId));
+      return promise;
     }
     async function loadEmployerIdsForJobPositions(jobPositionIds) {
       const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-      for (let index = 0; index < jobPositionIds.length; index += 25) {
-        const ids = jobPositionIds.slice(index, index + 25);
-        const result = await request(JOB_POSITION_EMPLOYERS_QUERY, { filter: { ids } });
+      const batches = [];
+      for (let index = 0; index < jobPositionIds.length; index += EMPLOYER_BATCH) {
+        batches.push(jobPositionIds.slice(index, index + EMPLOYER_BATCH));
+      }
+      const results = await Promise.all(batches.map((ids) => request(JOB_POSITION_EMPLOYERS_QUERY, { filter: { ids } })));
+      for (const result of results) {
         for (const item of result?.items || []) {
           if (item?.id && item?.employer?.id) employerIdByJobPositionId.set(item.id, item.employer.id);
         }
       }
       return employerIdByJobPositionId;
+    }
+    async function fetchCandidateMatches(candidateId) {
+      const variables = (page) => ({
+        filter: { candidateIds: [candidateId] },
+        page,
+        perPage: PAGE_SIZE,
+        sortField: "createdAt",
+        sortOrder: "DESC"
+      });
+      const first = await request(REVERSE_MATCH_QUERY, variables(0));
+      const items = [...first?.items || []];
+      const total = Number(first?.total?.count);
+      const pages = Number.isFinite(total) ? Math.ceil(total / PAGE_SIZE) : 1;
+      if (items.length && pages > 1) {
+        const rest = await Promise.all(Array.from({ length: pages - 1 }, (_, index) => request(REVERSE_MATCH_QUERY, variables(index + 1))));
+        rest.forEach((result) => items.push(...result?.items || []));
+      }
+      const employerIdByJobPositionId = await loadEmployerIdsForJobPositions(
+        [...new Set(items.map((item) => item?.jobPositionId).filter(Boolean))]
+      );
+      const matches = items.filter((item) => item?.id && item?.jobPositionId).map((item) => ({ ...item, employerId: employerIdByJobPositionId.get(item.jobPositionId) || "" }));
+      return { matches, employerIdByJobPositionId };
+    }
+    function loadCandidateMatches2(candidateId) {
+      const cached = candidateMatches.get(candidateId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
+      const promise = fetchCandidateMatches(candidateId);
+      candidateMatches.set(candidateId, { promise, expiresAt: Date.now() + CANDIDATE_MATCHES_TTL_MS });
+      promise.catch(() => candidateMatches.delete(candidateId));
+      return promise;
     }
     return {
       async loadMatch(matchId) {
@@ -867,149 +909,62 @@
           kamStatus: mapKamStatus(match.kamStatus)
         };
       },
-      // Returns a Map<jobPositionId, {value, label}> of KAM statuses for every
-      // active match between candidateId and employerId. Preserves the
-      // pre-migration behaviour of finding an AllMatches list by candidate +
-      // employer and mapping rows to JobPosition when more than one match is
-      // returned.
+      loadCandidateMatches: loadCandidateMatches2,
+      // KAM-Status je Vakanz bei einem Arbeitgeber, nur Matches mit Reaktion
+      // des Kandidaten (`matchedAt`, frueher Filter `matched: true`). Kommt aus
+      // loadCandidateMatches, keine eigene Abfrage.
       async loadReverseMatchKamStatuses(candidateId, employerId) {
-        const key = `${candidateId}|${employerId}`;
-        const existing = reverseLookupsInFlight.get(key);
-        if (existing) return existing;
-        const promise = (async () => {
-          const result = await request(REVERSE_MATCH_QUERY, {
-            filter: { candidateIds: [candidateId], employerIds: [employerId], matched: true },
-            page: 0,
-            perPage: 50,
-            sortField: "createdAt",
-            sortOrder: "DESC"
+        const { matches } = await loadCandidateMatches2(candidateId);
+        const statuses = /* @__PURE__ */ new Map();
+        for (const item of matches) {
+          if (item.employerId !== employerId || !item.matchedAt) continue;
+          if (statuses.has(item.jobPositionId)) continue;
+          statuses.set(item.jobPositionId, {
+            ...mapKamStatus(item.kamStatus) || { value: "not-found", label: "nicht gefunden" },
+            feedback: item.kamFeedback || ""
           });
-          const statuses = /* @__PURE__ */ new Map();
-          for (const item of result?.items || []) {
-            if (!item?.jobPositionId) continue;
-            statuses.set(item.jobPositionId, {
-              ...mapKamStatus(item.kamStatus) || { value: "not-found", label: "nicht gefunden" },
-              feedback: item.kamFeedback || ""
-            });
-          }
-          return statuses;
-        })();
-        reverseLookupsInFlight.set(key, promise);
-        try {
-          return await promise;
-        } finally {
-          reverseLookupsInFlight.delete(key);
         }
+        return statuses;
       },
-      // Fast path for the candidate page. `onlineMatchStatus: process` is the
-      // current technical value for a sent match. Resolve the remaining
-      // JobPosition -> Employer relation separately: requesting `jobPosition`
-      // inline makes the whole GraphQL response fail for deleted vacancies.
+      // Schneller Weg fuer die Kandidatenseite: Matches, die gerade auf einem
+      // Sende-Status stehen. Ohne Versionshistorie, also ohne Zeitpunkt.
       async loadCurrentSentMatchEmployers(candidateId) {
-        const existing = currentSentEmployerLookupsInFlight.get(candidateId);
-        if (existing) return existing;
-        const promise = (async () => {
-          const employerIds = /* @__PURE__ */ new Set();
-          const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-          const sentAtByEmployerId = /* @__PURE__ */ new Map();
-          const perPage = 100;
-          let page = 0;
-          let total = Infinity;
-          while (page * perPage < total) {
-            const result = await request(REVERSE_MATCH_QUERY, {
-              filter: { candidateIds: [candidateId] },
-              page,
-              perPage,
-              sortField: "createdAt",
-              sortOrder: "DESC"
-            });
-            const items = result?.items || [];
-            const currentItems = items.filter((item) => item?.onlineMatchStatus === "process" && item?.jobPositionId);
-            const employerIdsByJobPosition = await loadEmployerIdsForJobPositions(
-              [...new Set(currentItems.map((item) => item.jobPositionId))]
-            );
-            for (const item of currentItems) {
-              const employerId = employerIdsByJobPosition.get(item.jobPositionId);
-              if (!employerId) continue;
-              employerIds.add(employerId);
-              employerIdByJobPositionId.set(item.jobPositionId, employerId);
-            }
-            total = Number(result?.total?.count);
-            if (!Number.isFinite(total) || !items.length) break;
-            page++;
-          }
-          return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
-        })();
-        currentSentEmployerLookupsInFlight.set(candidateId, promise);
-        try {
-          return await promise;
-        } finally {
-          currentSentEmployerLookupsInFlight.delete(candidateId);
-        }
+        const { matches, employerIdByJobPositionId } = await loadCandidateMatches2(candidateId);
+        const employerIds = new Set(matches.filter((item) => item.employerId && isSentOnlineMatchStatus(item.onlineMatchStatus)).map((item) => item.employerId));
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId: /* @__PURE__ */ new Map() };
       },
-      // Reads the candidate's actual match history. A match counts when its
-      // version history contains a transition to "process", the technical
-      // value behind the Match status "Senden", even when its current status
-      // has changed since then.
-      async loadSentMatchEmployers(candidateId) {
-        const existing = sentEmployerLookupsInFlight.get(candidateId);
-        if (existing) return existing;
-        const promise = (async () => {
-          const employerIds = /* @__PURE__ */ new Set();
-          const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-          const sentAtByEmployerId = /* @__PURE__ */ new Map();
-          const perPage = 100;
-          let page = 0;
-          let total = Infinity;
-          while (page * perPage < total) {
-            const result = await request(REVERSE_MATCH_QUERY, {
-              filter: { candidateIds: [candidateId] },
-              page,
-              perPage,
-              sortField: "createdAt",
-              sortOrder: "DESC"
-            });
-            const items = result?.items || [];
-            const sentAtByMatchId = /* @__PURE__ */ new Map();
-            const employerIdsByJobPosition = await loadEmployerIdsForJobPositions(
-              [...new Set(items.map((item) => item?.jobPositionId).filter(Boolean))]
-            );
-            const matches = items.filter((item) => item?.id && employerIdsByJobPosition.has(item?.jobPositionId));
-            for (let index = 0; index < matches.length; index += 20) {
-              const batch = matches.slice(index, index + 20);
-              const sentDateResults = await Promise.allSettled(batch.map((match) => loadMatchSentAt(match.id)));
-              batch.forEach((match, batchIndex) => {
-                const result2 = sentDateResults[batchIndex];
-                if (result2.status === "fulfilled") {
-                  sentAtByMatchId.set(match.id, result2.value);
-                  return;
-                }
-                console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${match.id} konnte nicht geladen werden:`, result2.reason);
-              });
-            }
-            for (const item of matches) {
-              const employerId = employerIdsByJobPosition.get(item.jobPositionId);
-              const sentAt = sentAtByMatchId.get(item.id);
-              if (!item?.jobPositionId || !employerId || !sentAt) continue;
-              employerIds.add(employerId);
-              employerIdByJobPositionId.set(item.jobPositionId, employerId);
-              const previousSentAt = sentAtByEmployerId.get(employerId);
-              if (!previousSentAt || Date.parse(sentAt) > Date.parse(previousSentAt)) {
-                sentAtByEmployerId.set(employerId, sentAt);
-              }
-            }
-            total = Number(result?.total?.count);
-            if (!Number.isFinite(total) || !items.length) break;
-            page++;
-          }
-          return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
-        })();
-        sentEmployerLookupsInFlight.set(candidateId, promise);
-        try {
-          return await promise;
-        } finally {
-          sentEmployerLookupsInFlight.delete(candidateId);
+      // Wirklich gesendete Matches samt Zeitpunkt: auch solche, deren Status
+      // sich nach dem Senden geaendert hat. Dafuer die Versionshistorie je
+      // Match, aber nur fuer die Arbeitgeber in `employerIds` (die sichtbaren
+      // Zeilen), nicht fuer alle Matches des Kandidaten. Ohne `employerIds`
+      // fuer alle.
+      async loadSentMatchEmployers(candidateId, { employerIds: onlyEmployerIds } = {}) {
+        const { matches, employerIdByJobPositionId } = await loadCandidateMatches2(candidateId);
+        const only = onlyEmployerIds ? new Set(onlyEmployerIds) : null;
+        const relevant = matches.filter((item) => item.employerId && (!only || only.has(item.employerId)));
+        const sentAtByMatchId = /* @__PURE__ */ new Map();
+        for (let index = 0; index < relevant.length; index += REVISION_PARALLEL) {
+          const batch = relevant.slice(index, index + REVISION_PARALLEL);
+          const results = await Promise.allSettled(batch.map((item) => loadMatchSentAt(item.id)));
+          batch.forEach((item, batchIndex) => {
+            const result = results[batchIndex];
+            if (result.status === "fulfilled") sentAtByMatchId.set(item.id, result.value);
+            else console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+          });
         }
+        const employerIds = /* @__PURE__ */ new Set();
+        const sentAtByEmployerId = /* @__PURE__ */ new Map();
+        for (const item of relevant) {
+          const sentAt = sentAtByMatchId.get(item.id) || "";
+          if (!sentAt && !isSentOnlineMatchStatus(item.onlineMatchStatus)) continue;
+          employerIds.add(item.employerId);
+          if (!sentAt) continue;
+          const previousSentAt = sentAtByEmployerId.get(item.employerId);
+          if (!previousSentAt || Date.parse(sentAt) > Date.parse(previousSentAt)) {
+            sentAtByEmployerId.set(item.employerId, sentAt);
+          }
+        }
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
       }
     };
   }
@@ -2208,7 +2163,7 @@
       page: PAGES.potentialMatches,
       routes: [ROUTES.potentialMatches],
       kind: "view",
-      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“ hat.",
+      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“, „Reverse Match senden“ oder „Portal Uploaded“ hat oder hatte.",
       notes: [
         "Bis 90 Tage nach der Statusänderung ist die Zeile rot gefüllt, danach nur noch rot umrandet.",
         "Der Hinweis in der Zeile nennt das Datum der Statusänderung.",
@@ -3051,7 +3006,39 @@
     scheduleFlagCompanyRows();
   }
 
+  // ../../shared/js/admin-dom/page-load.js
+  var LOADING_SELECTOR = '.MuiLinearProgress-indeterminate, .MuiLinearProgress-query, header [role="progressbar"], header .MuiCircularProgress-root';
+  var LOADING_MAX_WAIT_MS = 8e3;
+  function adminpanelIsLoading(root = document) {
+    return [...root.querySelectorAll(LOADING_SELECTOR)].some((element) => {
+      if (!element.isConnected || element.closest('[hidden], dialog, [role="dialog"], [id^="werkia"]')) return false;
+      const style = getComputedStyle(element);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+  function claimPage(key, namespace, root = document.documentElement) {
+    const attr = `data-werkia-owner-${key}`;
+    const owner = root.getAttribute(attr);
+    if (owner && owner !== namespace) return false;
+    if (!owner) root.setAttribute(attr, namespace);
+    return true;
+  }
+  function createLoadingGate({ schedule, onRetry, maxWaitMs = LOADING_MAX_WAIT_MS, isLoading = adminpanelIsLoading }) {
+    let since = 0;
+    return function shouldWait() {
+      if (!isLoading()) {
+        since = 0;
+        return false;
+      }
+      if (!since) since = Date.now();
+      if (Date.now() - since >= maxWaitMs) return false;
+      schedule(onRetry, 1e3);
+      return true;
+    };
+  }
+
   // src/features/obc-fragebogen/kam-status-lookup.js
+  var OWNER_KEY = "kam-status-potentialMatches";
   var KAM_STATUS_TAG_CLASS = "werkia-obc-kam-status-tag";
   var MATCH_PRESENT_TAG_CLASS = "werkia-obc-match-present-tag";
   var MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -3086,7 +3073,7 @@
     const sentEmployerLoads = /* @__PURE__ */ new Map();
     const kamLookupTasks = /* @__PURE__ */ new Map();
     const kamLookupQueue = [];
-    let kamLookupRunning = false;
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
     function ensureMatchPresentStyles() {
       if (document.getElementById(MATCH_PRESENT_STYLE_ID)) return;
       const style = document.createElement("style");
@@ -3207,24 +3194,24 @@
     function cacheKamStatus(cacheKey, status, ttl = KAM_CACHE_TTL_MS) {
       kamStatusCache.set(cacheKey, { status, expiresAt: Date.now() + ttl });
     }
-    function getCachedSentEmployers(candidateId) {
-      const cached = sentEmployerCache.get(candidateId);
+    function getCachedSentEmployers(key) {
+      const cached = sentEmployerCache.get(key);
       if (!cached) return void 0;
       if (cached.expiresAt <= Date.now()) {
-        sentEmployerCache.delete(candidateId);
+        sentEmployerCache.delete(key);
         return void 0;
       }
       return cached.value;
     }
-    function loadSentEmployers(candidateId) {
-      const existing = sentEmployerLoads.get(candidateId);
+    function loadSentEmployers(key, candidateId, employerIds) {
+      const existing = sentEmployerLoads.get(key);
       if (existing) return existing;
-      const load2 = getObcGraphqlAdapter().matchProvider.loadSentMatchEmployers(candidateId).then((value) => {
-        sentEmployerCache.set(candidateId, { value, expiresAt: Date.now() + KAM_CACHE_TTL_MS });
+      const load2 = getObcGraphqlAdapter().matchProvider.loadSentMatchEmployers(candidateId, { employerIds }).then((value) => {
+        sentEmployerCache.set(key, { value, expiresAt: Date.now() + KAM_CACHE_TTL_MS });
         if (isCandidatePotentialMatchesPage2() && getCandidateIdFromRoute() === candidateId) flagReverseMatchKamStatusRows();
         return value;
-      }).catch((error) => console.warn("[OBC Match] Gesendete Matches konnten nicht geladen werden:", error)).finally(() => sentEmployerLoads.delete(candidateId));
-      sentEmployerLoads.set(candidateId, load2);
+      }).catch((error) => console.warn("[OBC Match] Gesendete Matches konnten nicht geladen werden:", error)).finally(() => sentEmployerLoads.delete(key));
+      sentEmployerLoads.set(key, load2);
       return load2;
     }
     async function lookupKamStatuses(candidateId, employerId) {
@@ -3242,39 +3229,59 @@
       kamLookupQueue.push(task);
       runKamLookupQueue();
     }
-    async function runKamLookupQueue() {
-      if (kamLookupRunning) return;
-      kamLookupRunning = true;
-      try {
-        while (kamLookupQueue.length) {
-          const task = kamLookupQueue.shift();
-          if (!isCandidatePotentialMatchesPage2()) {
-            kamLookupTasks.delete(task.groupKey);
-            continue;
-          }
-          let statusesByJob = null;
-          try {
-            statusesByJob = await lookupKamStatuses(task.candidateId, task.employerId);
-          } catch (error) {
-            console.warn("[OBC KAM-Status] KAM-Status konnte nicht geladen werden:", error);
-          }
-          cacheKamStatus(task.groupKey, statusesByJob || null, statusesByJob ? KAM_CACHE_TTL_MS : 15 * 1e3);
-          kamLookupTasks.delete(task.groupKey);
-          if (isCandidatePotentialMatchesPage2()) flagReverseMatchKamStatusRows();
-        }
-      } finally {
-        kamLookupRunning = false;
+    const overviews = /* @__PURE__ */ new Map();
+    function getCachedOverview(candidateId) {
+      const cached = overviews.get(candidateId);
+      if (cached && cached.expiresAt > Date.now()) return cached.value;
+      if (!cached?.loading) {
+        overviews.set(candidateId, { loading: true, expiresAt: 0 });
+        getObcGraphqlAdapter().matchProvider.loadCurrentSentMatchEmployers(candidateId).then((value) => overviews.set(candidateId, { value, expiresAt: Date.now() + KAM_CACHE_TTL_MS })).catch((error) => {
+          overviews.set(candidateId, { value: null, expiresAt: Date.now() + 15 * 1e3 });
+          console.warn("[OBC Match] Matches des Kandidaten nicht ladbar:", error);
+        }).finally(() => scheduleRender());
       }
+      return void 0;
+    }
+    function runKamLookupQueue() {
+      kamLookupQueue.splice(0).forEach(async (task) => {
+        if (!isCandidatePotentialMatchesPage2()) {
+          kamLookupTasks.delete(task.groupKey);
+          return;
+        }
+        let statusesByJob = null;
+        try {
+          statusesByJob = await lookupKamStatuses(task.candidateId, task.employerId);
+        } catch (error) {
+          console.warn("[OBC KAM-Status] KAM-Status konnte nicht geladen werden:", error);
+        }
+        cacheKamStatus(task.groupKey, statusesByJob || null, statusesByJob ? KAM_CACHE_TTL_MS : 15 * 1e3);
+        kamLookupTasks.delete(task.groupKey);
+        if (isCandidatePotentialMatchesPage2()) flagReverseMatchKamStatusRows();
+      });
     }
     function flagReverseMatchKamStatusRows() {
       if (!isCandidatePotentialMatchesPage2()) return;
       const candidateId = getCandidateIdFromRoute();
       if (!candidateId) return;
-      const sentEmployers = getCachedSentEmployers(candidateId);
-      if (sentEmployers === void 0) loadSentEmployers(candidateId);
-      document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root").forEach((row) => {
+      if (!claimPage(OWNER_KEY, "obc")) return;
+      if (waitForAdminpanel()) return;
+      const rows = [...document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root")];
+      const employerFor = /* @__PURE__ */ new Map();
+      const missing = rows.filter((row) => !getResourceIdFromRow(row, "Employer"));
+      const overview = missing.length ? getCachedOverview(candidateId) : null;
+      rows.forEach((row) => {
         const jobId = getResourceIdFromRow(row, "JobPosition");
-        const employerId = getResourceIdFromRow(row, "Employer") || sentEmployers?.employerIdByJobPositionId.get(jobId);
+        const employerId = getResourceIdFromRow(row, "Employer") || overview?.employerIdByJobPositionId.get(jobId) || "";
+        if (jobId && employerId) employerFor.set(row, employerId);
+      });
+      if (missing.length && overview === void 0) return;
+      const visibleEmployerIds = [...new Set(employerFor.values())].sort();
+      const fullKey = `${candidateId}|${visibleEmployerIds.join(",")}`;
+      const sentEmployers = getCachedSentEmployers(fullKey);
+      if (sentEmployers === void 0 && visibleEmployerIds.length) loadSentEmployers(fullKey, candidateId, visibleEmployerIds);
+      rows.forEach((row) => {
+        const jobId = getResourceIdFromRow(row, "JobPosition");
+        const employerId = employerFor.get(row);
         if (!jobId || !employerId) return;
         const reverseChip = getReverseMatchChip(row);
         const sentAt = sentEmployers?.sentAtByEmployerId.get(employerId);
@@ -7548,6 +7555,10 @@
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
+  function isInViewport(row) {
+    const rect = row.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < (window.innerHeight || document.documentElement.clientHeight || 0);
+  }
   var LEVEL_STYLES2 = {
     skull: "border-color:#e03131;background:#ffe3e3;color:#8f1d1d;font-weight:800;",
     ok: "border-color:#8ce99a;background:#ebfbee;color:#2b6a35;",
@@ -7732,6 +7743,7 @@
       work();
     }
     const WORKERS = 8;
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
     let workers = 0;
     async function computeCandidate(candidateId) {
       try {
@@ -7740,7 +7752,14 @@
         if (jobIds.length) {
           const provider = getProvider();
           const [candidateLocation, jobs] = await Promise.all([
-            provider.loadCandidateLocation(candidateId),
+            provider.loadCandidateLocation(candidateId).then((location2) => {
+              candidateErrors.delete(candidateId);
+              return location2;
+            }, (error) => {
+              candidateErrors.set(candidateId, "Kandidatenadresse nicht ladbar.");
+              console.warn("[Werkia Fahrzeit] Kandidatenadresse nicht ladbar:", error);
+              return null;
+            }),
             provider.loadJobs(jobIds)
           ]);
           const locations = [...jobs.values()].map((job) => job?.location).filter(Boolean);
@@ -7763,15 +7782,7 @@
       }
     }
     function candidateLocationFor(provider, candidateId) {
-      const location2 = provider.peekCandidateLocation(candidateId);
-      if (location2 !== void 0) return location2;
-      provider.loadCandidateLocation(candidateId).then(() => {
-        candidateErrors.delete(candidateId);
-      }, (error) => {
-        candidateErrors.set(candidateId, "Kandidatenadresse nicht ladbar.");
-        console.warn("[Werkia Fahrzeit] Kandidatenadresse nicht ladbar:", error);
-      }).finally(scheduleRender);
-      return void 0;
+      return provider.peekCandidateLocation(candidateId);
     }
     function render() {
       const page = findPage(location.hash || "", pageKeys);
@@ -7779,6 +7790,11 @@
         clearAll();
         return;
       }
+      if (!claimPage(`commute-${page.key}`, namespace)) {
+        clearAll();
+        return;
+      }
+      if (waitForAdminpanel()) return;
       let provider;
       try {
         provider = getProvider();
@@ -7793,6 +7809,7 @@
         });
       }
       const candidateLocations = /* @__PURE__ */ new Map();
+      const toEnqueue = /* @__PURE__ */ new Map();
       let hiddenCount = 0;
       for (const item of items) {
         if (!candidateLocations.has(item.candidateId)) {
@@ -7823,10 +7840,11 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
-          enqueue(item.candidateId);
+        if (job && candidateLocation !== null && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
+          toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }
+      [...toEnqueue].sort((a, b) => Number(b[1]) - Number(a[1])).forEach(([candidateId]) => enqueue(candidateId));
       if (page.skullMode === "hide") renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {

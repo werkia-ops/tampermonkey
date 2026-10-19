@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.18.254
+// @version      1.18.257
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -796,6 +796,7 @@
     kamStatus
     kamFeedback
     onlineMatchStatus
+    matchedAt
     __typename
   }
   total: _allMatchesMeta(page: $page, perPage: $perPage, filter: $filter) {
@@ -818,17 +819,28 @@
     if (!rawValue) return null;
     return { value: rawValue, label: CEM_STATUS_LABELS[rawValue] || rawValue };
   }
-  function sentAtFromRevisions(revisions) {
-    return (revisions || []).filter((revision) => /(?:^|\n)\s*-?\s*onlineMatchStatus:\s*(?:null|<unknown>|"[^"]+")\s*->\s*"process"/i.test(revision?.description || "")).map((revision) => revision.date).filter(Boolean).sort().at(0) || "";
+  var SENT_ONLINE_MATCH_STATUSES = ["process", "reverse_match_send", "portal_uploaded"];
+  var SENT_TRANSITION_RE = new RegExp(
+    `(?:^|\\n)\\s*-?\\s*onlineMatchStatus:\\s*(?:null|<unknown>|"[^"]+")\\s*->\\s*"(?:${SENT_ONLINE_MATCH_STATUSES.join("|")})"`,
+    "i"
+  );
+  function isSentOnlineMatchStatus(status2) {
+    return SENT_ONLINE_MATCH_STATUSES.includes(String(status2 || ""));
   }
+  function sentAtFromRevisions(revisions) {
+    return (revisions || []).filter((revision) => SENT_TRANSITION_RE.test(revision?.description || "")).map((revision) => revision.date).filter(Boolean).sort().at(0) || "";
+  }
+  var CANDIDATE_MATCHES_TTL_MS = 60 * 1e3;
+  var SENT_AT_TTL_MS = 30 * 60 * 1e3;
+  var PAGE_SIZE = 100;
+  var EMPLOYER_BATCH = 25;
+  var REVISION_PARALLEL = 20;
   function createMatchProvider({ request }) {
-    const reverseLookupsInFlight = /* @__PURE__ */ new Map();
-    const currentSentEmployerLookupsInFlight = /* @__PURE__ */ new Map();
-    const sentEmployerLookupsInFlight = /* @__PURE__ */ new Map();
-    const matchSentAtLookupsInFlight = /* @__PURE__ */ new Map();
-    async function loadMatchSentAt(matchId) {
-      const existing = matchSentAtLookupsInFlight.get(matchId);
-      if (existing) return existing;
+    const candidateMatches = /* @__PURE__ */ new Map();
+    const sentAtByMatch = /* @__PURE__ */ new Map();
+    function loadMatchSentAt(matchId) {
+      const cached = sentAtByMatch.get(matchId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
       const promise = request(MATCH_REVISIONS_QUERY, {
         filter: { resource: "Match", recordId: matchId },
         page: 0,
@@ -836,23 +848,53 @@
         sortField: "date",
         sortOrder: "ASC"
       }).then((result) => sentAtFromRevisions(result?.items));
-      matchSentAtLookupsInFlight.set(matchId, promise);
-      try {
-        return await promise;
-      } finally {
-        matchSentAtLookupsInFlight.delete(matchId);
-      }
+      sentAtByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
+      promise.catch(() => sentAtByMatch.delete(matchId));
+      return promise;
     }
     async function loadEmployerIdsForJobPositions(jobPositionIds) {
       const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-      for (let index = 0; index < jobPositionIds.length; index += 25) {
-        const ids = jobPositionIds.slice(index, index + 25);
-        const result = await request(JOB_POSITION_EMPLOYERS_QUERY, { filter: { ids } });
+      const batches = [];
+      for (let index = 0; index < jobPositionIds.length; index += EMPLOYER_BATCH) {
+        batches.push(jobPositionIds.slice(index, index + EMPLOYER_BATCH));
+      }
+      const results = await Promise.all(batches.map((ids) => request(JOB_POSITION_EMPLOYERS_QUERY, { filter: { ids } })));
+      for (const result of results) {
         for (const item of result?.items || []) {
           if (item?.id && item?.employer?.id) employerIdByJobPositionId.set(item.id, item.employer.id);
         }
       }
       return employerIdByJobPositionId;
+    }
+    async function fetchCandidateMatches(candidateId) {
+      const variables = (page) => ({
+        filter: { candidateIds: [candidateId] },
+        page,
+        perPage: PAGE_SIZE,
+        sortField: "createdAt",
+        sortOrder: "DESC"
+      });
+      const first = await request(REVERSE_MATCH_QUERY, variables(0));
+      const items = [...first?.items || []];
+      const total = Number(first?.total?.count);
+      const pages = Number.isFinite(total) ? Math.ceil(total / PAGE_SIZE) : 1;
+      if (items.length && pages > 1) {
+        const rest = await Promise.all(Array.from({ length: pages - 1 }, (_, index) => request(REVERSE_MATCH_QUERY, variables(index + 1))));
+        rest.forEach((result) => items.push(...result?.items || []));
+      }
+      const employerIdByJobPositionId = await loadEmployerIdsForJobPositions(
+        [...new Set(items.map((item) => item?.jobPositionId).filter(Boolean))]
+      );
+      const matches = items.filter((item) => item?.id && item?.jobPositionId).map((item) => ({ ...item, employerId: employerIdByJobPositionId.get(item.jobPositionId) || "" }));
+      return { matches, employerIdByJobPositionId };
+    }
+    function loadCandidateMatches(candidateId) {
+      const cached = candidateMatches.get(candidateId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
+      const promise = fetchCandidateMatches(candidateId);
+      candidateMatches.set(candidateId, { promise, expiresAt: Date.now() + CANDIDATE_MATCHES_TTL_MS });
+      promise.catch(() => candidateMatches.delete(candidateId));
+      return promise;
     }
     return {
       async loadMatch(matchId) {
@@ -866,149 +908,62 @@
           kamStatus: mapKamStatus(match.kamStatus)
         };
       },
-      // Returns a Map<jobPositionId, {value, label}> of KAM statuses for every
-      // active match between candidateId and employerId. Preserves the
-      // pre-migration behaviour of finding an AllMatches list by candidate +
-      // employer and mapping rows to JobPosition when more than one match is
-      // returned.
+      loadCandidateMatches,
+      // KAM-Status je Vakanz bei einem Arbeitgeber, nur Matches mit Reaktion
+      // des Kandidaten (`matchedAt`, frueher Filter `matched: true`). Kommt aus
+      // loadCandidateMatches, keine eigene Abfrage.
       async loadReverseMatchKamStatuses(candidateId, employerId) {
-        const key = `${candidateId}|${employerId}`;
-        const existing = reverseLookupsInFlight.get(key);
-        if (existing) return existing;
-        const promise = (async () => {
-          const result = await request(REVERSE_MATCH_QUERY, {
-            filter: { candidateIds: [candidateId], employerIds: [employerId], matched: true },
-            page: 0,
-            perPage: 50,
-            sortField: "createdAt",
-            sortOrder: "DESC"
+        const { matches } = await loadCandidateMatches(candidateId);
+        const statuses = /* @__PURE__ */ new Map();
+        for (const item of matches) {
+          if (item.employerId !== employerId || !item.matchedAt) continue;
+          if (statuses.has(item.jobPositionId)) continue;
+          statuses.set(item.jobPositionId, {
+            ...mapKamStatus(item.kamStatus) || { value: "not-found", label: "nicht gefunden" },
+            feedback: item.kamFeedback || ""
           });
-          const statuses = /* @__PURE__ */ new Map();
-          for (const item of result?.items || []) {
-            if (!item?.jobPositionId) continue;
-            statuses.set(item.jobPositionId, {
-              ...mapKamStatus(item.kamStatus) || { value: "not-found", label: "nicht gefunden" },
-              feedback: item.kamFeedback || ""
-            });
-          }
-          return statuses;
-        })();
-        reverseLookupsInFlight.set(key, promise);
-        try {
-          return await promise;
-        } finally {
-          reverseLookupsInFlight.delete(key);
         }
+        return statuses;
       },
-      // Fast path for the candidate page. `onlineMatchStatus: process` is the
-      // current technical value for a sent match. Resolve the remaining
-      // JobPosition -> Employer relation separately: requesting `jobPosition`
-      // inline makes the whole GraphQL response fail for deleted vacancies.
+      // Schneller Weg fuer die Kandidatenseite: Matches, die gerade auf einem
+      // Sende-Status stehen. Ohne Versionshistorie, also ohne Zeitpunkt.
       async loadCurrentSentMatchEmployers(candidateId) {
-        const existing = currentSentEmployerLookupsInFlight.get(candidateId);
-        if (existing) return existing;
-        const promise = (async () => {
-          const employerIds = /* @__PURE__ */ new Set();
-          const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-          const sentAtByEmployerId = /* @__PURE__ */ new Map();
-          const perPage = 100;
-          let page = 0;
-          let total = Infinity;
-          while (page * perPage < total) {
-            const result = await request(REVERSE_MATCH_QUERY, {
-              filter: { candidateIds: [candidateId] },
-              page,
-              perPage,
-              sortField: "createdAt",
-              sortOrder: "DESC"
-            });
-            const items = result?.items || [];
-            const currentItems = items.filter((item) => item?.onlineMatchStatus === "process" && item?.jobPositionId);
-            const employerIdsByJobPosition = await loadEmployerIdsForJobPositions(
-              [...new Set(currentItems.map((item) => item.jobPositionId))]
-            );
-            for (const item of currentItems) {
-              const employerId = employerIdsByJobPosition.get(item.jobPositionId);
-              if (!employerId) continue;
-              employerIds.add(employerId);
-              employerIdByJobPositionId.set(item.jobPositionId, employerId);
-            }
-            total = Number(result?.total?.count);
-            if (!Number.isFinite(total) || !items.length) break;
-            page++;
-          }
-          return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
-        })();
-        currentSentEmployerLookupsInFlight.set(candidateId, promise);
-        try {
-          return await promise;
-        } finally {
-          currentSentEmployerLookupsInFlight.delete(candidateId);
-        }
+        const { matches, employerIdByJobPositionId } = await loadCandidateMatches(candidateId);
+        const employerIds = new Set(matches.filter((item) => item.employerId && isSentOnlineMatchStatus(item.onlineMatchStatus)).map((item) => item.employerId));
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId: /* @__PURE__ */ new Map() };
       },
-      // Reads the candidate's actual match history. A match counts when its
-      // version history contains a transition to "process", the technical
-      // value behind the Match status "Senden", even when its current status
-      // has changed since then.
-      async loadSentMatchEmployers(candidateId) {
-        const existing = sentEmployerLookupsInFlight.get(candidateId);
-        if (existing) return existing;
-        const promise = (async () => {
-          const employerIds = /* @__PURE__ */ new Set();
-          const employerIdByJobPositionId = /* @__PURE__ */ new Map();
-          const sentAtByEmployerId = /* @__PURE__ */ new Map();
-          const perPage = 100;
-          let page = 0;
-          let total = Infinity;
-          while (page * perPage < total) {
-            const result = await request(REVERSE_MATCH_QUERY, {
-              filter: { candidateIds: [candidateId] },
-              page,
-              perPage,
-              sortField: "createdAt",
-              sortOrder: "DESC"
-            });
-            const items = result?.items || [];
-            const sentAtByMatchId = /* @__PURE__ */ new Map();
-            const employerIdsByJobPosition = await loadEmployerIdsForJobPositions(
-              [...new Set(items.map((item) => item?.jobPositionId).filter(Boolean))]
-            );
-            const matches = items.filter((item) => item?.id && employerIdsByJobPosition.has(item?.jobPositionId));
-            for (let index = 0; index < matches.length; index += 20) {
-              const batch = matches.slice(index, index + 20);
-              const sentDateResults = await Promise.allSettled(batch.map((match) => loadMatchSentAt(match.id)));
-              batch.forEach((match, batchIndex) => {
-                const result2 = sentDateResults[batchIndex];
-                if (result2.status === "fulfilled") {
-                  sentAtByMatchId.set(match.id, result2.value);
-                  return;
-                }
-                console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${match.id} konnte nicht geladen werden:`, result2.reason);
-              });
-            }
-            for (const item of matches) {
-              const employerId = employerIdsByJobPosition.get(item.jobPositionId);
-              const sentAt = sentAtByMatchId.get(item.id);
-              if (!item?.jobPositionId || !employerId || !sentAt) continue;
-              employerIds.add(employerId);
-              employerIdByJobPositionId.set(item.jobPositionId, employerId);
-              const previousSentAt = sentAtByEmployerId.get(employerId);
-              if (!previousSentAt || Date.parse(sentAt) > Date.parse(previousSentAt)) {
-                sentAtByEmployerId.set(employerId, sentAt);
-              }
-            }
-            total = Number(result?.total?.count);
-            if (!Number.isFinite(total) || !items.length) break;
-            page++;
-          }
-          return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
-        })();
-        sentEmployerLookupsInFlight.set(candidateId, promise);
-        try {
-          return await promise;
-        } finally {
-          sentEmployerLookupsInFlight.delete(candidateId);
+      // Wirklich gesendete Matches samt Zeitpunkt: auch solche, deren Status
+      // sich nach dem Senden geaendert hat. Dafuer die Versionshistorie je
+      // Match, aber nur fuer die Arbeitgeber in `employerIds` (die sichtbaren
+      // Zeilen), nicht fuer alle Matches des Kandidaten. Ohne `employerIds`
+      // fuer alle.
+      async loadSentMatchEmployers(candidateId, { employerIds: onlyEmployerIds } = {}) {
+        const { matches, employerIdByJobPositionId } = await loadCandidateMatches(candidateId);
+        const only = onlyEmployerIds ? new Set(onlyEmployerIds) : null;
+        const relevant = matches.filter((item) => item.employerId && (!only || only.has(item.employerId)));
+        const sentAtByMatchId = /* @__PURE__ */ new Map();
+        for (let index = 0; index < relevant.length; index += REVISION_PARALLEL) {
+          const batch = relevant.slice(index, index + REVISION_PARALLEL);
+          const results = await Promise.allSettled(batch.map((item) => loadMatchSentAt(item.id)));
+          batch.forEach((item, batchIndex) => {
+            const result = results[batchIndex];
+            if (result.status === "fulfilled") sentAtByMatchId.set(item.id, result.value);
+            else console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+          });
         }
+        const employerIds = /* @__PURE__ */ new Set();
+        const sentAtByEmployerId = /* @__PURE__ */ new Map();
+        for (const item of relevant) {
+          const sentAt = sentAtByMatchId.get(item.id) || "";
+          if (!sentAt && !isSentOnlineMatchStatus(item.onlineMatchStatus)) continue;
+          employerIds.add(item.employerId);
+          if (!sentAt) continue;
+          const previousSentAt = sentAtByEmployerId.get(item.employerId);
+          if (!previousSentAt || Date.parse(sentAt) > Date.parse(previousSentAt)) {
+            sentAtByEmployerId.set(item.employerId, sentAt);
+          }
+        }
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
       }
     };
   }
@@ -2324,7 +2279,7 @@
       page: PAGES.potentialMatches,
       routes: [ROUTES.potentialMatches],
       kind: "view",
-      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“ hat.",
+      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“, „Reverse Match senden“ oder „Portal Uploaded“ hat oder hatte.",
       notes: [
         "Bis 90 Tage nach der Statusänderung ist die Zeile rot gefüllt, danach nur noch rot umrandet.",
         "Der Hinweis in der Zeile nennt das Datum der Statusänderung.",
@@ -5209,7 +5164,39 @@
     scheduleContactBadges();
   }
 
+  // ../../shared/js/admin-dom/page-load.js
+  var LOADING_SELECTOR = '.MuiLinearProgress-indeterminate, .MuiLinearProgress-query, header [role="progressbar"], header .MuiCircularProgress-root';
+  var LOADING_MAX_WAIT_MS = 8e3;
+  function adminpanelIsLoading(root = document) {
+    return [...root.querySelectorAll(LOADING_SELECTOR)].some((element5) => {
+      if (!element5.isConnected || element5.closest('[hidden], dialog, [role="dialog"], [id^="werkia"]')) return false;
+      const style = getComputedStyle(element5);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+  function claimPage(key, namespace, root = document.documentElement) {
+    const attr = `data-werkia-owner-${key}`;
+    const owner = root.getAttribute(attr);
+    if (owner && owner !== namespace) return false;
+    if (!owner) root.setAttribute(attr, namespace);
+    return true;
+  }
+  function createLoadingGate({ schedule, onRetry, maxWaitMs = LOADING_MAX_WAIT_MS, isLoading = adminpanelIsLoading }) {
+    let since = 0;
+    return function shouldWait() {
+      if (!isLoading()) {
+        since = 0;
+        return false;
+      }
+      if (!since) since = Date.now();
+      if (Date.now() - since >= maxWaitMs) return false;
+      schedule(onRetry, 1e3);
+      return true;
+    };
+  }
+
   // src/features/cem-ofm/reverse-match-kam-status.js
+  var OWNER_KEY = "kam-status-potentialMatches";
   var TAG_CLASS = "werkia-cem-kam-status-tag";
   var SENT_MATCH_TAG_CLASS = "werkia-cem-sent-match-tag";
   var MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -5242,9 +5229,9 @@
     const statusCache = /* @__PURE__ */ new Map();
     const sentEmployerCache = /* @__PURE__ */ new Map();
     const sentEmployerLoads = /* @__PURE__ */ new Map();
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
     const tasks = /* @__PURE__ */ new Map();
     const queue = [];
-    let running = false;
     let renderTimer = null;
     const isPotentialMatchesPage = () => POTENTIAL_MATCHES_ROUTE.test(location.hash || "");
     function ensureMatchPresentStyles() {
@@ -5327,27 +5314,24 @@
       return cached.status;
     }
     const cacheStatus = (key, status2, ttl = CACHE_TTL_MS) => statusCache.set(key, { status: status2, expiresAt: Date.now() + ttl });
-    function cachedSentEmployers(candidateId) {
-      const cached = sentEmployerCache.get(candidateId);
+    function cachedSentEmployers(key) {
+      const cached = sentEmployerCache.get(key);
       if (!cached) return void 0;
       if (cached.expiresAt <= Date.now()) {
-        sentEmployerCache.delete(candidateId);
+        sentEmployerCache.delete(key);
         return void 0;
       }
       return cached.value;
     }
-    function loadSentEmployers(candidateId) {
-      const existing = sentEmployerLoads.get(candidateId);
-      if (existing) return existing;
-      const provider = getCemGraphqlAdapter().matchProvider;
-      const cacheAndRender = (value) => {
-        sentEmployerCache.set(candidateId, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+    function loadSentEmployers(key, candidateId, load2) {
+      if (sentEmployerLoads.has(key)) return sentEmployerLoads.get(key);
+      const promise = load2().then((value) => {
+        sentEmployerCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
         if (isPotentialMatchesPage() && getCandidateIdFromRoute() === candidateId) renderRows();
         return value;
-      };
-      const load2 = provider.loadCurrentSentMatchEmployers(candidateId).then(cacheAndRender).then(() => provider.loadSentMatchEmployers(candidateId)).then(cacheAndRender).catch((error) => console.warn("[CEM Match] Gesendete Matches konnten nicht geladen werden:", error)).finally(() => sentEmployerLoads.delete(candidateId));
-      sentEmployerLoads.set(candidateId, load2);
-      return load2;
+      }).catch((error) => console.warn("[CEM Match] Gesendete Matches konnten nicht geladen werden:", error)).finally(() => sentEmployerLoads.delete(key));
+      sentEmployerLoads.set(key, promise);
+      return promise;
     }
     async function lookupStatuses(candidateId, employerId) {
       return getCemGraphqlAdapter().matchProvider.loadReverseMatchKamStatuses(candidateId, employerId);
@@ -5364,37 +5348,41 @@
       queue.push(task);
       runQueue();
     }
-    async function runQueue() {
-      if (running) return;
-      running = true;
-      try {
-        while (queue.length) {
-          const task = queue.shift();
-          if (!isPotentialMatchesPage()) {
-            tasks.delete(task.key);
-            continue;
-          }
-          let statuses = null;
-          try {
-            statuses = await lookupStatuses(task.candidateId, task.employerId);
-          } catch (error) {
-            console.warn("[CEM Match] KAM-Status konnte nicht geladen werden:", error);
-          }
-          cacheStatus(task.key, statuses || null, statuses ? CACHE_TTL_MS : 15 * 1e3);
+    function runQueue() {
+      queue.splice(0).forEach(async (task) => {
+        if (!isPotentialMatchesPage()) {
           tasks.delete(task.key);
-          if (isPotentialMatchesPage()) renderRows();
+          return;
         }
-      } finally {
-        running = false;
-      }
+        let statuses = null;
+        try {
+          statuses = await lookupStatuses(task.candidateId, task.employerId);
+        } catch (error) {
+          console.warn("[CEM Match] KAM-Status konnte nicht geladen werden:", error);
+        }
+        cacheStatus(task.key, statuses || null, statuses ? CACHE_TTL_MS : 15 * 1e3);
+        tasks.delete(task.key);
+        if (isPotentialMatchesPage()) renderRows();
+      });
     }
     function renderRows() {
       if (!isPotentialMatchesPage()) return;
       const candidateId = getCandidateIdFromRoute();
       if (!candidateId) return;
-      const sentEmployers = cachedSentEmployers(candidateId);
-      if (sentEmployers === void 0) loadSentEmployers(candidateId);
-      document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root").forEach((row2) => {
+      if (!claimPage(OWNER_KEY, "cem")) return;
+      if (waitForAdminpanel()) return;
+      const provider = getCemGraphqlAdapter().matchProvider;
+      const current = cachedSentEmployers(candidateId);
+      if (current === void 0) loadSentEmployers(candidateId, candidateId, () => provider.loadCurrentSentMatchEmployers(candidateId));
+      const rows = [...document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root")];
+      const visibleEmployerIds = [...new Set(rows.map((row2) => getResourceIdFromRow(row2, "Employer") || current?.employerIdByJobPositionId.get(getResourceIdFromRow(row2, "JobPosition"))).filter(Boolean))].sort();
+      const fullKey = `${candidateId}|${visibleEmployerIds.join(",")}`;
+      const full = cachedSentEmployers(fullKey);
+      if (full === void 0 && current !== void 0 && visibleEmployerIds.length) {
+        loadSentEmployers(fullKey, candidateId, () => provider.loadSentMatchEmployers(candidateId, { employerIds: visibleEmployerIds }));
+      }
+      const sentEmployers = full ?? current;
+      rows.forEach((row2) => {
         const chip = getMatchTypeChip(row2);
         if (!chip) setTag(row2, null);
         const jobId = getResourceIdFromRow(row2, "JobPosition");
@@ -6960,6 +6948,10 @@
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var ROW_SELECTOR = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
+  function isInViewport(row2) {
+    const rect = row2.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < (window.innerHeight || document.documentElement.clientHeight || 0);
+  }
   var LEVEL_STYLES = {
     skull: "border-color:#e03131;background:#ffe3e3;color:#8f1d1d;font-weight:800;",
     ok: "border-color:#8ce99a;background:#ebfbee;color:#2b6a35;",
@@ -7144,6 +7136,7 @@
       work();
     }
     const WORKERS = 8;
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
     let workers = 0;
     async function computeCandidate(candidateId) {
       try {
@@ -7152,7 +7145,14 @@
         if (jobIds.length) {
           const provider = getProvider();
           const [candidateLocation, jobs] = await Promise.all([
-            provider.loadCandidateLocation(candidateId),
+            provider.loadCandidateLocation(candidateId).then((location2) => {
+              candidateErrors.delete(candidateId);
+              return location2;
+            }, (error) => {
+              candidateErrors.set(candidateId, "Kandidatenadresse nicht ladbar.");
+              console.warn("[Werkia Fahrzeit] Kandidatenadresse nicht ladbar:", error);
+              return null;
+            }),
             provider.loadJobs(jobIds)
           ]);
           const locations = [...jobs.values()].map((job) => job?.location).filter(Boolean);
@@ -7175,15 +7175,7 @@
       }
     }
     function candidateLocationFor(provider, candidateId) {
-      const location2 = provider.peekCandidateLocation(candidateId);
-      if (location2 !== void 0) return location2;
-      provider.loadCandidateLocation(candidateId).then(() => {
-        candidateErrors.delete(candidateId);
-      }, (error) => {
-        candidateErrors.set(candidateId, "Kandidatenadresse nicht ladbar.");
-        console.warn("[Werkia Fahrzeit] Kandidatenadresse nicht ladbar:", error);
-      }).finally(scheduleRender);
-      return void 0;
+      return provider.peekCandidateLocation(candidateId);
     }
     function render() {
       const page = findPage(location.hash || "", pageKeys);
@@ -7191,6 +7183,11 @@
         clearAll();
         return;
       }
+      if (!claimPage(`commute-${page.key}`, namespace)) {
+        clearAll();
+        return;
+      }
+      if (waitForAdminpanel()) return;
       let provider;
       try {
         provider = getProvider();
@@ -7205,6 +7202,7 @@
         });
       }
       const candidateLocations = /* @__PURE__ */ new Map();
+      const toEnqueue = /* @__PURE__ */ new Map();
       let hiddenCount = 0;
       for (const item of items) {
         if (!candidateLocations.has(item.candidateId)) {
@@ -7235,10 +7233,11 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS5) {
-          enqueue(item.candidateId);
+        if (job && candidateLocation !== null && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS5) {
+          toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }
+      [...toEnqueue].sort((a, b) => Number(b[1]) - Number(a[1])).forEach(([candidateId]) => enqueue(candidateId));
       if (page.skullMode === "hide") renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {
@@ -8712,7 +8711,7 @@
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
-  var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
+  var LOADING_SELECTOR2 = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
     runtime.registerSource(sourcePath);
     const {
@@ -8771,7 +8770,7 @@
       return style.display !== "none" && style.visibility !== "hidden";
     }
     function listIsLoading() {
-      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element5) => !element5.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element5));
+      return [...document.querySelectorAll(LOADING_SELECTOR2)].some((element5) => !element5.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element5));
     }
     function employerFromRow2(row2) {
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR2);

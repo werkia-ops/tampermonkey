@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.239
+// @version      1.14.241
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12576,6 +12576,10 @@ ${buildCbreBody(current)}`;
       document.getElementById(IDS5.pill)?.remove();
     }
     function renderPill(result) {
+      if (result?.fehler) {
+        renderErrorPill(result.fehler);
+        return;
+      }
       const vorschlag = result?.vorschlag;
       if (!result?.gefunden || !vorschlag || result.mailart === "kein_bezug") {
         removePill();
@@ -12599,13 +12603,24 @@ ${buildCbreBody(current)}`;
         });
         pill2.id = IDS5.pill;
         pill2.type = "button";
-        pill2.addEventListener("click", () => openDialog(current.result));
+        pill2.addEventListener("click", () => {
+          if (current.result?.fehler) window.alert(`Mail-Assistent: ${current.result.fehler}`);
+          else openDialog(current.result);
+        });
         document.body.appendChild(pill2);
       }
       const done = result.status === "erledigt";
       const staging = result.umgebung === "staging" ? " · Staging" : "";
       pill2.textContent = done ? `Vorschlag erledigt${staging}` : `Vorschlag: ${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${staging}`;
       styled2(pill2, { background: done ? "#6b7280" : "#1d4ed8" });
+    }
+    function renderErrorPill(message) {
+      renderPill({ gefunden: true, vorschlag: { mailart: "" }, status: "fehler" });
+      const pill2 = document.getElementById(IDS5.pill);
+      if (!pill2) return;
+      pill2.textContent = "Mail-Assistent: Fehler";
+      pill2.title = message;
+      styled2(pill2, { background: "#9ca3af" });
     }
     function choiceRow(choice, vorschlag, onChange) {
       const row2 = el4("div", { display: "grid", gap: "6px", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", background: choice.moeglich ? "#fff" : "#f9fafb" });
@@ -12876,8 +12891,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (disabled) return;
       if (!cache.has(key)) {
         cache.set(key, client.holen({ owaId, betreff, absender: "" }).catch((error) => {
-          if (/keine Vorschläge/.test(error.message)) disabled = true;
-          return null;
+          if (/keine Vorschläge/.test(error.message)) {
+            disabled = true;
+            return null;
+          }
+          console.warn("[Werkia KAM] Mail-Assistent:", error.message);
+          cache.delete(key);
+          return { fehler: error.message };
         }));
       }
       const result = await cache.get(key);

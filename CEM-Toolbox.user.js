@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.15.238
+// @version      1.16.239
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2277,7 +2277,7 @@
       summary: "Berechnet beim offenen Fragebogen Strecke und Fahrzeit mit dem Auto zwischen Wohnort des Kandidaten und Arbeitsort.",
       notes: [
         ...commute ? [
-          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen ab 50 Min steht ein 💀 davor und die Box wird rot."
+          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 50 Min steht ein 💀 davor und die Box wird rot."
         ] : [],
         "Ein Klick auf die Box öffnet die Route in OpenStreetMap.",
         "„Route nicht verfügbar“ heißt meist: Eine der beiden Adressen fehlt oder ließ sich nicht finden. Dann bitte selbst nachsehen.",
@@ -2294,14 +2294,15 @@
       kind: "view",
       summary: "Zeigt in jeder Zeile, wie lange der Kandidat mit dem Auto zur Vakanz fährt. Bei ortsgebundenen Stellen bitte vor allem kurze Fahrzeiten bevorzugen: Matches mit langer Fahrzeit führen deutlich seltener zum Erfolg.",
       notes: [
-        "💀 50 Min oder mehr bei einer ortsgebundenen Vakanz: fester Arbeitsort, der Kandidat pendelt täglich. Die Zeile wird ausgegraut, mit der Maus darüber ist sie wieder normal lesbar. Nur in Ausnahmefällen senden.",
-        "🚗 Fahrzeit unter 50 Min bei einer ortsgebundenen Vakanz.",
+        "💀 Über 50 Min bei einer ortsgebundenen Vakanz: fester Arbeitsort, der Kandidat pendelt täglich. Solche Zeilen werden ausgeblendet. Die rote Leiste über der Tabelle nennt ihre Zahl, „Anzeigen“ holt sie ausgegraut zurück. Nur in Ausnahmefällen senden.",
+        "🚗 Fahrzeit bis 50 Min bei einer ortsgebundenen Vakanz.",
         "🏠 Start von Zuhause: Startpunkt „von zu Hause“ oder ortsunabhängig. Die Fahrzeit ist hier nur zur Info.",
         "🗺️ Landes-/bundesweit: Einsatzgebiet ist ein ganzes Bundesland oder Deutschland. Die Fahrzeit ist nur zur Info.",
         "🧳 Montage: Reisetätigkeit „uneingeschränkt“, mit Übernachtung. Die Fahrzeit ist nur zur Info.",
         "Die Zeiten aller sichtbaren Zeilen eines Kandidaten kommen mit einer Anfrage, meist nach ein bis zwei Sekunden. Danach bleiben sie eine Woche im Browser gespeichert. „…“ heißt: noch nicht berechnet.",
         "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet. Dann gibt es keinen 💀.",
-        "Die Anzeige blendet nichts aus und sortiert nichts um. Die Entscheidung liegt bei dir."
+        "Die Liste kommt seitenweise vom Server, der die Fahrzeit nicht kennt. Eine Seite zeigt deshalb weniger Zeilen, wenn welche ausgeblendet sind. Umsortiert wird nichts.",
+        "Konnte nicht geprüft werden, ob die Vakanz landes- oder bundesweit ist, bleibt die Zeile mit 💀 ausgegraut sichtbar."
       ]
     };
   }
@@ -6091,7 +6092,7 @@
       key: "local",
       icon: "🚗",
       label: "Ortsgebunden",
-      hint: `Fester Arbeitsort, der Kandidat pendelt täglich. Ab ${SKULL_MINUTES} Min Fahrzeit 💀.`
+      hint: `Fester Arbeitsort, der Kandidat pendelt täglich. Über ${SKULL_MINUTES} Min Fahrzeit 💀.`
     }
   };
   var WIDE_SERVICE_AREA_TYPES = /* @__PURE__ */ new Set(["state_wide", "country_wide"]);
@@ -6114,8 +6115,16 @@
     const seconds = Number(entry.fastestDurationSeconds ?? entry.durationSeconds);
     return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds / 60) : null;
   }
+  function exactRouteMinutes(entry) {
+    if (!entry || entry.unavailable || entry.quality === "fallback") return null;
+    const seconds = Number(entry.fastestDurationSeconds ?? entry.durationSeconds);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds / 60 : null;
+  }
   function isSkull(commuteClass, minutes) {
-    return commuteClass?.key === "local" && Number.isFinite(minutes) && minutes >= SKULL_MINUTES;
+    return commuteClass?.key === "local" && Number.isFinite(minutes) && minutes > SKULL_MINUTES;
+  }
+  function isSurelyLocal(job) {
+    return classifyCommute(job)?.key === "local" && Array.isArray(job?.serviceAreaTypes);
   }
   function describeCommute(commuteClass, entry) {
     const minutes = routeMinutes(entry);
@@ -6127,7 +6136,7 @@
     else if (entry?.quality === "fallback" && Number.isFinite(entry.airDistanceMeters)) {
       timeText = `ca. ${formatKm(entry.airDistanceMeters)} Luftlinie`;
     } else if (entry?.unavailable) timeText = "keine Route";
-    const skull = isSkull(commuteClass, minutes);
+    const skull = isSkull(commuteClass, exactRouteMinutes(entry));
     let level = "pending";
     if (entry?.unavailable || entry?.quality === "fallback") level = "unknown";
     else if (skull) level = "skull";
@@ -6868,6 +6877,7 @@
   var PAGES2 = [
     {
       key: "potentialMatches",
+      hideSkulls: true,
       matches: (hash) => POTENTIAL_MATCHES_ROUTE5.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute2();
@@ -6908,6 +6918,10 @@
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
     const STYLE_ID13 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
+    const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
+    const BAR_CLASS4 = `werkia-${namespace}-commute-hidden-bar`;
+    const OWNED_SELECTOR = `.${BADGE_CLASS2}, .${BAR_CLASS4}`;
+    let showHidden = false;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
@@ -6924,12 +6938,17 @@
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
       tr[${SKULL_ATTR}] { opacity:.45;filter:grayscale(.6);transition:opacity .15s ease,filter .15s ease; }
       tr[${SKULL_ATTR}]:hover, tr[${SKULL_ATTR}]:focus-within { opacity:1;filter:none; }
+      tr[${HIDDEN_ATTR}] { display:none !important; }
+      .${BAR_CLASS4} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e03131;border-radius:8px;background:#fff5f5;color:#8f1d1d;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${BAR_CLASS4} button { margin-left:auto;padding:3px 10px;border:1px solid #c92a2a;border-radius:6px;background:#fff;color:#8f1d1d;font:inherit;cursor:pointer; }
     `;
       document.head.appendChild(style);
     }
     function clearAll() {
       document.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       document.querySelectorAll(`tr[${SKULL_ATTR}]`).forEach((row2) => row2.removeAttribute(SKULL_ATTR));
+      document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row2) => row2.removeAttribute(HIDDEN_ATTR));
+      document.querySelectorAll(`.${BAR_CLASS4}`).forEach((bar) => bar.remove());
       queue.length = 0;
       queued.clear();
     }
@@ -6945,6 +6964,33 @@
       if (badge.title !== view.title) badge.title = view.title;
       if (view.skull) item.row.setAttribute(SKULL_ATTR, "");
       else item.row.removeAttribute(SKULL_ATTR);
+      if (view.hide && !showHidden) item.row.setAttribute(HIDDEN_ATTR, "");
+      else item.row.removeAttribute(HIDDEN_ATTR);
+    }
+    function renderHiddenBar(items, hiddenCount) {
+      const table = items[0]?.row?.closest("table") || null;
+      let bar = document.querySelector(`.${BAR_CLASS4}`);
+      if (!table || !hiddenCount) {
+        bar?.remove();
+        return;
+      }
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.className = BAR_CLASS4;
+        bar.innerHTML = '<span></span><button type="button"></button>';
+        bar.querySelector("button").addEventListener("click", () => {
+          showHidden = !showHidden;
+          scheduleRender();
+        });
+      }
+      if (bar.nextElementSibling !== table) table.insertAdjacentElement("beforebegin", bar);
+      const label2 = hiddenCount === 1 ? "1 ortsgebundenes Match" : `${hiddenCount} ortsgebundene Matches`;
+      const text = `💀 ${label2} mit über ${SKULL_MINUTES} Min Fahrzeit ${showHidden ? "eingeblendet (ausgegraut)" : "ausgeblendet"}`;
+      const buttonText = showHidden ? "Wieder ausblenden" : "Anzeigen";
+      const span = bar.querySelector("span");
+      const button2 = bar.querySelector("button");
+      if (span.textContent !== text) span.textContent = text;
+      if (button2.textContent !== buttonText) button2.textContent = buttonText;
     }
     function isRowVisible(row2) {
       return row2.isConnected && row2.getClientRects().length > 0;
@@ -6999,7 +7045,8 @@
       return void 0;
     }
     function render() {
-      if (!findPage(location.hash || "", pageKeys)) {
+      const page = findPage(location.hash || "", pageKeys);
+      if (!page) {
         clearAll();
         return;
       }
@@ -7017,6 +7064,7 @@
         });
       }
       const candidateLocations = /* @__PURE__ */ new Map();
+      let hiddenCount = 0;
       for (const item of items) {
         if (!candidateLocations.has(item.candidateId)) {
           candidateLocations.set(item.candidateId, candidateLocationFor(provider, item.candidateId));
@@ -7038,12 +7086,16 @@
           continue;
         }
         const entry = job && candidateLocation ? getCachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : null;
-        renderBadge(item, describeCommute(commuteClass, entry));
+        const view = describeCommute(commuteClass, entry);
+        view.hide = Boolean(page.hideSkulls && view.skull && isSurelyLocal(job));
+        if (view.hide) hiddenCount += 1;
+        renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
         if (job && candidateLocation && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS4) {
           enqueue(item.candidateId);
         }
       }
+      if (page.hideSkulls) renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {
       if (scheduled) return;
@@ -7055,8 +7107,8 @@
     }
     runtime.createMutationObserver((mutations) => {
       const foreign = mutations.some((mutation) => {
-        if (mutation.target?.closest?.(`.${BADGE_CLASS2}`)) return false;
-        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.classList?.contains(BADGE_CLASS2));
+        if (mutation.target?.closest?.(OWNED_SELECTOR)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(OWNED_SELECTOR));
       });
       if (foreign) scheduleRender();
     }).observe(document.body, { childList: true, subtree: true });

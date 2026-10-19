@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.12.233
+// @version      1.14.235
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1734,10 +1734,10 @@
       ));
       const legend = el2("div", { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px", marginTop: "12px" });
       Object.keys(HELP_KINDS).filter((kind) => topics.some((topic) => topic.kind === kind)).forEach((kind) => {
-        const row = el2("div", { display: "grid", gap: "4px", padding: "10px 12px", border: `1px solid ${COLORS2.border}`, borderRadius: "10px", background: COLORS2.surface });
-        row.append(kindChip(kind), el2("div", { font: `400 12px/1.5 ${FONT2}`, color: COLORS2.muted }, HELP_KINDS[kind].explain));
-        row.firstChild.style.justifySelf = "start";
-        legend.appendChild(row);
+        const row2 = el2("div", { display: "grid", gap: "4px", padding: "10px 12px", border: `1px solid ${COLORS2.border}`, borderRadius: "10px", background: COLORS2.surface });
+        row2.append(kindChip(kind), el2("div", { font: `400 12px/1.5 ${FONT2}`, color: COLORS2.muted }, HELP_KINDS[kind].explain));
+        row2.firstChild.style.justifySelf = "start";
+        legend.appendChild(row2);
       });
       content.appendChild(legend);
       if (here.length) content.appendChild(section("Auf dieser Seite", here.map((topic) => topicCard(topic, topic.id === topicId))));
@@ -2333,15 +2333,134 @@
     return providers.get(graphqlAdapter);
   }
 
-  // ../../shared/js/employer-notes/index.js
-  var STYLE_ID = "werkia-agn-style-v1";
-  var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
+  // ../../shared/js/match-dialog-top/core.js
+  var TOP_SLOTS = Object.freeze({
+    "contact-person": 10,
+    "employer-notes": 20
+  });
+  function slotOrder(id) {
+    return TOP_SLOTS[id] ?? 100;
+  }
+  var CONTACT_PEOPLE_QUERY = `query WerkiaMatchDialogContacts($employerId: UUID) {
+  items: allMatchContactPeople(filter: { employerId: $employerId }, perPage: 100) {
+    id name surname gender isMain phoneNumbers email __typename
+  }
+}`;
+  var clean = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+  function contactName(contact) {
+    return [contact?.name, contact?.surname].map(clean).filter(Boolean).join(" ");
+  }
+  function contactPhones(contact) {
+    const list = Array.isArray(contact?.phoneNumbers) ? contact.phoneNumbers : [];
+    return [...new Set(list.map(clean).filter(Boolean))];
+  }
+  function contactEmail(contact) {
+    return clean(contact?.email);
+  }
+  function pickMainContact(contacts) {
+    const list = (contacts || []).filter((contact) => contact && (contact.id || contactName(contact)));
+    if (!list.length) return null;
+    const chosen = list.find((contact) => contact.isMain) || list[0];
+    const name = contactName(chosen);
+    const twins = name ? list.filter((contact) => contactName(contact).toLowerCase() === name.toLowerCase()) : [chosen];
+    const phones = contactPhones(chosen).length ? contactPhones(chosen) : twins.map(contactPhones).find((found) => found.length) || [];
+    const email = contactEmail(chosen) || twins.map(contactEmail).find(Boolean) || "";
+    const people = new Set(list.map((contact) => contactName(contact).toLowerCase() || contact.id));
+    return { id: String(chosen.id || ""), name, phones, email, isMain: Boolean(chosen.isMain), total: people.size };
+  }
+  function contactCopyText(contact) {
+    if (!contact) return "";
+    return [contact.name, ...contact.phones || [], contact.email].map(clean).filter(Boolean).join("\n");
+  }
+  function contactHint(contact) {
+    if (!contact) return "";
+    if (contact.isMain) return "Haupt-AP";
+    return contact.total > 1 ? `kein Haupt-AP markiert, erster von ${contact.total}` : "kein Haupt-AP markiert";
+  }
+  var CACHE_MS3 = 5 * 60 * 1e3;
+  function createContactPersonProvider({ request, employerIdForMatch = null, now = () => Date.now() }) {
+    const cache = /* @__PURE__ */ new Map();
+    function get(employerId, { fresh = false } = {}) {
+      const key = String(employerId || "");
+      if (!key) return Promise.resolve({ contact: null });
+      const hit = cache.get(key);
+      if (!fresh && hit && now() - hit.at < CACHE_MS3) return hit.promise;
+      const promise = Promise.resolve().then(() => request(CONTACT_PEOPLE_QUERY, { employerId: key })).then((data) => ({ contact: pickMainContact(data?.items || []) }));
+      cache.set(key, { at: now(), promise });
+      promise.catch(() => cache.delete(key));
+      return promise;
+    }
+    return {
+      get,
+      employerIdForMatch: (matchId) => employerIdForMatch ? employerIdForMatch(matchId) : Promise.resolve("")
+    };
+  }
+
+  // ../../shared/js/match-dialog-top/slots.js
+  var TOP_ATTRIBUTE = "data-werkia-match-dialog-top";
+  var SLOT_ATTRIBUTE = "data-werkia-mdt-slot";
+  var STYLE_ID = "werkia-mdt-top-style-v1";
   var EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"]';
+  var TITLE_SELECTOR = ".MuiDialogTitle-root, h1, h2";
+  var STYLE = `
+.werkia-mdt-top { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.werkia-mdt-top:empty, .werkia-mdt-slot:empty { display: none; }
+`;
+  function ensureStyle(doc) {
+    if (doc.getElementById(STYLE_ID)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = STYLE;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  function element(doc, tag, className) {
+    const node = doc.createElement(tag);
+    node.className = className;
+    return node;
+  }
+  function topPosition(dialog) {
+    const content = dialog.querySelector(".MuiDialogContent-root");
+    if (content) return { parent: content, after: null };
+    const title = [...dialog.children].find((child) => child.matches(TITLE_SELECTOR) || child.querySelector(TITLE_SELECTOR) && !child.querySelector(EDITOR_SELECTOR));
+    if (title) return { parent: dialog, after: title };
+    return { parent: dialog, after: null };
+  }
+  function placeTop(top, dialog) {
+    const { parent, after } = topPosition(dialog);
+    if (after) {
+      if (after.nextElementSibling !== top) after.after(top);
+    } else if (parent.firstElementChild !== top) {
+      parent.prepend(top);
+    }
+  }
+  function ensureTopSlot(dialog, id, doc = dialog.ownerDocument) {
+    ensureStyle(doc);
+    let top = dialog.querySelector(`[${TOP_ATTRIBUTE}]`);
+    if (!top) {
+      top = element(doc, "div", "werkia-mdt-top");
+      top.setAttribute(TOP_ATTRIBUTE, "");
+    }
+    placeTop(top, dialog);
+    let slot = [...top.children].find((child) => child.getAttribute(SLOT_ATTRIBUTE) === id);
+    if (!slot) {
+      slot = element(doc, "div", "werkia-mdt-slot");
+      slot.setAttribute(SLOT_ATTRIBUTE, id);
+    }
+    const order = slotOrder(id);
+    const next = [...top.children].find((child) => child !== slot && slotOrder(child.getAttribute(SLOT_ATTRIBUTE)) > order) || null;
+    if (slot.parentElement !== top || slot.nextElementSibling !== next) top.insertBefore(slot, next);
+    return slot;
+  }
+
+  // ../../shared/js/employer-notes/index.js
+  var STYLE_ID2 = "werkia-agn-style-v1";
+  var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
+  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
   var COMMENTS_BUTTON_SELECTOR = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var MATCH_LINK_SELECTOR = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR = 'a[href*="#/Employer/"]';
   var FONT3 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-  var STYLE = `
+  var STYLE2 = `
 .werkia-agn, .werkia-agn-pop, .werkia-agn-panel { font: 400 12px/1.45 ${FONT3}; color: #09090b; box-sizing: border-box; }
 .werkia-agn *, .werkia-agn-pop *, .werkia-agn-panel * { box-sizing: border-box; }
 .werkia-agn-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; font-size: 12px; color: #09090b; }
@@ -2359,7 +2478,11 @@
 .werkia-agn-chip b { font-weight: 700; color: #b85400; }
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
-.werkia-agn-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 8px 0; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
+.werkia-agn-panel[data-mode="read"] { display: block; }
+.werkia-agn-panel[data-mode="read"] .werkia-agn-list { max-height: 260px; overflow: auto; }
+.werkia-agn-more { margin-top: 6px; padding: 0; border: 0; background: transparent; color: #b85400; font: 600 11.5px/1.4 ${FONT3}; cursor: pointer; }
+.werkia-agn-more[hidden] { display: none; }
+.werkia-agn-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
 .werkia-agn-write { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .werkia-agn-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .werkia-agn-toggle { height: 26px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
@@ -2372,10 +2495,10 @@
 .werkia-agn-status[data-tone="error"] { color: #b52f2f; }
 `;
   function ensureEmployerNotesStyle(doc = document) {
-    if (doc.getElementById(STYLE_ID)) return;
+    if (doc.getElementById(STYLE_ID2)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = STYLE;
+    style.id = STYLE_ID2;
+    style.textContent = STYLE2;
     (doc.head || doc.documentElement).appendChild(style);
   }
   function matchIdFromHref(href) {
@@ -2384,24 +2507,24 @@
   function employerIdFromHref(href) {
     return String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
   }
-  function employerIdFromRow(row) {
-    return employerIdFromHref(row?.querySelector(EMPLOYER_LINK_SELECTOR)?.getAttribute("href"));
+  function employerIdFromRow(row2) {
+    return employerIdFromHref(row2?.querySelector(EMPLOYER_LINK_SELECTOR)?.getAttribute("href"));
   }
-  function matchIdFromRow(row) {
-    return matchIdFromHref(row?.querySelector(MATCH_LINK_SELECTOR)?.getAttribute("href"));
+  function matchIdFromRow(row2) {
+    return matchIdFromHref(row2?.querySelector(MATCH_LINK_SELECTOR)?.getAttribute("href"));
   }
-  function element(doc, tag, className, text) {
+  function element2(doc, tag, className, text) {
     const node = doc.createElement(tag);
     if (className) node.className = className;
     if (text !== void 0) node.textContent = text;
     return node;
   }
   function renderNote(doc, note, currentTag) {
-    const item = element(doc, "li", "werkia-agn-note");
-    const meta = element(doc, "div", "werkia-agn-meta");
+    const item = element2(doc, "li", "werkia-agn-note");
+    const meta = element2(doc, "div", "werkia-agn-meta");
     meta.append([formatNoteDate(note.createdAt), note.author].filter(Boolean).join(" · "));
-    for (const tag of note.tags.filter((tag2) => tag2 !== currentTag)) meta.append(element(doc, "span", "werkia-agn-tag", tag));
-    item.append(meta, element(doc, "div", "werkia-agn-text", note.text));
+    for (const tag of note.tags.filter((tag2) => tag2 !== currentTag)) meta.append(element2(doc, "span", "werkia-agn-tag", tag));
+    item.append(meta, element2(doc, "div", "werkia-agn-text", note.text));
     return item;
   }
   function watch(provider, node, getEmployerId2, reload) {
@@ -2414,18 +2537,23 @@
       if (employerId === getEmployerId2()) reload({ fresh: true });
     });
   }
-  function createEmployerNotesList({ provider, employerId = "", tag, limit = 3, document: doc = document, title, helpTip = null, hideWhenEmpty = false }) {
+  function createEmployerNotesList({ provider, employerId = "", tag = null, limit = 3, document: doc = document, title, helpTip = null, hideWhenEmpty = false, expandable = false }) {
     ensureEmployerNotesStyle(doc);
-    const root = element(doc, "section", "werkia-agn");
-    const head = element(doc, "div", "werkia-agn-head");
-    const heading = element(doc, "span", "", title || `AG-Notizen · ${tag}`);
-    const count = element(doc, "small");
+    const root = element2(doc, "section", "werkia-agn");
+    const head = element2(doc, "div", "werkia-agn-head");
+    const heading = element2(doc, "span", "", title || (tag ? `AG-Notizen · ${tag}` : "AG-Kommentare"));
+    const count = element2(doc, "small");
     head.append(...[heading, count, helpTip].filter(Boolean));
-    const list = element(doc, "ol", "werkia-agn-list");
-    const empty = element(doc, "div", "werkia-agn-empty");
-    root.append(head, list, empty);
+    const list = element2(doc, "ol", "werkia-agn-list");
+    const empty = element2(doc, "div", "werkia-agn-empty");
+    const more = element2(doc, "button", "werkia-agn-more");
+    more.type = "button";
+    more.hidden = true;
+    root.append(head, list, empty, more);
     let current = String(employerId || "");
     let generation = 0;
+    let expanded = false;
+    let all = [];
     function show(notes, message = "") {
       list.replaceChildren(...notes.map((note) => renderNote(doc, note, tag)));
       empty.textContent = message;
@@ -2440,17 +2568,30 @@
       }
       if (!list.children.length) show([], "Wird geladen …");
       try {
-        const all = notesWithTag(await provider.list(current, { fresh }), tag);
+        const notes = await provider.list(current, { fresh });
         if (mine !== generation) return;
-        const shown = all.slice(0, limit);
-        count.textContent = all.length > shown.length ? `${shown.length} von ${all.length}` : "";
-        show(shown, shown.length ? "" : `Keine Notiz mit Tag ${tag}.`);
+        all = tag ? notesWithTag(notes, tag) : notes;
+        showLoaded();
       } catch (error) {
         if (mine !== generation) return;
         console.warn("[AG-Notizen]", error);
-        show([], "AG-Notizen konnten nicht geladen werden.");
+        all = [];
+        more.hidden = true;
+        show([], tag ? "AG-Notizen konnten nicht geladen werden." : "AG-Kommentare konnten nicht geladen werden.");
       }
     }
+    function showLoaded() {
+      const shown = expanded ? all : all.slice(0, limit);
+      count.textContent = all.length > shown.length ? `${shown.length} von ${all.length}` : tag || !all.length ? "" : String(all.length);
+      more.hidden = !expandable || all.length <= limit;
+      more.textContent = expanded ? "Weniger zeigen" : `Alle ${all.length} zeigen`;
+      show(shown, shown.length ? "" : tag ? `Keine Notiz mit Tag ${tag}.` : "Keine Arbeitgeberkommentare.");
+    }
+    more.addEventListener("click", (event) => {
+      event.preventDefault();
+      expanded = !expanded;
+      showLoaded();
+    });
     watch(provider, root, () => current, load2);
     load2();
     return {
@@ -2459,6 +2600,7 @@
         const value = String(next || "");
         if (value === current) return;
         current = value;
+        expanded = false;
         list.replaceChildren();
         load2();
       },
@@ -2476,14 +2618,14 @@
   }
   function openPopover(doc, chip, notes, tag) {
     closePopover(doc);
-    const pop = element(doc, "div", "werkia-agn-pop");
+    const pop = element2(doc, "div", "werkia-agn-pop");
     pop.setAttribute("role", "dialog");
-    const head = element(doc, "div", "werkia-agn-head");
-    const close = element(doc, "button", "werkia-agn-close", "✕");
+    const head = element2(doc, "div", "werkia-agn-head");
+    const close = element2(doc, "button", "werkia-agn-close", "✕");
     close.type = "button";
     close.setAttribute("aria-label", "Schließen");
-    head.append(element(doc, "span", "", `AG-Notizen · ${tag}`), close);
-    const list = element(doc, "ol", "werkia-agn-list");
+    head.append(element2(doc, "span", "", `AG-Notizen · ${tag}`), close);
+    const list = element2(doc, "ol", "werkia-agn-list");
     list.append(...notes.map((note) => renderNote(doc, note, tag)));
     pop.append(head, list);
     doc.body.appendChild(pop);
@@ -2515,11 +2657,11 @@
   }
   function createEmployerNoteBadge({ provider, employerId, tag, document: doc = document }) {
     ensureEmployerNotesStyle(doc);
-    const root = element(doc, "span", "werkia-agn-badge");
+    const root = element2(doc, "span", "werkia-agn-badge");
     root.hidden = true;
     root.dataset.employerId = String(employerId || "");
     root.dataset.tag = tag;
-    const chip = element(doc, "button", "werkia-agn-chip");
+    const chip = element2(doc, "button", "werkia-agn-chip");
     chip.type = "button";
     chip.setAttribute("aria-expanded", "false");
     root.appendChild(chip);
@@ -2539,7 +2681,7 @@
         console.warn("[AG-Notizen]", error);
         notes = [];
       }
-      chip.replaceChildren(doc.createTextNode(`${tag} `), element(doc, "b", "", String(notes.length)));
+      chip.replaceChildren(doc.createTextNode(`${tag} `), element2(doc, "b", "", String(notes.length)));
       const latest = notes[0];
       chip.title = latest ? `${notes.length} AG-${notes.length === 1 ? "Notiz" : "Notizen"} mit Tag ${tag}. Neueste: ${latest.text.slice(0, 140)}` : "";
       root.hidden = !notes.length;
@@ -2549,7 +2691,7 @@
     return root;
   }
   function findMatchCommentsDialog(doc = document) {
-    const dialogs = [...doc.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR));
+    const dialogs = [...doc.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR2));
     return dialogs[dialogs.length - 1] || null;
   }
   function tiptapOf(editorElement) {
@@ -2582,7 +2724,7 @@
       page,
       routes,
       kind: "write",
-      summary: "Im Matchkommentar-Dialog stehen unter dem Kommentarfeld die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
+      summary: "Oben im Matchkommentar-Dialog, unter dem Ansprechpartner, stehen die letzten AG-Notizen mit Tag „Matches“. Mit „Als AG-Notiz speichern“ wird der Text aus dem Kommentarfeld zusätzlich als Arbeitgeberkommentar gespeichert. Der Matchkommentar bleibt stehen.",
       steps: [
         "Den Text wie gewohnt ins Kommentarfeld schreiben.",
         "Wenn gewünscht, darunter einen oder mehrere Tags wählen: Matches, AP, Vakanzen oder Prozess.",
@@ -2597,26 +2739,17 @@
       ]
     };
   }
-  function editorBoxFor(editor, dialog) {
-    let box = editor;
-    for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
-      const parent = box.parentElement;
-      if (parent.querySelector('[role="toolbar"], .MuiToolbar-root, button[title*="format" i]')) return parent;
-      box = parent;
-    }
-    return box;
-  }
   function placePanel(panel, dialog) {
-    const editor = dialog.querySelector(EDITOR_SELECTOR);
-    if (!editor) return;
-    const box = editorBoxFor(editor, dialog);
-    if (box.nextElementSibling !== panel) box.after(panel);
+    const slot = ensureTopSlot(dialog, "employer-notes", dialog.ownerDocument);
+    if (panel.parentElement !== slot) slot.appendChild(panel);
   }
   function executeEmployerNotesDialog(runtime, {
     getProvider,
     sourcePath,
     helpTip = () => null,
-    owner = "toolbox"
+    owner = "toolbox",
+    readOnly = false,
+    limit = readOnly ? 5 : 3
   } = {}) {
     if (sourcePath) runtime.registerSource(sourcePath);
     let clicked = { matchId: "", employerId: "" };
@@ -2635,19 +2768,21 @@
     function setStatus(text, tone = "") {
       if (!state) return;
       const status = state.panel.querySelector(".werkia-agn-status");
+      if (!status) return;
       if (status.textContent !== text) status.textContent = text;
       if ((status.dataset.tone || "") !== tone) status.dataset.tone = tone;
     }
     function updateSaveState() {
       if (!state) return;
       const button4 = state.panel.querySelector(".werkia-agn-save");
+      if (!button4) return;
       const disabled = state.saving || !state.employerId;
       if (button4.disabled !== disabled) button4.disabled = disabled;
     }
     async function save() {
       if (!state || state.saving) return;
       const current = state;
-      const editor = current.dialog.querySelector(EDITOR_SELECTOR);
+      const editor = current.dialog.querySelector(EDITOR_SELECTOR2);
       const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button4) => button4.dataset.tag);
       const text = editor ? editorText(editor) : "";
       if (!text) {
@@ -2675,14 +2810,20 @@
       }
     }
     function buildPanel(notesProvider) {
-      const panel = element(document, "aside", "werkia-agn-panel");
+      const panel = element2(document, "aside", "werkia-agn-panel");
       panel.setAttribute(PANEL_ATTRIBUTE, owner);
-      const list = createEmployerNotesList({ provider: notesProvider, tag: "Matches", limit: 3, document, helpTip: helpTip() });
-      const write = element(document, "div", "werkia-agn-write");
-      const head = element(document, "div", "werkia-agn-head", "Als AG-Notiz speichern");
-      const tags = element(document, "div", "werkia-agn-tags");
+      panel.dataset.mode = readOnly ? "read" : "write";
+      if (readOnly) {
+        const list2 = createEmployerNotesList({ provider: notesProvider, tag: null, limit, document, helpTip: helpTip(), expandable: true });
+        panel.append(list2.element, element2(document, "div", "werkia-agn-status"));
+        return { panel, list: list2 };
+      }
+      const list = createEmployerNotesList({ provider: notesProvider, tag: "Matches", limit, document, helpTip: helpTip() });
+      const write = element2(document, "div", "werkia-agn-write");
+      const head = element2(document, "div", "werkia-agn-head", "Als AG-Notiz speichern");
+      const tags = element2(document, "div", "werkia-agn-tags");
       for (const tag of NOTE_TAGS) {
-        const toggle = element(document, "button", "werkia-agn-toggle", tag.label);
+        const toggle = element2(document, "button", "werkia-agn-toggle", tag.label);
         toggle.type = "button";
         toggle.dataset.tag = tag.id;
         toggle.title = `Erscheint ${tag.hint}`;
@@ -2694,14 +2835,14 @@
         });
         tags.appendChild(toggle);
       }
-      const button4 = element(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
+      const button4 = element2(document, "button", "werkia-agn-save", "Als AG-Notiz speichern");
       button4.type = "button";
       button4.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
-      const hint = element(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
-      write.append(head, tags, button4, element(document, "div", "werkia-agn-status"), hint);
+      const hint = element2(document, "div", "werkia-agn-hint", "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.");
+      write.append(head, tags, button4, element2(document, "div", "werkia-agn-status"), hint);
       panel.append(list.element, write);
       return { panel, list };
     }
@@ -2732,7 +2873,10 @@
       }
       const host = dialog;
       const foreign = host.querySelector(`[${PANEL_ATTRIBUTE}]`);
-      if (foreign && foreign !== state?.panel) return;
+      if (foreign && foreign !== state?.panel) {
+        if (readOnly || foreign.dataset.mode !== "read") return;
+        foreign.remove();
+      }
       const target = currentTarget();
       if (state && (state.dialog !== dialog || state.matchId !== target.matchId)) teardown();
       if (!state) {
@@ -2764,12 +2908,1094 @@
     runtime.addDocumentListener("click", (event) => {
       const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
       if (!button4) return;
-      const row = button4.closest("tr");
-      clicked = { matchId: matchIdFromRow(row), employerId: employerIdFromRow(row) };
+      const row2 = button4.closest("tr");
+      clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
       schedule();
     }, true);
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("resize", schedule);
+    schedule();
+  }
+
+  // ../../shared/js/match-dialog-top/index.js
+  var STYLE_ID3 = "werkia-mdt-style-v1";
+  var BLOCK_ATTRIBUTE = "data-werkia-mdt-ap";
+  var FONT4 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var COPY_ICON_PATH = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
+  var STYLE3 = `
+.werkia-mdt-ap { font: 400 12px/1.45 ${FONT4}; color: #09090b; box-sizing: border-box; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
+.werkia-mdt-ap * { box-sizing: border-box; }
+.werkia-mdt-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; }
+.werkia-mdt-head small { font-weight: 500; color: #8b8b94; }
+.werkia-mdt-head small[data-tone="warn"] { color: #b85400; }
+.werkia-mdt-all { margin-left: auto; height: 24px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT4}; cursor: copy; }
+.werkia-mdt-all:hover, .werkia-mdt-all[data-copied="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+.werkia-mdt-all[hidden] { display: none; }
+.werkia-mdt-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.werkia-mdt-field { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.werkia-mdt-label { color: #8b8b94; font-size: 11px; }
+.werkia-mdt-value { overflow-wrap: anywhere; }
+.werkia-mdt-value[data-empty="true"] { color: #8b8b94; }
+.werkia-mdt-copy { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #52525b; cursor: copy; }
+.werkia-mdt-copy:hover { border-color: #d4d4d8; background: #fff; }
+.werkia-mdt-copy[data-copied="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+.werkia-mdt-copy svg { width: 13px; height: 13px; fill: currentColor; }
+.werkia-mdt-msg { color: #8b8b94; }
+.werkia-mdt-msg[data-tone="error"] { color: #b52f2f; }
+.werkia-mdt-msg:empty { display: none; }
+`;
+  function ensureMatchDialogTopStyle(doc = document) {
+    if (doc.getElementById(STYLE_ID3)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID3;
+    style.textContent = STYLE3;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  function element3(doc, tag, className, text) {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text !== void 0) node.textContent = text;
+    return node;
+  }
+  function copyIcon(doc) {
+    const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", COPY_ICON_PATH);
+    svg.appendChild(path);
+    return svg;
+  }
+  async function copyToClipboard(text, doc = document) {
+    try {
+      await doc.defaultView.navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const helper = doc.createElement("textarea");
+      helper.value = text;
+      doc.body.appendChild(helper);
+      helper.select();
+      let ok = false;
+      try {
+        ok = doc.execCommand("copy");
+      } catch {
+        ok = false;
+      }
+      helper.remove();
+      return ok;
+    }
+  }
+  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms) => setTimeout(fn, ms) } = {}) {
+    ensureMatchDialogTopStyle(doc);
+    const root = element3(doc, "section", "werkia-mdt-ap");
+    const head = element3(doc, "div", "werkia-mdt-head");
+    const hint = element3(doc, "small");
+    const all = element3(doc, "button", "werkia-mdt-all", "Alles kopieren");
+    all.type = "button";
+    all.hidden = true;
+    head.append(...[element3(doc, "span", "", "Ansprechpartner"), hint, helpTip, all].filter(Boolean));
+    const fields = element3(doc, "div", "werkia-mdt-fields");
+    const msg = element3(doc, "div", "werkia-mdt-msg");
+    root.append(head, fields, msg);
+    function flash(button4) {
+      button4.dataset.copied = "true";
+      later(() => {
+        delete button4.dataset.copied;
+      }, 1500);
+    }
+    function copyButton(text, what) {
+      const button4 = element3(doc, "button", "werkia-mdt-copy");
+      button4.type = "button";
+      button4.title = `${what} kopieren`;
+      button4.setAttribute("aria-label", `${what} kopieren`);
+      button4.dataset.copy = text;
+      button4.appendChild(copyIcon(doc));
+      button4.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (await copyToClipboard(text, doc)) flash(button4);
+      });
+      return button4;
+    }
+    function field(label, value, what) {
+      const node = element3(doc, "span", "werkia-mdt-field");
+      const valueNode = element3(doc, "span", "werkia-mdt-value", value || "–");
+      if (!value) valueNode.dataset.empty = "true";
+      node.append(element3(doc, "span", "werkia-mdt-label", label), valueNode);
+      if (value) node.appendChild(copyButton(value, what));
+      return node;
+    }
+    let allText = "";
+    all.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (allText && await copyToClipboard(allText, doc)) flash(all);
+    });
+    function showMessage(text, tone = "") {
+      fields.replaceChildren();
+      hint.textContent = "";
+      delete hint.dataset.tone;
+      allText = "";
+      all.hidden = true;
+      msg.textContent = text;
+      msg.dataset.tone = tone;
+    }
+    function showContact(contact) {
+      if (!contact) {
+        showMessage("Kein Ansprechpartner beim Arbeitgeber hinterlegt.");
+        return;
+      }
+      msg.textContent = "";
+      msg.dataset.tone = "";
+      hint.textContent = contactHint(contact);
+      if (contact.isMain) delete hint.dataset.tone;
+      else hint.dataset.tone = "warn";
+      const phones = contact.phones?.length ? contact.phones : [""];
+      fields.replaceChildren(
+        field("Name", contact.name, "Name"),
+        ...phones.map((phone, index) => field(phones.length > 1 ? `Telefon ${index + 1}` : "Telefon", phone, "Telefonnummer")),
+        field("E-Mail", contact.email, "E-Mail")
+      );
+      allText = contactCopyText(contact);
+      all.hidden = !allText;
+    }
+    return { element: root, showMessage, showContact };
+  }
+  function matchContactPersonTopic({ id = "match-contact-person", page, routes }) {
+    return {
+      id,
+      title: "Ansprechpartner im Matchkommentar-Dialog",
+      page,
+      routes,
+      kind: "view",
+      summary: "Ganz oben im Matchkommentar-Dialog steht der Hauptansprechpartner des Arbeitgebers mit Name, Telefonnummer und E-Mail. Jeder Wert hat einen Kopierknopf, „Alles kopieren“ nimmt alles auf einmal.",
+      notes: [
+        "Haupt-AP ist der Ansprechpartner, der im Adminpanel als Haupt-Ansprechpartner markiert ist. Ist keiner markiert, steht der erste dort, mit dem Hinweis „kein Haupt-AP markiert“.",
+        "„Alles kopieren“ legt Name, Telefonnummer und E-Mail untereinander in die Zwischenablage. Was fehlt, fällt weg.",
+        "„AP nicht lesbar“ heißt, dass das Adminpanel die Ansprechpartner für deine Anmeldung nicht herausgibt. Im Arbeitgeberprofil nachsehen.",
+        "Die Daten werden 5 Minuten zwischengespeichert. Am Arbeitgeber ändert sich nichts."
+      ]
+    };
+  }
+  var providers2 = /* @__PURE__ */ new WeakMap();
+  function contactPersonProviderFor(graphqlAdapter) {
+    if (!providers2.has(graphqlAdapter)) {
+      providers2.set(graphqlAdapter, createContactPersonProvider({
+        request: graphqlAdapter.request,
+        employerIdForMatch: (matchId) => employerNotesProviderFor(graphqlAdapter).employerIdForMatch(matchId)
+      }));
+    }
+    return providers2.get(graphqlAdapter);
+  }
+  function executeMatchContactPerson(runtime, {
+    getProvider,
+    sourcePath,
+    helpTip = () => null,
+    owner = "toolbox"
+  } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    let clicked = { matchId: "", employerId: "" };
+    let state = null;
+    function currentTarget() {
+      if (clicked.matchId || clicked.employerId) return clicked;
+      return { matchId: matchIdFromHref(location.hash), employerId: "" };
+    }
+    function teardown() {
+      state?.block.element.remove();
+      state = null;
+    }
+    function load2(current, employerId) {
+      if (!employerId) {
+        current.block.showMessage("Arbeitgeber zu diesem Match nicht gefunden.", "error");
+        return;
+      }
+      current.block.showMessage("Wird geladen …");
+      current.provider.get(employerId).then(({ contact }) => {
+        if (state !== current) return;
+        current.block.element.removeAttribute("title");
+        current.block.showContact(contact);
+      }, (error) => {
+        console.warn("[AP im Matchkommentar]", error);
+        if (state !== current) return;
+        current.block.showMessage("AP nicht lesbar.", "error");
+        current.block.element.title = String(error?.message || error || "");
+      });
+    }
+    function render() {
+      const dialog = findMatchCommentsDialog(document);
+      if (!dialog) {
+        if (state) {
+          teardown();
+          clicked = { matchId: "", employerId: "" };
+        }
+        return;
+      }
+      const foreign = dialog.querySelector(`[${BLOCK_ATTRIBUTE}]`);
+      if (foreign && foreign !== state?.block.element) return;
+      const target = currentTarget();
+      if (state && (state.dialog !== dialog || state.matchId !== target.matchId)) teardown();
+      if (!state) {
+        let provider = null;
+        try {
+          provider = getProvider();
+        } catch {
+          provider = null;
+        }
+        if (!provider) return;
+        const block = createContactPersonBlock({ document, helpTip: helpTip(), later: (fn, ms) => runtime.setTimeout(fn, ms) });
+        block.element.setAttribute(BLOCK_ATTRIBUTE, owner);
+        const current = { block, dialog, provider, matchId: target.matchId };
+        state = current;
+        if (target.employerId) load2(current, target.employerId);
+        else if (target.matchId) {
+          block.showMessage("Arbeitgeber wird ermittelt …");
+          provider.employerIdForMatch(target.matchId).then((id) => {
+            if (state === current) load2(current, id);
+          }, (error) => {
+            console.warn("[AP im Matchkommentar]", error);
+            if (state === current) block.showMessage("Arbeitgeber konnte nicht ermittelt werden.", "error");
+          });
+        } else {
+          block.showMessage("Match nicht erkannt. Den Dialog über den Kommentar-Knopf der Zeile öffnen.", "error");
+        }
+      }
+      const slot = ensureTopSlot(dialog, "contact-person", document);
+      if (state.block.element.parentElement !== slot) slot.appendChild(state.block.element);
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    };
+    runtime.addDocumentListener("click", (event) => {
+      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button4) return;
+      const row2 = button4.closest("tr");
+      clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
+      schedule();
+    }, true);
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    schedule();
+  }
+
+  // ../../shared/js/werkia-graphql/questionnaire-provider.js
+  var MATCH_SELECTION = `
+    distance
+    id
+    candidate {
+      id
+      firstName
+      lastName
+      desiredTravel
+      driversLicense
+      employmentType
+      germanSpeakingLevel
+      hasCar
+      jobAreas
+      otherNotes
+      recognitionStatus
+      salaryExpectation
+      yearsOfExperience
+      noGoEmployers { id __typename }
+      jobTitles { education jobTitle { id title __typename } __typename }
+      __typename
+    }
+    jobPosition {
+      id
+      mainTitle
+      subTitle
+      employmentTypes
+      frequencyOfTravel
+      jobAreas
+      requiredDriversLicense
+      requiredGermanSpeakingLevel
+      requiredYearsOfExperience
+      salaryHigh
+      salaryLow
+      jobTitles { id title __typename }
+      employer {
+        id
+        name
+        apprenticeshipAllowed
+        careerChangersAllowed
+        carRequired
+        cemNotes
+        cv
+        driversLicenseRequired
+        employmentTypesOffered
+        foreignQualificationsAllowed
+        germanSpeakingLevel
+        maximumDistanceOfCandidate
+        omNotes
+        referencesForFirstInterviewRequired
+        trainingCertificateForFirstInterview
+        trainingRequired
+        willingnessToTravel
+        yearsOfExperience
+        __typename
+      }
+      __typename
+    }
+    __typename`;
+  var MATCH_QUESTIONNAIRE_QUERY = `query Match($id: UUID!) {
+  data: Match(id: $id) {${MATCH_SELECTION}
+  }
+}`;
+  var MATCHES_QUESTIONNAIRE_QUERY = `query allMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
+  items: allMatches(filter: $filter, page: $page, perPage: $perPage) {${MATCH_SELECTION}
+  }
+}`;
+
+  // ../../shared/js/werkia-questionnaire/job-title-catalog.js
+  var JOB_TITLE_CATALOG = [
+    { slug: "auto_mechatronics_tech", name: "KFZ-Mechatroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "azubi_electronic", name: "Azubi Elektrotechnik", workArea: ["electrical"], education: ["none"] },
+    { slug: "azubi_shk", name: "Azubi SHK", workArea: ["shc"], education: ["none"] },
+    { slug: "bachelor_computer_science", name: "Bachelor Informatik", workArea: ["electrical"], education: ["master"] },
+    { slug: "bachelor_electrical_engineering", name: "Bachelor Elektrotechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "bachelor_electrical_info_tech", name: "Bachelor Elektro- und Informationstechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "central_hvac_engineer", name: "Zentralheizungs- und Lüftungsbauer", workArea: ["shc"], education: ["in_progress", "finished"] },
+    { slug: "electrician", name: "Elektroinstallateur", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_automation", name: "Elektroniker für Automatisierungstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_devices_systems", name: "Elektroniker für Geräte und Systeme", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_energy_building", name: "Elektroniker für Energie- und Gebäudetechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_industrial", name: "Elektroniker für Betriebstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_info_telecom", name: "Elektroniker für Informations- und Telekommunikationstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "electronic_tech_machine_drive", name: "Elektroniker für Maschinen- und Antriebstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "energy_system_electronic_tech", name: "Energieanlagenelektroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "gas_water_installer", name: "Gas- und Wasserinstallateur", workArea: ["shc"], education: ["in_progress", "finished"] },
+    { slug: "industrial_electronic_tech", name: "Industrieelektroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "industrial_mechanic", name: "Industriemechaniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "master_computer_science", name: "Master Informatik", workArea: ["electrical"], education: ["master"] },
+    { slug: "master_electrical_engineering", name: "Master Elektrotechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "master_electrical_info_tech", name: "Master Elektro- und Informationstechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "mechatronics_tech", name: "Mechatroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
+    { slug: "mechatronics_tech_refrigeration", name: "Mechatroniker für Kältetechnik", workArea: ["shc"], education: ["in_progress", "finished"] },
+    { slug: "meister_communication", name: "Meister Kommunikations & Sicherheitstechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "meister_electrical_engineering", name: "Meister Elektrotechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "meister_energy", name: "Meister Energie- & Gebäudetechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "meister_refrigeration_tech", name: "Meister Kältetechnik", workArea: ["shc"], education: ["master"] },
+    { slug: "meister_shk", name: "Meister SHK", workArea: ["shc"], education: ["master"] },
+    { slug: "meister_system_electronics", name: "Meister Systemelektronik", workArea: ["electrical"], education: ["master"] },
+    { slug: "miscellaneous_electronic", name: "Sonstiges Elektrotechnik", workArea: ["electrical"], education: ["none", "in_progress", "finished", "master"] },
+    { slug: "miscellaneous_shk", name: "Sonstiges SHK", workArea: ["shc"], education: ["none", "in_progress", "finished", "master"] },
+    { slug: "plant_mechanic_shk", name: "Anlagenmechaniker SHK", workArea: ["shc"], education: ["in_progress", "finished"] },
+    { slug: "refrigeration_system_builder", name: "Kälteanlagenbauer", workArea: ["shc"], education: ["in_progress", "finished"] },
+    { slug: "state_certified_tech_electronic", name: "Staatlich Geprüfter Techniker Elektrotechnik", workArea: ["electrical"], education: ["master"] },
+    { slug: "state_certified_tech_shk", name: "Staatlich Geprüfter Techniker SHK", workArea: ["shc"], education: ["master"] },
+    { slug: "tool_mechanic", name: "Werkzeugmechaniker", workArea: ["electrical"], education: ["in_progress", "finished"] }
+  ];
+  var JOB_TITLE_SLUGS = new Set(JOB_TITLE_CATALOG.map((entry) => entry.slug));
+
+  // ../../shared/js/werkia-questionnaire/scoring.js
+  var GREEN = "#d8f5d0";
+  var RED = "#ffd6d6";
+  var YELLOW = "#fff3bf";
+  var ORANGE = "#ffd8a8";
+  function clean2(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+  function asciiFold(value) {
+    return String(value || "").replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/[ßẞ]/g, "ss");
+  }
+  function foldIfNeeded(value, fold2) {
+    return fold2 ? asciiFold(value) : value;
+  }
+  function isEmptyValue(value) {
+    const v = clean2(value);
+    return !v || v === "-" || v === "–" || v === "nicht angegeben" || v === "keine angabe";
+  }
+  function travelRank(value, { fold: fold2 = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold2);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold2));
+    if (has2("keine reisebereitschaft")) return 0;
+    if (has2("gering")) return 1;
+    if (has2("regelmäßig")) return 2;
+    if (has2("uneingeschränkt")) return 3;
+    return null;
+  }
+  function languageRank(value) {
+    const v = clean2(value);
+    if (v.includes("grundkenntnisse")) return 0;
+    if (v.includes("verhandlungssicher")) return 1;
+    if (v.includes("muttersprachlich")) return 2;
+    return null;
+  }
+  function experienceRank(value) {
+    const v = clean2(value);
+    if (v.includes("mehr als 10")) return 4;
+    if (v.includes("6 bis 10")) return 3;
+    if (v.includes("3 bis 5")) return 2;
+    if (v.includes("1 bis 2")) return 1;
+    if (v === "0 jahre" || v.includes("0 jahre (")) return 0;
+    return null;
+  }
+  function isLicenseRequired(value, { fold: fold2 = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold2);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold2));
+    if (isEmptyValue(value)) return null;
+    if (v === "nein" || has2("nicht erforderlich") || has2("kein führerschein erforderlich")) return false;
+    if (has2("ja") || has2("führerschein") || has2("klasse") || /\bb\b/.test(v)) return true;
+    return null;
+  }
+  function licenseStatus(value, { fold: fold2 = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold2);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold2));
+    if (isEmptyValue(value)) return "empty";
+    if (has2("fahrschule") || has2("wird gemacht") || has2("in ausbildung")) return "driving-school";
+    if (has2("kein") || has2("nein") || has2("nicht vorhanden") || has2("ohne führerschein")) return "no-license";
+    if (has2("ja") || has2("klasse") || /\bb\b/.test(v) || has2("vorhanden")) return "has-license";
+    return "empty";
+  }
+  function parseSalaryNumbers(text) {
+    const matches = String(text || "").match(/\d[\d.,]*/g);
+    if (!matches) return [];
+    return matches.map((num) => Number(num.replace(/\./g, "").replace(",", "."))).filter((num) => !Number.isNaN(num) && num > 100);
+  }
+  function salaryMax(text) {
+    const numbers = parseSalaryNumbers(text);
+    return numbers.length ? Math.max(...numbers) : null;
+  }
+  function rankColor(requiredRank, candidateRank, { allowAllIfZero = false, oneBelowColor } = {}) {
+    if (requiredRank === null || candidateRank === null) return null;
+    if (allowAllIfZero && requiredRank === 0) return GREEN;
+    if (candidateRank >= requiredRank) return GREEN;
+    if (candidateRank === requiredRank - 1) return oneBelowColor;
+    return RED;
+  }
+  function languageColor(requiredRank, candidateRank) {
+    return rankColor(requiredRank, candidateRank, { oneBelowColor: YELLOW });
+  }
+  function normalizePosition(value, { fold: fold2 = false } = {}) {
+    let v = clean2(value).replace(/&/g, "und").replace(/anlagemechaniker/g, "anlagenmechaniker").replace(/\s+/g, " ").trim();
+    if (fold2) v = asciiFold(v);
+    return v;
+  }
+  var POSITION_EQUIVALENT_GROUPS = [
+    ["plant_mechanic_shk", "central_hvac_engineer", "gas_water_installer"],
+    ["mechatronics_tech_refrigeration", "refrigeration_system_builder"],
+    ["electronic_tech_energy_building", "electrician"],
+    ["electronic_tech_industrial", "energy_system_electronic_tech"],
+    ["electronic_tech_devices_systems", "industrial_electronic_tech", "electronic_tech_machine_drive"],
+    ["electronic_tech_info_telecom", "electronic_tech_automation"],
+    ["industrial_mechanic", "tool_mechanic"],
+    ["auto_mechatronics_tech"],
+    ["meister_shk", "state_certified_tech_shk"],
+    ["meister_refrigeration_tech"],
+    ["meister_electrical_engineering", "meister_energy", "state_certified_tech_electronic"],
+    ["meister_system_electronics", "meister_communication"],
+    ["bachelor_computer_science", "bachelor_electrical_info_tech", "bachelor_electrical_engineering", "master_electrical_info_tech", "master_electrical_engineering", "master_computer_science"],
+    ["miscellaneous_shk"],
+    ["miscellaneous_electronic"],
+    ["central_hvac_engineer", "gas_water_installer", "mechatronics_tech_refrigeration", "refrigeration_system_builder"]
+  ];
+  var SLUG_BY_NAME = new Map(JOB_TITLE_CATALOG.map((entry) => [normalizePosition(entry.name), entry.slug]));
+  var SLUG_BY_FOLDED_NAME = new Map(JOB_TITLE_CATALOG.map((entry) => [normalizePosition(entry.name, { fold: true }), entry.slug]));
+  function toPositionSlug(normalized, fold2) {
+    if (!normalized) return "";
+    if (JOB_TITLE_SLUGS.has(normalized)) return normalized;
+    return (fold2 ? SLUG_BY_FOLDED_NAME : SLUG_BY_NAME).get(normalized) || "";
+  }
+  function positionMatches(employerPosition, candidatePosition, { fold: fold2 = false } = {}) {
+    const employerName = normalizePosition(employerPosition, { fold: fold2 });
+    const candidateName = normalizePosition(candidatePosition, { fold: fold2 });
+    if (!employerName || !candidateName || employerName === "-" || candidateName === "-") return false;
+    if (employerName === candidateName) return true;
+    const employer = toPositionSlug(employerName, fold2);
+    const candidate = toPositionSlug(candidateName, fold2);
+    if (!employer || !candidate) return false;
+    if (employer === "mechatronics_tech" || candidate === "mechatronics_tech") return false;
+    return POSITION_EQUIVALENT_GROUPS.some((group) => group.includes(employer) && group.includes(candidate));
+  }
+  var POSITION_REVIEW_GROUPS = [
+    {
+      employer: ["electronic_tech_energy_building", "electrician"],
+      candidate: ["electronic_tech_industrial"]
+    },
+    {
+      employer: ["electronic_tech_info_telecom", "electronic_tech_automation"],
+      candidate: ["electronic_tech_devices_systems", "electronic_tech_machine_drive"]
+    },
+    {
+      employer: ["mechatronics_tech_refrigeration", "refrigeration_system_builder"],
+      candidate: ["plant_mechanic_shk", "central_hvac_engineer"]
+    },
+    {
+      employer: ["electronic_tech_industrial", "electronic_tech_energy_building"],
+      candidate: ["electronic_tech_industrial", "electronic_tech_energy_building"]
+    },
+    {
+      employer: ["electronic_tech_industrial", "electrician"],
+      candidate: ["electronic_tech_industrial", "electrician"]
+    }
+  ];
+  function positionsNeedReview(employerPosition, candidatePosition, { fold: fold2 = false } = {}) {
+    const employerName = normalizePosition(employerPosition, { fold: fold2 });
+    const candidateName = normalizePosition(candidatePosition, { fold: fold2 });
+    if (!employerName || !candidateName || employerName === "-" || candidateName === "-") return false;
+    if (positionMatches(employerPosition, candidatePosition, { fold: fold2 })) return false;
+    const employer = toPositionSlug(employerName, fold2);
+    const candidate = toPositionSlug(candidateName, fold2);
+    if (!employer || !candidate) return false;
+    return POSITION_REVIEW_GROUPS.some((group) => group.employer.includes(employer) && group.candidate.includes(candidate));
+  }
+  function positionRelated(employerPosition, candidatePosition, options) {
+    return positionsNeedReview(employerPosition, candidatePosition, options);
+  }
+
+  // ../../shared/js/werkia-questionnaire/om-notes.js
+  function collapseWhitespace(value) {
+    return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function foldForTagMatching(value) {
+    return collapseWhitespace(value).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
+  }
+  function getOmNoteTags(value) {
+    const rawTags = [...String(value || "").matchAll(/\[([^\]]+)\]/g)].map((match) => collapseWhitespace(match[1])).filter(Boolean);
+    const normalizedTags = rawTags.map(foldForTagMatching);
+    const cvInstructions = rawTags.filter((tag, index) => /^cv(?:\s*,|\s*$)/i.test(tag) || normalizedTags[index].startsWith("cv,"));
+    return {
+      rawTags,
+      cvInstructions,
+      openOnly: normalizedTags.some((tag) => tag === "nur offen"),
+      noRvm: normalizedTags.some((tag) => /^kein\s+rvm$/.test(tag)),
+      // Beide Schreibweisen: die Flag-Leiste (shared/js/om-notes-templates)
+      // und docs/reference/om_flags.md schreiben [RVM:100%], aeltere Notizen
+      // [RVM: NUR 100%]. Bis 2026-09-24 erkannte der Parser nur die zweite -
+      // bei 9 von 14 Arbeitgebern mit dem Flag blieb es dadurch wirkungslos.
+      strictRvm: normalizedTags.some((tag) => /^rvm\s*:\s*(?:nur\s*)?100\s*%$/.test(tag))
+    };
+  }
+  function describeOmNoteTags(tags) {
+    const parts = [];
+    if (tags.openOnly) parts.push("[NUR OFFEN] nur offene Profile senden, bevorzugt vor normalen offenen Matches.");
+    if (tags.cvInstructions.length) parts.push(`CV-Hinweis: ${tags.cvInstructions.map((tag) => `[${tag}]`).join(", ")}`);
+    if (tags.strictRvm) parts.push("[RVM: NUR 100%] nur bei sehr sicherem Match senden.");
+    if (tags.noRvm) parts.push("[KEIN RVM] nicht als Reverse Match senden.");
+    return parts.join(" ");
+  }
+
+  // ../../shared/js/om-fragebogen-spalte/core.js
+  var STATUS_LABELS = Object.freeze({ ok: "passt", check: "prüfen", bad: "passt nicht" });
+  var VALUE_LABELS = Object.freeze({
+    experience: { none: "0 Jahre", one_to_two: "1 bis 2 Jahre", three_to_five: "3 bis 5 Jahre", six_to_ten: "6 bis 10 Jahre", ten_plus: "Mehr als 10 Jahre" },
+    travel: { none: "Keine Reisebereitschaft", low: "Gering (1–4 Tage)", regular: "Regelmäßig (5–15 Tage)", unrestricted: "Uneingeschränkt" },
+    language: { none: "Keine Kenntnisse", low: "Grundkenntnisse", mid: "Verhandlungssicher", high: "Muttersprachlich" },
+    license: { no: "Nein", in_driving_school: "In der Fahrschule", klass_b: "Klasse B", klass_c: "Klasse C", yes: "Ja", in_progress: "In der Fahrschule" },
+    recognition: { completed: "Ja, ist anerkannt", in_germany: "Ausbildung in Deutschland", in_progress: "In Anerkennung", not_yet_applied: "Noch nicht beantragt" },
+    employment: { full_time: "Vollzeit", part_time: "Teilzeit", apprenticeship: "Ausbildung", marginal: "Minijob", mini_job: "Minijob" },
+    education: { none: "ohne Ausbildung", in_progress: "in Ausbildung", finished: "abgeschlossen", master: "Meister/Studium" },
+    jobArea: {
+      maintenance_servicing: "Wartung und Instandhaltung",
+      energy_building_technology: "Energie- und Gebäudetechnik",
+      customer_service: "Kundendienst",
+      heating_technology: "Heizungstechnik",
+      climate_ventilation_technology: "Klima- und Lüftungstechnik",
+      sanitary_technology: "Sanitärtechnik",
+      site_project_management: "Bau- und Projektleitung",
+      operating_technology: "Betriebstechnik",
+      heat_pumps: "Wärmepumpen",
+      photovoltaics_solar: "Photovoltaik und Solar",
+      production_industry: "Produktion und Industrie",
+      refrigeration_technology: "Kältetechnik",
+      testing_technology: "Prüftechnik",
+      automation_control_technology: "Automatisierungs- und Steuerungstechnik",
+      mechatronics: "Mechatronik",
+      security_technology: "Sicherheitstechnik",
+      new_construction_renovation: "Neubau und Sanierung",
+      mechanics: "Mechanik",
+      control_cabinet_construction: "Schaltschrankbau",
+      communication_data_technology: "Kommunikations- und Datentechnik",
+      device_and_system_technology: "Geräte- und Systemtechnik",
+      landscape_gardening: "Garten- und Landschaftsbau",
+      automotive_mechanics: "Kfz-Mechatronik",
+      automotive_mechatronics: "Kfz-Mechatronik",
+      traffic_systems: "Verkehrssysteme"
+    }
+  });
+  var TITLE_NAMES = new Map(JOB_TITLE_CATALOG.map(({ slug, name }) => [slug, name]));
+  var EXPERIENCE_RANK = { none: 0, one_to_two: 1, three_to_five: 2, six_to_ten: 3, ten_plus: 4 };
+  var TRAVEL_RANK = { none: 0, low: 1, regular: 2, unrestricted: 3 };
+  var LANGUAGE_RANK = { none: -1, low: 0, mid: 1, high: 2 };
+  var has = (value) => value !== null && value !== void 0 && value !== "";
+  var rankOf = (table, value) => has(value) && Object.prototype.hasOwnProperty.call(table, value) ? table[value] : null;
+  function valueLabel(kind, value) {
+    if (!has(value)) return "";
+    return VALUE_LABELS[kind]?.[value] || String(value);
+  }
+  function jobTitleName(slug) {
+    return TITLE_NAMES.get(slug) || String(slug || "");
+  }
+  function formatEuro(amount) {
+    return `${Math.round(amount).toLocaleString("de-DE")} €`;
+  }
+  function salaryAmount(value) {
+    const amount = typeof value === "number" ? value : Number(String(value ?? "").replace(/[^\d]/g, "") || NaN);
+    return Number.isFinite(amount) && amount > 0 ? amount : null;
+  }
+  function row(key, label, required, candidate, status = "", note = "") {
+    return { key, label, required: required || "", candidate: candidate || "", status, note };
+  }
+  function compareRanks(required, candidate) {
+    if (required === null) return "";
+    if (candidate === null) return "check";
+    if (candidate >= required) return "ok";
+    return candidate === required - 1 ? "check" : "bad";
+  }
+  function withFallback(vacancyValue, employerValue) {
+    if (has(vacancyValue)) return { value: vacancyValue, fromEmployer: false };
+    if (has(employerValue)) return { value: employerValue, fromEmployer: true };
+    return { value: null, fromEmployer: false };
+  }
+  var FROM_EMPLOYER = "Vakanz ohne Angabe, Wert vom Arbeitgeber.";
+  function positionRow(jobPosition, candidate) {
+    const required = (jobPosition.jobTitles || []).map((entry) => entry?.title).filter(Boolean);
+    const own = (candidate.jobTitles || []).map((entry) => ({ slug: entry?.jobTitle?.title || "", education: entry?.education || "" })).filter((entry) => entry.slug);
+    const requiredText = required.map(jobTitleName).join(", ");
+    const candidateText = own.map((entry) => entry.education ? `${jobTitleName(entry.slug)} (${valueLabel("education", entry.education)})` : jobTitleName(entry.slug)).join(", ");
+    let status = "";
+    if (required.length) {
+      if (!own.length) status = "check";
+      else if (required.some((slug) => own.some((entry) => positionMatches(slug, entry.slug)))) status = "ok";
+      else if (required.some((slug) => own.some((entry) => positionRelated(slug, entry.slug)))) status = "check";
+      else status = "bad";
+    }
+    return row("position", "Position", requiredText, candidateText, status);
+  }
+  function experienceRow(jobPosition, employer, candidate) {
+    const { value, fromEmployer } = withFallback(jobPosition.requiredYearsOfExperience, employer.yearsOfExperience);
+    const required = rankOf(EXPERIENCE_RANK, value);
+    const status = required === 0 ? "ok" : compareRanks(required, rankOf(EXPERIENCE_RANK, candidate.yearsOfExperience));
+    return row("experience", "Berufserfahrung", valueLabel("experience", value), valueLabel("experience", candidate.yearsOfExperience), status, fromEmployer ? FROM_EMPLOYER : "");
+  }
+  function languageRow(jobPosition, employer, candidate) {
+    const { value, fromEmployer } = withFallback(jobPosition.requiredGermanSpeakingLevel, employer.germanSpeakingLevel);
+    const required = rankOf(LANGUAGE_RANK, value);
+    const status = required !== null && required < 0 ? "ok" : compareRanks(required, rankOf(LANGUAGE_RANK, candidate.germanSpeakingLevel));
+    return row("language", "Deutschkenntnisse", valueLabel("language", value), valueLabel("language", candidate.germanSpeakingLevel), status, fromEmployer ? FROM_EMPLOYER : "");
+  }
+  function travelRow(jobPosition, employer, candidate) {
+    const { value, fromEmployer } = withFallback(jobPosition.frequencyOfTravel, employer.willingnessToTravel);
+    const required = rankOf(TRAVEL_RANK, value);
+    const own = rankOf(TRAVEL_RANK, candidate.desiredTravel);
+    let status = compareRanks(required, own);
+    if (required === 0) status = "ok";
+    else if (required !== null && own === 0) status = "bad";
+    return row("travel", "Reise-/Montagebereitschaft", valueLabel("travel", value), valueLabel("travel", candidate.desiredTravel), status, fromEmployer ? FROM_EMPLOYER : "");
+  }
+  function licenseRow(jobPosition, employer, candidate) {
+    const { value, fromEmployer } = withFallback(jobPosition.requiredDriversLicense, employer.driversLicenseRequired);
+    const required = value === "klass_b" || value === "klass_c" || value === "yes";
+    const own = candidate.driversLicense;
+    let status = "";
+    if (required) {
+      if (own === "klass_c" || own === "klass_b" && value !== "klass_c") status = "ok";
+      else if (own === "no") status = "bad";
+      else status = "check";
+    }
+    return row("license", "Führerschein", valueLabel("license", value), valueLabel("license", own), status, fromEmployer ? FROM_EMPLOYER : "");
+  }
+  function carRow(employer, candidate) {
+    const required = employer.carRequired;
+    const own = candidate.hasCar;
+    let status = "";
+    if (required === true) status = own === true ? "ok" : own === false ? "bad" : "check";
+    const requiredText = required === true ? "Auto muss da sein" : required === false ? "nicht nötig" : "";
+    const candidateText = own === true ? "Auto vorhanden" : own === false ? "kein Auto" : "";
+    return row("car", "Auto", requiredText, candidateText, status);
+  }
+  function salaryRow(jobPosition, candidate) {
+    const low = salaryAmount(jobPosition.salaryLow);
+    const high = salaryAmount(jobPosition.salaryHigh);
+    const own = salaryAmount(candidate.salaryExpectation);
+    const max = high ?? low;
+    const requiredText = low && high && low !== high ? `${formatEuro(low)} – ${formatEuro(high)}` : max ? formatEuro(max) : "";
+    let status = "";
+    if (max !== null && own !== null) status = own <= max + 1e3 ? "ok" : "bad";
+    return row("salary", "Gehalt pro Monat", requiredText, own ? formatEuro(own) : "", status, status === "bad" ? "Mehr als 1.000 € über dem Maximum der Vakanz." : "");
+  }
+  function jobAreaRow(jobPosition, candidate) {
+    const required = jobPosition.jobAreas || [];
+    const own = candidate.jobAreas || [];
+    let status = "";
+    if (required.length && own.length) status = required.some((area) => own.includes(area)) ? "ok" : "check";
+    const text = (list) => list.map((area) => valueLabel("jobArea", area)).join(", ");
+    return row("jobAreas", "Fachbereiche", text(required), text(own), status);
+  }
+  function employmentRow(jobPosition, candidate) {
+    const offered = jobPosition.employmentTypes || [];
+    const own = candidate.employmentType;
+    const status = offered.length && has(own) ? offered.includes(own) ? "ok" : "check" : "";
+    return row("employment", "Stellenumfang", offered.map((type) => valueLabel("employment", type)).join(", "), valueLabel("employment", own), status);
+  }
+  function recognitionRow(employer, candidate) {
+    const own = candidate.recognitionStatus;
+    const status = own === "completed" || own === "in_germany" ? "ok" : own === "in_progress" ? "check" : own === "not_yet_applied" ? "bad" : "";
+    const allowed = employer.foreignQualificationsAllowed;
+    const requiredText = allowed === true ? "Ausbildung in Anerkennung möglich" : allowed === false ? "Ausbildung in Anerkennung nicht möglich" : "";
+    return row("recognition", "Anerkennung", requiredText, valueLabel("recognition", own), status);
+  }
+  function distanceRow(match, employer) {
+    const meters = Number(match.distance);
+    const distance = has(match.distance) && Number.isFinite(meters) ? `${(meters / 1e3).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km` : "";
+    const max = Number(employer.maximumDistanceOfCandidate);
+    const maxText = has(employer.maximumDistanceOfCandidate) && Number.isFinite(max) && max > 0 ? `max. ${max} Min.` : "";
+    return row("distance", "Entfernung", maxText, distance);
+  }
+  var summaryOf = (rows) => rows.some((r) => r.status === "bad") ? "bad" : rows.some((r) => r.status === "check") ? "check" : "ok";
+  function buildOmQuestionnaire(match) {
+    if (!match) return null;
+    const candidate = match.candidate || {};
+    const jobPosition = match.jobPosition || {};
+    const employer = jobPosition.employer || {};
+    const rows = [
+      positionRow(jobPosition, candidate),
+      experienceRow(jobPosition, employer, candidate),
+      languageRow(jobPosition, employer, candidate),
+      licenseRow(jobPosition, employer, candidate),
+      carRow(employer, candidate),
+      travelRow(jobPosition, employer, candidate),
+      salaryRow(jobPosition, candidate),
+      jobAreaRow(jobPosition, candidate),
+      employmentRow(jobPosition, candidate),
+      recognitionRow(employer, candidate),
+      distanceRow(match, employer)
+    ];
+    const omNotes = String(employer.omNotes || "").trim();
+    const tags = getOmNoteTags(omNotes);
+    const hints = [describeOmNoteTags(tags)].filter(Boolean);
+    return {
+      matchId: match.id || "",
+      candidateId: candidate.id || "",
+      jobPositionId: jobPosition.id || "",
+      candidateName: [candidate.firstName, candidate.lastName].filter(Boolean).join(" "),
+      jobTitle: [jobPosition.mainTitle, jobPosition.subTitle].filter(Boolean).join(" "),
+      employerName: employer.name || "",
+      rows,
+      summary: summaryOf(rows),
+      counts: { bad: rows.filter((r) => r.status === "bad").length, check: rows.filter((r) => r.status === "check").length },
+      omNotes,
+      omHints: hints,
+      cemNotes: String(employer.cemNotes || "").trim()
+    };
+  }
+  function summaryText(questionnaire) {
+    if (!questionnaire) return "";
+    const { summary, counts } = questionnaire;
+    if (summary === "bad") return `passt nicht (${counts.bad}× rot${counts.check ? `, ${counts.check}× prüfen` : ""})`;
+    if (summary === "check") return `prüfen (${counts.check}×)`;
+    return "passt";
+  }
+  function pickMatch(items, { candidateId = "", jobPositionId = "" } = {}) {
+    const list = (items || []).filter(Boolean);
+    if (jobPositionId) return list.find((match) => match.jobPosition?.id === jobPositionId && (!candidateId || match.candidate?.id === candidateId)) || null;
+    return list.length === 1 ? list[0] : null;
+  }
+  function fits(match, { candidateId = "", jobPositionId = "" }) {
+    if (!match) return false;
+    if (candidateId && match.candidate?.id && match.candidate.id !== candidateId) return false;
+    if (jobPositionId && match.jobPosition?.id && match.jobPosition.id !== jobPositionId) return false;
+    return true;
+  }
+  function targetKey({ matchId = "", candidateId = "", jobPositionId = "" } = {}) {
+    return [matchId, candidateId, jobPositionId].join("|");
+  }
+  var CACHE_MS4 = 5 * 60 * 1e3;
+  var CANDIDATE_MATCHES_PER_PAGE = 200;
+  function createOmQuestionnaireColumnProvider({ request, now = () => Date.now() }) {
+    const cache = /* @__PURE__ */ new Map();
+    async function fetchMatch(target) {
+      if (target.matchId) {
+        const data2 = await request(MATCH_QUESTIONNAIRE_QUERY, { id: target.matchId });
+        if (fits(data2?.data, target)) return data2.data;
+      }
+      if (!target.candidateId) return null;
+      const data = await request(MATCHES_QUESTIONNAIRE_QUERY, {
+        filter: { candidateIds: [target.candidateId] },
+        page: 0,
+        perPage: CANDIDATE_MATCHES_PER_PAGE
+      });
+      return pickMatch(data?.items, target);
+    }
+    function load2(target, { fresh = false } = {}) {
+      const key = targetKey(target);
+      if (key === "||") return Promise.resolve(null);
+      const hit = cache.get(key);
+      if (!fresh && hit && now() - hit.at < CACHE_MS4) return hit.promise;
+      const promise = Promise.resolve().then(() => fetchMatch(target)).then(buildOmQuestionnaire);
+      cache.set(key, { at: now(), promise });
+      promise.catch(() => cache.delete(key));
+      return promise;
+    }
+    return { load: load2 };
+  }
+
+  // ../../shared/js/om-fragebogen-spalte/index.js
+  var COLUMN_ATTRIBUTE = "data-werkia-omq-col";
+  var HIDDEN_ATTRIBUTE = "data-werkia-omq-hidden";
+  var NATIVE_TITLE = "AG Fragebogen";
+  var STYLE_ID4 = "werkia-omq-style-v1";
+  var FONT5 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var STYLE4 = `
+[${HIDDEN_ATTRIBUTE}] { display: none !important; }
+.werkia-omq { font: 400 12px/1.45 ${FONT5}; color: #09090b; box-sizing: border-box; min-width: 280px; padding-left: 12px; border-left: 1px solid #e4e4e7; }
+.werkia-omq * { box-sizing: border-box; }
+.werkia-omq-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.werkia-omq-head h6 { margin: 0; }
+.werkia-omq-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; border: 1px solid #e4e4e7; color: #52525b; background: #fafafa; }
+.werkia-omq-pill[data-status="ok"] { color: #0a7c0a; border-color: #b7e2b7; background: #effaef; }
+.werkia-omq-pill[data-status="check"] { color: #8a6700; border-color: #ecd98f; background: #fdf8e4; }
+.werkia-omq-pill[data-status="bad"] { color: #b52f2f; border-color: #f0c4c4; background: #fdf0f0; }
+.werkia-omq-head .werkia-omq-pill { margin-left: auto; }
+.werkia-omq-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 8px; color: #52525b; cursor: pointer; user-select: none; }
+.werkia-omq-toggle input { margin: 0; accent-color: #ef6c00; cursor: pointer; }
+.werkia-omq-msg { color: #8b8b94; padding: 4px 0; }
+.werkia-omq-msg[data-tone="error"] { color: #b52f2f; }
+.werkia-omq-msg:empty { display: none; }
+.werkia-omq-table { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; overflow: hidden; }
+.werkia-omq-table:empty { display: none; }
+.werkia-omq-th { padding: 4px 8px; background: #fafafa; border-bottom: 1px solid #e4e4e7; color: #8b8b94; font-size: 11px; font-weight: 600; }
+.werkia-omq-label { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding: 6px 8px 0; border-top: 1px solid #ececee; font-weight: 600; }
+.werkia-omq-th + .werkia-omq-th + .werkia-omq-label { border-top: 0; }
+.werkia-omq-label .werkia-omq-pill { margin-left: auto; }
+.werkia-omq-cell { padding: 2px 8px 6px; overflow-wrap: anywhere; }
+.werkia-omq-cell[data-empty="true"] { color: #8b8b94; }
+.werkia-omq-note { grid-column: 1 / -1; padding: 0 8px 6px; color: #8b8b94; font-size: 11px; }
+.werkia-omq-block { margin-top: 10px; }
+.werkia-omq-block h4 { margin: 0 0 4px; font-size: 12px; font-weight: 650; }
+.werkia-omq-text { white-space: pre-wrap; overflow-wrap: anywhere; padding: 6px 8px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
+.werkia-omq-text[data-empty="true"] { color: #8b8b94; }
+.werkia-omq-hint { margin-top: 4px; padding: 4px 8px; border-radius: 6px; background: #fff3e8; color: #b85400; }
+`;
+  function ensureOmQuestionnaireStyle(doc = document) {
+    if (doc.getElementById(STYLE_ID4)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID4;
+    style.textContent = STYLE4;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  function element4(doc, tag, className, text) {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text !== void 0) node.textContent = text;
+    return node;
+  }
+  var isSeparator = (node) => Boolean(node?.matches?.('[role="separator"], .MuiDivider-root, hr'));
+  function findEmployerQuestionnaireColumn(dialog) {
+    const heading = [...dialog.querySelectorAll("h6")].find((h6) => h6.textContent.replace(/\s+/g, " ").trim() === NATIVE_TITLE && !h6.closest(`[${COLUMN_ATTRIBUTE}]`));
+    const column = heading?.parentElement;
+    if (!column || column === dialog) return null;
+    const divider = isSeparator(column.previousElementSibling) ? column.previousElementSibling : null;
+    return { column, divider, heading };
+  }
+  var idFrom = (href, type) => String(href || "").match(new RegExp(`#/${type}/([^/?]+)`, "i"))?.[1] || "";
+  function dialogTargetIds(dialog) {
+    const title = dialog.querySelector(".MuiDialogTitle-root") || dialog;
+    const link = (type) => idFrom(title.querySelector(`a[href*="#/${type}/"]`)?.getAttribute("href"), type);
+    return { candidateId: link("Candidate"), jobPositionId: link("JobPosition") };
+  }
+  function setNativeHidden(native, hidden) {
+    for (const node of [native?.column, native?.divider]) {
+      if (!node) continue;
+      if (hidden && !node.hasAttribute(HIDDEN_ATTRIBUTE)) node.setAttribute(HIDDEN_ATTRIBUTE, "");
+      if (!hidden && node.hasAttribute(HIDDEN_ATTRIBUTE)) node.removeAttribute(HIDDEN_ATTRIBUTE);
+    }
+  }
+  function pill(doc, status, text = STATUS_LABELS[status]) {
+    const node = element4(doc, "span", "werkia-omq-pill", text);
+    node.dataset.status = status;
+    return node;
+  }
+  function createOmQuestionnaireColumn({ document: doc = document, helpTip = null, showNative = false, onToggle = () => {
+  } } = {}) {
+    ensureOmQuestionnaireStyle(doc);
+    const root = element4(doc, "div", "werkia-omq");
+    const head = element4(doc, "div", "werkia-omq-head");
+    const heading = element4(doc, "h6", "MuiTypography-root MuiTypography-h6", "OM-Fragebogen");
+    const summary = element4(doc, "span");
+    head.append(...[heading, helpTip, summary].filter(Boolean));
+    const toggleLabel = element4(doc, "label", "werkia-omq-toggle");
+    const toggle = doc.createElement("input");
+    toggle.type = "checkbox";
+    toggle.checked = Boolean(showNative);
+    toggle.addEventListener("change", () => onToggle(toggle.checked));
+    toggleLabel.append(toggle, doc.createTextNode("AG-Fragebogen anzeigen"));
+    const msg = element4(doc, "div", "werkia-omq-msg");
+    const table = element4(doc, "div", "werkia-omq-table");
+    const notes = element4(doc, "div");
+    root.append(head, toggleLabel, msg, table, notes);
+    function adoptNativeLook(native) {
+      const columnClass2 = String(native?.column?.className || "");
+      const headingClass = String(native?.heading?.className || "");
+      const wanted = ["werkia-omq", columnClass2].filter(Boolean).join(" ");
+      if (root.className !== wanted) root.className = wanted;
+      if (headingClass && heading.className !== headingClass) heading.className = headingClass;
+    }
+    function showMessage(text, tone = "") {
+      table.replaceChildren();
+      notes.replaceChildren();
+      summary.replaceChildren();
+      msg.textContent = text;
+      msg.dataset.tone = tone;
+    }
+    function cell(text) {
+      const node = element4(doc, "div", "werkia-omq-cell", text || "–");
+      if (!text) node.dataset.empty = "true";
+      return node;
+    }
+    function textBlock(title, text, hints = []) {
+      const block = element4(doc, "div", "werkia-omq-block");
+      const body = element4(doc, "div", "werkia-omq-text", text || "–");
+      if (!text) body.dataset.empty = "true";
+      block.append(element4(doc, "h4", "", title), body, ...hints.map((hint) => element4(doc, "div", "werkia-omq-hint", hint)));
+      return block;
+    }
+    function showQuestionnaire(questionnaire) {
+      if (!questionnaire) {
+        showMessage("Kein Match zu diesem Dialog gefunden.", "error");
+        return;
+      }
+      msg.textContent = "";
+      msg.dataset.tone = "";
+      summary.replaceChildren(pill(doc, questionnaire.summary, summaryText(questionnaire)));
+      const cells = [element4(doc, "div", "werkia-omq-th", "Anforderung"), element4(doc, "div", "werkia-omq-th", "Kandidat")];
+      for (const entry of questionnaire.rows) {
+        const label = element4(doc, "div", "werkia-omq-label", entry.label);
+        label.dataset.key = entry.key;
+        if (entry.status) label.appendChild(pill(doc, entry.status));
+        cells.push(label, cell(entry.required), cell(entry.candidate));
+        if (entry.note) cells.push(element4(doc, "div", "werkia-omq-note", entry.note));
+      }
+      table.replaceChildren(...cells);
+      const blocks = [textBlock("Zusätzliche Information - OM", questionnaire.omNotes, questionnaire.omHints)];
+      if (questionnaire.cemNotes) blocks.push(textBlock("Zusätzliche Information - CEM", questionnaire.cemNotes));
+      notes.replaceChildren(...blocks);
+    }
+    return { element: root, toggle, showMessage, showQuestionnaire, adoptNativeLook };
+  }
+  function omQuestionnaireColumnTopic({ id = "om-questionnaire-column", page, routes }) {
+    return {
+      id,
+      title: "OM-Fragebogen im Matchkommentar-Dialog",
+      page,
+      routes,
+      kind: "view",
+      summary: "Im Matchkommentar-Dialog steht statt der Spalte „AG Fragebogen“ der OM-Fragebogen dieses Matches: die Anforderungen der Vakanz neben den Angaben des Kandidaten, je mit Bewertung, darunter „Zusätzliche Information - OM“.",
+      notes: [
+        "Bewertet werden Position, Berufserfahrung, Deutschkenntnisse, Führerschein, Auto, Reise-/Montagebereitschaft, Gehalt, Fachbereiche, Stellenumfang und Anerkennung: grün „passt“, gelb „prüfen“, rot „passt nicht“. Ohne Pille gibt es keine Anforderung. Oben steht das Gesamturteil.",
+        "Hat die Vakanz bei Berufserfahrung, Deutschkenntnissen, Führerschein oder Reisebereitschaft keinen Wert, gilt der Wert am Arbeitgeber; die Zeile sagt das dazu.",
+        "Gehalt passt, solange der Kandidat höchstens 1.000 € über dem Maximum der Vakanz liegt. Die Entfernung steht ohne Bewertung da.",
+        "„AG-Fragebogen anzeigen“ blendet die Spalte des Adminpanels wieder ein, zum Beispiel zum Bearbeiten. Das gilt nur, bis der Dialog geschlossen wird.",
+        "Die Spalte erscheint, wenn im Dialog der AG-Fragebogen eingeschaltet ist (Knöpfe neben „Matchkommentare“). Sie ändert nichts am Match."
+      ]
+    };
+  }
+  var providers3 = /* @__PURE__ */ new WeakMap();
+  function omQuestionnaireColumnProviderFor(graphqlAdapter) {
+    if (!providers3.has(graphqlAdapter)) providers3.set(graphqlAdapter, createOmQuestionnaireColumnProvider({ request: graphqlAdapter.request }));
+    return providers3.get(graphqlAdapter);
+  }
+  function executeOmQuestionnaireColumn(runtime, {
+    getProvider,
+    sourcePath,
+    helpTip = () => null,
+    owner = "toolbox"
+  } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    let clickedMatchId = "";
+    let state = null;
+    function teardown() {
+      if (!state) return;
+      state.column.element.remove();
+      setNativeHidden(state.native, false);
+      state = null;
+    }
+    function load2(current, target) {
+      if (!target.matchId && !target.candidateId) {
+        current.column.showMessage("Match nicht erkannt. Den Dialog über den Kommentar-Knopf der Zeile öffnen.", "error");
+        return;
+      }
+      current.column.showMessage("Wird geladen …");
+      current.provider.load(target).then((questionnaire) => {
+        if (state !== current) return;
+        current.column.element.removeAttribute("title");
+        current.column.showQuestionnaire(questionnaire);
+      }, (error) => {
+        console.warn("[OM-Fragebogen im Matchkommentar]", error);
+        if (state !== current) return;
+        current.column.showMessage("OM-Fragebogen nicht lesbar.", "error");
+        current.column.element.title = String(error?.message || error || "");
+      });
+    }
+    function render() {
+      const dialog = findMatchCommentsDialog(document);
+      const native = dialog ? findEmployerQuestionnaireColumn(dialog) : null;
+      if (!dialog || !native) {
+        if (!dialog && state) clickedMatchId = "";
+        teardown();
+        return;
+      }
+      const foreign = dialog.querySelector(`[${COLUMN_ATTRIBUTE}]`);
+      if (foreign && foreign !== state?.column.element) return;
+      const target = { matchId: clickedMatchId || matchIdFromHref(location.hash), ...dialogTargetIds(dialog) };
+      const key = targetKey(target);
+      if (state && (state.dialog !== dialog || state.key !== key)) {
+        const showNative = state.dialog === dialog && state.showNative;
+        teardown();
+        renderFresh(dialog, native, target, key, showNative);
+        return;
+      }
+      if (!state) renderFresh(dialog, native, target, key, false);
+      else place(state, native);
+    }
+    function renderFresh(dialog, native, target, key, showNative) {
+      let provider = null;
+      try {
+        provider = getProvider();
+      } catch {
+        provider = null;
+      }
+      if (!provider) return;
+      const current = { dialog, key, provider, native, showNative, column: null };
+      current.column = createOmQuestionnaireColumn({
+        document,
+        helpTip: helpTip(),
+        showNative,
+        onToggle: (checked) => {
+          current.showNative = checked;
+          if (state === current) setNativeHidden(current.native, !checked);
+        }
+      });
+      current.column.element.setAttribute(COLUMN_ATTRIBUTE, owner);
+      state = current;
+      load2(current, target);
+      place(current, native);
+    }
+    function place(current, native) {
+      if (current.native && current.native.column !== native.column) setNativeHidden(current.native, false);
+      current.native = native;
+      current.column.adoptNativeLook(native);
+      setNativeHidden(native, !current.showNative);
+      if (native.column.nextElementSibling !== current.column.element) native.column.after(current.column.element);
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    };
+    runtime.addDocumentListener("click", (event) => {
+      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button4) return;
+      clickedMatchId = matchIdFromRow(button4.closest("tr"));
+      schedule();
+    }, true);
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     schedule();
   }
 
@@ -2864,17 +4090,17 @@
 
   // ../../shared/js/match-mention/index.js
   var PREFIX = "werkia-mention";
-  var STYLE_ID2 = `${PREFIX}-style`;
-  var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
+  var STYLE_ID5 = `${PREFIX}-style`;
+  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR = 'div[role="dialog"], .MuiDialog-paper';
   var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var MATCH_LINK_SELECTOR2 = 'a[href*="#/Match/"]';
   var TOOLBAR_SELECTOR = '[role="toolbar"], .MuiToolbar-root';
   var OWN_SELECTOR = '[class*="werkia-"]';
   var RETRY_MS = 60 * 1e3;
-  function tiptapOf2(element2) {
+  function tiptapOf2(element5) {
     try {
-      return element2?.wrappedJSObject?.editor || element2?.editor || null;
+      return element5?.wrappedJSObject?.editor || element5?.editor || null;
     } catch {
       return null;
     }
@@ -2902,8 +4128,8 @@
     return node;
   }
   var keepFocus = (event) => event.preventDefault();
-  function isDark(element2) {
-    let node = element2;
+  function isDark(element5) {
+    let node = element5;
     while (node && node.nodeType === 1) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
       if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
@@ -2913,10 +4139,10 @@
     }
     return false;
   }
-  function ensureStyle() {
-    if (document.getElementById(STYLE_ID2)) return;
+  function ensureStyle2() {
+    if (document.getElementById(STYLE_ID5)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID2;
+    style.id = STYLE_ID5;
     style.textContent = `
     .${PREFIX}-wrap, .${PREFIX}-picker {
       --wm-surface:#ffffff; --wm-sunken:#f4f4f5; --wm-ink:#09090b; --wm-ink2:#52525b; --wm-muted:#8b8b94;
@@ -3032,10 +4258,10 @@
       }
     }
     function findDialog() {
-      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR2));
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR3));
       return dialogs[dialogs.length - 1] || null;
     }
-    function editorBoxFor2(editor, dialog) {
+    function editorBoxFor(editor, dialog) {
       let box = editor;
       for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
         const parent = box.parentElement;
@@ -3051,7 +4277,7 @@
       const format = [...box.querySelectorAll('button[title*="format" i]')].find((node) => !own(node));
       return format?.parentElement || null;
     }
-    const editorElement = () => findDialog()?.querySelector(EDITOR_SELECTOR2) || null;
+    const editorElement = () => findDialog()?.querySelector(EDITOR_SELECTOR3) || null;
     const currentWrap = () => document.querySelector(wrapSelector);
     const currentPicker = () => document.querySelector(pickerSelector);
     function updateButton() {
@@ -3216,11 +4442,11 @@
     runtime.addDocumentListener("click", (event) => {
       const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
       if (!button4) return;
-      const row = button4.closest("tr");
-      clickedMatchId = matchIdFromHref2(row?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
+      const row2 = button4.closest("tr");
+      clickedMatchId = matchIdFromHref2(row2?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
     }, true);
     function mountWrap(dialog) {
-      ensureStyle();
+      ensureStyle2();
       const button4 = el3("button", {
         type: "button",
         class: `${PREFIX}-btn`,
@@ -3251,8 +4477,8 @@
         wrap2 = null;
         closePicker();
       }
-      const editor = dialog.querySelector(EDITOR_SELECTOR2);
-      const box = editorBoxFor2(editor, dialog);
+      const editor = dialog.querySelector(EDITOR_SELECTOR3);
+      const box = editorBoxFor(editor, dialog);
       const toolbar = toolbarIn(box);
       const matchId = clickedMatchId || matchIdFromHref2(location.hash);
       if (!wrap2) {
@@ -3390,10 +4616,12 @@
         "Der Wert kommt aus dem Arbeitgeberprofil und wird alle 5 Minuten nachgeladen."
       ]
     },
+    matchContactPersonTopic({ page: `${MY_MATCHES} › Matchkommentar-Dialog`, routes: onMyMatches }),
+    omQuestionnaireColumnTopic({ page: `${MY_MATCHES} › Matchkommentar-Dialog`, routes: onMyMatches }),
     employerNotesTopic({
       page: `${MY_MATCHES} › Matchkommentar-Dialog`,
       routes: onMyMatches,
-      where: "Wo die Tags erscheinen: Matches im Matchkommentar-Dialog, AP und Prozess in Meine Matches hinter der AG Response Rate, Vakanzen im Vakanz-Panel am OM-Fragebogen.",
+      where: "Wo die Tags erscheinen: Matches oben im Matchkommentar-Dialog, AP und Prozess in Meine Matches hinter der AG Response Rate, Vakanzen im Vakanz-Panel am OM-Fragebogen.",
       displays: ["AP und Prozess stehen als Chip mit Anzahl hinter dem Arbeitgeber, nur wenn es solche Notizen gibt. Ein Klick zeigt sie."]
     }),
     {
@@ -3795,8 +5023,8 @@
     }
     const statusFor = (dialog) => (text, tone = "") => setStatus(text, tone, dialog);
     function setRunningControls(dialog, isRunning) {
-      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element2) => {
-        element2.disabled = isRunning;
+      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element5) => {
+        element5.disabled = isRunning;
       });
       const stopButton = dialog.querySelector('[data-action="close"]');
       if (stopButton) {
@@ -4175,37 +5403,37 @@
       }
       return null;
     }
-    function clickLikeUser(element2) {
+    function clickLikeUser(element5) {
       const eventOptions = { bubbles: true, cancelable: true, composed: true, button: 0, buttons: 1 };
       if (typeof PointerEvent === "function") {
-        element2.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element5.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element2.dispatchEvent(new MouseEvent("mousedown", eventOptions));
+      element5.dispatchEvent(new MouseEvent("mousedown", eventOptions));
       if (typeof PointerEvent === "function") {
-        element2.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element5.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element2.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
-      element2.click();
+      element5.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
+      element5.click();
     }
-    function visibleOverlay(element2) {
-      if (!element2) return false;
-      const style = getComputedStyle(element2);
-      const rect = element2.getBoundingClientRect();
+    function visibleOverlay(element5) {
+      if (!element5) return false;
+      const style = getComputedStyle(element5);
+      const rect = element5.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row) => row.querySelector(MATCH_LINK_SELECTOR3) && !row.querySelector("tr") && !row.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR3) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
-    function shownOnPage(element2) {
-      if (!element2.isConnected || element2.closest("[hidden]")) return false;
-      const style = getComputedStyle(element2);
+    function shownOnPage(element5) {
+      if (!element5.isConnected || element5.closest("[hidden]")) return false;
+      const style = getComputedStyle(element5);
       return style.display !== "none" && style.visibility !== "hidden";
     }
     function listIsLoading() {
-      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element2) => !element2.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element2));
+      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element5) => !element5.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element5));
     }
-    function employerFromRow(row) {
-      const link = row.querySelector(EMPLOYER_LINK_SELECTOR2);
+    function employerFromRow(row2) {
+      const link = row2.querySelector(EMPLOYER_LINK_SELECTOR2);
       if (!link) return null;
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
@@ -4213,20 +5441,20 @@
         name: normalize3(link.textContent) || "Unbekannter Arbeitgeber"
       };
     }
-    function candidateNameFromRow(row) {
-      const own = row.querySelector(CANDIDATE_LINK_SELECTOR);
+    function candidateNameFromRow(row2) {
+      const own = row2.querySelector(CANDIDATE_LINK_SELECTOR);
       if (own) return normalize3(own.textContent);
-      const parentRow = row.closest("table")?.closest("tr")?.previousElementSibling;
+      const parentRow = row2.closest("table")?.closest("tr")?.previousElementSibling;
       return normalize3(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR)?.textContent);
     }
-    function labelFromRow(row) {
-      const candidate = candidateNameFromRow(row);
-      const vacancy = normalize3(row.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
+    function labelFromRow(row2) {
+      const candidate = candidateNameFromRow(row2);
+      const vacancy = normalize3(row2.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
       const label = [candidate, vacancy].filter(Boolean).join(" – ");
       return label.length > 90 ? `${label.slice(0, 89)}…` : label;
     }
-    function matchIdFromRow2(row) {
-      const link = row.querySelector(MATCH_LINK_SELECTOR3);
+    function matchIdFromRow2(row2) {
+      const link = row2.querySelector(MATCH_LINK_SELECTOR3);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
@@ -4240,12 +5468,12 @@
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
-      return getRows().map((row, index) => {
-        const matchId = matchIdFromRow2(row);
+      return getRows().map((row2, index) => {
+        const matchId = matchIdFromRow2(row2);
         if (!matchId || seen.has(matchId)) return null;
         seen.add(matchId);
-        const employer = employerFromRow(row) || { id: "", name: "Ohne Arbeitgeber" };
-        return { matchId, employer, label: labelFromRow(row) || `Match ${index + 1}` };
+        const employer = employerFromRow(row2) || { id: "", name: "Ohne Arbeitgeber" };
+        return { matchId, employer, label: labelFromRow(row2) || `Match ${index + 1}` };
       }).filter(Boolean);
     }
     function matchChecklist(matches) {
@@ -4481,7 +5709,7 @@
       return interviews;
     }
     function markRow(matchId, markCell) {
-      getRows().filter((row) => matchIdFromRow2(row) === matchId).forEach((row) => markCell(row.querySelector(INTERVIEW_CELL_SELECTOR2)));
+      getRows().filter((row2) => matchIdFromRow2(row2) === matchId).forEach((row2) => markCell(row2.querySelector(INTERVIEW_CELL_SELECTOR2)));
     }
     async function forwardInterview(matchId, interview) {
       const request = getRequest();
@@ -4846,7 +6074,7 @@
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
-  var STYLE_ID3 = "werkia-kam-contact-style";
+  var STYLE_ID6 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
   var CONTACT_OPTIONS = {
     no_contact: { short: "Kein Kontakt", full: "Kein Kontakt (>1 Woche)", tone: "no-contact", priority: 2 },
@@ -4878,21 +6106,21 @@
     const contactIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row) => row.querySelector(WVL_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
     }
-    function employerFromRow(row) {
-      const link = row.querySelector(EMPLOYER_LINK_SELECTOR3);
+    function employerFromRow(row2) {
+      const link = row2.querySelector(EMPLOYER_LINK_SELECTOR3);
       if (!link) return null;
       const id = getContactEmployerId(link.href) || link.href;
       return { id, name: normalize5(link.textContent) || "Unbekannter Arbeitgeber" };
     }
     function getEmployerChoices() {
       const choices = /* @__PURE__ */ new Map();
-      getRows().forEach((row) => {
-        const employer = employerFromRow(row);
+      getRows().forEach((row2) => {
+        const employer = employerFromRow(row2);
         if (!employer) return;
         if (!choices.has(employer.id)) choices.set(employer.id, { ...employer, rows: [] });
-        choices.get(employer.id).rows.push(row);
+        choices.get(employer.id).rows.push(row2);
       });
       return [...choices.values()];
     }
@@ -4905,10 +6133,10 @@
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle4() {
-      if (document.getElementById(STYLE_ID3)) return;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID3;
+      style.id = STYLE_ID6;
       style.textContent = `
       .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
       .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
@@ -4995,11 +6223,11 @@
       return { kind: "info", text: "Kontakt nicht geladen", tone: "loading", title: "Kontaktdaten werden automatisch geladen" };
     }
     function renderContactBadges() {
-      getRows().forEach((row) => {
-        const employer = employerFromRow(row);
-        const link = row.querySelector(EMPLOYER_LINK_SELECTOR3);
+      getRows().forEach((row2) => {
+        const employer = employerFromRow(row2);
+        const link = row2.querySelector(EMPLOYER_LINK_SELECTOR3);
         if (!employer || !link) return;
-        let wrap2 = [...row.querySelectorAll(".werkia-kam-contact")].find((node) => node.dataset.employerId === employer.id);
+        let wrap2 = [...row2.querySelectorAll(".werkia-kam-contact")].find((node) => node.dataset.employerId === employer.id);
         if (!wrap2) {
           wrap2 = buildWrap(employer.id);
           link.insertAdjacentElement("afterend", wrap2);
@@ -5067,7 +6295,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle4();
+        ensureStyle5();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
       }, 150);
@@ -5095,10 +6323,10 @@
       helpTip: () => kamHelp.tip("employer-notes"),
       owner: "kam"
     });
-    function syncRow(row, provider) {
-      const employerId = employerIdFromRow(row);
-      const link = row.querySelector(EMPLOYER_LINK_SELECTOR4);
-      let box = row.querySelector(`.${BOX_CLASS}`);
+    function syncRow(row2, provider) {
+      const employerId = employerIdFromRow(row2);
+      const link = row2.querySelector(EMPLOYER_LINK_SELECTOR4);
+      let box = row2.querySelector(`.${BOX_CLASS}`);
       if (!employerId || !link) {
         box?.remove();
         return;
@@ -5113,7 +6341,7 @@
         box.dataset.employerId = employerId;
         for (const tag of ROW_TAGS) box.appendChild(createEmployerNoteBadge({ provider, employerId, tag, document }));
       }
-      const anchor = row.querySelector(".werkia-kam-contact") || link;
+      const anchor = row2.querySelector(".werkia-kam-contact") || link;
       if (anchor.nextElementSibling !== box) anchor.insertAdjacentElement("afterend", box);
     }
     function render() {
@@ -5124,7 +6352,7 @@
       } catch {
         return;
       }
-      document.querySelectorAll(ROW_SELECTOR3).forEach((row) => syncRow(row, provider));
+      document.querySelectorAll(ROW_SELECTOR3).forEach((row2) => syncRow(row2, provider));
     }
     let scheduled = false;
     const schedule = () => {
@@ -5138,6 +6366,26 @@
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     schedule();
+  }
+
+  // src/features/kam-suite/match-contact-person.js
+  function executeKamMatchContactPerson(runtime) {
+    executeMatchContactPerson(runtime, {
+      sourcePath: "kam/toolbox/src/features/kam-suite/match-contact-person.js",
+      getProvider: () => contactPersonProviderFor(getKamGraphqlAdapter()),
+      helpTip: () => kamHelp.tip("match-contact-person"),
+      owner: "kam"
+    });
+  }
+
+  // src/features/kam-suite/om-questionnaire-column.js
+  function executeKamOmQuestionnaireColumn(runtime) {
+    executeOmQuestionnaireColumn(runtime, {
+      sourcePath: "kam/toolbox/src/features/kam-suite/om-questionnaire-column.js",
+      getProvider: () => omQuestionnaireColumnProviderFor(getKamGraphqlAdapter()),
+      helpTip: () => kamHelp.tip("om-questionnaire-column"),
+      owner: "kam"
+    });
   }
 
   // ../../shared/js/werkia-graphql/job-position-city-provider.js
@@ -5164,7 +6412,7 @@
   // src/features/kam-suite/vacancy-city-badges.js
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID4 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID7 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage3(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -5178,26 +6426,26 @@
     const cityIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR));
     }
-    function jobPositionFromRow(row) {
-      const link = row.querySelector(JOB_TITLE_LINK_SELECTOR);
+    function jobPositionFromRow(row2) {
+      const link = row2.querySelector(JOB_TITLE_LINK_SELECTOR);
       if (!link) return null;
       const id = getJobPositionId(link.href) || link.href;
       return { id, link };
     }
     function getJobPositionIds() {
       const ids = /* @__PURE__ */ new Set();
-      getRows().forEach((row) => {
-        const jobPosition = jobPositionFromRow(row);
+      getRows().forEach((row2) => {
+        const jobPosition = jobPositionFromRow(row2);
         if (jobPosition) ids.add(jobPosition.id);
       });
       return [...ids];
     }
-    function ensureStyle4() {
-      if (document.getElementById(STYLE_ID4)) return;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID4;
+      style.id = STYLE_ID7;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -5206,10 +6454,10 @@
       document.head.appendChild(style);
     }
     function renderCityBadges() {
-      getRows().forEach((row) => {
-        const jobPosition = jobPositionFromRow(row);
+      getRows().forEach((row2) => {
+        const jobPosition = jobPositionFromRow(row2);
         if (!jobPosition) return;
-        let badge = row.querySelector(`.werkia-kam-vacancy-city[data-job-position-id="${jobPosition.id}"]`);
+        let badge = row2.querySelector(`.werkia-kam-vacancy-city[data-job-position-id="${jobPosition.id}"]`);
         if (!badge) {
           badge = document.createElement("span");
           badge.className = "werkia-kam-vacancy-city";
@@ -5265,7 +6513,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage3()) return;
-        ensureStyle4();
+        ensureStyle5();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -5359,10 +6607,10 @@
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID5 = "werkia-kam-cem-line-style";
+  var STYLE_ID8 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
-  var COPY_ICON_PATH = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
+  var COPY_ICON_PATH2 = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
   var CHECK_ICON_PATH = "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
   function isTargetPage4(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -5382,15 +6630,15 @@
     const failedMatchIds = /* @__PURE__ */ new Set();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row) => row.querySelector(KAM_STATUS_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
-    function matchIdFromRow2(row) {
-      return getMatchId(row.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
+    function matchIdFromRow2(row2) {
+      return getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
     }
-    function ensureStyle4() {
-      if (document.getElementById(STYLE_ID5)) return;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID5;
+      style.id = STYLE_ID8;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -5435,7 +6683,7 @@
       button4.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button4.append(label, icon2(COPY_ICON_PATH));
+      button4.append(label, icon2(COPY_ICON_PATH2));
       return button4;
     }
     function renderState(matchId) {
@@ -5473,9 +6721,9 @@
       line.replaceChildren(...parts);
     }
     function renderLines() {
-      getRows().forEach((row) => {
-        const cell = row.querySelector(KAM_STATUS_CELL_SELECTOR);
-        const matchId = matchIdFromRow2(row);
+      getRows().forEach((row2) => {
+        const cell = row2.querySelector(KAM_STATUS_CELL_SELECTOR);
+        const matchId = matchIdFromRow2(row2);
         let line = cell.querySelector(`.${LINE_CLASS}`);
         if (!matchId) {
           line?.remove();
@@ -5525,7 +6773,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle4();
+        ensureStyle5();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
@@ -5544,7 +6792,7 @@
         runtime.setTimeout(() => {
           delete button4.dataset.copied;
           button4.title = "CEM-Namen kopieren";
-          button4.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH));
+          button4.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH2));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -5656,9 +6904,9 @@
     const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
     if (!parsed || typeof parsed !== "object") return emptyStore();
     const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean4 = {};
+    const clean5 = {};
     Object.keys(routes).forEach((route) => {
-      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+      clean5[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
         id: String(preset.id || createPresetId()),
         name: String(preset.name),
         filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
@@ -5667,7 +6915,7 @@
         perPage: Number.parseInt(preset.perPage, 10) || 0
       }));
     });
-    return { version: STORE_VERSION, routes: clean4 };
+    return { version: STORE_VERSION, routes: clean5 };
   }
   function presetsForRoute(store, route) {
     return store?.routes?.[route] ? [...store.routes[route]] : [];
@@ -5726,8 +6974,8 @@
   ];
   function findListAnchor(root = document) {
     for (const selector of LIST_ANCHOR_SELECTORS) {
-      const element2 = root.querySelector(selector);
-      if (element2) return element2;
+      const element5 = root.querySelector(selector);
+      if (element5) return element5;
     }
     return null;
   }
@@ -5752,13 +7000,13 @@
     });
     const owner = sourcePath || routes.join(",");
     const ownElement = (id) => {
-      const element2 = document.getElementById(id);
-      return element2?.dataset.werkiaPresetsOwner === owner ? element2 : null;
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaPresetsOwner === owner ? element5 : null;
     };
     const isTargetPage8 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS2.style)) return;
       const style = document.createElement("style");
       style.id = IDS2.style;
@@ -5821,7 +7069,7 @@
         list.appendChild(empty);
       }
       presets.forEach((preset) => {
-        const row = document.createElement("li");
+        const row2 = document.createElement("li");
         const name = document.createElement("span");
         name.className = "werkia-filter-presets-name";
         name.textContent = preset.name;
@@ -5849,8 +7097,8 @@
           renderManager();
           render();
         });
-        row.append(name, fields, rename, remove);
-        list.appendChild(row);
+        row2.append(name, fields, rename, remove);
+        list.appendChild(row2);
       });
       card.appendChild(list);
       const hint = document.createElement("p");
@@ -5949,7 +7197,7 @@
         closeDialog();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       let bar = document.getElementById(IDS2.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -5990,8 +7238,8 @@
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean4 = [...new Set(statuses)].filter(Boolean);
-    if (clean4.length) next[field] = clean4;
+    const clean5 = [...new Set(statuses)].filter(Boolean);
+    if (clean5.length) next[field] = clean5;
     else delete next[field];
     return next;
   }
@@ -6004,7 +7252,7 @@
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID6 = "werkia-match-status-filter-style";
+  var STYLE_ID9 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -6021,10 +7269,10 @@
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage8 = () => route.test(location.hash);
-    function ensureStyle4() {
-      if (document.getElementById(STYLE_ID6)) return;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID6;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -6082,7 +7330,7 @@
         bar?.remove();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -6124,18 +7372,18 @@
   function isTargetPage5(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
-  function questionnaireResourceIdFromRow(row, resource) {
-    const link = row?.querySelector('a[href*="#/' + resource + '/"]');
+  function questionnaireResourceIdFromRow(row2, resource) {
+    const link = row2?.querySelector('a[href*="#/' + resource + '/"]');
     const href = link?.getAttribute("href") || link?.href || "";
     return href.match(new RegExp("#/" + resource + "/([a-f0-9-]{36})(?:[/?]|$)", "i"))?.[1] || "";
   }
-  function vacancyUuidFromRow(row) {
-    const link = row?.querySelector('a[href*="werkia.de/bewerben/"]');
+  function vacancyUuidFromRow(row2) {
+    const link = row2?.querySelector('a[href*="werkia.de/bewerben/"]');
     return link?.href.match(/bewerben\/([a-f0-9-]{36})/i)?.[1] || "";
   }
-  function buildQuestionnaireContext(row, origin = location.origin) {
-    const candidateId = questionnaireResourceIdFromRow(row, "Candidate");
-    const jobId = questionnaireResourceIdFromRow(row, "JobPosition") || vacancyUuidFromRow(row);
+  function buildQuestionnaireContext(row2, origin = location.origin) {
+    const candidateId = questionnaireResourceIdFromRow(row2, "Candidate");
+    const jobId = questionnaireResourceIdFromRow(row2, "JobPosition") || vacancyUuidFromRow(row2);
     if (!candidateId || !jobId) return null;
     return {
       key: candidateId + "|" + jobId,
@@ -6158,9 +7406,9 @@
       if (!isTargetPage5()) return;
       const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button4) return;
-      const row = button4.closest("tr");
-      if (!row) return;
-      const next = buildQuestionnaireContext(row);
+      const row2 = button4.closest("tr");
+      if (!row2) return;
+      const next = buildQuestionnaireContext(row2);
       Object.assign(context, next || EMPTY_CONTEXT);
     }
     runtime.addDocumentListener("click", captureContext, true);
@@ -6423,14 +7671,14 @@
       if (!isTargetPage5()) return;
       const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button4) return;
-      const row = button4.closest("tr");
-      if (!row) return;
-      const vacancyLink = row.querySelector('a[href*="werkia.de/bewerben/"]');
+      const row2 = button4.closest("tr");
+      if (!row2) return;
+      const vacancyLink = row2.querySelector('a[href*="werkia.de/bewerben/"]');
       const uuid = vacancyLink?.href.match(/bewerben\/([a-f0-9-]{36})/i)?.[1] || "";
       if (!uuid) return;
-      const jobTitleElement = row.querySelector(".column-jobPositionId a span, .column-jobPositionId a");
+      const jobTitleElement = row2.querySelector(".column-jobPositionId a span, .column-jobPositionId a");
       const jobTitle = jobTitleElement?.textContent?.trim() || "";
-      const employerId = employerIdFromRow(row);
+      const employerId = employerIdFromRow(row2);
       const routeKey = context.key || "";
       const token = String(++clickCounter);
       showVacancyLoading(jobTitle, token);
@@ -6521,235 +7769,6 @@
     return { shouldRun, reset };
   }
 
-  // ../../shared/js/werkia-questionnaire/om-notes.js
-  function collapseWhitespace(value) {
-    return String(value || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-  }
-  function foldForTagMatching(value) {
-    return collapseWhitespace(value).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
-  }
-  function getOmNoteTags(value) {
-    const rawTags = [...String(value || "").matchAll(/\[([^\]]+)\]/g)].map((match) => collapseWhitespace(match[1])).filter(Boolean);
-    const normalizedTags = rawTags.map(foldForTagMatching);
-    const cvInstructions = rawTags.filter((tag, index) => /^cv(?:\s*,|\s*$)/i.test(tag) || normalizedTags[index].startsWith("cv,"));
-    return {
-      rawTags,
-      cvInstructions,
-      openOnly: normalizedTags.some((tag) => tag === "nur offen"),
-      noRvm: normalizedTags.some((tag) => /^kein\s+rvm$/.test(tag)),
-      // Beide Schreibweisen: die Flag-Leiste (shared/js/om-notes-templates)
-      // und docs/reference/om_flags.md schreiben [RVM:100%], aeltere Notizen
-      // [RVM: NUR 100%]. Bis 2026-09-24 erkannte der Parser nur die zweite -
-      // bei 9 von 14 Arbeitgebern mit dem Flag blieb es dadurch wirkungslos.
-      strictRvm: normalizedTags.some((tag) => /^rvm\s*:\s*(?:nur\s*)?100\s*%$/.test(tag))
-    };
-  }
-  function describeOmNoteTags(tags) {
-    const parts = [];
-    if (tags.openOnly) parts.push("[NUR OFFEN] nur offene Profile senden, bevorzugt vor normalen offenen Matches.");
-    if (tags.cvInstructions.length) parts.push(`CV-Hinweis: ${tags.cvInstructions.map((tag) => `[${tag}]`).join(", ")}`);
-    if (tags.strictRvm) parts.push("[RVM: NUR 100%] nur bei sehr sicherem Match senden.");
-    if (tags.noRvm) parts.push("[KEIN RVM] nicht als Reverse Match senden.");
-    return parts.join(" ");
-  }
-
-  // ../../shared/js/werkia-questionnaire/job-title-catalog.js
-  var JOB_TITLE_CATALOG = [
-    { slug: "auto_mechatronics_tech", name: "KFZ-Mechatroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "azubi_electronic", name: "Azubi Elektrotechnik", workArea: ["electrical"], education: ["none"] },
-    { slug: "azubi_shk", name: "Azubi SHK", workArea: ["shc"], education: ["none"] },
-    { slug: "bachelor_computer_science", name: "Bachelor Informatik", workArea: ["electrical"], education: ["master"] },
-    { slug: "bachelor_electrical_engineering", name: "Bachelor Elektrotechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "bachelor_electrical_info_tech", name: "Bachelor Elektro- und Informationstechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "central_hvac_engineer", name: "Zentralheizungs- und Lüftungsbauer", workArea: ["shc"], education: ["in_progress", "finished"] },
-    { slug: "electrician", name: "Elektroinstallateur", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_automation", name: "Elektroniker für Automatisierungstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_devices_systems", name: "Elektroniker für Geräte und Systeme", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_energy_building", name: "Elektroniker für Energie- und Gebäudetechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_industrial", name: "Elektroniker für Betriebstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_info_telecom", name: "Elektroniker für Informations- und Telekommunikationstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "electronic_tech_machine_drive", name: "Elektroniker für Maschinen- und Antriebstechnik", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "energy_system_electronic_tech", name: "Energieanlagenelektroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "gas_water_installer", name: "Gas- und Wasserinstallateur", workArea: ["shc"], education: ["in_progress", "finished"] },
-    { slug: "industrial_electronic_tech", name: "Industrieelektroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "industrial_mechanic", name: "Industriemechaniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "master_computer_science", name: "Master Informatik", workArea: ["electrical"], education: ["master"] },
-    { slug: "master_electrical_engineering", name: "Master Elektrotechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "master_electrical_info_tech", name: "Master Elektro- und Informationstechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "mechatronics_tech", name: "Mechatroniker", workArea: ["electrical"], education: ["in_progress", "finished"] },
-    { slug: "mechatronics_tech_refrigeration", name: "Mechatroniker für Kältetechnik", workArea: ["shc"], education: ["in_progress", "finished"] },
-    { slug: "meister_communication", name: "Meister Kommunikations & Sicherheitstechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "meister_electrical_engineering", name: "Meister Elektrotechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "meister_energy", name: "Meister Energie- & Gebäudetechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "meister_refrigeration_tech", name: "Meister Kältetechnik", workArea: ["shc"], education: ["master"] },
-    { slug: "meister_shk", name: "Meister SHK", workArea: ["shc"], education: ["master"] },
-    { slug: "meister_system_electronics", name: "Meister Systemelektronik", workArea: ["electrical"], education: ["master"] },
-    { slug: "miscellaneous_electronic", name: "Sonstiges Elektrotechnik", workArea: ["electrical"], education: ["none", "in_progress", "finished", "master"] },
-    { slug: "miscellaneous_shk", name: "Sonstiges SHK", workArea: ["shc"], education: ["none", "in_progress", "finished", "master"] },
-    { slug: "plant_mechanic_shk", name: "Anlagenmechaniker SHK", workArea: ["shc"], education: ["in_progress", "finished"] },
-    { slug: "refrigeration_system_builder", name: "Kälteanlagenbauer", workArea: ["shc"], education: ["in_progress", "finished"] },
-    { slug: "state_certified_tech_electronic", name: "Staatlich Geprüfter Techniker Elektrotechnik", workArea: ["electrical"], education: ["master"] },
-    { slug: "state_certified_tech_shk", name: "Staatlich Geprüfter Techniker SHK", workArea: ["shc"], education: ["master"] },
-    { slug: "tool_mechanic", name: "Werkzeugmechaniker", workArea: ["electrical"], education: ["in_progress", "finished"] }
-  ];
-  var JOB_TITLE_SLUGS = new Set(JOB_TITLE_CATALOG.map((entry) => entry.slug));
-
-  // ../../shared/js/werkia-questionnaire/scoring.js
-  var GREEN = "#d8f5d0";
-  var RED = "#ffd6d6";
-  var YELLOW = "#fff3bf";
-  var ORANGE = "#ffd8a8";
-  function clean(value) {
-    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
-  }
-  function asciiFold(value) {
-    return String(value || "").replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/[ßẞ]/g, "ss");
-  }
-  function foldIfNeeded(value, fold2) {
-    return fold2 ? asciiFold(value) : value;
-  }
-  function isEmptyValue(value) {
-    const v = clean(value);
-    return !v || v === "-" || v === "–" || v === "nicht angegeben" || v === "keine angabe";
-  }
-  function travelRank(value, { fold: fold2 = false } = {}) {
-    const v = foldIfNeeded(clean(value), fold2);
-    const has = (literal) => v.includes(foldIfNeeded(literal, fold2));
-    if (has("keine reisebereitschaft")) return 0;
-    if (has("gering")) return 1;
-    if (has("regelmäßig")) return 2;
-    if (has("uneingeschränkt")) return 3;
-    return null;
-  }
-  function languageRank(value) {
-    const v = clean(value);
-    if (v.includes("grundkenntnisse")) return 0;
-    if (v.includes("verhandlungssicher")) return 1;
-    if (v.includes("muttersprachlich")) return 2;
-    return null;
-  }
-  function experienceRank(value) {
-    const v = clean(value);
-    if (v.includes("mehr als 10")) return 4;
-    if (v.includes("6 bis 10")) return 3;
-    if (v.includes("3 bis 5")) return 2;
-    if (v.includes("1 bis 2")) return 1;
-    if (v === "0 jahre" || v.includes("0 jahre (")) return 0;
-    return null;
-  }
-  function isLicenseRequired(value, { fold: fold2 = false } = {}) {
-    const v = foldIfNeeded(clean(value), fold2);
-    const has = (literal) => v.includes(foldIfNeeded(literal, fold2));
-    if (isEmptyValue(value)) return null;
-    if (v === "nein" || has("nicht erforderlich") || has("kein führerschein erforderlich")) return false;
-    if (has("ja") || has("führerschein") || has("klasse") || /\bb\b/.test(v)) return true;
-    return null;
-  }
-  function licenseStatus(value, { fold: fold2 = false } = {}) {
-    const v = foldIfNeeded(clean(value), fold2);
-    const has = (literal) => v.includes(foldIfNeeded(literal, fold2));
-    if (isEmptyValue(value)) return "empty";
-    if (has("fahrschule") || has("wird gemacht") || has("in ausbildung")) return "driving-school";
-    if (has("kein") || has("nein") || has("nicht vorhanden") || has("ohne führerschein")) return "no-license";
-    if (has("ja") || has("klasse") || /\bb\b/.test(v) || has("vorhanden")) return "has-license";
-    return "empty";
-  }
-  function parseSalaryNumbers(text) {
-    const matches = String(text || "").match(/\d[\d.,]*/g);
-    if (!matches) return [];
-    return matches.map((num) => Number(num.replace(/\./g, "").replace(",", "."))).filter((num) => !Number.isNaN(num) && num > 100);
-  }
-  function salaryMax(text) {
-    const numbers = parseSalaryNumbers(text);
-    return numbers.length ? Math.max(...numbers) : null;
-  }
-  function rankColor(requiredRank, candidateRank, { allowAllIfZero = false, oneBelowColor } = {}) {
-    if (requiredRank === null || candidateRank === null) return null;
-    if (allowAllIfZero && requiredRank === 0) return GREEN;
-    if (candidateRank >= requiredRank) return GREEN;
-    if (candidateRank === requiredRank - 1) return oneBelowColor;
-    return RED;
-  }
-  function languageColor(requiredRank, candidateRank) {
-    return rankColor(requiredRank, candidateRank, { oneBelowColor: YELLOW });
-  }
-  function normalizePosition(value, { fold: fold2 = false } = {}) {
-    let v = clean(value).replace(/&/g, "und").replace(/anlagemechaniker/g, "anlagenmechaniker").replace(/\s+/g, " ").trim();
-    if (fold2) v = asciiFold(v);
-    return v;
-  }
-  var POSITION_EQUIVALENT_GROUPS = [
-    ["plant_mechanic_shk", "central_hvac_engineer", "gas_water_installer"],
-    ["mechatronics_tech_refrigeration", "refrigeration_system_builder"],
-    ["electronic_tech_energy_building", "electrician"],
-    ["electronic_tech_industrial", "energy_system_electronic_tech"],
-    ["electronic_tech_devices_systems", "industrial_electronic_tech", "electronic_tech_machine_drive"],
-    ["electronic_tech_info_telecom", "electronic_tech_automation"],
-    ["industrial_mechanic", "tool_mechanic"],
-    ["auto_mechatronics_tech"],
-    ["meister_shk", "state_certified_tech_shk"],
-    ["meister_refrigeration_tech"],
-    ["meister_electrical_engineering", "meister_energy", "state_certified_tech_electronic"],
-    ["meister_system_electronics", "meister_communication"],
-    ["bachelor_computer_science", "bachelor_electrical_info_tech", "bachelor_electrical_engineering", "master_electrical_info_tech", "master_electrical_engineering", "master_computer_science"],
-    ["miscellaneous_shk"],
-    ["miscellaneous_electronic"],
-    ["central_hvac_engineer", "gas_water_installer", "mechatronics_tech_refrigeration", "refrigeration_system_builder"]
-  ];
-  var SLUG_BY_NAME = new Map(JOB_TITLE_CATALOG.map((entry) => [normalizePosition(entry.name), entry.slug]));
-  var SLUG_BY_FOLDED_NAME = new Map(JOB_TITLE_CATALOG.map((entry) => [normalizePosition(entry.name, { fold: true }), entry.slug]));
-  function toPositionSlug(normalized, fold2) {
-    if (!normalized) return "";
-    if (JOB_TITLE_SLUGS.has(normalized)) return normalized;
-    return (fold2 ? SLUG_BY_FOLDED_NAME : SLUG_BY_NAME).get(normalized) || "";
-  }
-  function positionMatches(employerPosition, candidatePosition, { fold: fold2 = false } = {}) {
-    const employerName = normalizePosition(employerPosition, { fold: fold2 });
-    const candidateName = normalizePosition(candidatePosition, { fold: fold2 });
-    if (!employerName || !candidateName || employerName === "-" || candidateName === "-") return false;
-    if (employerName === candidateName) return true;
-    const employer = toPositionSlug(employerName, fold2);
-    const candidate = toPositionSlug(candidateName, fold2);
-    if (!employer || !candidate) return false;
-    if (employer === "mechatronics_tech" || candidate === "mechatronics_tech") return false;
-    return POSITION_EQUIVALENT_GROUPS.some((group) => group.includes(employer) && group.includes(candidate));
-  }
-  var POSITION_REVIEW_GROUPS = [
-    {
-      employer: ["electronic_tech_energy_building", "electrician"],
-      candidate: ["electronic_tech_industrial"]
-    },
-    {
-      employer: ["electronic_tech_info_telecom", "electronic_tech_automation"],
-      candidate: ["electronic_tech_devices_systems", "electronic_tech_machine_drive"]
-    },
-    {
-      employer: ["mechatronics_tech_refrigeration", "refrigeration_system_builder"],
-      candidate: ["plant_mechanic_shk", "central_hvac_engineer"]
-    },
-    {
-      employer: ["electronic_tech_industrial", "electronic_tech_energy_building"],
-      candidate: ["electronic_tech_industrial", "electronic_tech_energy_building"]
-    },
-    {
-      employer: ["electronic_tech_industrial", "electrician"],
-      candidate: ["electronic_tech_industrial", "electrician"]
-    }
-  ];
-  function positionsNeedReview(employerPosition, candidatePosition, { fold: fold2 = false } = {}) {
-    const employerName = normalizePosition(employerPosition, { fold: fold2 });
-    const candidateName = normalizePosition(candidatePosition, { fold: fold2 });
-    if (!employerName || !candidateName || employerName === "-" || candidateName === "-") return false;
-    if (positionMatches(employerPosition, candidatePosition, { fold: fold2 })) return false;
-    const employer = toPositionSlug(employerName, fold2);
-    const candidate = toPositionSlug(candidateName, fold2);
-    if (!employer || !candidate) return false;
-    return POSITION_REVIEW_GROUPS.some((group) => group.employer.includes(employer) && group.candidate.includes(candidate));
-  }
-  function positionRelated(employerPosition, candidatePosition, options) {
-    return positionsNeedReview(employerPosition, candidatePosition, options);
-  }
-
   // ../../shared/js/werkia-questionnaire/labels.js
   var QUESTIONNAIRE_LABELS2 = [
     "Reisehäufigkeit",
@@ -6791,7 +7810,7 @@
 
   // ../../shared/js/werkia-questionnaire/dialog.js
   function normalize6(value, fold2) {
-    const v = clean(value);
+    const v = clean2(value);
     return fold2 ? asciiFold(v) : v;
   }
   function getVisibleDialogs(root = document) {
@@ -6815,12 +7834,12 @@
     if (strictMode && /Kandidatendateien|Zusammenführen|Halb anonym/i.test(text)) return false;
     const rawLabels = getDialogLabelTexts(dialog);
     const labelSet = new Set(rawLabels.map((l) => normalize6(l, fold2)));
-    const has = (literal) => labelSet.has(normalize6(literal, fold2));
-    const count = labels.filter((l) => has(l)).length;
-    const hasHeader = has("Kandidat") && has("Job");
+    const has2 = (literal) => labelSet.has(normalize6(literal, fold2));
+    const count = labels.filter((l) => has2(l)).length;
+    const hasHeader = has2("Kandidat") && has2("Job");
     if (!strictMode) return hasHeader && count >= 3;
-    const hasOmSpecificField = has("Zusätzliche Information - OM");
-    const hasCoreComparisonPair = has("Reisehäufigkeit") && has("Montagebereitschaft") || has("Erforderliche Berufserfahrung") && has("Berufserfahrung") || has("Erforderliche Sprachkentnisse") && has("Sprachkentnisse");
+    const hasOmSpecificField = has2("Zusätzliche Information - OM");
+    const hasCoreComparisonPair = has2("Reisehäufigkeit") && has2("Montagebereitschaft") || has2("Erforderliche Berufserfahrung") && has2("Berufserfahrung") || has2("Erforderliche Sprachkentnisse") && has2("Sprachkentnisse");
     return hasHeader && (hasOmSpecificField || hasCoreComparisonPair || count >= 4) || hasOmSpecificField && count >= 3;
   }
   function findQuestionnaireDialog(root = document, options = {}) {
@@ -6945,7 +7964,7 @@
     const employerName = getQuestionnaireHeaderValue(dialog, "Arbeitgeber");
     if (isFlaggedCompany(employerName)) return true;
     const omNotes = findValue(dialog, "Zusätzliche Information - OM")?.innerText || "";
-    return clean(omNotes).includes(clean(COMPANY_FLAG_TEXT));
+    return clean2(omNotes).includes(clean2(COMPANY_FLAG_TEXT));
   }
 
   // src/features/kam-suite/questionnaire-evaluation.js
@@ -7021,7 +8040,7 @@
     function compareRecognition(dialog) {
       const el7 = findValue(dialog, "Recognition status");
       if (!el7) return { status: "send" };
-      const v = clean(el7.innerText);
+      const v = clean2(el7.innerText);
       if (v.includes("ja, ist anerkannt")) {
         mark2(el7, GREEN, "Anerkennung: Ja");
         return { status: "send" };
@@ -7081,8 +8100,8 @@
       return { status: "send" };
     }
     function comparePositions(dialog) {
-      const empEls = getPositionEls(dialog, "Position").map((el7) => ({ el: el7, value: clean(el7.innerText) }));
-      const candEls = getPositionEls(dialog, "Positionen").map((el7) => ({ el: el7, value: clean(el7.innerText) }));
+      const empEls = getPositionEls(dialog, "Position").map((el7) => ({ el: el7, value: clean2(el7.innerText) }));
+      const candEls = getPositionEls(dialog, "Positionen").map((el7) => ({ el: el7, value: clean2(el7.innerText) }));
       if (!empEls.length) return { status: "send" };
       if (!candEls.length) return { status: "unclear", detail: `Positionen: ${empEls.map((p) => p.value).join(", ")} → leer` };
       let anyGreen = false;
@@ -7752,7 +8771,7 @@
     const isQuestionnaireDialog2 = (dialog) => {
       const text = dialog?.innerText || dialog?.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element2) => (element2.innerText || "").trim()));
+      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
       return labels.has("Kandidat") && labels.has("Job") && QUESTIONNAIRE_LABELS3.filter((label) => labels.has(label)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog2(dialog)) || null;
@@ -7924,12 +8943,12 @@
     let pendingCandidateId = "";
     let pendingCandidateAt = 0;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row) => row.querySelector(WVL_CELL_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR2));
     }
-    function visibleOverlay(element2) {
-      if (!element2) return false;
-      const style = getComputedStyle(element2);
-      const rect = element2.getBoundingClientRect();
+    function visibleOverlay(element5) {
+      if (!element5) return false;
+      const style = getComputedStyle(element5);
+      const rect = element5.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function candidateFilesDialog() {
@@ -7966,11 +8985,11 @@
       else dialog.prepend(button4);
     }
     function installCandidateFileHooks() {
-      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element2) => element2.remove());
-      getRows().forEach((row) => {
-        const actionsCell = row.querySelector(CANDIDATE_ACTIONS_CELL_SELECTOR);
+      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element5) => element5.remove());
+      getRows().forEach((row2) => {
+        const actionsCell = row2.querySelector(CANDIDATE_ACTIONS_CELL_SELECTOR);
         if (!actionsCell) return;
-        const candidateLink = row.querySelector(`${CANDIDATE_CELL_SELECTOR} a[href*="#/Candidate/"]`);
+        const candidateLink = row2.querySelector(`${CANDIDATE_CELL_SELECTOR} a[href*="#/Candidate/"]`);
         if (!candidateLink) return;
         const filesButton = actionsCell.querySelector('button[aria-label="Kandidat Dateien"]');
         if (!filesButton || filesButton.dataset.werkiaCandidatePopupHook === "true") return;
@@ -8276,9 +9295,9 @@
   var BANNER_CACHE_MAX_ENTRIES = 300;
   var BANNER_REFRESH_INTERVAL = 30 * 1e3;
   var isBannerCacheEntryExpired = (entry, now = Date.now()) => !entry || typeof entry !== "object" || !(now - Number(entry.time) < BANNER_CACHE_TTL);
-  var clean2 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
+  var clean3 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
   function badgeColor(value) {
-    const v = clean2(value);
+    const v = clean3(value);
     if (!v || v === "-" || v === "–" || v.includes("lädt")) return "#e9ecef";
     if (v.includes("out") || v.includes("absage") || v.includes("abgelehnt") || v.includes("nicht passend") || v.includes("entfernung")) return "#ff6b6b";
     if (v.includes("senden") || v.includes("send") || v.includes("wvl") || v.includes("akzeptiert") || v.includes("terminbestätigung")) return "#d8f5d0";
@@ -8334,8 +9353,8 @@
       });
       const candidate = rightLinks[0];
       if (!candidate) return null;
-      const row = candidate.closest("div") || candidate.parentElement;
-      const prio = [...row.querySelectorAll("span, div, button")].find((el7) => /^[A-F]\d*$/i.test((el7.innerText || "").trim()));
+      const row2 = candidate.closest("div") || candidate.parentElement;
+      const prio = [...row2.querySelectorAll("span, div, button")].find((el7) => /^[A-F]\d*$/i.test((el7.innerText || "").trim()));
       return prio || candidate;
     }
     function ensureBox() {
@@ -8460,12 +9479,12 @@
   var ROW_SELECTOR7 = "tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
-  function getMatchIdFromChatRow(row) {
-    const link = row?.querySelector(MATCH_LINK_SELECTOR5);
+  function getMatchIdFromChatRow(row2) {
+    const link = row2?.querySelector(MATCH_LINK_SELECTOR5);
     return link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
   }
-  function getEmployerIdFromChatRow(row) {
-    const link = row?.querySelector(EMPLOYER_LINK_SELECTOR5);
+  function getEmployerIdFromChatRow(row2) {
+    const link = row2?.querySelector(EMPLOYER_LINK_SELECTOR5);
     return link?.getAttribute("href")?.match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
   }
   function buildDirectChatUrl(chatIconHref, matchId, employerId) {
@@ -8488,12 +9507,12 @@
       if (!isTargetPage()) return;
       const link = event.target.closest(CHAT_LINK_SELECTOR);
       if (!link) return;
-      const row = link.closest(ROW_SELECTOR7);
-      const matchId = getMatchIdFromChatRow(row);
+      const row2 = link.closest(ROW_SELECTOR7);
+      const matchId = getMatchIdFromChatRow(row2);
       if (!matchId) return;
       event.preventDefault();
       event.stopPropagation();
-      location.hash = buildDirectChatUrl(link.getAttribute("href"), matchId, getEmployerIdFromChatRow(row));
+      location.hash = buildDirectChatUrl(link.getAttribute("href"), matchId, getEmployerIdFromChatRow(row2));
     }, true);
   }
 
@@ -8665,10 +9684,10 @@
   }
   function executeAppointmentCopyPaste(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/appointment-copy-paste.js");
-    function isVisible3(element2) {
-      if (!element2) return false;
-      const rect = element2.getBoundingClientRect();
-      const style = window.getComputedStyle(element2);
+    function isVisible3(element5) {
+      if (!element5) return false;
+      const rect = element5.getBoundingClientRect();
+      const style = window.getComputedStyle(element5);
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function appointmentDialog() {
@@ -8748,7 +9767,7 @@
         if (select) return select;
       }
       const selects = [...dialog.querySelectorAll(".MuiSelect-select")];
-      const fieldLabel = [...dialog.querySelectorAll("label")].find((element2) => element2.textContent?.trim().replace(/\*/g, "").trim() === label);
+      const fieldLabel = [...dialog.querySelectorAll("label")].find((element5) => element5.textContent?.trim().replace(/\*/g, "").trim() === label);
       if (fieldLabel) {
         const labelledSelect = selects.find((select) => select.getAttribute("aria-labelledby")?.split(/\s+/).includes(fieldLabel.id));
         if (labelledSelect) return labelledSelect;
@@ -9017,7 +10036,7 @@
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID7 = "werkia-kam-match-actions-style";
+  var STYLE_ID10 = "werkia-kam-match-actions-style";
   var STORE_KEY = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
@@ -9109,21 +10128,21 @@
       saveStore(store);
     }
     function rows() {
-      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row) => row.querySelector(JOB_TITLE_LINK_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR2));
     }
-    function rowIds(row) {
+    function rowIds(row2) {
       return {
-        jobPositionId: jobPositionIdFromHref(row.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref3(row.querySelector(MATCH_LINK_SELECTOR6)?.href)
+        jobPositionId: jobPositionIdFromHref(row2.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
+        matchId: matchIdFromHref3(row2.querySelector(MATCH_LINK_SELECTOR6)?.href)
       };
     }
     function visibleJobPositionIds() {
-      return [...new Set(rows().map((row) => rowIds(row).jobPositionId).filter(Boolean))];
+      return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle4() {
-      if (document.getElementById(STYLE_ID7)) return;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID7;
+      style.id = STYLE_ID10;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -9191,10 +10210,10 @@
         flash(button4, "Fehler");
       }
     }
-    function placeBar(row, bar) {
-      let fallback = row.querySelector(`.${FALLBACK_BLOCK_CLASS}`);
+    function placeBar(row2, bar) {
+      let fallback = row2.querySelector(`.${FALLBACK_BLOCK_CLASS}`);
       if (!fallback) {
-        const cell = row.querySelector(INTERVIEW_CELL_SELECTOR) || row.querySelector(".column-jobPositionId");
+        const cell = row2.querySelector(INTERVIEW_CELL_SELECTOR) || row2.querySelector(".column-jobPositionId");
         if (!cell) return;
         fallback = document.createElement("div");
         fallback.className = FALLBACK_BLOCK_CLASS;
@@ -9202,12 +10221,12 @@
       }
       if (bar.parentElement !== fallback) fallback.appendChild(bar);
     }
-    function ensureBar(row) {
-      const { jobPositionId, matchId } = rowIds(row);
+    function ensureBar(row2) {
+      const { jobPositionId, matchId } = rowIds(row2);
       if (!jobPositionId) return null;
-      let bar = row.querySelector(`.${BAR_CLASS2}`);
+      let bar = row2.querySelector(`.${BAR_CLASS2}`);
       if (bar && bar.dataset.jobPositionId === jobPositionId) {
-        placeBar(row, bar);
+        placeBar(row2, bar);
         return bar;
       }
       bar?.remove();
@@ -9229,13 +10248,13 @@
         tip.dataset.werkiaMatchActionsTip = "true";
         bar.appendChild(tip);
       }
-      placeBar(row, bar);
+      placeBar(row2, bar);
       return bar;
     }
     function render() {
       const { pending, pushSent } = loadStore();
-      rows().forEach((row) => {
-        const bar = ensureBar(row);
+      rows().forEach((row2) => {
+        const bar = ensureBar(row2);
         if (!bar) return;
         const jobPositionId = bar.dataset.jobPositionId;
         applyState(bar.querySelector('[data-action="urgent"]'), urgentButtonState(urgencyIndex.get(jobPositionId), pending[jobPositionId]));
@@ -9283,14 +10302,14 @@
       }, PENDING_POLL_MS);
     }
     function removeBars() {
-      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element2) => element2.remove());
+      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element5) => element5.remove());
     }
     function sync() {
       if (!isTargetPage7()) {
         removeBars();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -9311,7 +10330,7 @@
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID7)?.remove();
+      document.getElementById(STYLE_ID10)?.remove();
     });
     scheduleSync();
   }
@@ -9409,16 +10428,16 @@
   var BUTTON_CLASS = "werkia-slack-dm-button";
   var IDS3 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT4 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT6 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS = `
-  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT4}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT6}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT4}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT6}; color:#09090b; -webkit-font-smoothing:antialiased; }
   #${IDS3.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
   #${IDS3.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
   #${IDS3.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS3.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT4}; }
+  #${IDS3.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT6}; }
   #${IDS3.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS3.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
   #${IDS3.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
@@ -9428,14 +10447,14 @@
   #${IDS3.dialog} .sd-muted { color:#8b8b94; }
   #${IDS3.dialog} .sd-warn { color:#8a6700; }
   #${IDS3.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS3.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT4}; resize:vertical; }
+  #${IDS3.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT6}; resize:vertical; }
   #${IDS3.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
   #${IDS3.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
   #${IDS3.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
   #${IDS3.dialog} .sd-status.sd-error { color:#b52f2f; }
   #${IDS3.dialog} .sd-status.sd-ok { color:#0a7c0a; }
   #${IDS3.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS3.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT4}; }
+  #${IDS3.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT6}; }
   #${IDS3.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
   #${IDS3.dialog} .sd-secondary:hover { background:#f4f4f5; }
   #${IDS3.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
@@ -9462,7 +10481,7 @@
     let syncTimer = null;
     let closeTimer = null;
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS3.style)) return;
       const style = document.createElement("style");
       style.id = IDS3.style;
@@ -9470,24 +10489,24 @@
       document.head.appendChild(style);
     }
     function el7(tag, props = {}, children = []) {
-      const element2 = document.createElement(tag);
+      const element5 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {
-        if (key === "className") element2.className = value;
-        else if (key === "text") element2.textContent = value;
-        else if (key.startsWith("on")) element2.addEventListener(key.slice(2), value);
-        else element2.setAttribute(key, value);
+        if (key === "className") element5.className = value;
+        else if (key === "text") element5.textContent = value;
+        else if (key.startsWith("on")) element5.addEventListener(key.slice(2), value);
+        else element5.setAttribute(key, value);
       }
-      for (const child of [].concat(children)) if (child) element2.append(child);
-      return element2;
+      for (const child of [].concat(children)) if (child) element5.append(child);
+      return element5;
     }
-    function matchCellOf(row) {
-      if (row.querySelector("tr")) return null;
-      const link = [...row.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
+    function matchCellOf(row2) {
+      if (row2.querySelector("tr")) return null;
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
       const matchId = matchIdFromHref4(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
-    function addButton(row) {
-      const target = matchCellOf(row);
+    function addButton(row2) {
+      const target = matchCellOf(row2);
       if (!target?.cell) return;
       const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
       if (existing?.dataset.matchId === target.matchId) return;
@@ -9529,10 +10548,10 @@
     function renderPreview(dialog, preview) {
       const details = dialog.querySelector("dl");
       details.replaceChildren();
-      const row = (label, value) => details.append(el7("dt", { text: label }), el7("dd", {}, value));
-      row("Kandidat", preview.kandidat || "–");
-      row("Vakanz", vacancyLine(preview) || "–");
-      row("Match", el7("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
+      const row2 = (label, value) => details.append(el7("dt", { text: label }), el7("dd", {}, value));
+      row2("Kandidat", preview.kandidat || "–");
+      row2("Vakanz", vacancyLine(preview) || "–");
+      row2("Match", el7("a", { href: preview.matchLink, target: "_blank", rel: "noopener", text: "Im Adminpanel öffnen" }));
       const recipients = preview.empfaenger || [];
       const reachable = recipients.filter((entry) => entry.erreichbar);
       const list = el7("span");
@@ -9541,12 +10560,12 @@
         if (index) list.append(document.createTextNode(", "));
         list.append(el7("span", { className: entry.erreichbar ? "" : "sd-warn", text: recipientLabel(entry) + (entry.erreichbar ? "" : " (keine Slack-ID)") }));
       });
-      row("An", list);
+      row2("An", list);
       return reachable.length > 0;
     }
     async function openDialog(matchId) {
       closeDialog();
-      ensureStyle4();
+      ensureStyle5();
       const comment = el7("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el7("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
@@ -9605,7 +10624,7 @@
         removeButtons();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       document.querySelectorAll(ROW_SELECTOR9).forEach(addButton);
     }
     function scheduleSync() {
@@ -10041,8 +11060,8 @@
     'div[aria-label="Message body"]',
     'div[role="document"]'
   ];
-  function isVisible(element2) {
-    return element2.getClientRects().length > 0;
+  function isVisible(element5) {
+    return element5.getClientRects().length > 0;
   }
   var OUTSIDE_READING_PANE_SELECTOR = '[role="listbox"], [role="grid"], [role="tree"], [role="navigation"]';
   function readingPaneRoot() {
@@ -10052,7 +11071,7 @@
     while (node.parentElement && node.parentElement !== document.body && node.parentElement !== document.documentElement) {
       if (node.matches?.('[role="main"]')) break;
       const parent = node.parentElement;
-      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element2) => !node.contains(element2))) break;
+      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element5) => !node.contains(element5))) break;
       node = parent;
     }
     return node;
@@ -10064,7 +11083,7 @@
     return readingPaneRoot()?.innerText || text;
   }
   function readSubjectsFromReadingPane() {
-    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element2) => (element2.getAttribute("title") || element2.textContent || "").trim()).filter(Boolean);
+    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element5) => (element5.getAttribute("title") || element5.textContent || "").trim()).filter(Boolean);
     return [...new Set(subjects)];
   }
   function readOutMailCommentDraft() {
@@ -10329,13 +11348,13 @@
       return actions;
     }
     function buildSplitActions(leftChildren, rightChildren) {
-      const row = document.createElement("div");
-      styled3(row, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
+      const row2 = document.createElement("div");
+      styled3(row2, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
       const left = document.createElement("div");
       styled3(left, { display: "flex", gap: "8px" });
       leftChildren.forEach((child) => left.appendChild(child));
-      row.append(left, buildActions(rightChildren));
-      return row;
+      row2.append(left, buildActions(rightChildren));
+      return row2;
     }
     function buildButton(label, { action, primary = false } = {}) {
       const btn = document.createElement("button");
@@ -10462,11 +11481,11 @@
       const summary = applicationSummary(readMailContext());
       popover.dataset.summary = JSON.stringify(summary);
       const line = (label, value) => {
-        const row = document.createElement("div");
+        const row2 = document.createElement("div");
         const strong = document.createElement("strong");
         strong.textContent = `${label}: `;
-        row.append(strong, value || "aus der Mail nicht ablesbar");
-        return row;
+        row2.append(strong, value || "aus der Mail nicht ablesbar");
+        return row2;
       };
       const head = document.createElement("div");
       styled3(head, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", color: "#fff", background: "#ef6c00", fontWeight: "700" });
@@ -10852,7 +11871,7 @@
       }
     }
     function oversizedAttachments() {
-      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element2) => element2.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
+      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element5) => element5.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
     }
     async function renderCbreStep(dialog, state, match) {
       if (isDialogClosed(dialog)) return;
@@ -10877,21 +11896,21 @@
         return label;
       };
       const input = (value) => {
-        const element2 = document.createElement("input");
-        element2.type = "text";
-        element2.value = value || "";
-        return styled3(element2, fieldStyle);
+        const element5 = document.createElement("input");
+        element5.type = "text";
+        element5.value = value || "";
+        return styled3(element5, fieldStyle);
       };
       const select = (options, value) => {
-        const element2 = document.createElement("select");
+        const element5 = document.createElement("select");
         options.forEach(([optionValue, text]) => {
           const option = document.createElement("option");
           option.value = optionValue;
           option.textContent = text;
-          element2.appendChild(option);
+          element5.appendChild(option);
         });
-        element2.value = value;
-        return styled3(element2, fieldStyle);
+        element5.value = value;
+        return styled3(element5, fieldStyle);
       };
       const fields = {
         firstName: input(candidate.firstName || match.candidate?.firstName),
@@ -10921,7 +11940,7 @@
       );
       const preview = document.createElement("pre");
       styled3(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
-      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element2]) => [key, element2.value]));
+      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element5]) => [key, element5.value]));
       const updatePreview = () => {
         const current = values();
         preview.textContent = `An: ${CBRE_RECIPIENT}
@@ -10929,9 +11948,9 @@ Betreff: ${cbreSubject(current.positionId)}
 
 ${buildCbreBody(current)}`;
       };
-      Object.values(fields).forEach((element2) => {
-        element2.addEventListener("input", updatePreview);
-        element2.addEventListener("change", updatePreview);
+      Object.values(fields).forEach((element5) => {
+        element5.addEventListener("input", updatePreview);
+        element5.addEventListener("change", updatePreview);
       });
       updatePreview();
       const notes = [hasRefrigerationCertificate(candidate.certificates) ? "Laut Adminpanel hat der Kandidat einen Kälteschein. Ob groß oder klein, steht dort nicht – bitte auswählen." : "Laut Adminpanel ist kein Kälteschein hinterlegt. Für die Stelle ist der große Pflicht, der kleine geht unter Umständen."];
@@ -10985,9 +12004,9 @@ ${buildCbreBody(current)}`;
     async function openBccField() {
       const existing = visibleElement(COMPOSE_SELECTORS.bcc);
       if (existing) return existing;
-      const button4 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element2) => {
-        const label = `${element2.getAttribute("aria-label") || ""} ${element2.getAttribute("title") || ""}`;
-        return (element2.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
+      const button4 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element5) => {
+        const label = `${element5.getAttribute("aria-label") || ""} ${element5.getAttribute("title") || ""}`;
+        return (element5.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
       });
       if (!button4) return null;
       button4.click();
@@ -10999,8 +12018,8 @@ ${buildCbreBody(current)}`;
     async function waitForElement(selector, timeoutMs = 8e3) {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        const element2 = visibleElement(selector);
-        if (element2) return element2;
+        const element5 = visibleElement(selector);
+        if (element5) return element5;
         await sleep2(150);
       }
       return null;
@@ -11012,10 +12031,10 @@ ${buildCbreBody(current)}`;
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    function placeCaretAtEnd(element2) {
-      element2.focus();
+    function placeCaretAtEnd(element5) {
+      element5.focus();
       const range = document.createRange();
-      range.selectNodeContents(element2);
+      range.selectNodeContents(element5);
       range.collapse(false);
       const selection = window.getSelection();
       selection.removeAllRanges();
@@ -11037,16 +12056,16 @@ ${buildCbreBody(current)}`;
     function editorText2(editor) {
       return (editor.innerText || "").replace(/ /g, " ").replace(/\n{2,}/g, "\n").trim();
     }
-    function editableIn(element2) {
-      if (!element2) return null;
-      if (element2.isContentEditable) return element2;
-      return element2.querySelector('[contenteditable="true"]') || element2;
+    function editableIn(element5) {
+      if (!element5) return null;
+      if (element5.isContentEditable) return element5;
+      return element5.querySelector('[contenteditable="true"]') || element5;
     }
     function recipientPresent(toField, address) {
       let node = toField;
       for (let depth = 0; node && depth < 4; depth += 1, node = node.parentElement) {
         if (recipientLabelMatches(node.innerText, address)) return true;
-        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element2) => recipientLabelMatches(`${element2.getAttribute("title") || ""} ${element2.getAttribute("aria-label") || ""}`, address));
+        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element5) => recipientLabelMatches(`${element5.getAttribute("title") || ""} ${element5.getAttribute("aria-label") || ""}`, address));
         if (labelled) return true;
       }
       return false;
@@ -11057,13 +12076,13 @@ ${buildCbreBody(current)}`;
       target.dispatchEvent(new KeyboardEvent("keypress", init));
       target.dispatchEvent(new KeyboardEvent("keyup", init));
     }
-    async function waitForStableText(element2, { quietMs = 700, timeoutMs = 5e3 } = {}) {
+    async function waitForStableText(element5, { quietMs = 700, timeoutMs = 5e3 } = {}) {
       const deadline = Date.now() + timeoutMs;
-      let last = element2.innerText;
+      let last = element5.innerText;
       let stableSince = Date.now();
       while (Date.now() < deadline) {
         await sleep2(150);
-        const current = element2.innerText;
+        const current = element5.innerText;
         if (current !== last) {
           last = current;
           stableSince = Date.now();
@@ -11259,7 +12278,7 @@ ${buildCbreBody(current)}`;
     let settleUntil = 0;
     let lastMatched = false;
     function mailKey() {
-      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element2) => element2.id).join("|");
+      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element5) => element5.id).join("|");
       return `${location.href}#${ids}`;
     }
     function evaluateMail() {
@@ -11497,7 +12516,7 @@ ${buildCbreBody(current)}`;
   var MAIL_BODY_SELECTORS2 = ['div[aria-label="Nachrichtentext"]', 'div[aria-label="Message body"]', 'div[role="document"]'];
   var STATUS_CHOICES = ["interview_request", "interview_conducted", "interview_feedback", "hot_case", "hot_hot_case", "out"];
   var ADMIN = "https://admin.werkia.de/#";
-  var isVisible2 = (element2) => element2.getClientRects().length > 0;
+  var isVisible2 = (element5) => element5.getClientRects().length > 0;
   function styled2(node, styles) {
     Object.assign(node.style, styles);
     return node;
@@ -11553,9 +12572,9 @@ ${buildCbreBody(current)}`;
         removePill();
         return;
       }
-      let pill = document.getElementById(IDS5.pill);
-      if (!pill) {
-        pill = el4("button", {
+      let pill2 = document.getElementById(IDS5.pill);
+      if (!pill2) {
+        pill2 = el4("button", {
           position: "fixed",
           right: "88px",
           bottom: "27px",
@@ -11569,18 +12588,18 @@ ${buildCbreBody(current)}`;
           color: "#fff",
           boxShadow: "0 4px 16px rgba(0,0,0,.25)"
         });
-        pill.id = IDS5.pill;
-        pill.type = "button";
-        pill.addEventListener("click", () => openDialog(current.result));
-        document.body.appendChild(pill);
+        pill2.id = IDS5.pill;
+        pill2.type = "button";
+        pill2.addEventListener("click", () => openDialog(current.result));
+        document.body.appendChild(pill2);
       }
       const done = result.status === "erledigt";
       const staging = result.umgebung === "staging" ? " · Staging" : "";
-      pill.textContent = done ? `Vorschlag erledigt${staging}` : `Vorschlag: ${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${staging}`;
-      styled2(pill, { background: done ? "#6b7280" : "#1d4ed8" });
+      pill2.textContent = done ? `Vorschlag erledigt${staging}` : `Vorschlag: ${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${staging}`;
+      styled2(pill2, { background: done ? "#6b7280" : "#1d4ed8" });
     }
     function choiceRow(choice, vorschlag, onChange) {
-      const row = el4("div", { display: "grid", gap: "6px", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", background: choice.moeglich ? "#fff" : "#f9fafb" });
+      const row2 = el4("div", { display: "grid", gap: "6px", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", background: choice.moeglich ? "#fff" : "#f9fafb" });
       const head = el4("label", { display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" });
       const box = document.createElement("input");
       box.type = "checkbox";
@@ -11592,7 +12611,7 @@ ${buildCbreBody(current)}`;
       });
       const titles = { status: "KAM-Status", kommentar: "Matchkommentar", wvl: "WVL", agNotiz: "AG-Notiz" };
       head.append(box, titles[choice.art] || choice.art);
-      row.appendChild(head);
+      row2.appendChild(head);
       const touch = () => {
         box.checked = choice.moeglich;
         choice.aktiv = choice.moeglich;
@@ -11619,7 +12638,7 @@ ${buildCbreBody(current)}`;
         sync();
         const line = el4("div", { display: "flex", gap: "6px", flexWrap: "wrap" });
         line.append(status, reason);
-        row.appendChild(line);
+        row2.appendChild(line);
       } else if (choice.art === "kommentar") {
         const text = el4("textarea", { width: "100%", boxSizing: "border-box", font: "13px/1.4 Arial,sans-serif" });
         text.rows = 2;
@@ -11627,7 +12646,7 @@ ${buildCbreBody(current)}`;
         text.addEventListener("input", () => {
           choice.kommentar = text.value;
         });
-        row.appendChild(text);
+        row2.appendChild(text);
         if (choice.cem) {
           const cem = el4("label", { display: "flex", gap: "6px", alignItems: "center" });
           const cemBox = document.createElement("input");
@@ -11638,7 +12657,7 @@ ${buildCbreBody(current)}`;
             choice.cem = cemBox.checked ? person : null;
           });
           cem.append(cemBox, `@${person.label} erwähnen`);
-          row.appendChild(cem);
+          row2.appendChild(cem);
         }
         if (choice.mailtext) {
           const details = document.createElement("details");
@@ -11651,7 +12670,7 @@ ${buildCbreBody(current)}`;
             choice.mailtext = mail.value;
           });
           details.append(summary, mail);
-          row.appendChild(details);
+          row2.appendChild(details);
         }
       } else if (choice.art === "wvl") {
         const date = document.createElement("input");
@@ -11661,7 +12680,7 @@ ${buildCbreBody(current)}`;
           choice.wvl = date.value;
           touch();
         });
-        row.appendChild(date);
+        row2.appendChild(date);
       } else if (choice.art === "agNotiz") {
         const tags = el4("div", { display: "flex", gap: "10px", flexWrap: "wrap" });
         NOTE_TAGS.forEach((tag) => {
@@ -11681,11 +12700,11 @@ ${buildCbreBody(current)}`;
         text.addEventListener("input", () => {
           choice.text = text.value;
         });
-        row.append(tags, text);
+        row2.append(tags, text);
       }
-      if (choice.hinweis) row.appendChild(el4("div", { color: "#92400e", fontSize: "12px" }, choice.hinweis));
-      if (!choice.moeglich) row.appendChild(el4("div", { color: "#6b7280", fontSize: "12px" }, "Kein Match zugeordnet, nur zur Info."));
-      return row;
+      if (choice.hinweis) row2.appendChild(el4("div", { color: "#92400e", fontSize: "12px" }, choice.hinweis));
+      if (!choice.moeglich) row2.appendChild(el4("div", { color: "#6b7280", fontSize: "12px" }, "Kein Match zugeordnet, nur zur Info."));
+      return row2;
     }
     function matchBlock(entry, index, choices, onChange) {
       const block = el4("div", { display: "grid", gap: "6px" });
@@ -12097,11 +13116,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   function columnOf(cell) {
     return [...cell?.classList || []].find((name) => name.startsWith("column-")) || "";
   }
-  function directCell(row, className) {
-    return [...row.children].find((child) => child.classList?.contains(className)) || null;
+  function directCell(row2, className) {
+    return [...row2.children].find((child) => child.classList?.contains(className)) || null;
   }
-  function frontReference(row, cell) {
-    const cells = [...row.children];
+  function frontReference(row2, cell) {
+    const cells = [...row2.children];
     const after = cells.findIndex((child) => child.classList?.contains(FRONT_AFTER));
     return cells.slice(after + 1).find((child) => child !== cell && columnOf(child)) || null;
   }
@@ -12112,18 +13131,18 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     if (!column) return 0;
     const className = columnClass(column);
     let touched = 0;
-    rowsOf(root).forEach((row) => {
-      const cell = directCell(row, className);
+    rowsOf(root).forEach((row2) => {
+      const cell = directCell(row2, className);
       if (!cell) return;
       if (!cell.classList.contains(HIGHLIGHT_CLASS)) cell.classList.add(HIGHLIGHT_CLASS);
       if (cell.tagName === "TH" && !cell.classList.contains(HEAD_CLASS)) cell.classList.add(HEAD_CLASS);
       if (!front) return;
-      const reference = frontReference(row, cell);
+      const reference = frontReference(row2, cell);
       if (!reference) return;
-      const cells = [...row.children];
+      const cells = [...row2.children];
       if (cells.indexOf(cell) < cells.indexOf(reference)) return;
       if (!cell.hasAttribute(NEXT_ATTR)) cell.setAttribute(NEXT_ATTR, columnOf(cell.nextElementSibling));
-      row.insertBefore(cell, reference);
+      row2.insertBefore(cell, reference);
       touched += 1;
     });
     return touched;
@@ -12134,11 +13153,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!cell.hasAttribute(NEXT_ATTR)) return;
       const next = cell.getAttribute(NEXT_ATTR);
       cell.removeAttribute(NEXT_ATTR);
-      const row = cell.parentElement;
-      if (!row) return;
-      const reference = next ? directCell(row, next) : null;
-      if (reference) row.insertBefore(cell, reference);
-      else row.appendChild(cell);
+      const row2 = cell.parentElement;
+      if (!row2) return;
+      const reference = next ? directCell(row2, next) : null;
+      if (reference) row2.insertBefore(cell, reference);
+      else row2.appendChild(cell);
     });
   }
   function visibleColumns(root, labels = {}) {
@@ -12236,7 +13255,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return employers.promise;
     };
     installEmployerContactRewrite({ pageWindow, loadEmployers });
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
       style.id = IDS9.style;
@@ -12464,8 +13483,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
       if (select.value !== activeId) select.value = activeId;
     }
-    function setHidden(element2, hidden) {
-      if (element2 && element2.hidden !== hidden) element2.hidden = hidden;
+    function setHidden(element5, hidden) {
+      if (element5 && element5.hidden !== hidden) element5.hidden = hidden;
     }
     let onPage = false;
     function render() {
@@ -12480,7 +13499,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         return;
       }
       onPage = true;
-      ensureStyle4();
+      ensureStyle5();
       const own = storage.load();
       const state = parseListState(location.hash);
       if (hasStaleEmployerIds(state.filter)) {
@@ -12750,13 +13769,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   }
   function findToolbar(root = document) {
     for (const selector of TOOLBAR_SELECTORS) {
-      const element2 = root.querySelector(selector);
-      if (element2) return element2;
+      const element5 = root.querySelector(selector);
+      if (element5) return element5;
     }
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && /^filter hinzuf/i.test(element2.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element5) => element5.id !== IDS6.button && /^filter hinzuf/i.test(element5.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -12764,7 +13783,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && element2.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element5) => element5.id !== IDS6.button && element5.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -12787,10 +13806,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     let adminsOpen = false;
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element2 = document.getElementById(id);
-      return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaVertretungenOwner === sourcePath ? element5 : null;
     };
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
       style.id = IDS6.style;
@@ -12829,10 +13848,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       document.head.appendChild(style);
     }
     function el7(tag, props = {}, children = []) {
-      const element2 = document.createElement(tag);
-      Object.assign(element2, props);
-      element2.append(...children.filter((child) => child !== null && child !== void 0));
-      return element2;
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0));
+      return element5;
     }
     function button4(text, onClick, className = "") {
       return el7("button", { type: "button", textContent: text, className, onclick: onClick });
@@ -12840,20 +13859,20 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function confirmButton(label, question, onConfirm) {
       let armed = false;
       let timer = null;
-      const element2 = button4(label, () => {
+      const element5 = button4(label, () => {
         if (!armed) {
           armed = true;
-          element2.textContent = question;
+          element5.textContent = question;
           timer = runtime.setTimeout(() => {
             armed = false;
-            element2.textContent = label;
+            element5.textContent = label;
           }, CONFIRM_MS);
           return;
         }
         if (timer !== null) runtime.clearTimeout?.(timer);
         onConfirm();
       }, "wv-danger");
-      return element2;
+      return element5;
     }
     async function loadMyId() {
       if (myId) return myId;
@@ -12876,8 +13895,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       status.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
-        element2.disabled = busy;
+      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element5) => {
+        element5.disabled = busy;
       });
     }
     async function refresh(message = "") {
@@ -12918,9 +13937,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         }, "wv-secondary"),
         confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
       ] : [];
-      const row = el7("li", {}, [who, when, badge, ...actions]);
-      if (entry.geaendertVon) row.title = `Zuletzt geändert von ${entry.geaendertVon}`;
-      return row;
+      const row2 = el7("li", {}, [who, when, badge, ...actions]);
+      if (entry.geaendertVon) row2.title = `Zuletzt geändert von ${entry.geaendertVon}`;
+      return row2;
     }
     function form() {
       const today = berlinDay();
@@ -13012,7 +14031,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle4();
+      ensureStyle5();
       const overlay = el7("div", { id: IDS6.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
@@ -13040,7 +14059,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         owned(IDS6.bar)?.remove();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       const slot = findSlot(document);
       const existing = owned(IDS6.button);
       if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
@@ -13125,10 +14144,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
   var RETRY_MS2 = 60 * 1e3;
-  var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
-  function tiptapOf3(element2) {
+  var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
+  function tiptapOf3(element5) {
     try {
-      return element2.wrappedJSObject?.editor || element2.editor || null;
+      return element5.wrappedJSObject?.editor || element5.editor || null;
     } catch {
       return null;
     }
@@ -13177,10 +14196,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       await loading;
       return cache.aktiv;
     }
-    function attach(element2) {
-      const editor = tiptapOf3(element2);
+    function attach(element5) {
+      const editor = tiptapOf3(element5);
       if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
-      attached.add(element2);
+      attached.add(element5);
       const handled = /* @__PURE__ */ new Set();
       let pending = false;
       async function apply() {
@@ -13217,8 +14236,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       });
     }
     runtime.setInterval(() => {
-      for (const element2 of document.querySelectorAll(EDITOR_SELECTOR3)) {
-        if (!attached.has(element2)) attach(element2);
+      for (const element5 of document.querySelectorAll(EDITOR_SELECTOR4)) {
+        if (!attached.has(element5)) attach(element5);
       }
     }, SCAN_MS);
   }
@@ -13395,7 +14414,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         if (diff) return diff;
       }
       return a.natural - b.natural;
-    }).map((row) => row.key);
+    }).map((row2) => row2.key);
   }
   function absentFor(aktiv, myId) {
     const seen = /* @__PURE__ */ new Set();
@@ -13448,8 +14467,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     return groups;
   }
-  function employerOfRow(row) {
-    const link = row.querySelector(EMPLOYER_LINK_SELECTOR6);
+  function employerOfRow(row2) {
+    const link = row2.querySelector(EMPLOYER_LINK_SELECTOR6);
     const id = getEmployerId(link?.getAttribute("href") || link?.href);
     return id ? { id, name: String(link.textContent || "").replace(/\s+/g, " ").trim(), link } : null;
   }
@@ -13515,20 +14534,20 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     let lastPageKey = "";
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element2 = document.getElementById(id);
-      return element2?.dataset.werkiaPrioOwner === sourcePath ? element2 : null;
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaPrioOwner === sourcePath ? element5 : null;
     };
     const today = () => berlinDay2(now());
     const collapsed = () => store.get(STORAGE_KEYS.collapsed) === "1";
     const prioFirst = () => store.get(STORAGE_KEYS.prioFirst) === "1";
     function el7(tag, props = {}, children = []) {
-      const element2 = document.createElement(tag);
-      Object.assign(element2, props);
-      element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
-      return element2;
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
     }
     const button4 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS7.style)) return;
       const style = el7("style", { id: IDS7.style });
       const P = `#${IDS7.panel}`;
@@ -13808,16 +14827,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function extrasFor(employerId) {
       if (!renderEmployerExtras || !employerId) return null;
       if (!extrasCache.has(employerId)) {
-        let element3 = null;
+        let element6 = null;
         try {
-          element3 = renderEmployerExtras(employerId) || null;
+          element6 = renderEmployerExtras(employerId) || null;
         } catch (failure) {
           console.warn("[Prio-Liste] Zusatz am Arbeitgeber:", failure);
         }
-        extrasCache.set(employerId, element3);
+        extrasCache.set(employerId, element6);
       }
-      const element2 = extrasCache.get(employerId);
-      return element2 ? el7("div", { className: "wp-extra" }, [element2]) : null;
+      const element5 = extrasCache.get(employerId);
+      return element5 ? el7("div", { className: "wp-extra" }, [element5]) : null;
     }
     function entryItem(entry, readOnly) {
       const check = el7("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
@@ -13861,8 +14880,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function pageEmployers() {
       const onList = prioEmployerIds(entries, today());
       const found = /* @__PURE__ */ new Map();
-      for (const row of document.querySelectorAll(ROW_SELECTOR10)) {
-        const employer = employerOfRow(row);
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
+        const employer = employerOfRow(row2);
         if (employer && !onList.has(employer.id) && !found.has(employer.id)) found.set(employer.id, employer.name || "Unbekannter Arbeitgeber");
       }
       return [...found].sort((a, b) => a[1].localeCompare(b[1], "de"));
@@ -13947,13 +14966,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const day = today();
       const ids = prioEmployerIds(entries, day);
       const ready = loaded || Boolean(error);
-      for (const row of document.querySelectorAll(ROW_SELECTOR10)) {
-        const employer = employerOfRow(row);
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
+        const employer = employerOfRow(row2);
         if (!employer) continue;
         const flag = ids.has(employer.id) ? "1" : "";
-        if ((row.dataset.werkiaPrio || "") !== flag) {
-          if (flag) row.dataset.werkiaPrio = flag;
-          else delete row.dataset.werkiaPrio;
+        if ((row2.dataset.werkiaPrio || "") !== flag) {
+          if (flag) row2.dataset.werkiaPrio = flag;
+          else delete row2.dataset.werkiaPrio;
         }
         if (!ready) continue;
         let star = employer.link.previousElementSibling;
@@ -13993,7 +15012,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function applyOrder(ids) {
       const on = prioFirst();
       if (!on && !wasSorted) return;
-      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR10)].map((row) => row.parentElement))) {
+      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR10)].map((row2) => row2.parentElement))) {
         const groups = rowGroups(tbody);
         if (groups.some((group) => !natural.has(group[0]))) {
           epoch += 1;
@@ -14017,7 +15036,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const day = today();
       const open = openEntries(entries, day);
       if (!open.length) return;
-      ensureStyle4();
+      ensureStyle5();
       const decisions2 = new Map(open.map((entry) => [entry.id, "morgen"]));
       const status = el7("div", { className: "wp-status" });
       const items = open.map((entry) => {
@@ -14094,7 +15113,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         owned(IDS7.tab)?.remove();
         return;
       }
-      ensureStyle4();
+      ensureStyle5();
       placeButton();
       placePanel2();
       renderRows();
@@ -14234,7 +15253,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     if (runtime.MutationObserver) return new runtime.MutationObserver(callback);
     return new MutationObserver(callback);
   }
-  var clean3 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function executeVacancyStatus(runtime, config) {
     const { sourcePath, getRequest, namespace, runLock = null, lockId = "vacancy-status" } = config;
     const inMatchList = config.placement === "match-list";
@@ -14274,10 +15293,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       document.head.appendChild(style);
     }
     function cellText(cell) {
-      return clean3([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
+      return clean4([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
     }
-    function vacancyIdFromRow(row) {
-      for (const link of row.querySelectorAll('a[href*="#/JobPosition/"]')) {
+    function vacancyIdFromRow(row2) {
+      for (const link of row2.querySelectorAll('a[href*="#/JobPosition/"]')) {
         const id = vacancyIdFromHref(link.getAttribute("href") || link.href);
         if (id) return id;
       }
@@ -14285,16 +15304,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function visibleRows() {
       if (inMatchList) {
-        return [...document.querySelectorAll("tbody tr.RaDataTable-row")].map((row) => {
-          const cell = row.querySelector(":scope > td.column-jobPositionId");
+        return [...document.querySelectorAll("tbody tr.RaDataTable-row")].map((row2) => {
+          const cell = row2.querySelector(":scope > td.column-jobPositionId");
           const id = cell ? vacancyIdFromRow(cell) : "";
-          return id ? { row, cell, id } : null;
+          return id ? { row: row2, cell, id } : null;
         }).filter(Boolean);
       }
-      return [...document.querySelectorAll("tbody tr")].map((row) => {
-        const cell = row.querySelector(":scope > td.column-status");
-        const id = cell ? vacancyIdFromRow(row) : "";
-        return id ? { row, cell, id } : null;
+      return [...document.querySelectorAll("tbody tr")].map((row2) => {
+        const cell = row2.querySelector(":scope > td.column-status");
+        const id = cell ? vacancyIdFromRow(row2) : "";
+        return id ? { row: row2, cell, id } : null;
       }).filter(Boolean);
     }
     function currentStatus({ cell, id }) {
@@ -14435,9 +15454,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function bulkEntries() {
       const seen = /* @__PURE__ */ new Set();
       return visibleRows().filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => {
-        const title = clean3(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
-        const place = clean3(entry.row.querySelector(".column-location\\.name")?.textContent);
-        const employer = clean3(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
+        const title = clean4(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
+        const place = clean4(entry.row.querySelector(".column-location\\.name")?.textContent);
+        const employer = clean4(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
         const status = currentStatus(entry);
         const label = [title, place].filter(Boolean).join(" · ");
         return { ...entry, employer, status, label: `${label.length > 80 ? `${label.slice(0, 79)}…` : label} (${statusLabel(status)})` };
@@ -14768,15 +15787,15 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID8 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID11 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
-  function inScope(element2) {
-    if (!element2?.closest) return false;
-    if (element2.closest(`#${EXPLAIN_ID}`)) return false;
-    if (element2.closest(NOTES_SELECTOR)) return true;
-    const scope = element2.closest(SCOPE_SELECTOR);
+  function inScope(element5) {
+    if (!element5?.closest) return false;
+    if (element5.closest(`#${EXPLAIN_ID}`)) return false;
+    if (element5.closest(NOTES_SELECTOR)) return true;
+    const scope = element5.closest(SCOPE_SELECTOR);
     return Boolean(scope && /Matchkommentare/i.test(scope.textContent || ""));
   }
   function textPointAt(doc, x, y) {
@@ -14803,10 +15822,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return null;
     }
   }
-  function ensureStyle2(doc) {
-    if (doc.getElementById(STYLE_ID8)) return;
+  function ensureStyle3(doc) {
+    if (doc.getElementById(STYLE_ID11)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID8;
+    style.id = STYLE_ID11;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -14830,7 +15849,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
       if (shown === key) return;
       shown = key;
-      ensureStyle2(document);
+      ensureStyle3(document);
       let tip = document.getElementById(EXPLAIN_ID);
       if (!tip) {
         tip = document.createElement("div");
@@ -14881,16 +15900,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
 
   // ../../shared/js/comment-shortcuts/index.js
   var PREFIX2 = "werkia-shortcuts";
-  var STYLE_ID9 = `${PREFIX2}-style`;
+  var STYLE_ID12 = `${PREFIX2}-style`;
   var BAR_CLASS3 = `${PREFIX2}-bar`;
-  var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
+  var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
   var GROUP_STORAGE_KEY = `${PREFIX2}-group`;
   var TEMPLATES_TAB = "vorlagen";
   var GROUPS2 = buttonGroups();
-  function tiptapOf4(element2) {
+  function tiptapOf4(element5) {
     try {
-      return element2?.wrappedJSObject?.editor || element2?.editor || null;
+      return element5?.wrappedJSObject?.editor || element5?.editor || null;
     } catch {
       return null;
     }
@@ -14923,8 +15942,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     } catch {
     }
   }
-  function isDark2(element2) {
-    let node = element2;
+  function isDark2(element5) {
+    let node = element5;
     while (node && node.nodeType === 1) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
       if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
@@ -14957,10 +15976,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const before = node?.nodeType === 3 ? node.textContent.slice(0, selection.anchorOffset) : "";
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
-  function ensureStyle3() {
-    if (document.getElementById(STYLE_ID9)) return;
+  function ensureStyle4() {
+    if (document.getElementById(STYLE_ID12)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID9;
+    style.id = STYLE_ID12;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -15024,10 +16043,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     let form = null;
     const currentBar = () => document.querySelector(`.${BAR_CLASS3}`);
     function findDialog() {
-      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR4));
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR5));
       return dialogs[dialogs.length - 1] || null;
     }
-    function editorBoxFor2(editor, dialog) {
+    function editorBoxFor(editor, dialog) {
       let box = editor;
       for (let depth = 0; depth < 4 && box.parentElement && box.parentElement !== dialog; depth += 1) {
         const parent = box.parentElement;
@@ -15118,7 +16137,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       bar.appendChild(menu);
     }
     function editorElement() {
-      return findDialog()?.querySelector(EDITOR_SELECTOR4) || null;
+      return findDialog()?.querySelector(EDITOR_SELECTOR5) || null;
     }
     function insertText(text) {
       const editor = editorElement();
@@ -15290,12 +16309,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         if (existing) existing.remove();
         return;
       }
-      const editor = dialog.querySelector(EDITOR_SELECTOR4);
-      const box = editorBoxFor2(editor, dialog);
+      const editor = dialog.querySelector(EDITOR_SELECTOR5);
+      const box = editorBoxFor(editor, dialog);
       if (existing && !dialog.contains(existing)) existing.remove();
       let bar = currentBar();
       if (!bar) {
-        ensureStyle3();
+        ensureStyle4();
         form = null;
         bar = el5("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
         bar.dataset.mode = isDark2(dialog) ? "dark" : "light";
@@ -15652,14 +16671,14 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     return svg;
   }
   function el6(tag, props = {}, children = []) {
-    const element2 = document.createElement(tag);
+    const element5 = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
-      if (key === "style") element2.style.cssText = value;
-      else if (key === "role" || key.startsWith("aria-")) element2.setAttribute(key, value);
-      else element2[key] = value;
+      if (key === "style") element5.style.cssText = value;
+      else if (key === "role" || key.startsWith("aria-")) element5.setAttribute(key, value);
+      else element5[key] = value;
     }
-    element2.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
-    return element2;
+    element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+    return element5;
   }
   function button3(text, onClick, className = "wtp-secondary") {
     return el6("button", { type: "button", textContent: text, className, onclick: onClick });
@@ -15750,15 +16769,15 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const reported = /* @__PURE__ */ new Set();
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element2 = document.getElementById(id);
-      return element2?.dataset.werkiaTagesplanOwner === sourcePath ? element2 : null;
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaTagesplanOwner === sourcePath ? element5 : null;
     };
-    const own = (element2) => {
-      element2.dataset.werkiaTagesplanOwner = sourcePath;
-      element2.classList.add("wtp");
-      return element2;
+    const own = (element5) => {
+      element5.dataset.werkiaTagesplanOwner = sourcePath;
+      element5.classList.add("wtp");
+      return element5;
     };
-    function ensureStyle4() {
+    function ensureStyle5() {
       if (document.getElementById(IDS8.style)) return;
       document.head.appendChild(el6("style", { id: IDS8.style, textContent: CSS2 }));
     }
@@ -15856,10 +16875,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       daten.reminder = [...daten.reminder.filter((entry) => entry.id !== previousId), ...saved ? [saved] : []];
       refreshViews();
     }
-    async function reminderAction(item, action, element2) {
+    async function reminderAction(item, action, element5) {
       const entry = item.reminder;
-      const status = element2.closest(".wtp-item")?.querySelector(".wtp-status");
-      element2.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+      const status = element5.closest(".wtp-item")?.querySelector(".wtp-status");
+      element5.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
         control.disabled = true;
       });
       try {
@@ -15873,7 +16892,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           replaceReminder(await client().speichern("reminder", { id: entry.id, daten: entry.daten, faelligUm, erledigt: false }) || { ...entry, faelligUm, angezeigtAm: "" });
         }
       } catch (error) {
-        element2.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+        element5.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
           control.disabled = false;
         });
         if (status) {
@@ -15906,9 +16925,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const close = button3("×", () => markGesehen(item.key), "wtp-icon");
       close.title = "Ausblenden";
       close.style.float = "right";
-      const element2 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
-      element2.dataset.key = item.key;
-      return element2;
+      const element5 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
+      element5.dataset.key = item.key;
+      return element5;
     }
     function renderPopup() {
       const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
@@ -15919,7 +16938,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
-      ensureStyle4();
+      ensureStyle5();
       const popup = existing || own(el6("div", { id: IDS8.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
@@ -15954,7 +16973,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function openReminderDialog(matchId) {
       closeDialog();
-      ensureStyle4();
+      ensureStyle5();
       const overlay = own(el6("div", { id: IDS8.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -16034,15 +17053,15 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function decorateRows() {
       if (!isTargetPage8()) return;
-      for (const row of document.querySelectorAll(ROW_SELECTOR11)) {
-        const link = row.querySelector(MATCH_LINK_SELECTOR8);
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
+        const link = row2.querySelector(MATCH_LINK_SELECTOR8);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
-        const cell = row.querySelector("td.column-buttons") || link.closest("td");
+        const cell = row2.querySelector("td.column-buttons") || link.closest("td");
         if (!cell) continue;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
-          ensureStyle4();
+          ensureStyle5();
           rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
@@ -16067,7 +17086,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       teamEditing = null;
     }
     async function openPanel() {
-      ensureStyle4();
+      ensureStyle5();
       if (!owned(IDS8.panel)) {
         const panel = own(el6("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
@@ -16136,10 +17155,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         ])));
         main.append(el6("details", {}, [el6("summary", { textContent: "Matches anzeigen" }), list]));
       }
-      const element2 = el6("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
-      if (actions.childElementCount) element2.append(actions);
-      element2.dataset.art = entry.art;
-      return element2;
+      const element5 = el6("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
+      if (actions.childElementCount) element5.append(actions);
+      element5.dataset.art = entry.art;
+      return element5;
     }
     async function panelReminderAction(item, action, control) {
       control.disabled = true;
@@ -16276,7 +17295,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (existing && !slot) return;
       existing?.remove();
       if (!slot) return;
-      ensureStyle4();
+      ensureStyle5();
       const heute = button3("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
       heute.id = IDS8.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
@@ -16357,8 +17376,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       owned(IDS8.popup)?.remove();
       closeDialog();
       closePanel();
-      document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element2) => {
-        if (element2.dataset.werkiaTagesplanOwner === sourcePath) element2.remove();
+      document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element5) => {
+        if (element5.dataset.werkiaTagesplanOwner === sourcePath) element5.remove();
       });
     });
     schedule();
@@ -16407,7 +17426,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID10 = "werkia-om-notes-template-style";
+  var STYLE_ID13 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -16476,11 +17495,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID10)) {
+    if (document.getElementById(STYLE_ID13)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID10;
+    style.id = STYLE_ID13;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -16714,7 +17733,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID10)?.remove();
+      document.getElementById(STYLE_ID13)?.remove();
     });
     renderToolbar();
   }
@@ -16734,7 +17753,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID11 = "werkia-urgent-vacancy-style";
+      const STYLE_ID14 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -16857,25 +17876,25 @@ ${next}`;
         });
         return flags;
       }
-      function getJobId(row) {
-        const link = row.querySelector('a[href*="#/JobPosition/"][href*="/show"]');
+      function getJobId(row2) {
+        const link = row2.querySelector('a[href*="#/JobPosition/"][href*="/show"]');
         return link?.getAttribute("href")?.match(/#\/JobPosition\/([a-f0-9-]{36})\/show/i)?.[1] || "";
       }
       function getRowsByJobId() {
         const rowsByJobId = /* @__PURE__ */ new Map();
-        document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root").forEach((row) => {
-          const jobId = getJobId(row);
+        document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root").forEach((row2) => {
+          const jobId = getJobId(row2);
           if (!jobId) return;
           const rows = rowsByJobId.get(jobId) || [];
-          rows.push(row);
+          rows.push(row2);
           rowsByJobId.set(jobId, rows);
         });
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID11)) return;
+        if (document.getElementById(STYLE_ID14)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID11;
+        style.id = STYLE_ID14;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -16884,24 +17903,24 @@ ${next}`;
     `;
         document.head.appendChild(style);
       }
-      function removeHighlight(row) {
-        row.classList.remove(ROW_CLASS);
-        row.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+      function removeHighlight(row2) {
+        row2.classList.remove(ROW_CLASS);
+        row2.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
       }
-      function applyHighlight(row, urgent) {
-        const existingBadge = row.querySelector(`.${BADGE_CLASS}`);
-        if (row.matches(MATCH_PRESENT_ROW_SELECTOR)) {
-          if (row.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row);
+      function applyHighlight(row2, urgent) {
+        const existingBadge = row2.querySelector(`.${BADGE_CLASS}`);
+        if (row2.matches(MATCH_PRESENT_ROW_SELECTOR)) {
+          if (row2.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row2);
           return;
         }
         if (!urgent) {
-          if (row.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row);
+          if (row2.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row2);
           return;
         }
-        if (row.classList.contains(ROW_CLASS) && existingBadge) return;
-        removeHighlight(row);
-        row.classList.add(ROW_CLASS);
-        const target = row.querySelector("td.column-jobPositionId") || row.querySelector("td") || row;
+        if (row2.classList.contains(ROW_CLASS) && existingBadge) return;
+        removeHighlight(row2);
+        row2.classList.add(ROW_CLASS);
+        const target = row2.querySelector("td.column-jobPositionId") || row2.querySelector("td") || row2;
         const badge = document.createElement("span");
         badge.className = BADGE_CLASS;
         badge.textContent = "Dringende Suche";
@@ -16910,7 +17929,7 @@ ${next}`;
       }
       function render(rowsByJobId) {
         ensureStyles2();
-        rowsByJobId.forEach((rows, jobId) => rows.forEach((row) => applyHighlight(row, urgentIndex.get(jobId) === true)));
+        rowsByJobId.forEach((rows, jobId) => rows.forEach((row2) => applyHighlight(row2, urgentIndex.get(jobId) === true)));
       }
       async function loadUrgentFlags(jobIds, { force = false } = {}) {
         const missing = jobIds.filter((id) => force || !urgentIndex.has(id));
@@ -16966,7 +17985,9 @@ ${next}`;
     { id: "update-check", execute: (runtime) => updateCheck(runtime, { label: "KAM", fileName: "KAM-Toolbox.user.js" }) },
     { id: "kam-suite-bulk-match-actions", execute: executeBulkMatchActions2 },
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
+    { id: "kam-suite-match-contact-person", execute: executeKamMatchContactPerson },
     { id: "kam-suite-employer-notes", execute: executeKamEmployerNotes },
+    { id: "kam-suite-om-questionnaire-column", execute: executeKamOmQuestionnaireColumn },
     { id: "kam-suite-vacancy-city-badges", execute: executeVacancyCityBadges },
     { id: "kam-suite-cem-status-line", execute: executeCemStatusLine },
     { id: "kam-suite-cem-status-filter", execute: executeCemStatusFilter },

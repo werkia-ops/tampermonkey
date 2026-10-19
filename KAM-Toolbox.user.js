@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.255
+// @version      1.14.256
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1536,22 +1536,22 @@
     };
     function tip(topicId, { tone = "light" } = {}) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
-      const button4 = document.createElement("button");
-      button4.type = "button";
-      button4.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
-      button4.setAttribute("aria-label", tipLabel(topic));
-      button4.title = tipLabel(topic);
-      button4.textContent = "?";
-      return styled(button4, tipStyle(tone));
+      const button3 = document.createElement("button");
+      button3.type = "button";
+      button3.setAttribute(HELP_ATTRIBUTE, tipAttributeValue(namespace, topic.id));
+      button3.setAttribute("aria-label", tipLabel(topic));
+      button3.title = tipLabel(topic);
+      button3.textContent = "?";
+      return styled(button3, tipStyle(tone));
     }
     function tipHtml(topicId, options) {
       const topic = findTopic(topicId) || { id: topicId, title: topicId };
       return buildTipHtml(namespace, topic, options);
     }
     function ownTipFrom(target) {
-      const button4 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
-      const parsed = parseTipAttributeValue(button4?.getAttribute(HELP_ATTRIBUTE));
-      return parsed?.namespace === namespace ? { button: button4, topicId: parsed.topicId } : null;
+      const button3 = target?.closest?.(`[${HELP_ATTRIBUTE}]`);
+      const parsed = parseTipAttributeValue(button3?.getAttribute(HELP_ATTRIBUTE));
+      return parsed?.namespace === namespace ? { button: button3, topicId: parsed.topicId } : null;
     }
     const popover = () => document.getElementById(popoverId);
     function closePopover2() {
@@ -1762,9 +1762,9 @@
       const onAdmin = dockHosts.test(location.hostname || "");
       const { here } = splitTopicsByLocation(topics, { hash: location.hash || "", hostname: location.hostname || "" });
       let dock = document.getElementById(DOCK_ID);
-      let button4 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
+      let button3 = dock?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`);
       if (!onAdmin || !here.length) {
-        button4?.remove();
+        button3?.remove();
         if (dock && !dock.children.length) dock.remove();
         return;
       }
@@ -1782,8 +1782,8 @@
         dock.id = DOCK_ID;
         document.body.appendChild(dock);
       }
-      if (!button4) {
-        button4 = el2("button", {
+      if (!button3) {
+        button3 = el2("button", {
           display: "inline-flex",
           alignItems: "center",
           gap: "6px",
@@ -1797,9 +1797,9 @@
           font: `600 12px/1 ${FONT2}`,
           cursor: "pointer"
         });
-        button4.type = "button";
-        button4.setAttribute("data-werkia-help-dock-button", namespace);
-        button4.title = `Was macht die ${toolboxName} auf dieser Seite?`;
+        button3.type = "button";
+        button3.setAttribute("data-werkia-help-dock-button", namespace);
+        button3.title = `Was macht die ${toolboxName} auf dieser Seite?`;
         const mark2 = el2("span", {
           display: "inline-flex",
           alignItems: "center",
@@ -1811,9 +1811,9 @@
           color: "#fff",
           font: `700 12px/1 ${FONT2}`
         }, "?");
-        button4.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
-        button4.addEventListener("click", () => openOverview());
-        dock.appendChild(button4);
+        button3.append(mark2, document.createTextNode(`${toolboxName}: Hilfe`));
+        button3.addEventListener("click", () => openOverview());
+        dock.appendChild(button3);
       }
     }
     function install(runtime, { dock = true, menu = true, dockHostPattern } = {}) {
@@ -2779,16 +2779,16 @@
     }
     function updateSaveState() {
       if (!state) return;
-      const button4 = state.panel.querySelector(".werkia-agn-save");
-      if (!button4) return;
+      const button3 = state.panel.querySelector(".werkia-agn-save");
+      if (!button3) return;
       const disabled = state.saving || !state.employerId;
-      if (button4.disabled !== disabled) button4.disabled = disabled;
+      if (button3.disabled !== disabled) button3.disabled = disabled;
     }
     async function save() {
       if (!state || state.saving) return;
       const current = state;
       const editor = current.dialog.querySelector(EDITOR_SELECTOR2);
-      const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button4) => button4.dataset.tag);
+      const tags = [...current.panel.querySelectorAll('.werkia-agn-toggle[aria-pressed="true"]')].map((button3) => button3.dataset.tag);
       const text = editor ? editorText(editor) : "";
       if (!text) {
         setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
@@ -2804,7 +2804,7 @@
       try {
         await current.provider.create(current.employerId, tags, text);
         if (state !== current) return;
-        current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button4) => button4.setAttribute("aria-pressed", "false"));
+        current.panel.querySelectorAll(".werkia-agn-toggle").forEach((button3) => button3.setAttribute("aria-pressed", "false"));
         setStatus(tags.length ? `Als AG-Notiz gespeichert (${tags.join(", ")}).` : "Als AG-Notiz gespeichert.", "ok");
       } catch (error) {
         console.warn("[AG-Notizen]", error);
@@ -2840,14 +2840,14 @@
         });
         tags.appendChild(toggle);
       }
-      const button4 = element2(document, "button", "werkia-agn-save", "Speichern");
-      button4.type = "button";
-      button4.title = "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.";
-      button4.addEventListener("click", (event) => {
+      const button3 = element2(document, "button", "werkia-agn-save", "Speichern");
+      button3.type = "button";
+      button3.title = "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.";
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         save();
       });
-      tags.appendChild(button4);
+      tags.appendChild(button3);
       write.append(head, tags, element2(document, "div", "werkia-agn-status"));
       panel.append(list.element, write);
       return { panel, list };
@@ -2912,9 +2912,9 @@
       }, 200);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
-      if (!button4) return;
-      const row2 = button4.closest("tr");
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button3) return;
+      const row2 = button3.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
       schedule();
     }, true);
@@ -3003,24 +3003,24 @@
     const fields = element3(doc, "div", "werkia-mdt-fields");
     const msg = element3(doc, "div", "werkia-mdt-msg");
     root.append(head, fields, msg);
-    function flash(button4) {
-      button4.dataset.copied = "true";
+    function flash(button3) {
+      button3.dataset.copied = "true";
       later(() => {
-        delete button4.dataset.copied;
+        delete button3.dataset.copied;
       }, 1500);
     }
     function copyButton(text, what) {
-      const button4 = element3(doc, "button", "werkia-mdt-copy");
-      button4.type = "button";
-      button4.title = `${what} kopieren`;
-      button4.setAttribute("aria-label", `${what} kopieren`);
-      button4.dataset.copy = text;
-      button4.appendChild(copyIcon(doc));
-      button4.addEventListener("click", async (event) => {
+      const button3 = element3(doc, "button", "werkia-mdt-copy");
+      button3.type = "button";
+      button3.title = `${what} kopieren`;
+      button3.setAttribute("aria-label", `${what} kopieren`);
+      button3.dataset.copy = text;
+      button3.appendChild(copyIcon(doc));
+      button3.addEventListener("click", async (event) => {
         event.preventDefault();
-        if (await copyToClipboard(text, doc)) flash(button4);
+        if (await copyToClipboard(text, doc)) flash(button3);
       });
-      return button4;
+      return button3;
     }
     function field(label, value, what) {
       const node = element3(doc, "span", "werkia-mdt-field");
@@ -3176,9 +3176,9 @@
       }, 200);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
-      if (!button4) return;
-      const row2 = button4.closest("tr");
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button3) return;
+      const row2 = button3.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
       schedule();
     }, true);
@@ -3996,9 +3996,9 @@
       }, 200);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
-      if (!button4) return;
-      clickedMatchId = matchIdFromRow(button4.closest("tr"));
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (!button3) return;
+      clickedMatchId = matchIdFromRow(button3.closest("tr"));
       schedule();
     }, true);
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
@@ -4288,11 +4288,11 @@
     const currentPicker = () => document.querySelector(pickerSelector);
     function updateButton() {
       const wrap2 = currentWrap();
-      const button4 = wrap2?.querySelector(`.${PREFIX}-btn`);
-      if (!button4) return;
+      const button3 = wrap2?.querySelector(`.${PREFIX}-btn`);
+      if (!button3) return;
       const title = buttonTitle(config.kind, view.state, view.person);
-      if (button4.title !== title) button4.title = title;
-      if (button4.dataset.state !== view.state) button4.dataset.state = view.state;
+      if (button3.title !== title) button3.title = title;
+      if (button3.dataset.state !== view.state) button3.dataset.state = view.state;
       const msg = wrap2.querySelector(`.${PREFIX}-msg`);
       if (view.message && !msg) wrap2.appendChild(el3("span", { class: `${PREFIX}-msg`, role: "status", text: view.message }));
       else if (msg && !view.message) msg.remove();
@@ -4334,8 +4334,8 @@
       if (currentPicker()?.contains(node) || currentWrap()?.contains(node)) return;
       closePicker();
     }
-    function positionPicker(box, button4) {
-      const rect = button4.getBoundingClientRect();
+    function positionPicker(box, button3) {
+      const rect = button3.getBoundingClientRect();
       const height = box.offsetHeight || 320;
       const width = box.offsetWidth || 260;
       const below = rect.bottom + 4;
@@ -4446,14 +4446,14 @@
       });
     }
     runtime.addDocumentListener("click", (event) => {
-      const button4 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
-      if (!button4) return;
-      const row2 = button4.closest("tr");
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR2);
+      if (!button3) return;
+      const row2 = button3.closest("tr");
       clickedMatchId = matchIdFromHref2(row2?.querySelector(MATCH_LINK_SELECTOR2)?.getAttribute("href"));
     }, true);
     function mountWrap(dialog) {
       ensureStyle2();
-      const button4 = el3("button", {
+      const button3 = el3("button", {
         type: "button",
         class: `${PREFIX}-btn`,
         text: config.button,
@@ -4464,7 +4464,7 @@
       const wrap2 = el3(
         "span",
         { class: `${PREFIX}-wrap`, role: "group", "aria-label": `${config.short}-Person erwähnen`, dataset: { kind: config.kind } },
-        button4,
+        button3,
         helpTip()
       );
       wrap2.dataset.mode = isDark(dialog) ? "dark" : "light";
@@ -4840,18 +4840,19 @@
       page: "Outlook › Mail eines Arbeitgebers",
       hosts: [/(^|\.)outlook\.(office\.com|cloud\.microsoft)$/i],
       kind: "write",
-      summary: "Zu Mails von Arbeitgebern macht der Outlook-Assistent Vorschläge: KAM-Status, Grund, Matchkommentar mit CEM-Erwähnung, WVL, AG-Notiz. Liegt einer vor, erscheint unten rechts der blaue Knopf „Vorschlag: …“. Nichts wird ohne deinen Klick ins Adminpanel geschrieben.",
+      summary: "Zu Mails von Arbeitgebern macht der Outlook-Assistent Vorschläge: KAM-Status, Grund, Matchkommentar mit CEM-Erwähnung, WVL, AG-Notiz. Liegt einer vor, öffnet sich rechts die Seitenleiste „Mail-Assistent“ von selbst. Nichts wird ohne deinen Klick ins Adminpanel geschrieben.",
       steps: [
-        "Die Mail öffnen. Gibt es einen Vorschlag, zeigt der blaue Knopf die erkannte Mailart und wie sicher sie ist.",
-        "Knopf klicken. Je Match stehen die Vorschläge einzeln da. Haken setzen oder entfernen, Status, Grund, Text und Datum kannst du ändern. Vorausgewählt ist nur, was sicher erkannt wurde.",
-        "„Übernehmen“ zeigt noch einmal, was geschrieben wird, und schreibt es mit deiner Anmeldung. „Alles ablehnen“ schreibt nichts und markiert den Vorschlag als erledigt."
+        "Die Mail öffnen. Oben steht in einem Satz, was der Vorschlag tun will, darunter je Kandidat die einzelnen Schritte.",
+        "Sichere Schritte sind eingeschaltet, unsichere aus und gelb markiert. Mit dem Schalter an- oder ausschalten, mit „Ändern“ Status, Grund, Text oder Datum anpassen.",
+        "„Übernehmen“ (oder Strg+Enter) schreibt alles Eingeschaltete mit deiner Anmeldung und zeigt danach, was geklappt hat. „Ignorieren“ schreibt nichts und markiert den Vorschlag als erledigt.",
+        "Mit × oder Esc schließen. Der orange Knopf unten rechts öffnet die Seitenleiste wieder."
       ],
       notes: [
         "Bei Absagen geht der Mailtext des Arbeitgebers mit in den Matchkommentar, damit das CEM den Grund nachlesen kann.",
         "Out lehnt wie beim Outen offene Terminvorschläge ab und löscht die WVL.",
-        "Einen Antwortentwurf legt der Assistent in Outlook unter Entwürfe ab. Gesendet wird von Hand.",
+        "Einen Antwortentwurf legt der Assistent in Outlook unter Entwürfe ab, gesendet wird von Hand. In der Seitenleiste lässt er sich kopieren.",
         "Vakanz pausieren und Termine anlegen macht der Assistent nicht, dafür gibt es einen Link ins Adminpanel.",
-        "„Staging“ im Knopf heißt: Testdaten, geschrieben wird in staging-admin.werkia.de."
+        "„Staging“ oben heißt: Testdaten, geschrieben wird in staging-admin.werkia.de, auch die Links führen dorthin."
       ]
     }
   ];
@@ -4864,9 +4865,9 @@
   // ../../shared/js/admin-panel-reload.js
   var ADMIN_PANEL_RELOAD_SELECTOR = 'header button[aria-label="Neu laden"]';
   function reloadAdminPanel(documentRef = document) {
-    const button4 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
-    if (!button4 || button4.disabled) return false;
-    button4.click();
+    const button3 = documentRef.querySelector(ADMIN_PANEL_RELOAD_SELECTOR);
+    if (!button3 || button3.disabled) return false;
+    button3.click();
     return true;
   }
 
@@ -5186,17 +5187,17 @@
     function installButton(header, id, label, title, onClick) {
       if (!header || document.getElementById(id)) return;
       injectStyle();
-      const button4 = document.createElement("button");
-      button4.id = id;
-      button4.type = "button";
-      button4.textContent = label;
-      button4.title = title;
-      button4.addEventListener("click", (event) => {
+      const button3 = document.createElement("button");
+      button3.id = id;
+      button3.type = "button";
+      button3.textContent = label;
+      button3.title = title;
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         onClick();
       });
-      header.appendChild(button4);
+      header.appendChild(button3);
     }
     return {
       state,
@@ -6146,7 +6147,7 @@
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID6;
@@ -6308,7 +6309,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle5();
+        ensureStyle6();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
       }, 150);
@@ -6455,7 +6456,7 @@
       });
       return [...ids];
     }
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID7;
@@ -6526,7 +6527,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage3()) return;
-        ensureStyle5();
+        ensureStyle6();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -6648,7 +6649,7 @@
     function matchIdFromRow2(row2) {
       return getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
     }
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID8;
@@ -6690,14 +6691,14 @@
       }
     }
     function nameButton(name) {
-      const button4 = document.createElement("button");
-      button4.type = "button";
-      button4.className = `${LINE_CLASS}__name`;
-      button4.title = "CEM-Namen kopieren";
+      const button3 = document.createElement("button");
+      button3.type = "button";
+      button3.className = `${LINE_CLASS}__name`;
+      button3.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button4.append(label, icon2(COPY_ICON_PATH2));
-      return button4;
+      button3.append(label, icon2(COPY_ICON_PATH2));
+      return button3;
     }
     function renderState(matchId) {
       const info = infoByMatchId.get(matchId);
@@ -6786,26 +6787,26 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle5();
+        ensureStyle6();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
     };
     runtime.addDocumentListener("click", (event) => {
-      const button4 = event.target.closest?.(`.${LINE_CLASS}__name`);
-      if (!button4) return;
+      const button3 = event.target.closest?.(`.${LINE_CLASS}__name`);
+      if (!button3) return;
       event.preventDefault();
       event.stopPropagation();
-      const name = button4.querySelector("span")?.textContent || "";
+      const name = button3.querySelector("span")?.textContent || "";
       if (!name) return;
       copyText(name).then(() => {
-        button4.dataset.copied = "true";
-        button4.title = "Kopiert";
-        button4.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
+        button3.dataset.copied = "true";
+        button3.title = "Kopiert";
+        button3.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
         runtime.setTimeout(() => {
-          delete button4.dataset.copied;
-          button4.title = "CEM-Namen kopieren";
-          button4.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH2));
+          delete button3.dataset.copied;
+          button3.title = "CEM-Namen kopieren";
+          button3.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH2));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -7019,7 +7020,7 @@
     const isTargetPage8 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(IDS2.style)) return;
       const style = document.createElement("style");
       style.id = IDS2.style;
@@ -7210,7 +7211,7 @@
         closeDialog();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       let bar = document.getElementById(IDS2.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -7282,7 +7283,7 @@
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage8 = () => route.test(location.hash);
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID9;
@@ -7310,14 +7311,14 @@
       const title = document.createElement("strong");
       title.textContent = label;
       const chips = options.map((option) => {
-        const button4 = document.createElement("button");
-        button4.type = "button";
-        button4.dataset.value = option.value;
-        button4.textContent = option.label;
+        const button3 = document.createElement("button");
+        button3.type = "button";
+        button3.dataset.value = option.value;
+        button3.textContent = option.label;
         const chipTone = tone(option.value);
-        if (chipTone) button4.dataset.tone = chipTone;
-        button4.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
-        return button4;
+        if (chipTone) button3.dataset.tone = chipTone;
+        button3.addEventListener("click", () => applyFilter(toggleStatus(currentFilter(), field, option.value)));
+        return button3;
       });
       const reset = document.createElement("button");
       reset.type = "button";
@@ -7330,9 +7331,9 @@
     }
     function syncBar(bar) {
       const selected = selectedStatuses(currentFilter(), field);
-      bar.querySelectorAll("button[data-value]").forEach((button4) => {
-        const pressed = String(selected.includes(button4.dataset.value));
-        if (button4.getAttribute("aria-pressed") !== pressed) button4.setAttribute("aria-pressed", pressed);
+      bar.querySelectorAll("button[data-value]").forEach((button3) => {
+        const pressed = String(selected.includes(button3.dataset.value));
+        if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
       });
       const reset = bar.querySelector(`.${BAR_CLASS}-reset`);
       if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
@@ -7343,7 +7344,7 @@
         bar?.remove();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -7417,9 +7418,9 @@
     const context = getQuestionnaireContext();
     function captureContext(event) {
       if (!isTargetPage5()) return;
-      const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button4) return;
-      const row2 = button4.closest("tr");
+      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
+      const row2 = button3.closest("tr");
       if (!row2) return;
       const next = buildQuestionnaireContext(row2);
       Object.assign(context, next || EMPTY_CONTEXT);
@@ -7682,9 +7683,9 @@
     }
     async function handleQuestionnaireButtonClick(event) {
       if (!isTargetPage5()) return;
-      const button4 = event.target.closest('button[aria-label="OM Fragebogen"]');
-      if (!button4) return;
-      const row2 = button4.closest("tr");
+      const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
+      const row2 = button3.closest("tr");
       if (!row2) return;
       const vacancyLink = row2.querySelector('a[href*="werkia.de/bewerben/"]');
       const uuid = vacancyLink?.href.match(/bewerben\/([a-f0-9-]{36})/i)?.[1] || "";
@@ -8945,8 +8946,8 @@
     }
     function captureQuestionnaireClick(event) {
       if (!isTargetPage5()) return;
-      const button4 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
-      if (!button4) return;
+      const button3 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
+      if (!button3) return;
       if (!context.key) return;
       scheduleUpdate();
       waitForQuestionnaireDialog(context.key);
@@ -9004,19 +9005,19 @@
       const dialog = candidateFilesDialog();
       if (!dialog || dialog.querySelector(".werkia-kam-candidate-open")) return;
       const candidateId = pendingCandidateId;
-      const button4 = document.createElement("button");
-      button4.className = "werkia-kam-candidate-open";
-      button4.type = "button";
-      button4.textContent = "Kandidatenansicht öffnen ↗";
-      button4.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
-      button4.addEventListener("click", (event) => {
+      const button3 = document.createElement("button");
+      button3.className = "werkia-kam-candidate-open";
+      button3.type = "button";
+      button3.textContent = "Kandidatenansicht öffnen ↗";
+      button3.title = "Kandidatenansicht /show/9 in einem Popupfenster öffnen";
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         openCandidateViewPopup(candidateId);
       });
       const title = dialog.querySelector(".MuiDialogTitle-root");
-      if (title) title.insertAdjacentElement("afterend", button4);
-      else dialog.prepend(button4);
+      if (title) title.insertAdjacentElement("afterend", button3);
+      else dialog.prepend(button3);
     }
     function installCandidateFileHooks() {
       document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element5) => element5.remove());
@@ -10173,7 +10174,7 @@
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID10;
@@ -10195,28 +10196,28 @@
       document.head.appendChild(style);
     }
     const post = (payload) => postJson(webhookUrl, payload);
-    function applyState(button4, { state, label, title, disabled = false }) {
-      if (button4.dataset.busy === "true") return;
-      if (button4.textContent !== label) button4.textContent = label;
-      if (button4.title !== title) button4.title = title;
-      if (button4.dataset.state !== state) button4.dataset.state = state;
-      if (button4.disabled !== disabled) button4.disabled = disabled;
+    function applyState(button3, { state, label, title, disabled = false }) {
+      if (button3.dataset.busy === "true") return;
+      if (button3.textContent !== label) button3.textContent = label;
+      if (button3.title !== title) button3.title = title;
+      if (button3.dataset.state !== state) button3.dataset.state = state;
+      if (button3.disabled !== disabled) button3.disabled = disabled;
     }
-    function flash(button4, text) {
-      button4.dataset.busy = "true";
-      button4.textContent = text;
+    function flash(button3, text) {
+      button3.dataset.busy = "true";
+      button3.textContent = text;
       runtime.setTimeout(() => {
-        delete button4.dataset.busy;
+        delete button3.dataset.busy;
         render();
       }, 1500);
     }
-    async function onUrgentClick(button4, jobPositionId, matchId) {
+    async function onUrgentClick(button3, jobPositionId, matchId) {
       const urgency = urgencyIndex.get(jobPositionId);
       const { state } = urgentButtonState(urgency, loadStore().pending[jobPositionId]);
       if (state === "loading" || state === "pending") return;
       const target = !urgency.urgent;
       if (!target && !window.confirm(STOP_URGENT_CONFIRM_TEXT)) return;
-      button4.disabled = true;
+      button3.disabled = true;
       try {
         await post({ type: target ? "DRINGEND" : "NICHT_DRINGEND", jobPositionId, matchId });
         updateStore((store) => {
@@ -10226,22 +10227,22 @@
         schedulePendingPoll();
       } catch (error) {
         console.warn("[KAM Dringend]", error);
-        flash(button4, "Fehler");
+        flash(button3, "Fehler");
       }
     }
-    async function onPushClick(button4, jobPositionId, matchId) {
+    async function onPushClick(button3, jobPositionId, matchId) {
       const sentAt = loadStore().pushSent[jobPositionId];
       if (sentAt && !window.confirm(pushResendConfirmText(sentAt))) return;
-      button4.disabled = true;
+      button3.disabled = true;
       try {
         await post({ type: "PUSH", jobPositionId, matchId });
         updateStore((store) => {
           store.pushSent[jobPositionId] = (/* @__PURE__ */ new Date()).toISOString();
         });
-        flash(button4, "Gesendet");
+        flash(button3, "Gesendet");
       } catch (error) {
         console.warn("[KAM Push Request]", error);
-        flash(button4, "Fehler");
+        flash(button3, "Fehler");
       }
     }
     function placeBar(row2, bar) {
@@ -10343,7 +10344,7 @@
         removeBars();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -10515,7 +10516,7 @@
     let syncTimer = null;
     let closeTimer = null;
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(IDS3.style)) return;
       const style = document.createElement("style");
       style.id = IDS3.style;
@@ -10545,19 +10546,19 @@
       const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
       if (existing?.dataset.matchId === target.matchId) return;
       existing?.remove();
-      const button4 = el7("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
-      button4.dataset.matchId = target.matchId;
-      button4.dataset.werkiaSlackDmOwner = sourcePath;
-      button4.addEventListener("click", (event) => {
+      const button3 = el7("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
+      button3.dataset.matchId = target.matchId;
+      button3.dataset.werkiaSlackDmOwner = sourcePath;
+      button3.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         openDialog(target.matchId);
       });
-      target.cell.appendChild(button4);
+      target.cell.appendChild(button3);
     }
     function removeButtons() {
-      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button4) => {
-        if (button4.dataset.werkiaSlackDmOwner === sourcePath) button4.remove();
+      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button3) => {
+        if (button3.dataset.werkiaSlackDmOwner === sourcePath) button3.remove();
       });
     }
     function closeDialog() {
@@ -10599,7 +10600,7 @@
     }
     async function openDialog(matchId) {
       closeDialog();
-      ensureStyle5();
+      ensureStyle6();
       const comment = el7("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el7("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
@@ -10658,7 +10659,7 @@
         removeButtons();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       document.querySelectorAll(ROW_SELECTOR9).forEach(addButton);
     }
     function scheduleSync() {
@@ -11339,7 +11340,7 @@
         interviews: interviewResult
       };
     }
-    function styled3(node, styles) {
+    function styled2(node, styles) {
       Object.assign(node.style, styles);
       return node;
     }
@@ -11347,11 +11348,11 @@
       const head = document.createElement("div");
       head.textContent = titleText;
       head.appendChild(kamHelp.tip("outlook-match-outen", { tone: "dark" }));
-      return styled3(head, { display: "flex", alignItems: "center", padding: "16px 18px", color: "#fff", background: "#ef6c00", fontSize: "17px", fontWeight: "700" });
+      return styled2(head, { display: "flex", alignItems: "center", padding: "16px 18px", color: "#fff", background: "#ef6c00", fontSize: "17px", fontWeight: "700" });
     }
     function buildBody(children) {
       const body = document.createElement("div");
-      styled3(body, { padding: "18px", display: "grid", gap: "12px", font: "14px/1.4 Arial,sans-serif", color: "#222" });
+      styled2(body, { padding: "18px", display: "grid", gap: "12px", font: "14px/1.4 Arial,sans-serif", color: "#222" });
       children.forEach((child) => {
         if (child) body.appendChild(child);
       });
@@ -11359,7 +11360,7 @@
     }
     function buildNote(parts, { error = false } = {}) {
       const note = document.createElement("div");
-      styled3(note, { padding: "10px", borderRadius: "5px", background: error ? "#fdecea" : "#f5f5f5", color: error ? "#b3261e" : "#444" });
+      styled2(note, { padding: "10px", borderRadius: "5px", background: error ? "#fdecea" : "#f5f5f5", color: error ? "#b3261e" : "#444" });
       (Array.isArray(parts) ? parts : [parts]).forEach((part) => {
         if (part && typeof part === "object") {
           const anchor = document.createElement("a");
@@ -11367,7 +11368,7 @@
           anchor.href = part.href;
           anchor.target = "_blank";
           anchor.rel = "noopener";
-          styled3(anchor, { color: "#0b5cab" });
+          styled2(anchor, { color: "#0b5cab" });
           note.appendChild(anchor);
         } else {
           note.appendChild(document.createTextNode(String(part ?? "")));
@@ -11377,15 +11378,15 @@
     }
     function buildActions(children) {
       const actions = document.createElement("div");
-      styled3(actions, { display: "flex", justifyContent: "flex-end", gap: "8px" });
+      styled2(actions, { display: "flex", justifyContent: "flex-end", gap: "8px" });
       children.forEach((child) => actions.appendChild(child));
       return actions;
     }
     function buildSplitActions(leftChildren, rightChildren) {
       const row2 = document.createElement("div");
-      styled3(row2, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
+      styled2(row2, { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" });
       const left = document.createElement("div");
-      styled3(left, { display: "flex", gap: "8px" });
+      styled2(left, { display: "flex", gap: "8px" });
       leftChildren.forEach((child) => left.appendChild(child));
       row2.append(left, buildActions(rightChildren));
       return row2;
@@ -11395,7 +11396,7 @@
       btn.type = "button";
       btn.textContent = label;
       if (action) btn.dataset.action = action;
-      styled3(btn, {
+      styled2(btn, {
         padding: "8px 13px",
         border: primary ? "1px solid #ef6c00" : "1px solid #aaa",
         borderRadius: "5px",
@@ -11408,15 +11409,15 @@
     }
     function setButtonDisabled(btn, disabled) {
       btn.disabled = disabled;
-      styled3(btn, { opacity: disabled ? ".55" : "1", cursor: disabled ? "wait" : "pointer" });
+      styled2(btn, { opacity: disabled ? ".55" : "1", cursor: disabled ? "wait" : "pointer" });
     }
     function buildList() {
       const list = document.createElement("div");
-      return styled3(list, { display: "grid", gap: "6px", maxHeight: "260px", overflowY: "auto", border: "1px solid #ddd", borderRadius: "6px", padding: "8px" });
+      return styled2(list, { display: "grid", gap: "6px", maxHeight: "260px", overflowY: "auto", border: "1px solid #ddd", borderRadius: "6px", padding: "8px" });
     }
     function buildOptionRow({ name, index, checked, labelText, href, linkLabel = "im AP prüfen" }) {
       const option = document.createElement("label");
-      styled3(option, { display: "flex", alignItems: "flex-start", gap: "8px", padding: "6px", borderRadius: "5px", fontWeight: "400", cursor: "pointer" });
+      styled2(option, { display: "flex", alignItems: "flex-start", gap: "8px", padding: "6px", borderRadius: "5px", fontWeight: "400", cursor: "pointer" });
       const radio = document.createElement("input");
       radio.type = "radio";
       radio.name = name;
@@ -11431,13 +11432,13 @@
         anchor.href = href;
         anchor.target = "_blank";
         anchor.rel = "noopener";
-        styled3(anchor, { marginLeft: "auto", fontSize: "12px", color: "#0b5cab", whiteSpace: "nowrap" });
+        styled2(anchor, { marginLeft: "auto", fontSize: "12px", color: "#0b5cab", whiteSpace: "nowrap" });
         option.appendChild(anchor);
       }
       return { option, radio };
     }
     function styleDialogFrame(dialog) {
-      styled3(dialog, {
+      styled2(dialog, {
         width: "min(520px, calc(100vw - 32px))",
         border: "0",
         borderRadius: "10px",
@@ -11456,7 +11457,7 @@
         launcher.title = "KAM-Toolbox: Bewerbungsmail erkannt";
         launcher.setAttribute("aria-label", "KAM-Toolbox öffnen");
         launcher.setAttribute("aria-expanded", "false");
-        styled3(launcher, {
+        styled2(launcher, {
           position: "fixed",
           right: "20px",
           bottom: "20px",
@@ -11496,7 +11497,7 @@
         popover.id = IDS4.popover;
         popover.setAttribute("role", "dialog");
         popover.setAttribute("aria-label", "KAM-Toolbox");
-        styled3(popover, {
+        styled2(popover, {
           position: "fixed",
           right: "20px",
           bottom: "84px",
@@ -11522,7 +11523,7 @@
         return row2;
       };
       const head = document.createElement("div");
-      styled3(head, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", color: "#fff", background: "#ef6c00", fontWeight: "700" });
+      styled2(head, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", color: "#fff", background: "#ef6c00", fontWeight: "700" });
       const title = document.createElement("span");
       title.textContent = "Bewerbungsmail erkannt";
       title.appendChild(kamHelp.tip("outlook-match-outen", { tone: "dark" }));
@@ -11530,7 +11531,7 @@
       closeBtn.type = "button";
       closeBtn.textContent = "×";
       closeBtn.setAttribute("aria-label", "Schließen");
-      styled3(closeBtn, { border: "0", background: "transparent", color: "#fff", fontSize: "20px", lineHeight: "1", cursor: "pointer" });
+      styled2(closeBtn, { border: "0", background: "transparent", color: "#fff", fontSize: "20px", lineHeight: "1", cursor: "pointer" });
       closeBtn.addEventListener("click", closePopover2);
       head.append(title, closeBtn);
       const outenBtn = buildButton("Match outen", { action: "outen", primary: true });
@@ -11552,7 +11553,7 @@
         line("Arbeitgeber", summary.employerName),
         buildActions(actions)
       ]);
-      styled3(body, { padding: "12px 14px", gap: "6px" });
+      styled2(body, { padding: "12px 14px", gap: "6px" });
       popover.replaceChildren(head, body);
     }
     function isDialogClosed(dialog) {
@@ -11729,7 +11730,7 @@
       });
       if (preselected < 0) {
         setButtonDisabled(continueBtn, true);
-        styled3(continueBtn, { cursor: "not-allowed" });
+        styled2(continueBtn, { cursor: "not-allowed" });
         radios.forEach((radio) => radio.addEventListener("change", () => setButtonDisabled(continueBtn, false)));
       }
       const leftActions = [];
@@ -11767,7 +11768,7 @@
       const select = document.createElement("select");
       select.name = "outFeedback";
       select.required = true;
-      styled3(select, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" });
+      styled2(select, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" });
       const chooseOption = document.createElement("option");
       chooseOption.value = "__choose__";
       chooseOption.textContent = "Bitte auswählen";
@@ -11779,7 +11780,7 @@
         select.appendChild(option);
       });
       const label = document.createElement("label");
-      styled3(label, { display: "grid", gap: "5px", fontWeight: "700" });
+      styled2(label, { display: "grid", gap: "5px", fontWeight: "700" });
       label.append("Grund", select);
       const commentDraft = readOutMailCommentDraft();
       const commentToggle = document.createElement("input");
@@ -11787,33 +11788,33 @@
       commentToggle.name = "outMailComment";
       commentToggle.checked = Boolean(commentDraft);
       const commentToggleLabel = document.createElement("label");
-      styled3(commentToggleLabel, { display: "flex", alignItems: "center", gap: "6px", fontWeight: "700" });
+      styled2(commentToggleLabel, { display: "flex", alignItems: "center", gap: "6px", fontWeight: "700" });
       commentToggleLabel.append(commentToggle, "Mailtext als Matchkommentar (für CEM)");
       const commentText = document.createElement("textarea");
       commentText.name = "outMailCommentText";
       commentText.rows = 6;
       commentText.value = commentDraft;
       commentText.placeholder = "Kein Antworttext erkannt – hier einfügen oder den Haken entfernen.";
-      styled3(commentText, { boxSizing: "border-box", width: "100%", padding: "8px", border: "1px solid #bbb", borderRadius: "5px", font: "13px/1.4 Arial,sans-serif", resize: "vertical" });
+      styled2(commentText, { boxSizing: "border-box", width: "100%", padding: "8px", border: "1px solid #bbb", borderRadius: "5px", font: "13px/1.4 Arial,sans-serif", resize: "vertical" });
       commentText.addEventListener("input", () => {
         if (commentText.value.trim()) commentToggle.checked = true;
       });
       const commentBox = document.createElement("div");
-      styled3(commentBox, { display: "grid", gap: "5px" });
+      styled2(commentBox, { display: "grid", gap: "5px" });
       commentBox.append(commentToggleLabel, commentText);
       const statusEl = document.createElement("div");
       statusEl.textContent = "Bitte einen Grund auswählen.";
       const setStatus = (text, tone = "") => {
         statusEl.textContent = text;
         const color = tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222";
-        styled3(statusEl, { color });
+        styled2(statusEl, { color });
       };
       const openMatchLink = document.createElement("a");
       openMatchLink.textContent = "Match in Meine Matches öffnen";
       openMatchLink.href = kamMyMatchesUrl({ candidateId: match.candidateId, employerId: state.employer.id });
       openMatchLink.target = "_blank";
       openMatchLink.rel = "noopener";
-      styled3(openMatchLink, {
+      styled2(openMatchLink, {
         padding: "8px 13px",
         border: "1px solid #aaa",
         borderRadius: "5px",
@@ -11925,7 +11926,7 @@
       const fieldStyle = { boxSizing: "border-box", width: "100%", padding: "8px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit", background: "#fff" };
       const labelled = (labelText, control) => {
         const label = document.createElement("label");
-        styled3(label, { display: "grid", gap: "4px", fontWeight: "700" });
+        styled2(label, { display: "grid", gap: "4px", fontWeight: "700" });
         label.append(labelText, control);
         return label;
       };
@@ -11933,7 +11934,7 @@
         const element5 = document.createElement("input");
         element5.type = "text";
         element5.value = value || "";
-        return styled3(element5, fieldStyle);
+        return styled2(element5, fieldStyle);
       };
       const select = (options, value) => {
         const element5 = document.createElement("select");
@@ -11944,7 +11945,7 @@
           element5.appendChild(option);
         });
         element5.value = value;
-        return styled3(element5, fieldStyle);
+        return styled2(element5, fieldStyle);
       };
       const fields = {
         firstName: input(candidate.firstName || match.candidate?.firstName),
@@ -11959,7 +11960,7 @@
         note: input("")
       };
       const grid = document.createElement("div");
-      styled3(grid, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 10px" });
+      styled2(grid, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 10px" });
       grid.append(
         labelled("Vorname", fields.firstName),
         labelled("Nachname", fields.lastName),
@@ -11973,7 +11974,7 @@
         labelled("Weitere Angaben (optional)", fields.note)
       );
       const preview = document.createElement("pre");
-      styled3(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
+      styled2(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
       const values = () => Object.fromEntries(Object.entries(fields).map(([key, element5]) => [key, element5.value]));
       const updatePreview = () => {
         const current = values();
@@ -11994,7 +11995,7 @@ ${buildCbreBody(current)}`;
       const statusEl = document.createElement("div");
       const setStatus = (text, tone = "") => {
         statusEl.textContent = text;
-        styled3(statusEl, { color: tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222" });
+        styled2(statusEl, { color: tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222" });
       };
       const closeBtn = buildButton("Abbrechen", { action: "close" });
       const applyBtn = buildButton("Weiterleitung erstellen", { action: "apply", primary: true });
@@ -12038,12 +12039,12 @@ ${buildCbreBody(current)}`;
     async function openBccField() {
       const existing = visibleElement(COMPOSE_SELECTORS.bcc);
       if (existing) return existing;
-      const button4 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element5) => {
+      const button3 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element5) => {
         const label = `${element5.getAttribute("aria-label") || ""} ${element5.getAttribute("title") || ""}`;
         return (element5.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
       });
-      if (!button4) return null;
-      button4.click();
+      if (!button3) return null;
+      button3.click();
       return waitForElement(COMPOSE_SELECTORS.bcc, 3e3);
     }
     function visibleElement(selector) {
@@ -12196,7 +12197,7 @@ ${buildCbreBody(current)}`;
       toast.setAttribute("role", "status");
       toast.title = "Klicken zum Schließen";
       toast.textContent = text;
-      styled3(toast, {
+      styled2(toast, {
         position: "fixed",
         right: "20px",
         bottom: "84px",
@@ -12234,9 +12235,9 @@ ${buildCbreBody(current)}`;
         const input = document.createElement("input");
         input.type = "text";
         input.value = value || "";
-        styled3(input, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit" });
+        styled2(input, { boxSizing: "border-box", width: "100%", padding: "9px", border: "1px solid #bbb", borderRadius: "5px", font: "inherit" });
         const label = document.createElement("label");
-        styled3(label, { display: "grid", gap: "5px", fontWeight: "700" });
+        styled2(label, { display: "grid", gap: "5px", fontWeight: "700" });
         label.append(labelText, input);
         return { label, input };
       };
@@ -12394,9 +12395,6 @@ ${buildCbreBody(current)}`;
       return match[1];
     }
   }
-  function percent(value) {
-    return `${Math.round((Number(value) || 0) * 100)} %`;
-  }
   function parseWebhookResponse(status, text) {
     let data = null;
     try {
@@ -12542,37 +12540,135 @@ ${buildCbreBody(current)}`;
       ok: results.has(choice.key) ? results.get(choice.key) : null
     }));
   }
+  var STATUS_VERB = {
+    out: "auf Out setzen",
+    interview_request: "auf VT-Anfrage setzen",
+    interview_conducted: "auf „Stattgefundenes VT“ setzen",
+    interview_feedback: "auf VT Feedback setzen",
+    hot_case: "auf Hot Case setzen",
+    hot_hot_case: "auf Hot Hot Case setzen"
+  };
+  function summaryLine(vorschlag) {
+    const matches = (vorschlag?.matches || []).filter((entry2) => entry2.matchId);
+    const sure = matches.filter((entry2) => (Number(entry2.sicherheit) || 0) >= PRESELECT_FROM);
+    if (matches.length > 1 && sure.length !== 1) return `${matches.length} Kandidaten, bitte prüfen`;
+    const entry = sure[0] || matches[0];
+    if (entry?.kam_status && STATUS_VERB[entry.kam_status]) return `${entry.kandidat || "Kandidat"} ${STATUS_VERB[entry.kam_status]}`;
+    if (entry?.kommentar) return `Kommentar zu ${entry.kandidat || "Kandidat"}`;
+    if (vorschlag?.ag_notiz?.text) return "AG-Notiz anlegen";
+    return vorschlag?.zusammenfassung || MAILART_LABELS[vorschlag?.mailart] || "Vorschlag";
+  }
+  function choiceText(choice, entry) {
+    if (choice.art === "status") {
+      const detail = [];
+      if (choice.kamStatus === "out") detail.push(`Grund: ${reasonOption(choice.outGrund)?.label || "bitte wählen"}`);
+      if (statusClearsWvl(choice.kamStatus) && entry?.wvlAktuell) detail.push(`WVL ${entry.wvlAktuell} wird gelöscht`);
+      return { titel: `KAM-Status → ${KAM_STATUS_LABELS2[choice.kamStatus] || choice.kamStatus}`, detail: detail.join(" · ") };
+    }
+    if (choice.art === "kommentar") {
+      return {
+        titel: `Matchkommentar${choice.cem ? `, @${choice.cem.label}` : ""}`,
+        detail: `„${String(choice.kommentar || "").trim()}“${choice.mailtext ? " + Mailtext für CEM" : ""}`
+      };
+    }
+    if (choice.art === "wvl") return { titel: `Wiedervorlage ${choice.wvl}`, detail: "" };
+    if (choice.art === "agNotiz") return { titel: `AG-Notiz ${(choice.tags || []).map((tag) => `[${tag}]`).join("")}`, detail: `„${String(choice.text || "").trim()}“` };
+    return { titel: choice.art, detail: "" };
+  }
+  function unsureText(choice, entry) {
+    if (!choice.moeglich) return choice.art === "agNotiz" ? "Kein Arbeitgeber zugeordnet, nur zur Info." : "Kein Match zugeordnet, nur zur Info.";
+    if (choice.hinweis) return choice.hinweis;
+    if (choice.art !== "agNotiz" && entry && (Number(entry.sicherheit) || 0) < PRESELECT_FROM) return "Zuordnung unsicher, bitte im Mailtext prüfen und dann einschalten.";
+    if (choice.art === "status" && choice.kamStatus === "out" && !reasonOption(choice.outGrund)) return "Bitte einen Grund wählen.";
+    return "";
+  }
+  function outlookDone(aktionen) {
+    const done = String(aktionen || "").split(",").filter(Boolean);
+    const lines = [];
+    if (done.includes("verschieben")) lines.push("Mail liegt im Ordner „Out“.");
+    if (done.includes("kategorie-setzen")) lines.push("Kategorie „Werkia“ gesetzt.");
+    return { lines, entwurf: done.includes("entwurf") };
+  }
 
   // src/features/outlook-assistent/index.js
   var SOURCE = "kam/toolbox/src/features/outlook-assistent/index.js";
   var HOSTS = ["outlook.office.com", "outlook.cloud.microsoft"];
-  var IDS5 = { pill: "werkia-mail-assistent-pill", dialog: "werkia-mail-assistent-dialog" };
+  var IDS5 = { pill: "werkia-mail-assistent-pill", panel: "werkia-mail-assistent-panel", style: "werkia-mail-assistent-style" };
   var MAIL_BODY_SELECTORS2 = ['div[aria-label="Nachrichtentext"]', 'div[aria-label="Message body"]', 'div[role="document"]'];
   var STATUS_CHOICES = ["interview_request", "interview_conducted", "interview_feedback", "hot_case", "hot_hot_case", "out"];
   var adminBase = (umgebung) => umgebung === "staging" ? "https://staging-admin.werkia.de/#" : "https://admin.werkia.de/#";
+  var CSS2 = `
+#${IDS5.panel}{--ink:#09090b;--ink2:#52525b;--muted:#8b8b94;--line:#e4e4e7;--line2:#d4d4d8;--sunken:#f4f4f5;--accent:#ef6c00;--navy:#284e75;--good:#0a7c0a;--goodSoft:#ecf7ec;--warn:#8a6700;--warnSoft:#fdf6e0;--bad:#b52f2f;--badSoft:#fbecec;
+  position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100vw;z-index:2147483001;display:flex;flex-direction:column;background:#fff;color:var(--ink);
+  border-left:1px solid var(--line);box-shadow:-12px 0 32px -18px rgba(9,9,11,.35);font:14px/1.45 "Segoe UI",Inter,system-ui,Arial,sans-serif;box-sizing:border-box}
+#${IDS5.panel} *{box-sizing:border-box;font-family:inherit}
+#${IDS5.panel} .wma-hd{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+#${IDS5.panel} .wma-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#${IDS5.panel} .wma-brand i{width:8px;height:8px;border-radius:2px;background:var(--accent)}
+#${IDS5.panel} .wma-sp{flex:1}
+#${IDS5.panel} .wma-env{font-size:10.5px;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--warnSoft);color:var(--warn);text-transform:none}
+#${IDS5.panel} .wma-x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 2px}
+#${IDS5.panel} .wma-chip{display:inline-block;margin-top:10px;font-weight:600;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--sunken);color:var(--ink2)}
+#${IDS5.panel} .wma-chip.absage{background:var(--badSoft);color:var(--bad)}
+#${IDS5.panel} .wma-chip.interesse,#${IDS5.panel} .wma-chip.termin_zusage,#${IDS5.panel} .wma-chip.vertrag{background:var(--goodSoft);color:var(--good)}
+#${IDS5.panel} .wma-sum{margin-top:8px;font-weight:600;font-size:15px;line-height:1.35}
+#${IDS5.panel} .wma-sub{margin-top:6px;color:var(--ink2);font-size:12.5px}
+#${IDS5.panel} a{color:var(--navy);font-weight:600;text-decoration:none}
+#${IDS5.panel} a:hover{text-decoration:underline}
+#${IDS5.panel} .wma-bd{flex:1;overflow:auto;padding:12px 16px;display:grid;gap:10px;align-content:start}
+#${IDS5.panel} .wma-lbl{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 -2px}
+#${IDS5.panel} .wma-who{font-weight:600;font-size:13px;margin-top:4px}
+#${IDS5.panel} .wma-who span{font-weight:400;color:var(--ink2)}
+#${IDS5.panel} .wma-act{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px;background:#fff}
+#${IDS5.panel} .wma-act.off{background:var(--sunken)}
+#${IDS5.panel} .wma-act.off .wma-ttl{color:var(--muted)}
+#${IDS5.panel} .wma-row{display:flex;align-items:center;gap:10px}
+#${IDS5.panel} .wma-ttl{flex:1;font-weight:600;min-width:0}
+#${IDS5.panel} .wma-ttl small{display:block;font-weight:400;color:var(--ink2);font-size:12.5px;margin-top:1px;overflow-wrap:anywhere}
+#${IDS5.panel} .wma-sw{position:relative;width:34px;height:20px;border-radius:999px;background:var(--line2);flex:none;cursor:pointer;border:0;padding:0;transition:background .15s}
+#${IDS5.panel} .wma-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+#${IDS5.panel} .wma-sw[aria-checked="true"]{background:var(--accent)}
+#${IDS5.panel} .wma-sw[aria-checked="true"]::after{left:16px}
+#${IDS5.panel} .wma-sw:disabled{opacity:.4;cursor:default}
+#${IDS5.panel} .wma-edit{border:0;background:none;color:var(--navy);font-weight:600;font-size:12px;cursor:pointer;padding:0}
+#${IDS5.panel} .wma-line{display:flex;gap:6px;flex-wrap:wrap}
+#${IDS5.panel} select,#${IDS5.panel} textarea,#${IDS5.panel} input[type=date]{font-size:13px;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;background:#fff;color:var(--ink)}
+#${IDS5.panel} select{flex:1;min-width:0}
+#${IDS5.panel} textarea{width:100%;min-height:54px;resize:vertical}
+#${IDS5.panel} .wma-tags{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px}
+#${IDS5.panel} .wma-unsure{font-size:12px;color:var(--warn);background:var(--warnSoft);border-radius:6px;padding:6px 8px}
+#${IDS5.panel} .wma-note{font-size:12.5px;color:var(--ink2)}
+#${IDS5.panel} .wma-draft{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--sunken);font-size:13px;display:grid;gap:6px}
+#${IDS5.panel} .wma-draft p{margin:0;white-space:pre-wrap}
+#${IDS5.panel} .wma-ghost{justify-self:start;font-weight:600;font-size:12px;border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--ink)}
+#${IDS5.panel} .wma-ft{border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:8px}
+#${IDS5.panel} .wma-btns{display:flex;gap:8px}
+#${IDS5.panel} .wma-primary{flex:1;font-weight:600;font-size:14px;border:0;border-radius:7px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer}
+#${IDS5.panel} .wma-primary:disabled{background:var(--line2);cursor:default}
+#${IDS5.panel} .wma-secondary{font-weight:600;font-size:14px;border:1px solid var(--line2);border-radius:7px;padding:10px 14px;background:#fff;color:var(--ink2);cursor:pointer}
+#${IDS5.panel} .wma-hint{font-size:11.5px;color:var(--muted);text-align:center}
+#${IDS5.panel} .wma-kbd{font-size:10.5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+#${IDS5.panel} .wma-done{display:grid;gap:6px}
+#${IDS5.panel} .wma-ok{color:var(--good);font-weight:700}
+#${IDS5.panel} .wma-fail{color:var(--bad);font-weight:700}
+#${IDS5.pill}{position:fixed;right:88px;bottom:27px;z-index:2147483000;height:40px;padding:0 16px;border-radius:20px;border:0;cursor:pointer;
+  font:600 13px "Segoe UI",Inter,system-ui,Arial,sans-serif;color:#fff;background:#ef6c00;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+#${IDS5.pill}.done{background:#71717a}
+#${IDS5.pill}.error{background:#a1a1aa}
+`;
   var isVisible2 = (element5) => element5.getClientRects().length > 0;
-  function styled2(node, styles) {
-    Object.assign(node.style, styles);
-    return node;
-  }
-  function el4(tag, styles = {}, text = "") {
-    const node = styled2(document.createElement(tag), styles);
+  function el4(tag, className = "", text = "") {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
     if (text) node.textContent = text;
     return node;
   }
-  function button2(label, { primary = false } = {}) {
-    const node = el4("button", {
-      padding: "7px 12px",
-      borderRadius: "5px",
-      cursor: "pointer",
-      fontWeight: "600",
-      font: "600 13px Arial,sans-serif",
-      border: primary ? "1px solid #1d4ed8" : "1px solid #aaa",
-      background: primary ? "#1d4ed8" : "#fff",
-      color: primary ? "#fff" : "#222"
-    }, label);
-    node.type = "button";
-    return node;
+  function ensureStyle3() {
+    if (document.getElementById(IDS5.style)) return;
+    const style = el4("style");
+    style.id = IDS5.style;
+    style.textContent = CSS2;
+    document.head.appendChild(style);
   }
   function readSubject() {
     const heading = [...document.querySelectorAll('[id$="_SUBJECT"]')].find(isVisible2);
@@ -12597,129 +12693,102 @@ ${buildCbreBody(current)}`;
     const cache = /* @__PURE__ */ new Map();
     let current = { key: "", result: null };
     let disabled = false;
+    const closedKeys = /* @__PURE__ */ new Set();
     function removePill() {
       document.getElementById(IDS5.pill)?.remove();
     }
+    function pillLabel(result) {
+      if (result?.fehler && !result.vorschlag) return "Mail-Assistent: Fehler";
+      const art = MAILART_LABELS[result.vorschlag.mailart] || result.vorschlag.mailart;
+      return result.status === "erledigt" ? `Erledigt · ${art}` : `Mail-Assistent · ${art}`;
+    }
     function renderPill(result) {
-      if (result?.fehler) {
-        renderErrorPill(result.fehler);
-        return;
-      }
-      const vorschlag = result?.vorschlag;
-      if (!result?.gefunden || !vorschlag || result.mailart === "kein_bezug") {
+      const isError = Boolean(result?.fehler && !result.vorschlag);
+      if (!isError && (!result?.gefunden || !result.vorschlag || result.mailart === "kein_bezug")) {
         removePill();
         return;
       }
+      ensureStyle3();
       let pill2 = document.getElementById(IDS5.pill);
       if (!pill2) {
-        pill2 = el4("button", {
-          position: "fixed",
-          right: "88px",
-          bottom: "27px",
-          zIndex: "2147483000",
-          height: "40px",
-          padding: "0 14px",
-          borderRadius: "20px",
-          border: "0",
-          cursor: "pointer",
-          font: "600 13px Arial,sans-serif",
-          color: "#fff",
-          boxShadow: "0 4px 16px rgba(0,0,0,.25)"
-        });
+        pill2 = el4("button");
         pill2.id = IDS5.pill;
         pill2.type = "button";
         pill2.addEventListener("click", () => {
-          if (current.result?.fehler) window.alert(`Mail-Assistent: ${current.result.fehler}`);
-          else openDialog(current.result);
+          const result2 = current.result;
+          if (result2?.fehler && !result2.vorschlag) window.alert(`Mail-Assistent: ${result2.fehler}`);
+          else if (document.getElementById(IDS5.panel)) closePanel();
+          else openPanel(result2);
         });
         document.body.appendChild(pill2);
       }
-      const done = result.status === "erledigt";
-      const staging = result.umgebung === "staging" ? " · Staging" : "";
-      pill2.textContent = done ? `Vorschlag erledigt${staging}` : `Vorschlag: ${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${staging}`;
-      styled2(pill2, { background: done ? "#6b7280" : "#1d4ed8" });
+      pill2.textContent = pillLabel(result);
+      pill2.title = isError ? result.fehler : "";
+      pill2.className = isError ? "error" : result.status === "erledigt" ? "done" : "";
     }
-    function renderErrorPill(message) {
-      renderPill({ gefunden: true, vorschlag: { mailart: "" }, status: "fehler" });
-      const pill2 = document.getElementById(IDS5.pill);
-      if (!pill2) return;
-      pill2.textContent = "Mail-Assistent: Fehler";
-      pill2.title = message;
-      styled2(pill2, { background: "#9ca3af" });
+    function closePanel() {
+      document.getElementById(IDS5.panel)?.remove();
     }
-    function choiceRow(choice, vorschlag, onChange) {
-      const row2 = el4("div", { display: "grid", gap: "6px", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "6px", background: choice.moeglich ? "#fff" : "#f9fafb" });
-      const head = el4("label", { display: "flex", alignItems: "center", gap: "8px", fontWeight: "600" });
-      const box = document.createElement("input");
-      box.type = "checkbox";
-      box.checked = choice.aktiv && choice.moeglich;
-      box.disabled = !choice.moeglich;
-      box.addEventListener("change", () => {
-        choice.aktiv = box.checked;
-        onChange();
-      });
-      const titles = { status: "KAM-Status", kommentar: "Matchkommentar", wvl: "WVL", agNotiz: "AG-Notiz" };
-      head.append(box, titles[choice.art] || choice.art);
-      row2.appendChild(head);
-      const touch = () => {
-        box.checked = choice.moeglich;
-        choice.aktiv = choice.moeglich;
-        onChange();
-      };
+    function switchButton(on, disabled2, onToggle) {
+      const node = el4("button", "wma-sw");
+      node.type = "button";
+      node.setAttribute("role", "switch");
+      node.setAttribute("aria-checked", String(on));
+      node.disabled = disabled2;
+      node.addEventListener("click", onToggle);
+      return node;
+    }
+    function editor(choice, rerender) {
+      const box = el4("div");
       if (choice.art === "status") {
+        const line = el4("div", "wma-line");
         const status = document.createElement("select");
         STATUS_CHOICES.forEach((value) => status.append(new Option(KAM_STATUS_LABELS2[value], value, false, value === choice.kamStatus)));
         const reason = document.createElement("select");
         reason.append(new Option("Grund wählen", ""));
         OUT_FEEDBACK_OPTIONS.forEach((option) => reason.append(new Option(option.label, option.value, false, option.value === choice.outGrund)));
-        const sync = () => {
-          reason.hidden = status.value !== "out";
-        };
+        reason.hidden = choice.kamStatus !== "out";
         status.addEventListener("change", () => {
           choice.kamStatus = status.value;
-          sync();
-          touch();
+          rerender();
         });
         reason.addEventListener("change", () => {
           choice.outGrund = reason.value;
-          touch();
+          rerender();
         });
-        sync();
-        const line = el4("div", { display: "flex", gap: "6px", flexWrap: "wrap" });
         line.append(status, reason);
-        row2.appendChild(line);
+        box.appendChild(line);
       } else if (choice.art === "kommentar") {
-        const text = el4("textarea", { width: "100%", boxSizing: "border-box", font: "13px/1.4 Arial,sans-serif" });
-        text.rows = 2;
+        const text = el4("textarea");
         text.value = choice.kommentar;
         text.addEventListener("input", () => {
           choice.kommentar = text.value;
         });
-        row2.appendChild(text);
-        if (choice.cem) {
-          const cem = el4("label", { display: "flex", gap: "6px", alignItems: "center" });
+        text.addEventListener("change", rerender);
+        box.appendChild(text);
+        if (choice.cemPerson) {
+          const label = el4("label", "wma-tags");
           const cemBox = document.createElement("input");
           cemBox.type = "checkbox";
-          cemBox.checked = true;
-          const person = choice.cem;
+          cemBox.checked = Boolean(choice.cem);
           cemBox.addEventListener("change", () => {
-            choice.cem = cemBox.checked ? person : null;
+            choice.cem = cemBox.checked ? choice.cemPerson : null;
+            rerender();
           });
-          cem.append(cemBox, `@${person.label} erwähnen`);
-          row2.appendChild(cem);
+          label.append(cemBox, `@${choice.cemPerson.label} erwähnen`);
+          box.appendChild(label);
         }
         if (choice.mailtext) {
           const details = document.createElement("details");
-          const summary = document.createElement("summary");
-          summary.textContent = "Mailtext des Arbeitgebers kommt mit (für CEM)";
-          const mail = el4("textarea", { width: "100%", boxSizing: "border-box", font: "12px/1.4 Arial,sans-serif" });
+          const summary = el4("summary", "wma-note", "Mailtext für CEM ansehen und ändern");
+          const mail = el4("textarea");
           mail.rows = 5;
           mail.value = choice.mailtext;
           mail.addEventListener("input", () => {
             choice.mailtext = mail.value;
           });
           details.append(summary, mail);
-          row2.appendChild(details);
+          box.appendChild(details);
         }
       } else if (choice.art === "wvl") {
         const date = document.createElement("input");
@@ -12727,50 +12796,272 @@ ${buildCbreBody(current)}`;
         date.value = choice.wvl;
         date.addEventListener("change", () => {
           choice.wvl = date.value;
-          touch();
+          rerender();
         });
-        row2.appendChild(date);
+        box.appendChild(date);
       } else if (choice.art === "agNotiz") {
-        const tags = el4("div", { display: "flex", gap: "10px", flexWrap: "wrap" });
+        const tags = el4("div", "wma-tags");
         NOTE_TAGS.forEach((tag) => {
-          const label = el4("label", { display: "flex", gap: "4px", alignItems: "center" });
+          const label = el4("label");
           const tagBox = document.createElement("input");
           tagBox.type = "checkbox";
           tagBox.checked = choice.tags.includes(tag.id);
           tagBox.addEventListener("change", () => {
             choice.tags = tagBox.checked ? [.../* @__PURE__ */ new Set([...choice.tags, tag.id])] : choice.tags.filter((id) => id !== tag.id);
+            rerender();
           });
-          label.append(tagBox, tag.label || tag.id);
+          label.append(tagBox, ` ${tag.label || tag.id}`);
           tags.appendChild(label);
         });
-        const text = el4("textarea", { width: "100%", boxSizing: "border-box", font: "13px/1.4 Arial,sans-serif" });
-        text.rows = 2;
+        const text = el4("textarea");
         text.value = choice.text;
         text.addEventListener("input", () => {
           choice.text = text.value;
         });
-        row2.append(tags, text);
+        text.addEventListener("change", rerender);
+        box.append(tags, text);
       }
-      if (choice.hinweis) row2.appendChild(el4("div", { color: "#92400e", fontSize: "12px" }, choice.hinweis));
-      if (!choice.moeglich) row2.appendChild(el4("div", { color: "#6b7280", fontSize: "12px" }, "Kein Match zugeordnet, nur zur Info."));
-      return row2;
+      return box;
     }
-    function matchBlock(entry, index, choices, onChange, umgebung) {
-      const block = el4("div", { display: "grid", gap: "6px" });
-      const status = KAM_STATUS_LABELS2[entry.kamStatusAktuell ?? entry.kamStatusBisher] || "ohne KAM-Status";
-      const title = el4("div", { fontWeight: "700" });
+    function actionCard(choice, entry, state, rerender) {
+      const on = Boolean(choice.aktiv && choice.moeglich);
+      const card = el4("div", `wma-act${on ? "" : " off"}`);
+      const row2 = el4("div", "wma-row");
+      const { titel, detail } = choiceText(choice, entry);
+      const ttl = el4("div", "wma-ttl", titel);
+      if (detail) ttl.appendChild(el4("small", "", detail));
+      row2.appendChild(ttl);
+      if (choice.moeglich) {
+        const edit = el4("button", "wma-edit", state.open.has(choice.key) ? "Fertig" : "Ändern");
+        edit.type = "button";
+        edit.addEventListener("click", () => {
+          if (state.open.has(choice.key)) state.open.delete(choice.key);
+          else {
+            state.open.add(choice.key);
+            choice.aktiv = true;
+          }
+          rerender();
+        });
+        row2.appendChild(edit);
+      }
+      row2.appendChild(switchButton(on, !choice.moeglich, () => {
+        choice.aktiv = !on;
+        rerender();
+      }));
+      card.appendChild(row2);
+      if (state.open.has(choice.key)) card.appendChild(editor(choice, rerender));
+      const unsure = unsureText(choice, entry);
+      if (unsure && !on) card.appendChild(el4("div", "wma-unsure", unsure));
+      return card;
+    }
+    function candidateHead(entry, umgebung) {
+      const head = el4("div", "wma-who");
       if (entry.matchId) {
-        const link = el4("a", { color: "#1d4ed8" }, entry.kandidat || "Match");
+        const link = el4("a", "", entry.kandidat || "Match");
         link.href = `${adminBase(umgebung)}/Match/${entry.matchId}/show`;
         link.target = "_blank";
         link.rel = "noopener";
-        title.append(link, ` – ${entry.vakanz || ""} (${status})`);
+        head.appendChild(link);
+        const status = KAM_STATUS_LABELS2[entry.kamStatusAktuell ?? entry.kamStatusBisher] || "ohne KAM-Status";
+        head.appendChild(el4("span", "", ` · ${entry.vakanz || "Vakanz"} · ${status}`));
       } else {
-        title.textContent = "Kandidat nicht zugeordnet";
+        head.textContent = "Kandidat nicht zugeordnet";
       }
-      block.append(title, el4("div", { color: "#4b5563", fontSize: "12px" }, `${entry.begruendung || ""} · Sicherheit ${percent(entry.sicherheit)}`));
-      choices.filter((choice) => choice.match === index).forEach((choice) => block.appendChild(choiceRow(choice, entry, onChange)));
-      return block;
+      return head;
+    }
+    function openPanel(result) {
+      if (!result?.vorschlag) return;
+      closePanel();
+      ensureStyle3();
+      const { vorschlag } = result;
+      const choices = buildChoices(vorschlag, { mailText: readMailText() });
+      choices.forEach((choice) => {
+        if (choice.art === "kommentar") choice.cemPerson = choice.cem;
+      });
+      const state = { open: /* @__PURE__ */ new Set(), done: null, busy: false };
+      const panel = el4("aside");
+      panel.id = IDS5.panel;
+      panel.dataset.key = current.key;
+      panel.setAttribute("aria-label", "Mail-Assistent");
+      const staging = result.umgebung === "staging";
+      const employer = (vorschlag.arbeitgeber || []).map((entry) => entry.name).filter(Boolean).join(" / ");
+      const apply = async () => {
+        const operations = buildOperations(vorschlag, choices);
+        if (!operations.length || state.busy) return;
+        state.busy = true;
+        render();
+        try {
+          const { outcome, lines } = await execute(result, operations);
+          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices, outcome) }).catch(() => {
+          });
+          result.status = "erledigt";
+          state.done = { lines, at: /* @__PURE__ */ new Date() };
+          renderPill(result);
+        } catch (error) {
+          state.done = { lines: [`✗ Fehlgeschlagen: ${error.message}`], at: /* @__PURE__ */ new Date(), failed: true };
+        }
+        state.busy = false;
+        render();
+      };
+      const ignore = async () => {
+        choices.forEach((choice) => {
+          choice.aktiv = false;
+        });
+        try {
+          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices) });
+          result.status = "erledigt";
+          renderPill(result);
+          closePanel();
+        } catch (error) {
+          state.done = { lines: [`✗ Fehlgeschlagen: ${error.message}`], at: /* @__PURE__ */ new Date(), failed: true };
+          render();
+        }
+      };
+      function header() {
+        const hd = el4("div", "wma-hd");
+        const brand = el4("div", "wma-brand");
+        brand.append(el4("i"), "Mail-Assistent");
+        brand.appendChild(kamHelp.tip("outlook-assistent"));
+        brand.appendChild(el4("span", "wma-sp"));
+        if (staging) brand.appendChild(el4("span", "wma-env", "Staging"));
+        const close = el4("button", "wma-x", "×");
+        close.type = "button";
+        close.setAttribute("aria-label", "Schließen");
+        close.addEventListener("click", () => {
+          closedKeys.add(current.key);
+          closePanel();
+        });
+        brand.appendChild(close);
+        hd.append(brand, el4("span", `wma-chip ${vorschlag.mailart}`, MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart));
+        const doneBefore = result.status === "erledigt" && !state.done;
+        hd.appendChild(el4("div", "wma-sum", state.done && !state.done.failed ? "Erledigt" : summaryLine(vorschlag)));
+        const sub = [employer, vorschlag.zusammenfassung].filter(Boolean).join(" · ");
+        if (sub) hd.appendChild(el4("div", "wma-sub", sub));
+        if (doneBefore) hd.appendChild(el4("div", "wma-sub", `Schon erledigt${result.erledigt?.von ? ` von ${result.erledigt.von}` : ""}. Du kannst trotzdem noch etwas übernehmen.`));
+        return hd;
+      }
+      function body() {
+        const bd = el4("div", "wma-bd");
+        if (state.done) {
+          const list = el4("div", "wma-done");
+          state.done.lines.forEach((line) => {
+            const row2 = el4("div");
+            const ok = line.startsWith("✓");
+            row2.append(el4("span", ok ? "wma-ok" : "wma-fail", ok ? "✓ " : "✗ "), line.replace(/^[✓✗]\s*/, ""));
+            list.appendChild(row2);
+          });
+          bd.appendChild(list);
+          const at = state.done.at.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+          const note2 = el4("div", "wma-note", `Übernommen um ${at}${staging ? " auf Staging" : ""}.`);
+          bd.appendChild(note2);
+          return bd;
+        }
+        bd.appendChild(el4("div", "wma-lbl", `Wird ins Adminpanel geschrieben${staging ? " (Staging)" : ""}`));
+        (vorschlag.matches || []).forEach((entry, index) => {
+          const own = choices.filter((choice) => choice.match === index);
+          if (!own.length) return;
+          bd.appendChild(candidateHead(entry, result.umgebung));
+          own.forEach((choice) => bd.appendChild(actionCard(choice, entry, state, render)));
+        });
+        const note = choices.find((choice) => choice.art === "agNotiz");
+        if (note) {
+          bd.appendChild(el4("div", "wma-who", "Arbeitgeber"));
+          bd.appendChild(actionCard(note, null, state, render));
+        }
+        if (!choices.length) bd.appendChild(el4("div", "wma-note", "Nichts fürs Adminpanel. Die Zusammenfassung oben reicht als Info."));
+        if (vorschlag.vakanz_pausieren) {
+          const info = el4("div", "wma-unsure", "Klingt nach „Stelle besetzt“. Vakanz bitte im Adminpanel pausieren. ");
+          const jobId = (vorschlag.matches || []).find((entry) => entry.jobPositionId)?.jobPositionId;
+          if (jobId) {
+            const link = el4("a", "", "Vakanz öffnen");
+            link.href = `${adminBase(result.umgebung)}/JobPosition/${jobId}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            info.appendChild(link);
+          }
+          bd.appendChild(info);
+        }
+        const outlook = outlookDone(result.aktionen);
+        if (outlook.lines.length) {
+          bd.appendChild(el4("div", "wma-lbl", "In Outlook schon erledigt"));
+          bd.appendChild(el4("div", "wma-note", outlook.lines.map((line) => `✓ ${line}`).join(" ")));
+        }
+        if (vorschlag.antwortentwurf) {
+          bd.appendChild(el4("div", "wma-lbl", "Antwortentwurf"));
+          const draft = el4("div", "wma-draft");
+          draft.appendChild(el4("div", "wma-note", outlook.entwurf ? "Liegt in Outlook unter Entwürfe, gesendet wird von Hand." : "Nicht in Outlook angelegt, zum Kopieren."));
+          draft.appendChild(el4("p", "", vorschlag.antwortentwurf));
+          const copy = el4("button", "wma-ghost", "Kopieren");
+          copy.type = "button";
+          copy.addEventListener("click", () => {
+            navigator.clipboard?.writeText(vorschlag.antwortentwurf).then(() => {
+              copy.textContent = "Kopiert ✓";
+            }, () => {
+              copy.textContent = "Kopieren nicht erlaubt";
+            });
+          });
+          draft.appendChild(copy);
+          bd.appendChild(draft);
+        }
+        return bd;
+      }
+      function footer() {
+        const ft = el4("div", "wma-ft");
+        const btns = el4("div", "wma-btns");
+        if (state.done) {
+          const close = el4("button", "wma-secondary", "Schließen");
+          close.type = "button";
+          close.style.flex = "1";
+          close.addEventListener("click", () => {
+            closedKeys.add(current.key);
+            closePanel();
+          });
+          btns.appendChild(close);
+          ft.appendChild(btns);
+          return ft;
+        }
+        const count = buildOperations(vorschlag, choices).length;
+        const ignoreBtn = el4("button", "wma-secondary", "Ignorieren");
+        ignoreBtn.type = "button";
+        ignoreBtn.disabled = state.busy;
+        ignoreBtn.addEventListener("click", ignore);
+        const applyBtn = el4("button", "wma-primary", state.busy ? "Schreibe …" : count ? `Übernehmen (${count})` : "Nichts ausgewählt");
+        applyBtn.type = "button";
+        applyBtn.disabled = !count || state.busy;
+        applyBtn.addEventListener("click", apply);
+        btns.append(ignoreBtn, applyBtn);
+        const hint = el4("div", "wma-hint", `Schreibt ${staging ? "auf Staging" : "mit deiner Anmeldung ins Adminpanel"} · `);
+        hint.append(el4("span", "wma-kbd", "Strg"), "+", el4("span", "wma-kbd", "Enter"));
+        ft.append(btns, hint);
+        return ft;
+      }
+      function render() {
+        const scroll = panel.querySelector(".wma-bd")?.scrollTop || 0;
+        panel.replaceChildren(header(), body(), footer());
+        const bd = panel.querySelector(".wma-bd");
+        if (bd) bd.scrollTop = scroll;
+      }
+      panel.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !state.done) {
+          event.preventDefault();
+          apply();
+        }
+        if (event.key === "Escape") {
+          closedKeys.add(current.key);
+          closePanel();
+        }
+      });
+      render();
+      document.body.appendChild(panel);
+    }
+    function autoOpen(result, key) {
+      const open = document.getElementById(IDS5.panel);
+      if (open && open.dataset.key !== key) closePanel();
+      if (!result?.gefunden || !result.vorschlag || result.status !== "offen" || closedKeys.has(key)) {
+        if (!result?.vorschlag) closePanel();
+        return;
+      }
+      openPanel(result);
     }
     async function declineInterviews(request, matchId) {
       const data = await request(ALL_INTERVIEWS_QUERY, { filter: { matchId, statuses: OPEN_INTERVIEW_STATUSES }, page: 0, perPage: 100, sortField: "status", sortOrder: "ASC" });
@@ -12807,99 +13098,6 @@ ${buildCbreBody(current)}`;
       }
       return { outcome, lines };
     }
-    function openDialog(result) {
-      if (!result?.vorschlag) return;
-      document.getElementById(IDS5.dialog)?.remove();
-      const { vorschlag } = result;
-      const choices = buildChoices(vorschlag, { mailText: readMailText() });
-      const dialog = el4("dialog", { width: "min(620px, calc(100vw - 32px))", maxHeight: "calc(100vh - 48px)", border: "0", borderRadius: "10px", padding: "0", boxShadow: "0 12px 45px rgba(0,0,0,.3)", font: "14px/1.4 Arial,sans-serif", color: "#222" });
-      dialog.id = IDS5.dialog;
-      const head = el4("div", { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", color: "#fff", background: "#1d4ed8", fontWeight: "700" });
-      const title = el4("span", {}, `${MAILART_LABELS[vorschlag.mailart] || vorschlag.mailart} · ${percent(vorschlag.sicherheit)}${result.umgebung === "staging" ? " · Staging" : ""}`);
-      title.appendChild(kamHelp.tip("outlook-assistent", { tone: "dark" }));
-      const close = el4("button", { border: "0", background: "transparent", color: "#fff", fontSize: "20px", cursor: "pointer" }, "×");
-      close.type = "button";
-      close.setAttribute("aria-label", "Schließen");
-      close.autofocus = true;
-      close.addEventListener("click", () => dialog.close());
-      head.append(title, close);
-      const body = el4("div", { padding: "14px 16px", display: "grid", gap: "12px", overflowY: "auto", maxHeight: "calc(100vh - 170px)" });
-      body.appendChild(el4("div", {}, vorschlag.zusammenfassung || ""));
-      const employer = (vorschlag.arbeitgeber || []).map((entry) => entry.name).filter(Boolean).join(" / ");
-      if (employer) body.appendChild(el4("div", { color: "#4b5563" }, `Arbeitgeber: ${employer}`));
-      if (result.status === "erledigt") body.appendChild(el4("div", { color: "#92400e" }, `Schon erledigt${result.erledigt?.von ? ` von ${result.erledigt.von}` : ""}. Du kannst trotzdem noch etwas übernehmen.`));
-      const status = el4("div", { whiteSpace: "pre-line", fontSize: "13px" });
-      const applyBtn = button2("Übernehmen", { primary: true });
-      const rejectBtn = button2("Alles ablehnen");
-      const refresh = () => {
-        const count = buildOperations(vorschlag, choices).length;
-        applyBtn.textContent = count ? `Übernehmen (${count})` : "Übernehmen";
-        applyBtn.disabled = !count;
-      };
-      (vorschlag.matches || []).forEach((entry, index) => body.appendChild(matchBlock(entry, index, choices, refresh, result.umgebung)));
-      const noteChoice = choices.find((choice) => choice.art === "agNotiz");
-      if (noteChoice) body.appendChild(choiceRow(noteChoice, null, refresh));
-      if (vorschlag.vakanz_pausieren) {
-        const info = el4("div", { color: "#92400e" }, "Die Mail klingt nach „Stelle besetzt“. Vakanz bitte im Adminpanel pausieren. ");
-        const jobId = (vorschlag.matches || []).find((entry) => entry.jobPositionId)?.jobPositionId;
-        if (jobId) {
-          const link = el4("a", { color: "#1d4ed8" }, "Vakanz öffnen");
-          link.href = `${adminBase(result.umgebung)}/JobPosition/${jobId}`;
-          link.target = "_blank";
-          link.rel = "noopener";
-          info.appendChild(link);
-        }
-        body.appendChild(info);
-      }
-      if (vorschlag.antwortentwurf) {
-        const box = el4("div", { display: "grid", gap: "4px", padding: "8px 10px", background: "#f3f4f6", borderRadius: "6px" });
-        box.append(el4("strong", {}, "Antwortentwurf (liegt in Outlook unter Entwürfe, wenn das Postfach freigegeben ist)"), el4("div", { whiteSpace: "pre-wrap" }, vorschlag.antwortentwurf));
-        body.appendChild(box);
-      }
-      const footer = el4("div", { display: "flex", justifyContent: "flex-end", gap: "8px", padding: "10px 16px", borderTop: "1px solid #e5e7eb" });
-      footer.append(rejectBtn, applyBtn);
-      body.appendChild(status);
-      applyBtn.addEventListener("click", async () => {
-        const operations = buildOperations(vorschlag, choices);
-        if (!operations.length) return;
-        if (!window.confirm(`Ins Adminpanel${result.umgebung === "staging" ? " (Staging)" : ""} schreiben?
-
-${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) return;
-        applyBtn.disabled = true;
-        rejectBtn.disabled = true;
-        status.textContent = "Schreibe …";
-        try {
-          const { outcome, lines } = await execute(result, operations);
-          status.textContent = lines.join("\n");
-          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices, outcome) }).catch(() => {
-          });
-          result.status = "erledigt";
-          renderPill(result);
-        } catch (error) {
-          status.textContent = `Fehlgeschlagen: ${error.message}`;
-          applyBtn.disabled = false;
-        }
-        rejectBtn.disabled = false;
-      });
-      rejectBtn.addEventListener("click", async () => {
-        choices.forEach((choice) => {
-          choice.aktiv = false;
-        });
-        try {
-          await client.erledigt({ schluessel: result.schluessel, entscheidungen: decisions(choices) });
-          result.status = "erledigt";
-          renderPill(result);
-          dialog.close();
-        } catch (error) {
-          status.textContent = `Fehlgeschlagen: ${error.message}`;
-        }
-      });
-      refresh();
-      dialog.append(head, body, footer);
-      dialog.addEventListener("close", () => dialog.remove(), { once: true });
-      document.body.appendChild(dialog);
-      dialog.showModal();
-    }
     let scheduled = false;
     async function check() {
       const betreff = readSubject();
@@ -12907,6 +13105,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!betreff && !owaId) {
         current = { key: "", result: null };
         removePill();
+        closePanel();
         return;
       }
       if (!betreff) return;
@@ -12929,6 +13128,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (current.key !== key) return;
       current.result = result;
       renderPill(result);
+      autoOpen(result, key);
     }
     function scheduleCheck() {
       if (scheduled) return;
@@ -12941,7 +13141,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     runtime.createMutationObserver(scheduleCheck).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addCleanup(() => {
       removePill();
-      document.getElementById(IDS5.dialog)?.remove();
+      closePanel();
     });
     scheduleCheck();
   }
@@ -13421,7 +13621,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       employers.patch(event?.detail?.employerId, event?.detail?.directContact);
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
       style.id = IDS9.style;
@@ -13651,20 +13851,20 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       title.textContent = SIDE_MODES[0].side.box || "Filter";
       side.appendChild(title);
       SIDE_MODES.forEach((mode) => {
-        const button4 = document.createElement("button");
-        button4.type = "button";
-        button4.dataset.mode = mode.id;
-        button4.title = mode.description || mode.name;
-        button4.setAttribute("aria-pressed", "false");
+        const button3 = document.createElement("button");
+        button3.type = "button";
+        button3.dataset.mode = mode.id;
+        button3.title = mode.description || mode.name;
+        button3.setAttribute("aria-pressed", "false");
         const dot = document.createElement("i");
         dot.style.background = mode.side.fill || "";
         dot.style.borderColor = mode.side.ring || mode.side.fill || "";
-        button4.append(dot, document.createTextNode(mode.side.label || mode.name));
-        button4.addEventListener("click", () => {
+        button3.append(dot, document.createTextNode(mode.side.label || mode.name));
+        button3.addEventListener("click", () => {
           if (readActive()?.id === mode.id) leave();
           else activate(mode);
         });
-        side.appendChild(button4);
+        side.appendChild(button3);
       });
       container.after(side);
       return side;
@@ -13712,7 +13912,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         return;
       }
       onPage = true;
-      ensureStyle5();
+      ensureStyle6();
       const own = storage.load();
       const state = parseListState(location.hash);
       if (hasStaleEmployerIds(state.filter)) {
@@ -13748,9 +13948,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const side = ensureSide(container);
       if (side) {
         if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
-        side.querySelectorAll("button[data-mode]").forEach((button4) => {
-          const pressed = String(button4.dataset.mode === mode?.id);
-          if (button4.getAttribute("aria-pressed") !== pressed) button4.setAttribute("aria-pressed", pressed);
+        side.querySelectorAll("button[data-mode]").forEach((button3) => {
+          const pressed = String(button3.dataset.mode === mode?.id);
+          if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
         });
       }
       setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
@@ -14040,7 +14240,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const element5 = document.getElementById(id);
       return element5?.dataset.werkiaVertretungenOwner === sourcePath ? element5 : null;
     };
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
       style.id = IDS6.style;
@@ -14084,13 +14284,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       element5.append(...children.filter((child) => child !== null && child !== void 0));
       return element5;
     }
-    function button4(text, onClick, className = "") {
+    function button3(text, onClick, className = "") {
       return el7("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
       let timer = null;
-      const element5 = button4(label, () => {
+      const element5 = button3(label, () => {
         if (!armed) {
           armed = true;
           element5.textContent = question;
@@ -14162,7 +14362,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const when = el7("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
       const badge = entry.aktiv ? el7("span", { className: "wv-badge", textContent: "läuft" }) : null;
       const actions = entry.darfBearbeiten ? [
-        button4("Bearbeiten", () => {
+        button3("Bearbeiten", () => {
           editing = entry;
           render();
         }, "wv-secondary"),
@@ -14179,7 +14379,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
       const von = el7("input", { type: "date", value: editing ? editing.von : today });
       const bis = el7("input", { type: "date", value: editing ? editing.bis : today, min: today });
-      const save = button4(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+      const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
         const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
         const problem = validateDraft(ich, draft, today);
         if (problem) {
@@ -14188,7 +14388,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         }
         run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
       });
-      const cancel = editing ? button4("Abbrechen", () => {
+      const cancel = editing ? button3("Abbrechen", () => {
         editing = null;
         render();
       }, "wv-secondary") : null;
@@ -14222,7 +14422,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       ];
       if (ich.darfAlles) {
         const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
-        const add = button4("Als Admin eintragen", () => {
+        const add = button3("Als Admin eintragen", () => {
           if (!candidate.value) {
             setStatus("Bitte auswählen, wer Admin werden soll.", true);
             return;
@@ -14257,18 +14457,18 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         ...form(),
         adminSection(),
         el7("div", { className: "wv-status" }),
-        el7("div", { className: "wv-actions" }, [button4("Schließen", closeDialog, "wv-secondary")])
+        el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
       );
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle5();
+      ensureStyle6();
       const overlay = el7("div", { id: IDS6.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
-      const close = button4("×", closeDialog, "wv-close");
+      const close = button3("×", closeDialog, "wv-close");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
       const target = el7("div", { className: "wv-body" }, [
@@ -14281,7 +14481,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         await refresh();
       } catch (error) {
         setStatus(error.message || String(error), true);
-        target.append(el7("div", { className: "wv-actions" }, [button4("Schließen", closeDialog, "wv-secondary")]));
+        target.append(el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
       }
     }
     function placeButton() {
@@ -14290,12 +14490,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         owned(IDS6.bar)?.remove();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       const slot = findSlot(document);
       const existing = owned(IDS6.button);
       if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
       existing?.remove();
-      const vertretungenButton = button4("Vertretungen", openDialog);
+      const vertretungenButton = button3("Vertretungen", openDialog);
       vertretungenButton.id = IDS6.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
@@ -14777,8 +14977,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element5;
     }
-    const button4 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
-    function ensureStyle5() {
+    const button3 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
+    function ensureStyle6() {
       if (document.getElementById(IDS7.style)) return;
       const style = el7("style", { id: IDS7.style });
       const P = `#${IDS7.panel}`;
@@ -14974,7 +15174,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         existing = null;
       }
       if (!existing) {
-        const prioButton = button4("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
+        const prioButton = button3("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
         prioButton.id = IDS7.button;
         prioButton.dataset.werkiaPrioOwner = sourcePath;
         prioButton.append(el7("span", { className: "wp-label" }));
@@ -15029,7 +15229,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         return;
       }
       if (!tab) {
-        tab = button4("", togglePanel, "", "Prio-Liste öffnen");
+        tab = button3("", togglePanel, "", "Prio-Liste öffnen");
         tab.id = IDS7.tab;
         tab.dataset.werkiaPrioOwner = sourcePath;
         tab.append(starIcon("14px"), el7("span", { className: "wp-label" }));
@@ -15075,11 +15275,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const name = el7("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
       const tag = entry.uebertragen ? el7("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
       const actions = readOnly ? el7("span") : el7("span", { className: "wp-actions" }, [
-        button4("✎", () => {
+        button3("✎", () => {
           editingId = entry.id;
           renderPanel();
         }, "wp-icon", "Notiz bearbeiten"),
-        button4("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
+        button3("×", () => removeEntry(entry), "wp-icon", "Von der Liste nehmen")
       ]);
       const parts = [check, el7("div", {}, [name, tag]), actions];
       if (editingId === entry.id && !readOnly) {
@@ -15100,7 +15300,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
             renderPanel();
           }
         });
-        parts.push(el7("div", { className: "wp-edit" }, [input, button4("Speichern", save, "wp-btn wp-primary")]));
+        parts.push(el7("div", { className: "wp-edit" }, [input, button3("Speichern", save, "wp-btn wp-primary")]));
         runtime.setTimeout(() => input.focus(), 0);
       } else if (entry.notiz) {
         parts.push(el7("div", { className: "wp-notiz", textContent: entry.notiz }));
@@ -15122,7 +15322,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!choices.length) return el7("p", { className: "wp-hint", textContent: "Mit ★ vor einem Arbeitgeber in der Liste kommt er auf die Prio-Liste." });
       const select = el7("select", { disabled: busy }, [el7("option", { value: "", textContent: "Arbeitgeber dieser Seite …" })]);
       choices.forEach(([id, name]) => select.append(el7("option", { value: id, textContent: name })));
-      const add = button4("Hinzufügen", () => {
+      const add = button3("Hinzufügen", () => {
         if (!select.value) return;
         addEmployer(select.value, select.selectedOptions[0].textContent);
       }, "wp-btn", "Auf die heutige Prio-Liste setzen");
@@ -15147,7 +15347,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!panel) return;
       const day = today();
       const tip = helpTip?.() || null;
-      const close = button4("–", togglePanel, "wp-icon", "Einklappen");
+      const close = button3("–", togglePanel, "wp-icon", "Einklappen");
       const head = el7("div", { className: "wp-head" }, [el7("span", { className: "wp-title", textContent: "Prio-Liste" }), tip, viewSelect() || el7("span", { style: "flex:1" }), close]);
       const sw = el7("input", { type: "checkbox", checked: prioFirst() });
       sw.addEventListener("change", () => {
@@ -15173,7 +15373,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
       if (!loaded && !error) body.append(el7("p", { className: "wp-hint", textContent: "Lädt …" }));
       if (!loaded && error) {
-        body.append(status, el7("div", { className: "wp-add" }, [button4("Erneut laden", () => load2({ force: true }), "wp-btn")]));
+        body.append(status, el7("div", { className: "wp-add" }, [button3("Erneut laden", () => load2({ force: true }), "wp-btn")]));
         panel.replaceChildren(head, switchRow, body);
         return;
       }
@@ -15186,7 +15386,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         const open = openEntries(entries, day);
         const footer = [];
         if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay2(later[0].tag)}). `));
-        if (open.length) footer.push(button4("Tag abschließen …", () => openReview(), "wp-link"));
+        if (open.length) footer.push(button3("Tag abschließen …", () => openReview(), "wp-link"));
         if (footer.length) body.append(el7("p", { className: "wp-hint" }, footer));
         body.append(status);
       }
@@ -15267,13 +15467,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const day = today();
       const open = openEntries(entries, day);
       if (!open.length) return;
-      ensureStyle5();
+      ensureStyle6();
       const decisions2 = new Map(open.map((entry) => [entry.id, "morgen"]));
       const status = el7("div", { className: "wp-status" });
       const items = open.map((entry) => {
         const seg = el7("span", { className: "wp-seg" });
         const choices = [["erledigt", "Erledigt"], ["morgen", "Auf morgen"]].map(([value, label]) => {
-          const choice = button4(label, () => {
+          const choice = button3(label, () => {
             decisions2.set(entry.id, value);
             seg.querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === choice)));
           });
@@ -15284,7 +15484,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         const sub = [entry.uebertragen ? `übertragen vom ${formatDay2(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
         return el7("li", {}, [el7("div", { className: "wp-who" }, [el7("b", { textContent: entry.employerName }), sub ? el7("span", { textContent: sub }) : null]), seg]);
       });
-      const save = button4("Übernehmen", async () => {
+      const save = button3("Übernehmen", async () => {
         const saves = reviewSaves(open, decisions2, day);
         save.disabled = true;
         status.className = "wp-status";
@@ -15307,7 +15507,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         }
         closeReview();
       }, "wp-btn wp-primary");
-      const later = button4("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
+      const later = button3("Schließen", closeReview, "wp-btn", "Ohne Änderung schließen. Offenes erscheint morgen trotzdem wieder.");
       const card = el7("div", { className: "wp-card" });
       card.setAttribute("role", "dialog");
       card.setAttribute("aria-label", "Prio-Liste: Tag abschließen");
@@ -15344,7 +15544,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         owned(IDS7.tab)?.remove();
         return;
       }
-      ensureStyle5();
+      ensureStyle6();
       placeButton();
       placePanel2();
       renderRows();
@@ -16053,7 +16253,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return null;
     }
   }
-  function ensureStyle3(doc) {
+  function ensureStyle4(doc) {
     if (doc.getElementById(STYLE_ID11)) return;
     const style = doc.createElement("style");
     style.id = STYLE_ID11;
@@ -16080,7 +16280,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
       if (shown === key) return;
       shown = key;
-      ensureStyle3(document);
+      ensureStyle4(document);
       let tip = document.getElementById(EXPLAIN_ID);
       if (!tip) {
         tip = document.createElement("div");
@@ -16207,7 +16407,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const before = node?.nodeType === 3 ? node.textContent.slice(0, selection.anchorOffset) : "";
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
-  function ensureStyle4() {
+  function ensureStyle5() {
     if (document.getElementById(STYLE_ID12)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID12;
@@ -16545,7 +16745,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (existing && !dialog.contains(existing)) existing.remove();
       let bar = currentBar();
       if (!bar) {
-        ensureStyle4();
+        ensureStyle5();
         form = null;
         bar = el5("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
         bar.dataset.mode = isDark2(dialog) ? "dark" : "light";
@@ -16911,10 +17111,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
     return element5;
   }
-  function button3(text, onClick, className = "wtp-secondary") {
+  function button2(text, onClick, className = "wtp-secondary") {
     return el6("button", { type: "button", textContent: text, className, onclick: onClick });
   }
-  var CSS2 = `
+  var CSS3 = `
   .wtp { --plane:#fafafa; --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
     --accent:#ef6c00; --accent-ink:#b85400; --accent-soft:#fff3e8; --navy:#284e75; --good:#0a7c0a; --bad:#b52f2f; --warn:#8a6700;
     font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.45; color:var(--ink); }
@@ -17008,9 +17208,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       element5.classList.add("wtp");
       return element5;
     };
-    function ensureStyle5() {
+    function ensureStyle6() {
       if (document.getElementById(IDS8.style)) return;
-      document.head.appendChild(el6("style", { id: IDS8.style, textContent: CSS2 }));
+      document.head.appendChild(el6("style", { id: IDS8.style, textContent: CSS3 }));
     }
     function readGesehen() {
       try {
@@ -17147,13 +17347,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         later.addEventListener("change", () => {
           if (later.value) reminderAction(item, later.value, later);
         });
-        const erledigt = button3("Erledigt", (event) => reminderAction(item, "erledigt", event.currentTarget), "wtp-primary");
-        const loeschen = button3("Löschen", (event) => reminderAction(item, "loeschen", event.currentTarget), "wtp-danger");
+        const erledigt = button2("Erledigt", (event) => reminderAction(item, "erledigt", event.currentTarget), "wtp-primary");
+        const loeschen = button2("Löschen", (event) => reminderAction(item, "loeschen", event.currentTarget), "wtp-danger");
         actions.append(erledigt, later, loeschen);
       } else {
-        actions.append(button3("OK", () => markGesehen(item.key), "wtp-primary"));
+        actions.append(button2("OK", () => markGesehen(item.key), "wtp-primary"));
       }
-      const close = button3("×", () => markGesehen(item.key), "wtp-icon");
+      const close = button2("×", () => markGesehen(item.key), "wtp-icon");
       close.title = "Ausblenden";
       close.style.float = "right";
       const element5 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
@@ -17169,7 +17369,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
-      ensureStyle5();
+      ensureStyle6();
       const popup = existing || own(el6("div", { id: IDS8.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
@@ -17204,13 +17404,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function openReminderDialog(matchId) {
       closeDialog();
-      ensureStyle5();
+      ensureStyle6();
       const overlay = own(el6("div", { id: IDS8.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
       const body = el6("div", { className: "wtp-body" });
-      const close = button3("×", closeDialog, "wtp-icon");
+      const close = button2("×", closeDialog, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.style.cssText = "position:absolute;top:10px;right:10px;";
       overlay.append(el6("div", { className: "wtp-card" }, [close, body]));
@@ -17224,7 +17424,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         body.textContent = "";
         const list = el6("ul");
         openReminders(matchId).forEach((entry) => {
-          const remove = button3("Löschen", async () => {
+          const remove = button2("Löschen", async () => {
             remove.disabled = true;
             try {
               await client().loeschen("reminder", entry.id);
@@ -17242,7 +17442,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         const tag = el6("input", { type: "date", value: preset.tag, min: berlinDay2(now()) });
         const uhrzeit = el6("input", { type: "time", value: preset.uhrzeit, step: 300 });
         const text = el6("input", { type: "text", placeholder: "z. B. AP zurückrufen", maxLength: 300 });
-        const save = button3("Reminder speichern", async () => {
+        const save = button2("Reminder speichern", async () => {
           const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value };
           const problem = validateReminderDraft(draft, now());
           if (problem) {
@@ -17275,7 +17475,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           openReminders(matchId).length ? list : el6("div", { className: "wtp-muted", textContent: daten.error ? `Reminder konnten nicht geladen werden: ${daten.error}` : "Noch kein Reminder für diesen Match." }),
           el6("h3", { textContent: "Neuer Reminder" }),
           el6("div", { className: "wtp-grid" }, [el6("label", { textContent: "Wann" }), el6("div", { className: "wtp-row" }, [tag, uhrzeit]), el6("label", { textContent: "Woran" }), text]),
-          el6("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button3("Schließen", closeDialog)]),
+          el6("div", { className: "wtp-row", style: "margin-top:12px" }, [save, button2("Schließen", closeDialog)]),
           status
         );
         text.focus?.();
@@ -17292,7 +17492,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         if (!cell) continue;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
-          ensureStyle5();
+          ensureStyle6();
           rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
@@ -17317,7 +17517,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       teamEditing = null;
     }
     async function openPanel() {
-      ensureStyle5();
+      ensureStyle6();
       if (!owned(IDS8.panel)) {
         const panel = own(el6("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
@@ -17350,8 +17550,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         if (!entry.erledigt) {
           const item = { reminder: entry.eintrag };
           actions.append(
-            button3("Erledigt", (event) => panelReminderAction(item, "erledigt", event.currentTarget)),
-            button3("Löschen", (event) => panelReminderAction(item, "loeschen", event.currentTarget), "wtp-danger")
+            button2("Erledigt", (event) => panelReminderAction(item, "erledigt", event.currentTarget)),
+            button2("Löschen", (event) => panelReminderAction(item, "loeschen", event.currentTarget), "wtp-danger")
           );
         }
       }
@@ -17360,11 +17560,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         main.append(el6("div", { className: "wtp-muted", textContent: [entry.autor && `von ${entry.autor}`, entry.eintrag.eigen ? sichtbar : ""].filter(Boolean).join(" · ") }));
         if (entry.eintrag.eigen && ich?.ich?.darfTeam) {
           actions.append(
-            button3("Bearbeiten", () => {
+            button2("Bearbeiten", () => {
               teamEditing = entry.eintrag;
               renderPanel();
             }),
-            button3("Löschen", async (event) => {
+            button2("Löschen", async (event) => {
               const control = event.currentTarget;
               control.disabled = true;
               try {
@@ -17432,7 +17632,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       };
       art.addEventListener("change", syncArt);
       syncArt();
-      const save = button3(editing ? "Änderung speichern" : "Eintragen", async () => {
+      const save = button2(editing ? "Änderung speichern" : "Eintragen", async () => {
         const sichtbarFuer = buildSichtbarFuer({ art: art.value, team: teamSelect.value, personen: [...people.querySelectorAll("input:checked")].map((box) => box.value) });
         const draft = { tag: tag.value, uhrzeit: uhrzeit.value, text: text.value.trim(), sichtbarFuer };
         const problem = validateTeamDraft(draft);
@@ -17463,7 +17663,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         ]),
         people,
         el6("div", { style: "margin-top:8px" }, [text]),
-        el6("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button3("Abbrechen", () => {
+        el6("div", { className: "wtp-row", style: "margin-top:8px" }, [save, button2("Abbrechen", () => {
           teamEditing = null;
           renderPanel();
         })])
@@ -17479,7 +17679,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const panel = owned(IDS8.panel);
       if (!panel) return;
       const day = berlinDay2(now());
-      const close = button3("×", closePanel, "wtp-icon");
+      const close = button2("×", closePanel, "wtp-icon");
       close.title = "Schließen (Esc)";
       close.setAttribute("aria-label", "Schließen");
       const head = el6("div", { className: "wtp-head" }, [
@@ -17501,7 +17701,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const parts = [status, ...errors, list, empty];
       if (ich?.ich?.darfTeam) {
         parts.push(el6("h3", { textContent: "Team-Eintrag" }));
-        parts.push(teamEditing ? teamForm() : button3("Neuer Team-Eintrag", () => {
+        parts.push(teamEditing ? teamForm() : button2("Neuer Team-Eintrag", () => {
           teamEditing = {};
           renderPanel();
         }));
@@ -17526,8 +17726,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (existing && !slot) return;
       existing?.remove();
       if (!slot) return;
-      ensureStyle5();
-      const heute = button3("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
+      ensureStyle6();
+      const heute = button2("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
       heute.id = IDS8.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
       heute.dataset.werkiaTagesplanOwner = sourcePath;
@@ -17783,7 +17983,7 @@ ${next}`;
     const rootRect = positioningRoot.getBoundingClientRect();
     const omRect = anchor.getBoundingClientRect();
     const toolbarHeight = toolbar.getBoundingClientRect().height;
-    const saveButton = [...documentRef.querySelectorAll("button")].find((button4) => /speichern/i.test(button4.textContent || ""));
+    const saveButton = [...documentRef.querySelectorAll("button")].find((button3) => /speichern/i.test(button3.textContent || ""));
     const actionBar = saveButton?.closest('footer, [class*="Actions"], [class*="Toolbar"]') || saveButton?.parentElement;
     const actionBarTop = actionBar?.getBoundingClientRect().top;
     const bottomLimit = Number.isFinite(actionBarTop) && actionBarTop > omRect.top ? actionBarTop - 8 : viewportHeight ? viewportHeight - 8 : omRect.bottom;
@@ -17805,8 +18005,8 @@ ${next}`;
       if (!field || !toolbar) {
         return;
       }
-      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button4) => {
-        button4.classList.toggle("is-active", hasOmNote(field.value, button4.title));
+      toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button3) => {
+        button3.classList.toggle("is-active", hasOmNote(field.value, button3.title));
       });
     }
     function write(nextValue) {
@@ -17890,14 +18090,14 @@ ${next}`;
         const chips = document.createElement("div");
         chips.className = "werkia-om-notes-chips";
         OM_NOTE_TEMPLATES.filter((template) => template.group === groupName).forEach((template) => {
-          const button4 = document.createElement("button");
-          button4.type = "button";
-          button4.className = "werkia-om-notes-chip";
-          button4.textContent = template.label;
-          button4.title = template.value;
-          button4.classList.toggle("is-active", hasOmNote(field.value, template.value));
-          button4.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
-          chips.appendChild(button4);
+          const button3 = document.createElement("button");
+          button3.type = "button";
+          button3.className = "werkia-om-notes-chip";
+          button3.textContent = template.label;
+          button3.title = template.value;
+          button3.classList.toggle("is-active", hasOmNote(field.value, template.value));
+          button3.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
+          chips.appendChild(button3);
         });
         group.appendChild(chips);
         groups.appendChild(group);

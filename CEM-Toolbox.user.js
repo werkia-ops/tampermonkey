@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.15.237
+// @version      1.15.238
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -5009,7 +5009,7 @@
     __typename
   }
 }`;
-  async function fetchAllEmployerContacts(request, { perPage = 2e3, maxPages = 20 } = {}) {
+  async function fetchAllEmployerContacts(request, { perPage = 1e4, maxPages = 20 } = {}) {
     const employers = [];
     for (let page = 0; page < maxPages; page += 1) {
       const result = await request(ALL_EMPLOYER_CONTACTS_QUERY, { page, perPage });
@@ -9948,7 +9948,8 @@
       if (!before && contacts.includes(directContact)) refresh().catch(() => {
       });
     }
-    return { load: load2, prefetch, patch, refresh };
+    const hasStored = () => Boolean(read());
+    return { load: load2, prefetch, patch, refresh, hasStored };
   }
 
   // ../../shared/js/focus-modes/employer-contact-rewrite.js
@@ -10434,7 +10435,7 @@
         active = null;
         mode = null;
       }
-      if (mode?.keepFilter) employers.prefetch();
+      if (mode?.keepFilter || hasContactMode() && employers.hasStored()) employers.prefetch();
       if (mode?.column) applyColumnFocus(document, mode);
       else clearColumnFocus(document);
       const container = ensureControls();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.242
+// @version      1.14.243
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12944,7 +12944,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
 
   // src/features/kam-suite/host-filter.js
   var OUTLOOK_HOSTNAMES = ["outlook.office.com", "outlook.cloud.microsoft"];
-  var OUTLOOK_FEATURE_IDS = ["toolbox-help", "update-check", "kam-suite-outlook-match-outen"];
+  var OUTLOOK_FEATURE_IDS = ["toolbox-help", "update-check", "kam-suite-outlook-match-outen", "outlook-assistent"];
   function isOutlookHost(hostname) {
     return OUTLOOK_HOSTNAMES.includes(String(hostname || "").toLowerCase());
   }

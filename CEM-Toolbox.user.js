@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.15.236
+// @version      1.15.237
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -3098,11 +3098,13 @@
   // ../../shared/js/match-dialog-top/slots.js
   var TOP_ATTRIBUTE = "data-werkia-match-dialog-top";
   var SLOT_ATTRIBUTE = "data-werkia-mdt-slot";
-  var STYLE_ID2 = "werkia-mdt-top-style-v1";
+  var STYLE_ID2 = "werkia-mdt-top-style-v2";
   var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
   var TITLE_SELECTOR = ".MuiDialogTitle-root, h1, h2";
   var STYLE = `
-.werkia-mdt-top { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.werkia-mdt-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: stretch; gap: 8px; margin: 8px 0; }
+.werkia-mdt-slot { min-width: 0; display: flex; flex-direction: column; }
+.werkia-mdt-slot > * { flex: 1 1 auto; }
 .werkia-mdt-top:empty, .werkia-mdt-slot:empty { display: none; }
 `;
   function ensureStyle2(doc) {
@@ -3152,7 +3154,7 @@
   }
 
   // ../../shared/js/employer-notes/index.js
-  var STYLE_ID3 = "werkia-agn-style-v1";
+  var STYLE_ID3 = "werkia-agn-style-v2";
   var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
   var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
   var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
@@ -3160,13 +3162,13 @@
   var EMPLOYER_LINK_SELECTOR = 'a[href*="#/Employer/"]';
   var FONT3 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var STYLE2 = `
-.werkia-agn, .werkia-agn-pop, .werkia-agn-panel { font: 400 12px/1.45 ${FONT3}; color: #09090b; box-sizing: border-box; }
+.werkia-agn, .werkia-agn-pop, .werkia-agn-panel { font: 400 13px/1.45 ${FONT3}; color: #09090b; box-sizing: border-box; }
 .werkia-agn *, .werkia-agn-pop *, .werkia-agn-panel * { box-sizing: border-box; }
-.werkia-agn-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; font-size: 12px; color: #09090b; }
+.werkia-agn-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; font-size: 13px; color: #09090b; }
 .werkia-agn-head small { font-weight: 500; color: #8b8b94; }
 .werkia-agn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .werkia-agn-note { padding: 7px 9px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; }
-.werkia-agn-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: #8b8b94; font-size: 11px; margin-bottom: 2px; }
+.werkia-agn-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: #8b8b94; font-size: 12px; margin-bottom: 2px; }
 .werkia-agn-tag { padding: 0 6px; border-radius: 999px; background: #f4f4f5; color: #52525b; font-size: 10.5px; font-weight: 600; line-height: 16px; }
 .werkia-agn-text { white-space: pre-wrap; overflow-wrap: anywhere; color: #09090b; }
 .werkia-agn-empty { color: #8b8b94; }
@@ -3188,7 +3190,7 @@
 .werkia-agn-toggle[aria-pressed="true"] { border-color: #ef6c00; background: #fff3e8; color: #b85400; }
 .werkia-agn-save { height: 30px; padding: 0 12px; border: 1px solid #09090b; border-radius: 8px; background: #09090b; color: #fff; font: 600 12px/1 ${FONT3}; cursor: pointer; }
 .werkia-agn-save:disabled { opacity: .45; cursor: default; }
-.werkia-agn-hint { color: #8b8b94; font-size: 11px; }
+.werkia-agn-hint { color: #8b8b94; font-size: 12px; }
 .werkia-agn-status { min-height: 16px; font-size: 11.5px; color: #52525b; }
 .werkia-agn-status[data-tone="ok"] { color: #0a7c0a; }
 .werkia-agn-status[data-tone="error"] { color: #b52f2f; }
@@ -3522,12 +3524,12 @@
   }
 
   // ../../shared/js/match-dialog-top/index.js
-  var STYLE_ID4 = "werkia-mdt-style-v1";
+  var STYLE_ID4 = "werkia-mdt-style-v2";
   var BLOCK_ATTRIBUTE = "data-werkia-mdt-ap";
   var FONT4 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var COPY_ICON_PATH = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
   var STYLE3 = `
-.werkia-mdt-ap { font: 400 12px/1.45 ${FONT4}; color: #09090b; box-sizing: border-box; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
+.werkia-mdt-ap { font: 400 13px/1.45 ${FONT4}; color: #09090b; box-sizing: border-box; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
 .werkia-mdt-ap * { box-sizing: border-box; }
 .werkia-mdt-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 650; }
 .werkia-mdt-head small { font-weight: 500; color: #8b8b94; }
@@ -3537,7 +3539,7 @@
 .werkia-mdt-all[hidden] { display: none; }
 .werkia-mdt-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .werkia-mdt-field { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
-.werkia-mdt-label { color: #8b8b94; font-size: 11px; }
+.werkia-mdt-label { color: #8b8b94; font-size: 12px; }
 .werkia-mdt-value { overflow-wrap: anywhere; }
 .werkia-mdt-value[data-empty="true"] { color: #8b8b94; }
 .werkia-mdt-copy { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #52525b; cursor: copy; }
@@ -4268,11 +4270,11 @@
   var COLUMN_ATTRIBUTE = "data-werkia-omq-col";
   var HIDDEN_ATTRIBUTE = "data-werkia-omq-hidden";
   var NATIVE_TITLE = "AG Fragebogen";
-  var STYLE_ID5 = "werkia-omq-style-v1";
+  var STYLE_ID5 = "werkia-omq-style-v2";
   var FONT5 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var STYLE4 = `
 [${HIDDEN_ATTRIBUTE}] { display: none !important; }
-.werkia-omq { font: 400 12px/1.45 ${FONT5}; color: #09090b; box-sizing: border-box; min-width: 280px; padding-left: 12px; border-left: 1px solid #e4e4e7; }
+.werkia-omq { font: 400 13px/1.45 ${FONT5}; color: #09090b; box-sizing: border-box; min-width: 280px; padding-left: 12px; border-left: 1px solid #e4e4e7; }
 .werkia-omq * { box-sizing: border-box; }
 .werkia-omq-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .werkia-omq-head h6 { margin: 0; }
@@ -4288,15 +4290,15 @@
 .werkia-omq-msg:empty { display: none; }
 .werkia-omq-table { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; overflow: hidden; }
 .werkia-omq-table:empty { display: none; }
-.werkia-omq-th { padding: 4px 8px; background: #fafafa; border-bottom: 1px solid #e4e4e7; color: #8b8b94; font-size: 11px; font-weight: 600; }
+.werkia-omq-th { padding: 4px 8px; background: #fafafa; border-bottom: 1px solid #e4e4e7; color: #8b8b94; font-size: 12px; font-weight: 600; }
 .werkia-omq-label { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding: 6px 8px 0; border-top: 1px solid #ececee; font-weight: 600; }
 .werkia-omq-th + .werkia-omq-th + .werkia-omq-label { border-top: 0; }
 .werkia-omq-label .werkia-omq-pill { margin-left: auto; }
 .werkia-omq-cell { padding: 2px 8px 6px; overflow-wrap: anywhere; }
 .werkia-omq-cell[data-empty="true"] { color: #8b8b94; }
-.werkia-omq-note { grid-column: 1 / -1; padding: 0 8px 6px; color: #8b8b94; font-size: 11px; }
+.werkia-omq-note { grid-column: 1 / -1; padding: 0 8px 6px; color: #8b8b94; font-size: 12px; }
 .werkia-omq-block { margin-top: 10px; }
-.werkia-omq-block h4 { margin: 0 0 4px; font-size: 12px; font-weight: 650; }
+.werkia-omq-block h4 { margin: 0 0 4px; font-size: 13px; font-weight: 650; }
 .werkia-omq-text { white-space: pre-wrap; overflow-wrap: anywhere; padding: 6px 8px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }
 .werkia-omq-text[data-empty="true"] { color: #8b8b94; }
 .werkia-omq-hint { margin-top: 4px; padding: 4px 8px; border-radius: 6px; background: #fff3e8; color: #b85400; }

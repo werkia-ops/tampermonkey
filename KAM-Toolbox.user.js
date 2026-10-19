@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.12.228
+// @version      1.12.232
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -3456,10 +3456,12 @@
         "Im Dropdown „Focus-Mode“ neben den Filtervorlagen einen Modus wählen.",
         "„VTA-Session“ zeigt die VT-Anfragen wie der Schalter „Anfragen“ und stellt die Terminspalte nach vorn.",
         "„Feedbacks einholen“ zeigt die Matches im KAM-Status „VT Feedback“, die am längsten wartenden zuerst, mit der Terminspalte vorn.",
+        "„Nur AG mit Kontakt“ blendet alle Matches aus, deren Arbeitgeber bei „AG Response Rate“ nicht „Direkter Kontakt“ oder „Indirekter Kontakt“ hat. Deine übrigen Filter bleiben stehen.",
         "„Verlassen“ bringt die Ansicht von vorher zurück."
       ],
       notes: [
         "Wer selbst am Filter dreht, verlässt den Modus damit. Die Spalte steht dann wieder an ihrem Platz.",
+        "„Nur AG mit Kontakt“ bleibt auch beim Filtern an. Die Arbeitgeber werden beim Einschalten geladen: Wer danach den Kontakt eines Arbeitgebers ändert, schaltet den Modus einmal aus und wieder an.",
         "Der Modus behält die KAM-Auswahl und „Von“ der aktuellen Ansicht.",
         "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
       ]
@@ -4818,6 +4820,26 @@
       throw new Error("Speichern wurde von der API nicht bestätigt");
     }
     return normalize4(saved.directContact);
+  }
+  var ALL_EMPLOYER_CONTACTS_QUERY = `query WerkiaAllEmployerContacts($page: Int, $perPage: Int) {
+  items: allEmployers(page: $page, perPage: $perPage) {
+    id
+    directContact
+    kamEmployeeId
+    __typename
+  }
+}`;
+  async function fetchAllEmployerContacts(request, { perPage = 2e3, maxPages = 20 } = {}) {
+    const employers = [];
+    for (let page = 0; page < maxPages; page += 1) {
+      const result = await request(ALL_EMPLOYER_CONTACTS_QUERY, { page, perPage });
+      const items = Array.isArray(result?.items) ? result.items : [];
+      for (const item of items) {
+        if (item?.id) employers.push({ id: item.id, directContact: normalize4(item.directContact), kamEmployeeId: item.kamEmployeeId || "" });
+      }
+      if (items.length < perPage) return employers;
+    }
+    throw new Error("Zu viele Arbeitgeber-Seiten, Abbruch");
   }
 
   // src/features/kam-suite/contact-badges.js
@@ -11874,121 +11896,88 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     });
   }
 
-  // src/features/focus-modes/core.js
-  var ROUTE = "KAM/MyMatches";
-  var STORAGE_KEY2 = "werkia_kam_focus_modes_v1";
-  var ACTIVE_KEY = "werkia_kam_focus_active_v1";
+  // ../../shared/js/focus-modes/core.js
   var STORE_VERSION2 = 1;
-  var SCOPE_KEYS = ["kamEmployeeIds", "interviewCreatorTeam"];
-  var DEFAULT_CREATOR_TEAM = "cem_agc";
-  var KAM_ROLE_NAME = "Key Account Management";
-  var OPEN_KAM_STATUSES = [
-    "pending",
-    "with_cem",
-    "interview_request",
-    "interview_conducted",
-    "hot_case",
-    "hot_hot_case",
-    "match_mail_sent",
-    "interview_feedback"
-  ];
-  var BUILT_IN_MODES = [
-    {
-      id: "vta-session",
-      name: "VTA-Session",
-      description: "VT-Anfragen wie im Schalter „Anfragen“, Terminspalte vorn",
-      filter: {
-        hasKamStatus: true,
-        kamStatuses: OPEN_KAM_STATUSES,
-        interviewStatuses: ["suggestion"],
-        selectedMatchFilter: "suggestion",
-        suggestionOrForwardedToggleFilterApplied: true
-      },
-      sort: "",
-      order: "",
-      perPage: 0,
-      column: "interview",
-      front: true,
-      builtIn: true
-    },
-    // Vorlaeufig (2026-10-15): "VT Feedback" als "Feedback einholen" gelesen,
-    // noch von den KAM zu bestaetigen. Ein Filter "ohne Feedback" und eine
-    // Sortierung nach Termindatum gibt es nicht (README.md); sortiert wird
-    // nach der letzten Statusaenderung, aelteste zuerst: wer am laengsten auf
-    // Feedback wartet, steht oben. lastStatusChangeAt ist eine sortierbare
-    // Spalte der Liste.
-    {
-      id: "feedbacks-einholen",
-      name: "Feedbacks einholen",
-      description: "KAM-Status „VT Feedback“, am längsten wartende zuerst, Terminspalte vorn",
-      filter: {
-        hasKamStatus: true,
-        kamStatuses: ["interview_feedback"]
-      },
-      sort: "lastStatusChangeAt",
-      order: "ASC",
-      perPage: 0,
-      column: "interview",
-      front: true,
-      builtIn: true
-    }
-  ];
-  var COLUMN_LABELS = {
-    interview: "Termin",
-    kamStatus: "KAM Status",
-    kamFollowUpDate: "KAM WVL",
-    lastStatusChangeAt: "Historie",
-    candidateId: "Kandidat",
-    jobPositionId: "Vakanz",
-    matchComments: "Match Aktionen"
+  var GOOD_EMPLOYER_CONTACTS = ["direct_contact", "indirect_contact"];
+  var EMPLOYER_CONTACT_MODE = {
+    id: "ag-kontakt",
+    name: "Nur AG mit Kontakt",
+    description: "Nur Matches von Arbeitgebern mit direktem oder indirektem Kontakt",
+    filter: {},
+    keepFilter: true,
+    employerContacts: GOOD_EMPLOYER_CONTACTS,
+    sort: "",
+    order: "",
+    perPage: 0,
+    column: "",
+    front: false,
+    builtIn: true
   };
   function hashHasFilter(hash = "") {
     return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
   }
-  function pickScope(filter) {
-    const scope = {};
-    SCOPE_KEYS.forEach((key) => {
-      if (filter && !isEmptyFilterValue(filter[key])) scope[key] = filter[key];
-    });
-    return scope;
+  function contactEmployerIds(employers, { contacts = GOOD_EMPLOYER_CONTACTS, filter = {} } = {}) {
+    const kams = Array.isArray(filter.kamEmployeeIds) && filter.kamEmployeeIds.length ? new Set(filter.kamEmployeeIds) : null;
+    const within = Array.isArray(filter.employerIds) && filter.employerIds.length ? new Set(filter.employerIds) : null;
+    return (employers || []).filter((employer) => employer?.id && contacts.includes(employer.directContact)).filter((employer) => !kams || kams.has(employer.kamEmployeeId)).filter((employer) => !within || within.has(employer.id)).map((employer) => employer.id).sort();
   }
-  function withoutScope(filter) {
-    const rest = { ...filter || {} };
-    SCOPE_KEYS.forEach((key) => {
-      delete rest[key];
-    });
-    return rest;
-  }
-  function defaultScope(me) {
-    const scope = { interviewCreatorTeam: DEFAULT_CREATOR_TEAM };
-    const isKam = (me?.roles || []).some((role) => role?.name === KAM_ROLE_NAME);
-    if (isKam && me?.id) scope.kamEmployeeIds = [me.id];
-    return scope;
-  }
-  function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter)) {
-    const filter = mode.builtIn ? { ...scope, ...mode.filter } : { ...mode.filter || {} };
-    return {
-      route: currentState?.route || ROUTE,
-      filter,
-      sort: mode.sort || currentState?.sort || "",
-      order: mode.order || currentState?.order || "",
-      perPage: mode.perPage || currentState?.perPage || 0
-    };
-  }
-  function modeHash(mode, hash, scope) {
-    const state = parseListState(hash);
-    return buildListHash(applyModeToState(mode, state, scope));
-  }
-  function modeMatchesState(mode, state) {
-    if (!mode || !state) return false;
-    if (String(state.route).toLowerCase() !== ROUTE.toLowerCase()) return false;
-    if (mode.builtIn) return filterKey(withoutScope(state.filter)) === filterKey(mode.filter);
-    return filterKey(state.filter) === filterKey(mode.filter);
-  }
-  function leaveHash(previousHash, currentHash) {
-    if (previousHash && parseListState(previousHash).route.toLowerCase() === ROUTE.toLowerCase()) return previousHash;
-    const state = parseListState(currentHash);
-    return buildListHash({ ...state, route: ROUTE, filter: pickScope(state.filter) });
+  function createFocusModeCore({ routes, scopeKeys, defaults }) {
+    const isRoute = (route) => isTargetRoute(`#/${route}`, routes);
+    function pickScope2(filter) {
+      const scope = {};
+      scopeKeys.forEach((key) => {
+        if (filter && !isEmptyFilterValue(filter[key])) scope[key] = filter[key];
+      });
+      return scope;
+    }
+    function withoutScope2(filter) {
+      const rest = { ...filter || {} };
+      scopeKeys.forEach((key) => {
+        delete rest[key];
+      });
+      return rest;
+    }
+    function defaultScope2(me) {
+      const scope = { ...defaults.filter };
+      const hasRole2 = (me?.roles || []).some((role) => role?.name === defaults.roleName);
+      if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
+      return scope;
+    }
+    function applyModeToState2(mode, currentState, scope = pickScope2(currentState?.filter), extra = {}) {
+      let filter;
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter, ...extra };
+      else if (mode.builtIn) filter = { ...scope, ...mode.filter, ...extra };
+      else filter = { ...mode.filter || {}, ...extra };
+      return {
+        route: isRoute(currentState?.route) ? currentState.route : routes[0],
+        filter,
+        sort: mode.sort || currentState?.sort || "",
+        order: mode.order || currentState?.order || "",
+        perPage: mode.perPage || currentState?.perPage || 0
+      };
+    }
+    function modeHash2(mode, hash, scope, extra) {
+      const state = parseListState(hash);
+      return buildListHash(applyModeToState2(mode, state, scope, extra));
+    }
+    function modeMatchesState2(mode, state) {
+      if (!mode || !state) return false;
+      if (!isRoute(state.route)) return false;
+      if (mode.employerContacts) return Array.isArray(state.filter?.employerIds) && state.filter.employerIds.length > 0;
+      if (mode.builtIn) return filterKey(withoutScope2(state.filter)) === filterKey(mode.filter);
+      return filterKey(state.filter) === filterKey(mode.filter);
+    }
+    function leaveHash2(previousHash, currentHash, mode = null) {
+      const state = parseListState(currentHash);
+      if (mode?.keepFilter && isRoute(state.route)) {
+        const filter = { ...state.filter };
+        if (mode.employerContacts) delete filter.employerIds;
+        return buildListHash({ ...state, filter });
+      }
+      if (previousHash && isRoute(parseListState(previousHash).route)) return previousHash;
+      return buildListHash({ ...state, route: isRoute(state.route) ? state.route : routes[0], filter: pickScope2(state.filter) });
+    }
+    return { routes, isRoute, pickScope: pickScope2, withoutScope: withoutScope2, defaultScope: defaultScope2, applyModeToState: applyModeToState2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, leaveHash: leaveHash2 };
   }
   function cleanColumn(value) {
     return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(String(value || "")) ? String(value) : "";
@@ -12052,7 +12041,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
   }
 
-  // src/features/focus-modes/columns.js
+  // ../../shared/js/focus-modes/columns.js
   var HIGHLIGHT_CLASS = "werkia-focus-col";
   var HEAD_CLASS = "werkia-focus-col-head";
   var NEXT_ATTR = "data-werkia-focus-next";
@@ -12118,8 +12107,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }).filter(Boolean);
   }
 
-  // src/features/focus-modes/index.js
-  var SOURCE_PATH = "kam/toolbox/src/features/focus-modes/index.js";
+  // ../../shared/js/focus-modes/index.js
+  var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
   var IDS6 = {
     group: "werkia-focus-group",
     bar: "werkia-focus-bar",
@@ -12141,34 +12130,42 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return fallback;
     }
   }
-  function createDefaultStorage() {
+  function createDefaultStorage(STORAGE_KEY3) {
     const gmGet = typeof GM_getValue === "function" ? GM_getValue : null;
     const gmSet = typeof GM_setValue === "function" ? GM_setValue : null;
     return {
       load() {
-        const primary = parseModes(safe(() => localStorage.getItem(STORAGE_KEY2)));
+        const primary = parseModes(safe(() => localStorage.getItem(STORAGE_KEY3)));
         if (primary.length || !gmGet) return primary;
-        const backup = parseModes(safe(() => gmGet(STORAGE_KEY2, "")));
-        if (backup.length) safe(() => localStorage.setItem(STORAGE_KEY2, serializeModes(backup)));
+        const backup = parseModes(safe(() => gmGet(STORAGE_KEY3, "")));
+        if (backup.length) safe(() => localStorage.setItem(STORAGE_KEY3, serializeModes(backup)));
         return backup;
       },
       save(modes) {
         const serialized = serializeModes(modes);
-        safe(() => localStorage.setItem(STORAGE_KEY2, serialized));
-        if (gmSet) safe(() => gmSet(STORAGE_KEY2, serialized));
+        safe(() => localStorage.setItem(STORAGE_KEY3, serialized));
+        if (gmSet) safe(() => gmSet(STORAGE_KEY3, serialized));
       }
     };
   }
   function executeFocusModes(runtime, {
-    storage = createDefaultStorage(),
-    request = (...args) => getKamGraphqlAdapter().request(...args),
-    helpTip = () => kamHelp.tip("focus-modes")
-  } = {}) {
-    runtime.registerSource(SOURCE_PATH);
-    const isTargetPage8 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
-    const allModes = () => [...BUILT_IN_MODES, ...storage.load()];
-    const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY), null));
-    const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY));
+    sourcePath,
+    core,
+    builtInModes: BUILT_IN_MODES2,
+    storageKey: STORAGE_KEY3,
+    activeKey: ACTIVE_KEY2,
+    columnLabels: COLUMN_LABELS2 = {},
+    storage = createDefaultStorage(STORAGE_KEY3),
+    request,
+    helpTip = () => null,
+    now = () => Date.now()
+  }) {
+    runtime.registerSource(sourcePath);
+    const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
+    const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
+    const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
+    const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY2), null));
+    const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY2, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY2));
     let mePromise = null;
     const loadMe = () => {
       mePromise ||= Promise.resolve().then(() => request(ME_QUERY, {})).then((data) => data?.me || null).catch((error) => {
@@ -12177,6 +12174,33 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       });
       return mePromise;
     };
+    let employers = null;
+    const loadEmployers = () => {
+      if (!employers || now() - employers.at > EMPLOYER_CACHE_MS) {
+        const promise = Promise.resolve().then(() => fetchAllEmployerContacts(request)).catch((error) => {
+          if (employers?.promise === promise) employers = null;
+          throw error;
+        });
+        employers = { at: now(), promise };
+      }
+      return employers.promise;
+    };
+    async function resolveExtra(mode, filter) {
+      if (!mode.employerContacts) return {};
+      let list;
+      try {
+        list = await loadEmployers();
+      } catch {
+        window.alert(`Focus-Mode „${mode.name}“: Die Arbeitgeber ließen sich nicht laden. Bitte die Seite neu laden und es erneut versuchen.`);
+        return null;
+      }
+      const employerIds = contactEmployerIds(list, { contacts: mode.employerContacts, filter });
+      if (!employerIds.length) {
+        window.alert(`Focus-Mode „${mode.name}“: In dieser Ansicht gibt es keinen Arbeitgeber mit direktem oder indirektem Kontakt.`);
+        return null;
+      }
+      return { employerIds };
+    }
     function ensureStyle4() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
@@ -12212,26 +12236,36 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const before = location.hash;
       let scope;
       if (hashHasFilter(before)) {
-        scope = pickScope(parseListState(before).filter);
+        scope = pickScope2(parseListState(before).filter);
       } else {
         try {
-          scope = defaultScope(await loadMe());
+          scope = defaultScope2(await loadMe());
         } catch {
           window.alert("Focus-Mode: Konnte nicht ermitteln, wer angemeldet ist. Bitte die Seite neu laden oder einmal einen Filter setzen und es erneut versuchen.");
           render();
           return;
         }
       }
+      const select = document.getElementById(IDS6.select);
+      if (select) select.disabled = true;
+      const extra = await resolveExtra(mode, { ...scope, ...parseListState(before).filter }).finally(() => {
+        if (select) select.disabled = false;
+      });
+      if (!extra) {
+        render();
+        return;
+      }
       const previous = readActive();
       writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
-      location.hash = modeHash(mode, before, scope);
+      location.hash = modeHash2(mode, before, scope, extra);
       render();
     }
     function leave() {
       const active = readActive();
+      const mode = active ? allModes().find((entry) => entry.id === active.id) : null;
       writeActive(null);
       clearColumnFocus(document);
-      location.hash = leaveHash(active?.previousHash, location.hash);
+      location.hash = leaveHash2(active?.previousHash, location.hash, mode);
       render();
     }
     function removeOwn(mode) {
@@ -12272,7 +12306,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       none.value = "";
       none.textContent = "Keine";
       columnSelect.appendChild(none);
-      visibleColumns(document, COLUMN_LABELS).forEach(({ value, label }) => {
+      visibleColumns(document, COLUMN_LABELS2).forEach(({ value, label }) => {
         const option = document.createElement("option");
         option.value = value;
         option.textContent = label;
@@ -12301,7 +12335,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           nameInput.focus();
           return;
         }
-        if (BUILT_IN_MODES.some((mode2) => mode2.name.toLowerCase() === name.toLowerCase())) {
+        if (BUILT_IN_MODES2.some((mode2) => mode2.name.toLowerCase() === name.toLowerCase())) {
           window.alert(`„${name}“ ist ein fester Focus-Mode. Bitte einen anderen Namen wählen.`);
           return;
         }
@@ -12388,7 +12422,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         placeholder.value = "";
         placeholder.textContent = "Kein Focus-Mode";
         select.appendChild(placeholder);
-        [["Team", BUILT_IN_MODES], ["Eigene", own]].forEach(([label, modes]) => {
+        [["Team", BUILT_IN_MODES2], ["Eigene", own]].forEach(([label, modes]) => {
           if (!modes.length) return;
           const group = document.createElement("optgroup");
           group.label = label;
@@ -12419,8 +12453,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const own = storage.load();
       const state = parseListState(location.hash);
       let active = readActive();
-      let mode = active ? [...BUILT_IN_MODES, ...own].find((entry) => entry.id === active.id) : null;
-      if (active && !modeMatchesState(mode, state)) {
+      let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
+      if (active && !modeMatchesState2(mode, state)) {
         writeActive(null);
         active = null;
         mode = null;
@@ -12447,6 +12481,113 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleRender);
     scheduleRender();
+  }
+
+  // src/features/focus-modes/core.js
+  var ROUTE = "KAM/MyMatches";
+  var STORAGE_KEY2 = "werkia_kam_focus_modes_v1";
+  var ACTIVE_KEY = "werkia_kam_focus_active_v1";
+  var SCOPE_KEYS = ["kamEmployeeIds", "interviewCreatorTeam"];
+  var DEFAULT_CREATOR_TEAM = "cem_agc";
+  var KAM_ROLE_NAME = "Key Account Management";
+  var OPEN_KAM_STATUSES = [
+    "pending",
+    "with_cem",
+    "interview_request",
+    "interview_conducted",
+    "hot_case",
+    "hot_hot_case",
+    "match_mail_sent",
+    "interview_feedback"
+  ];
+  var BUILT_IN_MODES = [
+    {
+      id: "vta-session",
+      name: "VTA-Session",
+      description: "VT-Anfragen wie im Schalter „Anfragen“, Terminspalte vorn",
+      filter: {
+        hasKamStatus: true,
+        kamStatuses: OPEN_KAM_STATUSES,
+        interviewStatuses: ["suggestion"],
+        selectedMatchFilter: "suggestion",
+        suggestionOrForwardedToggleFilterApplied: true
+      },
+      sort: "",
+      order: "",
+      perPage: 0,
+      column: "interview",
+      front: true,
+      builtIn: true
+    },
+    // Vorlaeufig (2026-10-15): "VT Feedback" als "Feedback einholen" gelesen,
+    // noch von den KAM zu bestaetigen. Ein Filter "ohne Feedback" und eine
+    // Sortierung nach Termindatum gibt es nicht (shared README.md); sortiert wird
+    // nach der letzten Statusaenderung, aelteste zuerst: wer am laengsten auf
+    // Feedback wartet, steht oben. lastStatusChangeAt ist eine sortierbare
+    // Spalte der Liste.
+    {
+      id: "feedbacks-einholen",
+      name: "Feedbacks einholen",
+      description: "KAM-Status „VT Feedback“, am längsten wartende zuerst, Terminspalte vorn",
+      filter: {
+        hasKamStatus: true,
+        kamStatuses: ["interview_feedback"]
+      },
+      sort: "lastStatusChangeAt",
+      order: "ASC",
+      perPage: 0,
+      column: "interview",
+      front: true,
+      builtIn: true
+    },
+    EMPLOYER_CONTACT_MODE
+  ];
+  var COLUMN_LABELS = {
+    interview: "Termin",
+    kamStatus: "KAM Status",
+    kamFollowUpDate: "KAM WVL",
+    lastStatusChangeAt: "Historie",
+    candidateId: "Kandidat",
+    jobPositionId: "Vakanz",
+    matchComments: "Match Aktionen"
+  };
+  var KAM_FOCUS_CORE = createFocusModeCore({
+    routes: [ROUTE],
+    scopeKeys: SCOPE_KEYS,
+    defaults: {
+      filter: { interviewCreatorTeam: DEFAULT_CREATOR_TEAM },
+      roleName: KAM_ROLE_NAME,
+      employeeKey: "kamEmployeeIds"
+    }
+  });
+  var {
+    pickScope,
+    withoutScope,
+    defaultScope,
+    applyModeToState,
+    modeHash,
+    modeMatchesState,
+    leaveHash
+  } = KAM_FOCUS_CORE;
+
+  // src/features/focus-modes/index.js
+  var SOURCE_PATH = "kam/toolbox/src/features/focus-modes/index.js";
+  function executeFocusModes2(runtime, {
+    request = (...args) => getKamGraphqlAdapter().request(...args),
+    helpTip = () => kamHelp.tip("focus-modes"),
+    ...options
+  } = {}) {
+    executeFocusModes(runtime, {
+      sourcePath: SOURCE_PATH,
+      core: KAM_FOCUS_CORE,
+      builtInModes: BUILT_IN_MODES,
+      storageKey: STORAGE_KEY2,
+      activeKey: ACTIVE_KEY,
+      columnLabels: COLUMN_LABELS,
+      request,
+      helpTip,
+      ...options
+    });
   }
 
   // ../../shared/js/vertretungen/core.js
@@ -16812,7 +16953,7 @@ ${next}`;
     { id: "outlook-assistent", execute: executeOutlookAssistent },
     { id: "filter-presets", execute: executeFilterPresets },
     // Haengt sich in die Leiste der Filtervorlagen, deshalb danach.
-    { id: "focus-modes", execute: executeFocusModes },
+    { id: "focus-modes", execute: executeFocusModes2 },
     { id: "vertretungen", execute: executeVertretungen2 },
     { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
     { id: "prio-liste", execute: executePrioListe2 },

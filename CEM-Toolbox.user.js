@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.13.228
+// @version      1.13.232
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2964,6 +2964,23 @@
     filterPresetsTopic({ page: "CEM › Meine Matches", routes: [ROUTES.cemMyMatches] }),
     matchStatusFilterTopic({ id: "kam-status-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
     {
+      id: "focus-modes",
+      title: "Focus-Modes",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "local",
+      summary: "Ein Focus-Mode stellt die Liste mit einem Klick auf eine Aufgabe ein: Filter, Sortierung und eine hervorgehobene Spalte.",
+      steps: [
+        "Im Dropdown „Focus-Mode“ neben den Filtervorlagen einen Modus wählen.",
+        "„Nur AG mit Kontakt“ blendet alle Matches aus, deren Arbeitgeber keinen direkten oder indirekten Kontakt hat (Badge „Schnelle Rückmeldung“ oder „Verzögerte Rückmeldung“). Deine übrigen Filter bleiben stehen.",
+        "„Verlassen“ nimmt den Arbeitgeberfilter wieder heraus."
+      ],
+      notes: [
+        "Die Arbeitgeber werden beim Einschalten geladen. Ändert sich der Kontakt eines Arbeitgebers, den Modus einmal aus- und wieder einschalten.",
+        "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
+      ]
+    },
+    {
       id: "kam-status-filter-expanded",
       title: "Aufgeklappte Matches nach KAM-Status filtern",
       page: "CEM › Meine Kandidaten (aufgeklappte Matches)",
@@ -3280,6 +3297,26 @@
       if (item?.id) index.set(item.id, normalize2(item.directContact));
     }
     return index;
+  }
+  var ALL_EMPLOYER_CONTACTS_QUERY = `query WerkiaAllEmployerContacts($page: Int, $perPage: Int) {
+  items: allEmployers(page: $page, perPage: $perPage) {
+    id
+    directContact
+    kamEmployeeId
+    __typename
+  }
+}`;
+  async function fetchAllEmployerContacts(request, { perPage = 2e3, maxPages = 20 } = {}) {
+    const employers = [];
+    for (let page = 0; page < maxPages; page += 1) {
+      const result = await request(ALL_EMPLOYER_CONTACTS_QUERY, { page, perPage });
+      const items = Array.isArray(result?.items) ? result.items : [];
+      for (const item of items) {
+        if (item?.id) employers.push({ id: item.id, directContact: normalize2(item.directContact), kamEmployeeId: item.kamEmployeeId || "" });
+      }
+      if (items.length < perPage) return employers;
+    }
+    throw new Error("Zu viele Arbeitgeber-Seiten, Abbruch");
   }
 
   // src/features/cem-ofm/contact-badges.js
@@ -6868,7 +6905,7 @@
       team,
       isTargetPage: isTargetPage3,
       getRequest,
-      ids: IDS7,
+      ids: IDS8,
       fields,
       columns,
       statusOptions,
@@ -6948,13 +6985,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS7,
-      buttonIds: [IDS7.button, IDS7.statusButton, IDS7.forwardButton, IDS7.declinePastButton],
+      ids: IDS8,
+      buttonIds: [IDS8.button, IDS8.statusButton, IDS8.forwardButton, IDS8.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS7.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS7.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS8.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS8.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -7094,13 +7131,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS7.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS8.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS7.feedbackShortcuts;
+      shortcuts.id = IDS8.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -7400,10 +7437,10 @@
     function installHeaderButtons() {
       if (!isTargetPage3()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS7.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS7.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS7.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS7.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS8.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS8.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS8.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS8.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -8099,6 +8136,636 @@
     });
   }
 
+  // ../../shared/js/focus-modes/core.js
+  var STORE_VERSION2 = 1;
+  var GOOD_EMPLOYER_CONTACTS = ["direct_contact", "indirect_contact"];
+  var EMPLOYER_CONTACT_MODE = {
+    id: "ag-kontakt",
+    name: "Nur AG mit Kontakt",
+    description: "Nur Matches von Arbeitgebern mit direktem oder indirektem Kontakt",
+    filter: {},
+    keepFilter: true,
+    employerContacts: GOOD_EMPLOYER_CONTACTS,
+    sort: "",
+    order: "",
+    perPage: 0,
+    column: "",
+    front: false,
+    builtIn: true
+  };
+  function hashHasFilter(hash = "") {
+    return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
+  }
+  function contactEmployerIds(employers, { contacts = GOOD_EMPLOYER_CONTACTS, filter = {} } = {}) {
+    const kams = Array.isArray(filter.kamEmployeeIds) && filter.kamEmployeeIds.length ? new Set(filter.kamEmployeeIds) : null;
+    const within = Array.isArray(filter.employerIds) && filter.employerIds.length ? new Set(filter.employerIds) : null;
+    return (employers || []).filter((employer) => employer?.id && contacts.includes(employer.directContact)).filter((employer) => !kams || kams.has(employer.kamEmployeeId)).filter((employer) => !within || within.has(employer.id)).map((employer) => employer.id).sort();
+  }
+  function createFocusModeCore({ routes, scopeKeys, defaults }) {
+    const isRoute = (route) => isTargetRoute(`#/${route}`, routes);
+    function pickScope(filter) {
+      const scope = {};
+      scopeKeys.forEach((key) => {
+        if (filter && !isEmptyFilterValue(filter[key])) scope[key] = filter[key];
+      });
+      return scope;
+    }
+    function withoutScope(filter) {
+      const rest = { ...filter || {} };
+      scopeKeys.forEach((key) => {
+        delete rest[key];
+      });
+      return rest;
+    }
+    function defaultScope(me) {
+      const scope = { ...defaults.filter };
+      const hasRole2 = (me?.roles || []).some((role) => role?.name === defaults.roleName);
+      if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
+      return scope;
+    }
+    function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter), extra = {}) {
+      let filter;
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter, ...extra };
+      else if (mode.builtIn) filter = { ...scope, ...mode.filter, ...extra };
+      else filter = { ...mode.filter || {}, ...extra };
+      return {
+        route: isRoute(currentState?.route) ? currentState.route : routes[0],
+        filter,
+        sort: mode.sort || currentState?.sort || "",
+        order: mode.order || currentState?.order || "",
+        perPage: mode.perPage || currentState?.perPage || 0
+      };
+    }
+    function modeHash(mode, hash, scope, extra) {
+      const state = parseListState(hash);
+      return buildListHash(applyModeToState(mode, state, scope, extra));
+    }
+    function modeMatchesState(mode, state) {
+      if (!mode || !state) return false;
+      if (!isRoute(state.route)) return false;
+      if (mode.employerContacts) return Array.isArray(state.filter?.employerIds) && state.filter.employerIds.length > 0;
+      if (mode.builtIn) return filterKey(withoutScope(state.filter)) === filterKey(mode.filter);
+      return filterKey(state.filter) === filterKey(mode.filter);
+    }
+    function leaveHash(previousHash, currentHash, mode = null) {
+      const state = parseListState(currentHash);
+      if (mode?.keepFilter && isRoute(state.route)) {
+        const filter = { ...state.filter };
+        if (mode.employerContacts) delete filter.employerIds;
+        return buildListHash({ ...state, filter });
+      }
+      if (previousHash && isRoute(parseListState(previousHash).route)) return previousHash;
+      return buildListHash({ ...state, route: isRoute(state.route) ? state.route : routes[0], filter: pickScope(state.filter) });
+    }
+    return { routes, isRoute, pickScope, withoutScope, defaultScope, applyModeToState, modeHash, modeMatchesState, leaveHash };
+  }
+  function cleanColumn(value) {
+    return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(String(value || "")) ? String(value) : "";
+  }
+  function normalizeMode(raw) {
+    if (!raw || typeof raw !== "object" || !String(raw.name || "").trim()) return null;
+    return {
+      id: String(raw.id || createPresetId()),
+      name: String(raw.name).trim(),
+      filter: raw.filter && typeof raw.filter === "object" && !Array.isArray(raw.filter) ? raw.filter : {},
+      sort: String(raw.sort || ""),
+      order: String(raw.order || ""),
+      perPage: Number.parseInt(raw.perPage, 10) || 0,
+      column: cleanColumn(raw.column),
+      front: Boolean(raw.front)
+    };
+  }
+  function modeFromState(name, state, { column = "", front = false } = {}) {
+    return normalizeMode({
+      id: createPresetId(),
+      name,
+      filter: state?.filter,
+      sort: state?.sort,
+      order: state?.order,
+      perPage: state?.perPage,
+      column,
+      front
+    });
+  }
+  function parseModes(raw) {
+    let parsed = raw;
+    if (typeof raw === "string") {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = null;
+      }
+    }
+    const list = Array.isArray(parsed?.modes) ? parsed.modes : [];
+    return list.map(normalizeMode).filter(Boolean);
+  }
+  function serializeModes(modes) {
+    return JSON.stringify({ version: STORE_VERSION2, modes });
+  }
+  function upsertMode(modes, mode) {
+    const kept = (modes || []).filter((entry) => entry.id !== mode.id);
+    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === mode.name.toLowerCase());
+    if (sameName >= 0) kept.splice(sameName, 1, mode);
+    else kept.push(mode);
+    return kept;
+  }
+  function removeMode(modes, id) {
+    return (modes || []).filter((entry) => entry.id !== id);
+  }
+  function parseActive(raw) {
+    try {
+      const parsed = JSON.parse(raw || "null");
+      return parsed && typeof parsed.id === "string" ? { id: parsed.id, previousHash: String(parsed.previousHash || "") } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ../../shared/js/focus-modes/columns.js
+  var HIGHLIGHT_CLASS = "werkia-focus-col";
+  var HEAD_CLASS = "werkia-focus-col-head";
+  var NEXT_ATTR = "data-werkia-focus-next";
+  var FRONT_AFTER = "column-buttons";
+  function columnClass(column) {
+    return `column-${column}`;
+  }
+  function columnOf(cell) {
+    return [...cell?.classList || []].find((name) => name.startsWith("column-")) || "";
+  }
+  function directCell(row, className) {
+    return [...row.children].find((child) => child.classList?.contains(className)) || null;
+  }
+  function frontReference(row, cell) {
+    const cells = [...row.children];
+    const after = cells.findIndex((child) => child.classList?.contains(FRONT_AFTER));
+    return cells.slice(after + 1).find((child) => child !== cell && columnOf(child)) || null;
+  }
+  function rowsOf(root) {
+    return [...root.querySelectorAll("table tr")];
+  }
+  function applyColumnFocus(root, { column, front = false } = {}) {
+    if (!column) return 0;
+    const className = columnClass(column);
+    let touched = 0;
+    rowsOf(root).forEach((row) => {
+      const cell = directCell(row, className);
+      if (!cell) return;
+      if (!cell.classList.contains(HIGHLIGHT_CLASS)) cell.classList.add(HIGHLIGHT_CLASS);
+      if (cell.tagName === "TH" && !cell.classList.contains(HEAD_CLASS)) cell.classList.add(HEAD_CLASS);
+      if (!front) return;
+      const reference = frontReference(row, cell);
+      if (!reference) return;
+      const cells = [...row.children];
+      if (cells.indexOf(cell) < cells.indexOf(reference)) return;
+      if (!cell.hasAttribute(NEXT_ATTR)) cell.setAttribute(NEXT_ATTR, columnOf(cell.nextElementSibling));
+      row.insertBefore(cell, reference);
+      touched += 1;
+    });
+    return touched;
+  }
+  function clearColumnFocus(root) {
+    root.querySelectorAll(`.${HIGHLIGHT_CLASS}, [${NEXT_ATTR}]`).forEach((cell) => {
+      cell.classList.remove(HIGHLIGHT_CLASS, HEAD_CLASS);
+      if (!cell.hasAttribute(NEXT_ATTR)) return;
+      const next = cell.getAttribute(NEXT_ATTR);
+      cell.removeAttribute(NEXT_ATTR);
+      const row = cell.parentElement;
+      if (!row) return;
+      const reference = next ? directCell(row, next) : null;
+      if (reference) row.insertBefore(cell, reference);
+      else row.appendChild(cell);
+    });
+  }
+  function visibleColumns(root, labels = {}) {
+    const head = root.querySelector("table thead tr");
+    if (!head) return [];
+    return [...head.children].map((cell) => {
+      const name = columnOf(cell).replace(/^column-/, "");
+      if (!name || name === "buttons") return null;
+      const text = (cell.textContent || "").replace(/\s+/g, " ").trim();
+      return { value: name, label: labels[name] || text || name };
+    }).filter(Boolean);
+  }
+
+  // ../../shared/js/focus-modes/index.js
+  var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
+  var IDS4 = {
+    group: "werkia-focus-group",
+    bar: "werkia-focus-bar",
+    select: "werkia-focus-select",
+    leave: "werkia-focus-leave",
+    save: "werkia-focus-save",
+    remove: "werkia-focus-remove",
+    style: "werkia-focus-style",
+    dialog: "werkia-focus-dialog"
+  };
+  var PRESETS_BAR_ID = "werkia-filter-presets-bar";
+  var ME_QUERY = `query WerkiaFocusModesMe {
+  me: currentEmployee { id roles { name } }
+}`;
+  function safe(callback, fallback = "") {
+    try {
+      return callback();
+    } catch {
+      return fallback;
+    }
+  }
+  function createDefaultStorage(STORAGE_KEY4) {
+    const gmGet = typeof GM_getValue === "function" ? GM_getValue : null;
+    const gmSet = typeof GM_setValue === "function" ? GM_setValue : null;
+    return {
+      load() {
+        const primary = parseModes(safe(() => localStorage.getItem(STORAGE_KEY4)));
+        if (primary.length || !gmGet) return primary;
+        const backup = parseModes(safe(() => gmGet(STORAGE_KEY4, "")));
+        if (backup.length) safe(() => localStorage.setItem(STORAGE_KEY4, serializeModes(backup)));
+        return backup;
+      },
+      save(modes) {
+        const serialized = serializeModes(modes);
+        safe(() => localStorage.setItem(STORAGE_KEY4, serialized));
+        if (gmSet) safe(() => gmSet(STORAGE_KEY4, serialized));
+      }
+    };
+  }
+  function executeFocusModes(runtime, {
+    sourcePath,
+    core,
+    builtInModes: BUILT_IN_MODES2,
+    storageKey: STORAGE_KEY4,
+    activeKey: ACTIVE_KEY2,
+    columnLabels: COLUMN_LABELS2 = {},
+    storage = createDefaultStorage(STORAGE_KEY4),
+    request,
+    helpTip = () => null,
+    now = () => Date.now()
+  }) {
+    runtime.registerSource(sourcePath);
+    const { defaultScope, leaveHash, modeHash, modeMatchesState, pickScope } = core;
+    const isTargetPage3 = () => core.isRoute(parseListState(location.hash).route);
+    const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
+    const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY2), null));
+    const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY2, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY2));
+    let mePromise = null;
+    const loadMe2 = () => {
+      mePromise ||= Promise.resolve().then(() => request(ME_QUERY, {})).then((data) => data?.me || null).catch((error) => {
+        mePromise = null;
+        throw error;
+      });
+      return mePromise;
+    };
+    let employers = null;
+    const loadEmployers = () => {
+      if (!employers || now() - employers.at > EMPLOYER_CACHE_MS) {
+        const promise = Promise.resolve().then(() => fetchAllEmployerContacts(request)).catch((error) => {
+          if (employers?.promise === promise) employers = null;
+          throw error;
+        });
+        employers = { at: now(), promise };
+      }
+      return employers.promise;
+    };
+    async function resolveExtra(mode, filter) {
+      if (!mode.employerContacts) return {};
+      let list;
+      try {
+        list = await loadEmployers();
+      } catch {
+        window.alert(`Focus-Mode „${mode.name}“: Die Arbeitgeber ließen sich nicht laden. Bitte die Seite neu laden und es erneut versuchen.`);
+        return null;
+      }
+      const employerIds = contactEmployerIds(list, { contacts: mode.employerContacts, filter });
+      if (!employerIds.length) {
+        window.alert(`Focus-Mode „${mode.name}“: In dieser Ansicht gibt es keinen Arbeitgeber mit direktem oder indirektem Kontakt.`);
+        return null;
+      }
+      return { employerIds };
+    }
+    function ensureStyle3() {
+      if (document.getElementById(IDS4.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS4.style;
+      style.textContent = `
+      #${IDS4.group}, #${IDS4.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS4.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS4.group}.is-active, #${IDS4.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS4.group} > strong, #${IDS4.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS4.group}.is-active > strong, #${IDS4.bar}.is-active > strong { color:#b85400; }
+      #${IDS4.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS4.group} button, #${IDS4.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS4.group} button:hover, #${IDS4.bar} button:hover { background:#f4f4f5; }
+      #${IDS4.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS4.leave}:hover { background:#b85400 !important; }
+      #${IDS4.group} [hidden], #${IDS4.bar} [hidden] { display:none !important; }
+      .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
+      .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
+      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS4.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS4.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS4.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS4.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS4.dialog} input[type=text], #${IDS4.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS4.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS4.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS4.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS4.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+    `;
+      document.head.appendChild(style);
+    }
+    async function activate(mode) {
+      const before = location.hash;
+      let scope;
+      if (hashHasFilter(before)) {
+        scope = pickScope(parseListState(before).filter);
+      } else {
+        try {
+          scope = defaultScope(await loadMe2());
+        } catch {
+          window.alert("Focus-Mode: Konnte nicht ermitteln, wer angemeldet ist. Bitte die Seite neu laden oder einmal einen Filter setzen und es erneut versuchen.");
+          render();
+          return;
+        }
+      }
+      const select = document.getElementById(IDS4.select);
+      if (select) select.disabled = true;
+      const extra = await resolveExtra(mode, { ...scope, ...parseListState(before).filter }).finally(() => {
+        if (select) select.disabled = false;
+      });
+      if (!extra) {
+        render();
+        return;
+      }
+      const previous = readActive();
+      writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
+      location.hash = modeHash(mode, before, scope, extra);
+      render();
+    }
+    function leave() {
+      const active = readActive();
+      const mode = active ? allModes().find((entry) => entry.id === active.id) : null;
+      writeActive(null);
+      clearColumnFocus(document);
+      location.hash = leaveHash(active?.previousHash, location.hash, mode);
+      render();
+    }
+    function removeOwn(mode) {
+      if (!window.confirm(`Focus-Mode „${mode.name}“ löschen?`)) return;
+      storage.save(removeMode(storage.load(), mode.id));
+      leave();
+    }
+    function closeDialog() {
+      document.getElementById(IDS4.dialog)?.remove();
+    }
+    function openSaveDialog() {
+      closeDialog();
+      const state = parseListState(location.hash);
+      const overlay = document.createElement("div");
+      overlay.id = IDS4.dialog;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const card = document.createElement("div");
+      card.className = "werkia-focus-card";
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-label", "Als Focus-Mode speichern");
+      const heading = document.createElement("h2");
+      heading.textContent = "Als Focus-Mode speichern";
+      const hint = document.createElement("p");
+      hint.textContent = "Speichert Filter, Sortierung und Seitengröße der aktuellen Ansicht zusammen mit einer hervorgehobenen Spalte. Liegt nur in diesem Browser.";
+      const nameLabel = document.createElement("label");
+      nameLabel.textContent = "Name";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.name = "name";
+      nameLabel.appendChild(nameInput);
+      const columnLabel = document.createElement("label");
+      columnLabel.textContent = "Hervorgehobene Spalte";
+      const columnSelect = document.createElement("select");
+      columnSelect.name = "column";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "Keine";
+      columnSelect.appendChild(none);
+      visibleColumns(document, COLUMN_LABELS2).forEach(({ value, label: label2 }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label2;
+        columnSelect.appendChild(option);
+      });
+      columnLabel.appendChild(columnSelect);
+      const frontLabel = document.createElement("label");
+      frontLabel.className = "werkia-focus-check";
+      const frontInput = document.createElement("input");
+      frontInput.type = "checkbox";
+      frontInput.name = "front";
+      frontLabel.append(frontInput, document.createTextNode("Spalte nach vorn stellen"));
+      const actions = document.createElement("div");
+      actions.className = "werkia-focus-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Abbrechen";
+      cancel.addEventListener("click", closeDialog);
+      const confirm = document.createElement("button");
+      confirm.type = "button";
+      confirm.className = "werkia-focus-primary";
+      confirm.textContent = "Speichern";
+      confirm.addEventListener("click", () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          nameInput.focus();
+          return;
+        }
+        if (BUILT_IN_MODES2.some((mode2) => mode2.name.toLowerCase() === name.toLowerCase())) {
+          window.alert(`„${name}“ ist ein fester Focus-Mode. Bitte einen anderen Namen wählen.`);
+          return;
+        }
+        const mode = modeFromState(name, state, { column: columnSelect.value, front: frontInput.checked && Boolean(columnSelect.value) });
+        const modes = upsertMode(storage.load(), mode);
+        storage.save(modes);
+        const saved = modes.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+        writeActive({ id: saved.id, previousHash: readActive()?.previousHash || "" });
+        closeDialog();
+        render();
+      });
+      actions.append(cancel, confirm);
+      card.append(heading, hint, nameLabel, columnLabel, frontLabel, actions);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      nameInput.focus();
+    }
+    function buildControls(container) {
+      const title = document.createElement("strong");
+      title.textContent = "Focus-Mode";
+      const select = document.createElement("select");
+      select.id = IDS4.select;
+      select.setAttribute("aria-label", "Focus-Mode wählen");
+      select.addEventListener("change", () => {
+        const mode = allModes().find((entry) => entry.id === select.value);
+        if (mode) activate(mode);
+        else if (readActive()) leave();
+      });
+      const leaveButton = document.createElement("button");
+      leaveButton.type = "button";
+      leaveButton.id = IDS4.leave;
+      leaveButton.textContent = "Verlassen";
+      leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
+      leaveButton.addEventListener("click", leave);
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.id = IDS4.save;
+      saveButton.textContent = "Als Focus-Mode speichern";
+      saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
+      saveButton.addEventListener("click", openSaveDialog);
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.id = IDS4.remove;
+      removeButton.textContent = "Löschen";
+      removeButton.title = "Diesen eigenen Focus-Mode löschen";
+      removeButton.addEventListener("click", () => {
+        const own = storage.load().find((entry) => entry.id === readActive()?.id);
+        if (own) removeOwn(own);
+      });
+      const tip = safe(() => helpTip?.(), null);
+      container.append(...[title, tip, select, leaveButton, removeButton, saveButton].filter(Boolean));
+    }
+    function ensureControls() {
+      const presetsBar = document.getElementById(PRESETS_BAR_ID);
+      let group = document.getElementById(IDS4.group);
+      let ownBar = document.getElementById(IDS4.bar);
+      if (presetsBar) {
+        ownBar?.remove();
+        if (group && group.parentElement === presetsBar) return group;
+        group?.remove();
+        group = document.createElement("span");
+        group.id = IDS4.group;
+        buildControls(group);
+        presetsBar.appendChild(group);
+        return group;
+      }
+      group?.remove();
+      if (ownBar) return ownBar;
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return null;
+      ownBar = document.createElement("div");
+      ownBar.id = IDS4.bar;
+      buildControls(ownBar);
+      anchor.parentElement.insertBefore(ownBar, anchor);
+      return ownBar;
+    }
+    const optionSignatures = /* @__PURE__ */ new WeakMap();
+    function fillSelect(select, own, activeId) {
+      const signature = JSON.stringify(own.map((mode) => [mode.id, mode.name]));
+      if (optionSignatures.get(select) !== signature) {
+        optionSignatures.set(select, signature);
+        select.textContent = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Kein Focus-Mode";
+        select.appendChild(placeholder);
+        [["Team", BUILT_IN_MODES2], ["Eigene", own]].forEach(([label2, modes]) => {
+          if (!modes.length) return;
+          const group = document.createElement("optgroup");
+          group.label = label2;
+          modes.forEach((mode) => {
+            const option = document.createElement("option");
+            option.value = mode.id;
+            option.textContent = mode.name;
+            if (mode.description) option.title = mode.description;
+            group.appendChild(option);
+          });
+          select.appendChild(group);
+        });
+      }
+      if (select.value !== activeId) select.value = activeId;
+    }
+    function setHidden(element, hidden) {
+      if (element && element.hidden !== hidden) element.hidden = hidden;
+    }
+    function render() {
+      if (!isTargetPage3()) {
+        clearColumnFocus(document);
+        document.getElementById(IDS4.group)?.remove();
+        document.getElementById(IDS4.bar)?.remove();
+        closeDialog();
+        return;
+      }
+      ensureStyle3();
+      const own = storage.load();
+      const state = parseListState(location.hash);
+      let active = readActive();
+      let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
+      if (active && !modeMatchesState(mode, state)) {
+        writeActive(null);
+        active = null;
+        mode = null;
+      }
+      if (mode?.column) applyColumnFocus(document, mode);
+      else clearColumnFocus(document);
+      const container = ensureControls();
+      if (!container) return;
+      const isActive = Boolean(mode);
+      if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
+      fillSelect(container.querySelector(`#${IDS4.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS4.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS4.remove}`), !isActive || Boolean(mode?.builtIn));
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // src/features/focus-modes.js
+  var SOURCE_PATH = "cem/toolbox/src/features/focus-modes.js";
+  var STORAGE_KEY2 = "werkia_cem_focus_modes_v1";
+  var ACTIVE_KEY = "werkia_cem_focus_active_v1";
+  var SCOPE_KEYS = ["cemEmployeeIds", "interviewCreatorTeam"];
+  var CEM_ROLE_NAME = "CEM";
+  var BUILT_IN_MODES = [EMPLOYER_CONTACT_MODE];
+  var COLUMN_LABELS = {
+    matchInterview: "Termin",
+    cemStatus: "CEM Status",
+    cemFollowUpDate: "CEM WVL",
+    lastStatusChangeAt: "Historie",
+    candidateId: "Kandidat",
+    jobPositionId: "Vakanz",
+    matchComments: "Match Aktionen"
+  };
+  var CEM_FOCUS_CORE = createFocusModeCore({
+    routes: CEM_ROUTES,
+    scopeKeys: SCOPE_KEYS,
+    defaults: {
+      filter: { interviewCreatorTeam: "kam" },
+      roleName: CEM_ROLE_NAME,
+      employeeKey: "cemEmployeeIds"
+    }
+  });
+  function executeFocusModes2(runtime, {
+    request = (...args) => getCemGraphqlAdapter().request(...args),
+    helpTip = () => cemHelp.tip("focus-modes"),
+    ...options
+  } = {}) {
+    executeFocusModes(runtime, {
+      sourcePath: SOURCE_PATH,
+      core: CEM_FOCUS_CORE,
+      builtInModes: BUILT_IN_MODES,
+      storageKey: STORAGE_KEY2,
+      activeKey: ACTIVE_KEY,
+      columnLabels: COLUMN_LABELS,
+      request,
+      helpTip,
+      ...options
+    });
+  }
+
   // ../../shared/js/match-status-filter/core.js
   function optionsFromLabels(labels) {
     return Object.entries(labels || {}).map(([value, label2]) => ({ value, label: label2 }));
@@ -8545,7 +9212,7 @@
   }
 
   // ../../shared/js/vertretungen/index.js
-  var IDS4 = {
+  var IDS5 = {
     button: "werkia-vertretungen-button",
     bar: "werkia-vertretungen-bar",
     dialog: "werkia-vertretungen-dialog",
@@ -8591,7 +9258,7 @@
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /^filter hinzuf/i.test(element.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS5.button && /^filter hinzuf/i.test(element.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -8599,7 +9266,7 @@
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS5.button && element.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -8626,40 +9293,40 @@
       return element?.dataset.werkiaVertretungenOwner === sourcePath ? element : null;
     };
     function ensureStyle3() {
-      if (document.getElementById(IDS4.style)) return;
+      if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
-      style.id = IDS4.style;
+      style.id = IDS5.style;
       style.textContent = `
-      #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS4.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS4.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS4.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS4.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS4.dialog} .wv-admins { margin-top:16px; }
-      #${IDS4.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS4.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS4.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS4.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS4.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS4.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS4.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS4.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS4.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS4.dialog} select, #${IDS4.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS4.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS4.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS4.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS4.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS4.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS4.dialog} .wv-status.wv-error { color:#a02334; }
+      #${IDS5.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS5.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS5.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS5.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS5.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS5.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS5.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS5.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS5.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS5.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS5.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS5.dialog} .wv-admins { margin-top:16px; }
+      #${IDS5.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS5.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS5.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS5.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS5.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS5.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS5.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS5.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS5.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS5.dialog} select, #${IDS5.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS5.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS5.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS5.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS5.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS5.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS5.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS5.dialog} .wv-status.wv-error { color:#a02334; }
     `;
       document.head.appendChild(style);
     }
@@ -8701,17 +9368,17 @@
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function closeDialog() {
-      owned(IDS4.dialog)?.remove();
+      owned(IDS5.dialog)?.remove();
       editing = null;
     }
     function setStatus(text, isError = false) {
-      const status2 = owned(IDS4.dialog)?.querySelector(".wv-status");
+      const status2 = owned(IDS5.dialog)?.querySelector(".wv-status");
       if (!status2) return;
       status2.textContent = text;
       status2.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS4.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
+      owned(IDS5.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
         element.disabled = busy;
       });
     }
@@ -8824,7 +9491,7 @@
       return details;
     }
     function card() {
-      return owned(IDS4.dialog)?.querySelector(".wv-body");
+      return owned(IDS5.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
@@ -8848,7 +9515,7 @@
     async function openDialog() {
       closeDialog();
       ensureStyle3();
-      const overlay = el4("div", { id: IDS4.dialog });
+      const overlay = el4("div", { id: IDS5.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -8871,21 +9538,21 @@
     }
     function placeButton() {
       if (!isTargetPage3()) {
-        owned(IDS4.button)?.remove();
-        owned(IDS4.bar)?.remove();
+        owned(IDS5.button)?.remove();
+        owned(IDS5.bar)?.remove();
         return;
       }
       ensureStyle3();
       const slot = findSlot(document);
-      const existing = owned(IDS4.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
+      const existing = owned(IDS5.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS5.bar)) return;
       existing?.remove();
       const vertretungenButton = button2("Vertretungen", openDialog);
-      vertretungenButton.id = IDS4.button;
+      vertretungenButton.id = IDS5.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (slot) {
-        owned(IDS4.bar)?.remove();
+        owned(IDS5.bar)?.remove();
         const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
@@ -8907,15 +9574,15 @@
         return;
       }
       vertretungenButton.className = "wv-own";
-      owned(IDS4.bar)?.remove();
+      owned(IDS5.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el4("div", { id: IDS4.bar }, [vertretungenButton]);
+      const bar = el4("div", { id: IDS5.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS4.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS5.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -8937,8 +9604,8 @@
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     runtime.addCleanup?.(() => {
-      owned(IDS4.button)?.remove();
-      owned(IDS4.bar)?.remove();
+      owned(IDS5.button)?.remove();
+      owned(IDS5.bar)?.remove();
       closeDialog();
     });
     schedule();
@@ -10094,8 +10761,8 @@
   }
 
   // src/features/wa-templates/custom-templates.js
-  var STORAGE_KEY2 = "werkia_cem_wa_custom_templates_v1";
-  var STORE_VERSION2 = 1;
+  var STORAGE_KEY3 = "werkia_cem_wa_custom_templates_v1";
+  var STORE_VERSION3 = 1;
   var SCOPES = [
     { value: "candidate", label: "Kandidat (überall)" },
     { value: "match", label: "Match (nur in Match-Zeilen)" }
@@ -10188,7 +10855,7 @@
       }
     }
     const list = Array.isArray(parsed?.templates) ? parsed.templates : [];
-    return { version: STORE_VERSION2, templates: list.map(normalize5).filter(Boolean) };
+    return { version: STORE_VERSION3, templates: list.map(normalize5).filter(Boolean) };
   }
   function upsertTemplate(store, template) {
     const clean3 = normalize5(template);
@@ -10197,26 +10864,26 @@
     const index = templates.findIndex((entry) => entry.id === clean3.id);
     if (index >= 0) templates[index] = clean3;
     else templates.push(clean3);
-    return { version: STORE_VERSION2, templates };
+    return { version: STORE_VERSION3, templates };
   }
   function moveTemplate(store, id, delta) {
     const templates = [...store?.templates || []];
     const from = templates.findIndex((entry) => entry.id === id);
     const to = from + delta;
-    if (from < 0 || to < 0 || to >= templates.length) return { version: STORE_VERSION2, templates };
+    if (from < 0 || to < 0 || to >= templates.length) return { version: STORE_VERSION3, templates };
     const [moved] = templates.splice(from, 1);
     templates.splice(to, 0, moved);
-    return { version: STORE_VERSION2, templates };
+    return { version: STORE_VERSION3, templates };
   }
   function removeTemplate(store, id) {
-    return { version: STORE_VERSION2, templates: (store?.templates || []).filter((entry) => entry.id !== id) };
+    return { version: STORE_VERSION3, templates: (store?.templates || []).filter((entry) => entry.id !== id) };
   }
   function findNameClash(store, name, ownId = "") {
     const wanted = String(name || "").trim().toLowerCase();
     return (store?.templates || []).find((entry) => entry.id !== ownId && entry.name.toLowerCase() === wanted) || null;
   }
   function createTemplateStorage({ read, write, backupRead, backupWrite }) {
-    const safe = (fn) => {
+    const safe2 = (fn) => {
       try {
         return fn();
       } catch {
@@ -10225,22 +10892,22 @@
     };
     return {
       load() {
-        const primary = parseStore2(safe(read));
+        const primary = parseStore2(safe2(read));
         if (primary.templates.length) return primary;
-        const backup = parseStore2(safe(backupRead));
-        if (backup.templates.length) safe(() => write(JSON.stringify(backup)));
+        const backup = parseStore2(safe2(backupRead));
+        if (backup.templates.length) safe2(() => write(JSON.stringify(backup)));
         return backup;
       },
       save(store) {
         const serialized = JSON.stringify(parseStore2(store));
-        safe(() => write(serialized));
-        safe(() => backupWrite(serialized));
+        safe2(() => write(serialized));
+        safe2(() => backupWrite(serialized));
       }
     };
   }
 
   // src/features/wa-templates/index.js
-  var SOURCE_PATH = "cem/toolbox/src/features/wa-templates/index.js";
+  var SOURCE_PATH2 = "cem/toolbox/src/features/wa-templates/index.js";
   var ROUTE_RE = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
   var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
@@ -10248,7 +10915,7 @@
   var BUTTON_CLASS = "werkia-wa-button";
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
-  var IDS5 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
+  var IDS6 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
   var CACHE_MS2 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
@@ -10256,79 +10923,79 @@
   .${CELL_CLASS} { width:1%; white-space:nowrap; padding-left:4px !important; padding-right:4px !important; text-align:center; }
   th.${CELL_CLASS} { font-weight:500; }
   .${BUTTON_CLASS}:hover { background:#1f9a6b; color:#fff; }
-  #${IDS5.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS5.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
-  #${IDS5.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS5.menu} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS5.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS5.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
-  #${IDS5.dialog} .wa-head button { cursor:pointer; }
-  #${IDS5.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
-  #${IDS5.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
-  #${IDS5.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
-  #${IDS5.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
-  #${IDS5.dialog} select, #${IDS5.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS5.dialog} select:focus, #${IDS5.dialog} textarea:focus { outline:2px solid #b6a4ff; }
-  #${IDS5.dialog} textarea { min-height:440px; resize:vertical; }
-  #${IDS5.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-  #${IDS5.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
-  #${IDS5.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
-  #${IDS5.dialog} .wa-loading { color:#6b6775; }
-  #${IDS5.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
-  #${IDS5.dialog} .wa-foot button, #${IDS5.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS5.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
-  #${IDS5.dialog} .wa-primary:hover { background:#5535d6; }
-  #${IDS5.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
-  #${IDS5.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS5.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
-  #${IDS5.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
-  #${IDS5.menu} button.wa-action { color:#6d4aff; font-weight:600; }
-  #${IDS5.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
-  #${IDS5.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
-  #${IDS5.menu} .wa-group-items { padding-left:8px; }
-  #${IDS5.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS5.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS5.context} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS5.context} button.wa-delete { color:#c23f3f; }
-  #${IDS5.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
-  #${IDS5.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS5.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS5.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
-  #${IDS5.confirm} p { margin:0; padding:16px 18px; }
-  #${IDS5.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
-  #${IDS5.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS5.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS5.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
-  #${IDS5.confirm} .wa-delete-solid:hover { background:#a83232; }
-  #${IDS5.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
-  #${IDS5.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS5.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
-  #${IDS5.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
-  #${IDS5.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS5.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
-  #${IDS5.dialog} .wa-note { color:#6b6775; font-size:12px; }
-  #${IDS5.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
-  #${IDS5.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
-  #${IDS5.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
-  #${IDS5.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
-  #${IDS5.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
-  #${IDS5.dialog} .wa-move { padding:4px 9px !important; }
-  #${IDS5.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
-  #${IDS5.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
-  #${IDS5.dialog} .wa-spacer { flex:1; }
-  #${IDS5.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #${IDS5.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
+  #${IDS6.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS6.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
+  #${IDS6.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS6.menu} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS6.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS6.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
+  #${IDS6.dialog} .wa-head button { cursor:pointer; }
+  #${IDS6.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
+  #${IDS6.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
+  #${IDS6.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
+  #${IDS6.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
+  #${IDS6.dialog} select, #${IDS6.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS6.dialog} select:focus, #${IDS6.dialog} textarea:focus { outline:2px solid #b6a4ff; }
+  #${IDS6.dialog} textarea { min-height:440px; resize:vertical; }
+  #${IDS6.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  #${IDS6.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
+  #${IDS6.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
+  #${IDS6.dialog} .wa-loading { color:#6b6775; }
+  #${IDS6.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
+  #${IDS6.dialog} .wa-foot button, #${IDS6.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS6.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
+  #${IDS6.dialog} .wa-primary:hover { background:#5535d6; }
+  #${IDS6.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
+  #${IDS6.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS6.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
+  #${IDS6.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
+  #${IDS6.menu} button.wa-action { color:#6d4aff; font-weight:600; }
+  #${IDS6.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
+  #${IDS6.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
+  #${IDS6.menu} .wa-group-items { padding-left:8px; }
+  #${IDS6.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS6.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS6.context} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS6.context} button.wa-delete { color:#c23f3f; }
+  #${IDS6.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
+  #${IDS6.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS6.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS6.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
+  #${IDS6.confirm} p { margin:0; padding:16px 18px; }
+  #${IDS6.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
+  #${IDS6.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS6.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS6.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
+  #${IDS6.confirm} .wa-delete-solid:hover { background:#a83232; }
+  #${IDS6.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
+  #${IDS6.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS6.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
+  #${IDS6.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  #${IDS6.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS6.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
+  #${IDS6.dialog} .wa-note { color:#6b6775; font-size:12px; }
+  #${IDS6.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
+  #${IDS6.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
+  #${IDS6.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
+  #${IDS6.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
+  #${IDS6.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
+  #${IDS6.dialog} .wa-move { padding:4px 9px !important; }
+  #${IDS6.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
+  #${IDS6.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
+  #${IDS6.dialog} .wa-spacer { flex:1; }
+  #${IDS6.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #${IDS6.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
 `;
   function executeWaTemplates(runtime) {
-    runtime.registerSource(SOURCE_PATH);
+    runtime.registerSource(SOURCE_PATH2);
     const cache = /* @__PURE__ */ new Map();
     let syncTimer = null;
     let toastTimer = null;
     function ensureStyle3() {
-      if (document.getElementById(IDS5.style)) return;
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS5.style;
+      style.id = IDS6.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
@@ -10344,11 +11011,11 @@
     const loadMatch = (matchId) => cached(`match:${matchId}`, () => loadMatchContext(request, matchId));
     const loadCandidate = (candidateId) => cached(`candidate:${candidateId}`, () => loadCandidateContext(request, candidateId));
     const storage = createTemplateStorage({
-      read: () => localStorage.getItem(STORAGE_KEY2),
-      write: (value) => localStorage.setItem(STORAGE_KEY2, value),
-      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY2, null) : null,
+      read: () => localStorage.getItem(STORAGE_KEY3),
+      write: (value) => localStorage.setItem(STORAGE_KEY3, value),
+      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY3, null) : null,
       backupWrite: (value) => {
-        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY2, value);
+        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY3, value);
       }
     });
     const asDialogTemplate = (own) => ({
@@ -10439,14 +11106,14 @@
     let activeMenu = null;
     let followFrame = 0;
     function closeMenu() {
-      document.getElementById(IDS5.menu)?.remove();
+      document.getElementById(IDS6.menu)?.remove();
       activeMenu = null;
       closeContextMenu();
     }
     function openMenu(button2, target) {
       closeMenu();
       const menu = document.createElement("div");
-      menu.id = IDS5.menu;
+      menu.id = IDS6.menu;
       const place = () => {
         const rect = button2.getBoundingClientRect();
         const height = menu.offsetHeight;
@@ -10509,11 +11176,11 @@
       activeMenu = { button: button2, place };
     }
     function closeContextMenu() {
-      document.getElementById(IDS5.context)?.remove();
+      document.getElementById(IDS6.context)?.remove();
     }
     function openContextMenu(event, template) {
       closeContextMenu();
-      const context = element("div", { id: IDS5.context });
+      const context = element("div", { id: IDS6.context });
       const editButton = element("button", { type: "button", textContent: "Bearbeiten" });
       editButton.addEventListener("click", () => {
         closeMenu();
@@ -10531,9 +11198,9 @@
       Object.assign(context.style, { left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` });
     }
     function confirmDelete(template, onDeleted) {
-      document.getElementById(IDS5.confirm)?.remove();
+      document.getElementById(IDS6.confirm)?.remove();
       const close = () => {
-        document.getElementById(IDS5.confirm)?.remove();
+        document.getElementById(IDS6.confirm)?.remove();
         window.removeEventListener("keydown", onKey, true);
       };
       const onKey = (keyEvent) => {
@@ -10543,7 +11210,7 @@
       };
       const cancelButton = element("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const deleteButton = element("button", { type: "button", className: "wa-delete-solid", textContent: "Löschen" });
-      const overlay = element("div", { id: IDS5.confirm }, [element("div", { className: "wa-card" }, [
+      const overlay = element("div", { id: IDS6.confirm }, [element("div", { className: "wa-card" }, [
         element("h2", { textContent: "Vorlage löschen?" }),
         element("p", { textContent: `Möchtest du die Vorlage „${template.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.` }),
         element("div", { className: "wa-foot" }, [cancelButton, deleteButton])
@@ -10562,14 +11229,14 @@
       cancelButton.focus();
     }
     function onDocumentClick(event) {
-      const context = document.getElementById(IDS5.context);
+      const context = document.getElementById(IDS6.context);
       if (context?.contains(event.target)) return;
       closeContextMenu();
-      const menu = document.getElementById(IDS5.menu);
+      const menu = document.getElementById(IDS6.menu);
       if (menu && !menu.contains(event.target)) closeMenu();
     }
     function onDocumentScroll(event) {
-      const menu = document.getElementById(IDS5.menu);
+      const menu = document.getElementById(IDS6.menu);
       if (!menu || event.target instanceof Node && menu.contains(event.target)) return;
       closeContextMenu();
       if (followFrame) return;
@@ -10592,7 +11259,7 @@
       return node;
     }
     function closeDialog() {
-      document.getElementById(IDS5.dialog)?.remove();
+      document.getElementById(IDS6.dialog)?.remove();
       document.removeEventListener("keydown", onDialogKey, true);
     }
     function onDialogKey(event) {
@@ -10627,7 +11294,7 @@
       const cancelButton = element("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const card = element("div", { className: "wa-card" }, [head, body, element("div", { className: "wa-foot" }, [cancelButton, copyButton])]);
       makeDraggable(card, head);
-      const overlay = element("div", { id: IDS5.dialog }, [card]);
+      const overlay = element("div", { id: IDS6.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -10763,7 +11430,7 @@ Trotzdem kopieren?`)) return;
       const foot = element("div", { className: "wa-foot" });
       const card = element("div", { className: "wa-card" }, [head, body, foot]);
       makeDraggable(card, head);
-      const overlay = element("div", { id: IDS5.dialog }, [card]);
+      const overlay = element("div", { id: IDS6.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -10946,9 +11613,9 @@ Trotzdem speichern?`)) return void 0;
       }
     }
     function showNotice(message) {
-      document.getElementById(IDS5.toast)?.remove();
+      document.getElementById(IDS6.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
-      const toast = element("div", { id: IDS5.toast, textContent: message });
+      const toast = element("div", { id: IDS6.toast, textContent: message });
       document.body.appendChild(toast);
       toastTimer = runtime.setTimeout(() => {
         toastTimer = null;
@@ -10956,10 +11623,10 @@ Trotzdem speichern?`)) return void 0;
       }, 4e3);
     }
     function showToast(template, context, text) {
-      document.getElementById(IDS5.toast)?.remove();
+      document.getElementById(IDS6.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
       const preview = text.split("\n").filter((line) => line.trim()).slice(0, 2).join("\n");
-      const toast = element("div", { id: IDS5.toast }, [
+      const toast = element("div", { id: IDS6.toast }, [
         element("div", { textContent: `✓ Kopiert: ${template.label}${context.candidateFirstName ? ` für ${context.candidateFirstName}` : ""}` }),
         element("div", { className: "wa-preview", textContent: preview })
       ]);
@@ -10982,9 +11649,9 @@ Trotzdem speichern?`)) return void 0;
       if (followFrame) window.cancelAnimationFrame(followFrame);
       removeAll();
       closeDialog();
-      document.getElementById(IDS5.confirm)?.remove();
-      document.getElementById(IDS5.toast)?.remove();
-      document.getElementById(IDS5.style)?.remove();
+      document.getElementById(IDS6.confirm)?.remove();
+      document.getElementById(IDS6.toast)?.remove();
+      document.getElementById(IDS6.style)?.remove();
     });
     scheduleSync();
   }
@@ -11476,40 +12143,40 @@ Trotzdem speichern?`)) return void 0;
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
-  var IDS6 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var IDS7 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
   var FONT3 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
   .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT3}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT3}; color:#09090b; -webkit-font-smoothing:antialiased; }
-  #${IDS6.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS6.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
-  #${IDS6.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS6.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT3}; }
-  #${IDS6.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS6.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
-  #${IDS6.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS6.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
-  #${IDS6.dialog} dd a { color:#b85400; text-decoration:none; }
-  #${IDS6.dialog} dd a:hover { text-decoration:underline; }
-  #${IDS6.dialog} .sd-muted { color:#8b8b94; }
-  #${IDS6.dialog} .sd-warn { color:#8a6700; }
-  #${IDS6.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS6.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT3}; resize:vertical; }
-  #${IDS6.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
-  #${IDS6.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
-  #${IDS6.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
-  #${IDS6.dialog} .sd-status.sd-error { color:#b52f2f; }
-  #${IDS6.dialog} .sd-status.sd-ok { color:#0a7c0a; }
-  #${IDS6.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS6.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT3}; }
-  #${IDS6.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
-  #${IDS6.dialog} .sd-secondary:hover { background:#f4f4f5; }
-  #${IDS6.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
-  #${IDS6.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
-  #${IDS6.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+  #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT3}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS7.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS7.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS7.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS7.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT3}; }
+  #${IDS7.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS7.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS7.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS7.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS7.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS7.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS7.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS7.dialog} .sd-warn { color:#8a6700; }
+  #${IDS7.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS7.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT3}; resize:vertical; }
+  #${IDS7.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS7.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS7.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS7.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS7.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS7.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS7.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT3}; }
+  #${IDS7.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS7.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS7.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS7.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS7.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
 `;
   function executeSlackDm(runtime, {
     routes = [],
@@ -11532,9 +12199,9 @@ Trotzdem speichern?`)) return void 0;
     let closeTimer = null;
     const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
     function ensureStyle3() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS7.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS7.style;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
@@ -11581,7 +12248,7 @@ Trotzdem speichern?`)) return void 0;
         runtime.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      document.getElementById(IDS6.dialog)?.remove();
+      document.getElementById(IDS7.dialog)?.remove();
       document.removeEventListener("keydown", onKeydown, true);
     }
     function onKeydown(event) {
@@ -11616,7 +12283,7 @@ Trotzdem speichern?`)) return void 0;
     async function openDialog(matchId) {
       closeDialog();
       ensureStyle3();
-      const comment = el4("textarea", { id: `${IDS6.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const comment = el4("textarea", { id: `${IDS7.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el4("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
@@ -11628,7 +12295,7 @@ Trotzdem speichern?`)) return void 0;
         el4("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
         el4("div", { className: "sd-head" }, [el4("h2", { text: `${config.label} schicken` }), tip]),
         el4("dl", {}, [el4("dt", { text: "Match" }), el4("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el4("label", { for: `${IDS6.dialog}-comment`, text: "Kommentar" }),
+        el4("label", { for: `${IDS7.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
         el4("div", { className: "sd-status" }),
@@ -11637,7 +12304,7 @@ Trotzdem speichern?`)) return void 0;
           sendButton
         ])
       ]);
-      const dialog = el4("div", { id: IDS6.dialog }, card);
+      const dialog = el4("div", { id: IDS7.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -11693,7 +12360,7 @@ Trotzdem speichern?`)) return void 0;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       closeDialog();
       removeButtons();
-      document.getElementById(IDS6.style)?.remove();
+      document.getElementById(IDS7.style)?.remove();
     });
     scheduleSync();
   }
@@ -12000,6 +12667,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "vacancy-candidate-info", execute: executeVacancyCandidateInfo },
     { id: "offline-match-bulk", execute: executeOfflineMatchBulk },
     { id: "filter-presets", execute: executeFilterPresets },
+    { id: "focus-modes", execute: executeFocusModes2 },
     { id: "kam-status-filter", execute: executeKamStatusFilter },
     { id: "kam-status-filter-expanded", execute: executeKamStatusFilterExpanded },
     { id: "vertretungen", execute: executeVertretungen2 },

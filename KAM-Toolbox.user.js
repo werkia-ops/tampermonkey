@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.243
+// @version      1.14.244
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12896,19 +12896,18 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       dialog.showModal();
     }
     let scheduled = false;
-    function mailKey() {
-      return `${location.href}#${readSubject()}`;
-    }
     async function check() {
-      const key = mailKey();
-      if (key === current.key) return;
-      current = { key, result: null };
       const betreff = readSubject();
       const owaId = owaIdFromUrl(location.href);
       if (!betreff && !owaId) {
+        current = { key: "", result: null };
         removePill();
         return;
       }
+      if (!betreff) return;
+      const key = `${owaId}#${betreff}`;
+      if (key === current.key) return;
+      current = { key, result: null };
       if (disabled) return;
       if (!cache.has(key)) {
         cache.set(key, client.holen({ owaId, betreff, absender: "" }).catch((error) => {

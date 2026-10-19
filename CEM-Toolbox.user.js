@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.18.252
+// @version      1.18.254
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4732,7 +4732,8 @@
         "Im Focus-Mode „Ampel: nur Grün“ (bzw. Gelb, Rot) zeigt die Liste nur noch Kandidaten dieser Farbe, über alle Seiten. „Verlassen“ hebt das wieder auf."
       ],
       notes: [
-        "Grün: ein Match ist Hot Case (KAM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
+        "Grün: ein Match ist Hot Case (CEM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
+        "Grün mit roter Umrandung: Ein Match ist bei dir Hot Case, bei KAM aber out. Auf KAM-Seite stimmt dann etwas nicht.",
         "Gelb: nach den ersten 7 Werktagen kein Hot Case, kein bestätigter VT, kein KAM-VTA, aber noch Matches in Onboarding (oder noch keine Matches).",
         "Rot: Kandidat inaktiv, alle Matches out, oder 7 Werktage ohne Kontakt von dir. Kontakt heißt: dein Matchkommentar auf einem Match des Kandidaten oder dein Anruf (sipgate).",
         "Werktage sind Montag bis Freitag, Feiertage zählen mit.",
@@ -11021,6 +11022,7 @@
   function dotTitle(entry) {
     if (!entry?.farbe) return entry?.grund || "";
     const lines = [`Ampel ${FARBEN[entry.farbe].label}: ${entry.grund}`];
+    if (entry.kamWarnung) lines.push("Achtung: Ein Match ist bei CEM Hot Case, bei KAM aber out.");
     if (entry.manuell && entry.automatisch) lines.push(`Automatisch wäre: ${FARBEN[entry.automatisch.farbe]?.label || "–"} (${entry.automatisch.grund})`);
     lines.push(entry.darfSetzen ? "Klicken, um die Farbe zu setzen." : "Klicken für Details.");
     return lines.join("\n");
@@ -12691,6 +12693,7 @@
       .${DOT_CLASS}:focus-visible { outline:2px solid ${THEME.accent}; outline-offset:2px; }
       .${DOT_CLASS}[data-manuell="true"] { outline:2px dashed ${THEME.inkSecondary}; outline-offset:2px; }
       ${FARB_IDS.map((farbe) => `.${DOT_CLASS}[data-farbe="${farbe}"] { background:${FARBEN[farbe].fill}; border-color:${FARBEN[farbe].ring}; }`).join("\n      ")}
+      .${DOT_CLASS}[data-kam-warnung="true"] { border:3px solid ${FARBEN.rot.fill}; box-shadow:0 0 0 2px ${FARBEN.rot.fill}, 0 1px 3px rgba(9,9,11,.35); }
       .${NEW_CLASS} { display:inline-block; margin:0 0 0 8px; padding:2px 7px; border-radius:5px; background:${THEME.accent}; color:#fff; font:800 12px/1.25 ${font}; letter-spacing:.06em; vertical-align:middle; box-shadow:0 1px 2px rgba(9,9,11,.3); cursor:default; }
       #${IDS6.info} { margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
       ${m} { position:absolute; z-index:2147483000; width:280px; box-sizing:border-box; padding:12px; border:1px solid ${THEME.line}; border-radius:12px; background:${THEME.surface}; color:${THEME.ink}; box-shadow:${THEME.shadowRaised}; font:400 13px/1.4 ${font}; }
@@ -12819,6 +12822,7 @@
       const title = dotTitle(entry);
       if (dot.dataset.farbe !== entry.farbe) dot.dataset.farbe = entry.farbe;
       if (dot.dataset.manuell !== String(Boolean(entry.manuell))) dot.dataset.manuell = String(Boolean(entry.manuell));
+      if (dot.dataset.kamWarnung !== String(Boolean(entry.kamWarnung))) dot.dataset.kamWarnung = String(Boolean(entry.kamWarnung));
       if (dot.title !== title) dot.title = title;
       if (entry.neu && !badge) {
         badge = el4("span", { className: NEW_CLASS, textContent: "NEW", title: NEW_TITLE });

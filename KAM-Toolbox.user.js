@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.252
+// @version      1.14.255
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12549,7 +12549,7 @@ ${buildCbreBody(current)}`;
   var IDS5 = { pill: "werkia-mail-assistent-pill", dialog: "werkia-mail-assistent-dialog" };
   var MAIL_BODY_SELECTORS2 = ['div[aria-label="Nachrichtentext"]', 'div[aria-label="Message body"]', 'div[role="document"]'];
   var STATUS_CHOICES = ["interview_request", "interview_conducted", "interview_feedback", "hot_case", "hot_hot_case", "out"];
-  var ADMIN = "https://admin.werkia.de/#";
+  var adminBase = (umgebung) => umgebung === "staging" ? "https://staging-admin.werkia.de/#" : "https://admin.werkia.de/#";
   var isVisible2 = (element5) => element5.getClientRects().length > 0;
   function styled2(node, styles) {
     Object.assign(node.style, styles);
@@ -12755,13 +12755,13 @@ ${buildCbreBody(current)}`;
       if (!choice.moeglich) row2.appendChild(el4("div", { color: "#6b7280", fontSize: "12px" }, "Kein Match zugeordnet, nur zur Info."));
       return row2;
     }
-    function matchBlock(entry, index, choices, onChange) {
+    function matchBlock(entry, index, choices, onChange, umgebung) {
       const block = el4("div", { display: "grid", gap: "6px" });
       const status = KAM_STATUS_LABELS2[entry.kamStatusAktuell ?? entry.kamStatusBisher] || "ohne KAM-Status";
       const title = el4("div", { fontWeight: "700" });
       if (entry.matchId) {
         const link = el4("a", { color: "#1d4ed8" }, entry.kandidat || "Match");
-        link.href = `${ADMIN}/Match/${entry.matchId}/show`;
+        link.href = `${adminBase(umgebung)}/Match/${entry.matchId}/show`;
         link.target = "_blank";
         link.rel = "noopener";
         title.append(link, ` – ${entry.vakanz || ""} (${status})`);
@@ -12836,7 +12836,7 @@ ${buildCbreBody(current)}`;
         applyBtn.textContent = count ? `Übernehmen (${count})` : "Übernehmen";
         applyBtn.disabled = !count;
       };
-      (vorschlag.matches || []).forEach((entry, index) => body.appendChild(matchBlock(entry, index, choices, refresh)));
+      (vorschlag.matches || []).forEach((entry, index) => body.appendChild(matchBlock(entry, index, choices, refresh, result.umgebung)));
       const noteChoice = choices.find((choice) => choice.art === "agNotiz");
       if (noteChoice) body.appendChild(choiceRow(noteChoice, null, refresh));
       if (vorschlag.vakanz_pausieren) {
@@ -12844,7 +12844,7 @@ ${buildCbreBody(current)}`;
         const jobId = (vorschlag.matches || []).find((entry) => entry.jobPositionId)?.jobPositionId;
         if (jobId) {
           const link = el4("a", { color: "#1d4ed8" }, "Vakanz öffnen");
-          link.href = `${ADMIN}/JobPosition/${jobId}`;
+          link.href = `${adminBase(result.umgebung)}/JobPosition/${jobId}`;
           link.target = "_blank";
           link.rel = "noopener";
           info.appendChild(link);

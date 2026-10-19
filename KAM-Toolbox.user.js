@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.250
+// @version      1.14.252
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -13351,7 +13351,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       save: `${prefix}-save`,
       remove: `${prefix}-remove`,
       style: `${prefix}-style`,
-      dialog: `${prefix}-dialog`
+      dialog: `${prefix}-dialog`,
+      side: `${prefix}-side`
     };
   }
   var PRESETS_BAR_ID = "werkia-filter-presets-bar";
@@ -13402,6 +13403,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
     const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
+    const SIDE_MODES = BUILT_IN_MODES2.filter((mode) => mode.side);
+    const SELECT_MODES = BUILT_IN_MODES2.filter((mode) => !mode.side);
     const readActive = () => parseActive(safe(() => sessionStorage.getItem(ACTIVE_KEY2), null));
     const writeActive = (value) => safe(() => value ? sessionStorage.setItem(ACTIVE_KEY2, JSON.stringify(value)) : sessionStorage.removeItem(ACTIVE_KEY2));
     let mePromise = null;
@@ -13424,7 +13427,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       style.id = IDS9.style;
       style.textContent = `
       #${IDS9.group}, #${IDS9.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS9.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS9.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS9.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
+      #${IDS9.group} + #${IDS9.side} { margin:0 0 0 8px; }
+      #${IDS9.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS9.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS9.side}.is-active > strong { color:#b85400; }
+      #${IDS9.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS9.side} button:hover { background:#f4f4f5; }
+      #${IDS9.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS9.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
       #${IDS9.group}.is-active, #${IDS9.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
       #${IDS9.group} > strong, #${IDS9.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
       #${IDS9.group}.is-active > strong, #${IDS9.bar}.is-active > strong { color:#b85400; }
@@ -13625,6 +13637,38 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
     }
+    function ensureSide(container) {
+      let side = document.getElementById(IDS9.side);
+      if (!SIDE_MODES.length) {
+        side?.remove();
+        return null;
+      }
+      if (side && side.previousElementSibling === container) return side;
+      side?.remove();
+      side = document.createElement("span");
+      side.id = IDS9.side;
+      const title = document.createElement("strong");
+      title.textContent = SIDE_MODES[0].side.box || "Filter";
+      side.appendChild(title);
+      SIDE_MODES.forEach((mode) => {
+        const button4 = document.createElement("button");
+        button4.type = "button";
+        button4.dataset.mode = mode.id;
+        button4.title = mode.description || mode.name;
+        button4.setAttribute("aria-pressed", "false");
+        const dot = document.createElement("i");
+        dot.style.background = mode.side.fill || "";
+        dot.style.borderColor = mode.side.ring || mode.side.fill || "";
+        button4.append(dot, document.createTextNode(mode.side.label || mode.name));
+        button4.addEventListener("click", () => {
+          if (readActive()?.id === mode.id) leave();
+          else activate(mode);
+        });
+        side.appendChild(button4);
+      });
+      container.after(side);
+      return side;
+    }
     const optionSignatures = /* @__PURE__ */ new WeakMap();
     function fillSelect(select, own, activeId) {
       const signature = JSON.stringify(own.map((mode) => [mode.id, mode.name]));
@@ -13635,7 +13679,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         placeholder.value = "";
         placeholder.textContent = "Kein Focus-Mode";
         select.appendChild(placeholder);
-        [["Team", BUILT_IN_MODES2], ["Eigene", own]].forEach(([label, modes]) => {
+        [["Team", SELECT_MODES], ["Eigene", own]].forEach(([label, modes]) => {
           if (!modes.length) return;
           const group = document.createElement("optgroup");
           group.label = label;
@@ -13662,6 +13706,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           clearColumnFocus(document);
           document.getElementById(IDS9.group)?.remove();
           document.getElementById(IDS9.bar)?.remove();
+          document.getElementById(IDS9.side)?.remove();
           closeDialog();
         }
         return;
@@ -13695,10 +13740,19 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       else clearColumnFocus(document);
       const container = ensureControls();
       if (!container) return;
-      const isActive = Boolean(mode);
+      const sideActive = Boolean(mode?.side);
+      const isActive = Boolean(mode) && !sideActive;
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS9.select}`), own, mode?.id || "");
+      fillSelect(container.querySelector(`#${IDS9.select}`), own, isActive ? mode.id : "");
       setHidden(container.querySelector(`#${IDS9.leave}`), !isActive);
+      const side = ensureSide(container);
+      if (side) {
+        if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
+        side.querySelectorAll("button[data-mode]").forEach((button4) => {
+          const pressed = String(button4.dataset.mode === mode?.id);
+          if (button4.getAttribute("aria-pressed") !== pressed) button4.setAttribute("aria-pressed", pressed);
+        });
+      }
       setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.245
+// @version      1.14.246
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2455,7 +2455,7 @@
   }
 
   // ../../shared/js/employer-notes/index.js
-  var STYLE_ID2 = "werkia-agn-style-v2";
+  var STYLE_ID2 = "werkia-agn-style-v3";
   var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
   var EDITOR_SELECTOR2 = '.ProseMirror[contenteditable="true"]';
   var COMMENTS_BUTTON_SELECTOR = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
@@ -2481,7 +2481,9 @@
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
 .werkia-agn-panel[data-mode="read"] { display: block; }
-.werkia-agn-panel[data-mode="read"] .werkia-agn-list { max-height: 260px; overflow: auto; }
+.werkia-agn-panel[data-mode="read"] .werkia-agn-list { max-height: 120px; overflow: auto; }
+.werkia-agn-panel[data-mode="read"] .werkia-agn-note { background: #f4f4f5; border-color: #e4e4e7; cursor: default; }
+.werkia-agn-panel[data-mode="read"] .werkia-agn-text { color: #3f3f46; }
 .werkia-agn-more { margin-top: 6px; padding: 0; border: 0; background: transparent; color: #b85400; font: 600 11.5px/1.4 ${FONT3}; cursor: pointer; }
 .werkia-agn-more[hidden] { display: none; }
 .werkia-agn-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; }

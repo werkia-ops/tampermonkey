@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.13.232
+// @version      1.13.233
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2976,7 +2976,7 @@
         "„Verlassen“ nimmt den Arbeitgeberfilter wieder heraus."
       ],
       notes: [
-        "Die Arbeitgeber werden beim Einschalten geladen. Ändert sich der Kontakt eines Arbeitgebers, den Modus einmal aus- und wieder einschalten.",
+        "Ändert jemand den Kontakt eines Arbeitgebers, wirkt das nach spätestens fünf Minuten oder nach Neuladen der Seite.",
         "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
       ]
     },
@@ -6905,7 +6905,7 @@
       team,
       isTargetPage: isTargetPage3,
       getRequest,
-      ids: IDS8,
+      ids: IDS7,
       fields,
       columns,
       statusOptions,
@@ -6985,13 +6985,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS8,
-      buttonIds: [IDS8.button, IDS8.statusButton, IDS8.forwardButton, IDS8.declinePastButton],
+      ids: IDS7,
+      buttonIds: [IDS7.button, IDS7.statusButton, IDS7.forwardButton, IDS7.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS8.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS8.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS7.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS7.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -7131,13 +7131,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS8.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS7.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS8.feedbackShortcuts;
+      shortcuts.id = IDS7.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -7437,10 +7437,10 @@
     function installHeaderButtons() {
       if (!isTargetPage3()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS8.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS8.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS8.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS8.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS7.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS7.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS7.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS7.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -8139,13 +8139,13 @@
   // ../../shared/js/focus-modes/core.js
   var STORE_VERSION2 = 1;
   var GOOD_EMPLOYER_CONTACTS = ["direct_contact", "indirect_contact"];
+  var CONTACT_MARKER = "werkiaEmployerContacts";
   var EMPLOYER_CONTACT_MODE = {
     id: "ag-kontakt",
     name: "Nur AG mit Kontakt",
     description: "Nur Matches von Arbeitgebern mit direktem oder indirektem Kontakt",
-    filter: {},
+    filter: { [CONTACT_MARKER]: GOOD_EMPLOYER_CONTACTS },
     keepFilter: true,
-    employerContacts: GOOD_EMPLOYER_CONTACTS,
     sort: "",
     order: "",
     perPage: 0,
@@ -8153,6 +8153,10 @@
     front: false,
     builtIn: true
   };
+  var STALE_EMPLOYER_IDS = 100;
+  function hasStaleEmployerIds(filter) {
+    return Array.isArray(filter?.employerIds) && filter.employerIds.length > STALE_EMPLOYER_IDS;
+  }
   function hashHasFilter(hash = "") {
     return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
   }
@@ -8183,11 +8187,11 @@
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
       return scope;
     }
-    function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter), extra = {}) {
+    function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter)) {
       let filter;
-      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter, ...extra };
-      else if (mode.builtIn) filter = { ...scope, ...mode.filter, ...extra };
-      else filter = { ...mode.filter || {}, ...extra };
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter };
+      else if (mode.builtIn) filter = { ...scope, ...mode.filter };
+      else filter = { ...mode.filter || {} };
       return {
         route: isRoute(currentState?.route) ? currentState.route : routes[0],
         filter,
@@ -8196,14 +8200,16 @@
         perPage: mode.perPage || currentState?.perPage || 0
       };
     }
-    function modeHash(mode, hash, scope, extra) {
+    function modeHash(mode, hash, scope) {
       const state = parseListState(hash);
-      return buildListHash(applyModeToState(mode, state, scope, extra));
+      return buildListHash(applyModeToState(mode, state, scope));
     }
     function modeMatchesState(mode, state) {
       if (!mode || !state) return false;
       if (!isRoute(state.route)) return false;
-      if (mode.employerContacts) return Array.isArray(state.filter?.employerIds) && state.filter.employerIds.length > 0;
+      if (mode.keepFilter) {
+        return Object.keys(mode.filter).every((key) => JSON.stringify(state.filter?.[key]) === JSON.stringify(mode.filter[key]));
+      }
       if (mode.builtIn) return filterKey(withoutScope(state.filter)) === filterKey(mode.filter);
       return filterKey(state.filter) === filterKey(mode.filter);
     }
@@ -8211,7 +8217,9 @@
       const state = parseListState(currentHash);
       if (mode?.keepFilter && isRoute(state.route)) {
         const filter = { ...state.filter };
-        if (mode.employerContacts) delete filter.employerIds;
+        Object.keys(mode.filter).forEach((key) => {
+          delete filter[key];
+        });
         return buildListHash({ ...state, filter });
       }
       if (previousHash && isRoute(parseListState(previousHash).route)) return previousHash;
@@ -8279,6 +8287,43 @@
     } catch {
       return null;
     }
+  }
+
+  // ../../shared/js/focus-modes/employer-contact-rewrite.js
+  var NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
+  var INSTALLED_FLAG2 = "__werkiaFocusEmployerContactRewrite";
+  function bodyHasMarker(body) {
+    return typeof body === "string" && body.includes(`"${CONTACT_MARKER}"`);
+  }
+  function rewriteVariables(node, employers) {
+    if (Array.isArray(node)) return node.map((item) => rewriteVariables(item, employers));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== CONTACT_MARKER) out[key] = rewriteVariables(node[key], employers);
+    });
+    if (!Object.prototype.hasOwnProperty.call(node, CONTACT_MARKER)) return out;
+    const contacts = Array.isArray(node[CONTACT_MARKER]) ? node[CONTACT_MARKER] : [];
+    const ids = contactEmployerIds(employers, { contacts, filter: out });
+    out.employerIds = ids.length ? ids : [NO_MATCH_ID];
+    return out;
+  }
+  function rewriteBody(body, employers) {
+    const payload = JSON.parse(body);
+    const rewrite = (operation) => operation && typeof operation === "object" ? { ...operation, variables: rewriteVariables(operation.variables, employers) } : operation;
+    return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
+  }
+  function installEmployerContactRewrite({ pageWindow, loadEmployers }) {
+    if (!pageWindow || pageWindow[INSTALLED_FLAG2] || typeof pageWindow.fetch !== "function") return false;
+    pageWindow[INSTALLED_FLAG2] = true;
+    const originalFetch = pageWindow.fetch;
+    pageWindow.fetch = function werkiaFocusEmployerContactFetch(input, init) {
+      const body = init?.body;
+      const url = typeof input === "string" ? input : input?.url;
+      if (!bodyHasMarker(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers) })));
+    };
+    return true;
   }
 
   // ../../shared/js/focus-modes/columns.js
@@ -8349,16 +8394,18 @@
 
   // ../../shared/js/focus-modes/index.js
   var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
-  var IDS4 = {
-    group: "werkia-focus-group",
-    bar: "werkia-focus-bar",
-    select: "werkia-focus-select",
-    leave: "werkia-focus-leave",
-    save: "werkia-focus-save",
-    remove: "werkia-focus-remove",
-    style: "werkia-focus-style",
-    dialog: "werkia-focus-dialog"
-  };
+  function makeIds(prefix) {
+    return {
+      group: `${prefix}-group`,
+      bar: `${prefix}-bar`,
+      select: `${prefix}-select`,
+      leave: `${prefix}-leave`,
+      save: `${prefix}-save`,
+      remove: `${prefix}-remove`,
+      style: `${prefix}-style`,
+      dialog: `${prefix}-dialog`
+    };
+  }
   var PRESETS_BAR_ID = "werkia-filter-presets-bar";
   var ME_QUERY = `query WerkiaFocusModesMe {
   me: currentEmployee { id roles { name } }
@@ -8398,9 +8445,12 @@
     storage = createDefaultStorage(STORAGE_KEY4),
     request,
     helpTip = () => null,
+    idPrefix = "werkia-focus",
+    pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow,
     now = () => Date.now()
   }) {
     runtime.registerSource(sourcePath);
+    const IDS7 = makeIds(idPrefix);
     const { defaultScope, leaveHash, modeHash, modeMatchesState, pickScope } = core;
     const isTargetPage3 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -8425,50 +8475,35 @@
       }
       return employers.promise;
     };
-    async function resolveExtra(mode, filter) {
-      if (!mode.employerContacts) return {};
-      let list;
-      try {
-        list = await loadEmployers();
-      } catch {
-        window.alert(`Focus-Mode „${mode.name}“: Die Arbeitgeber ließen sich nicht laden. Bitte die Seite neu laden und es erneut versuchen.`);
-        return null;
-      }
-      const employerIds = contactEmployerIds(list, { contacts: mode.employerContacts, filter });
-      if (!employerIds.length) {
-        window.alert(`Focus-Mode „${mode.name}“: In dieser Ansicht gibt es keinen Arbeitgeber mit direktem oder indirektem Kontakt.`);
-        return null;
-      }
-      return { employerIds };
-    }
+    installEmployerContactRewrite({ pageWindow, loadEmployers });
     function ensureStyle3() {
-      if (document.getElementById(IDS4.style)) return;
+      if (document.getElementById(IDS7.style)) return;
       const style = document.createElement("style");
-      style.id = IDS4.style;
+      style.id = IDS7.style;
       style.textContent = `
-      #${IDS4.group}, #${IDS4.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS4.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS4.group}.is-active, #${IDS4.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS4.group} > strong, #${IDS4.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS4.group}.is-active > strong, #${IDS4.bar}.is-active > strong { color:#b85400; }
-      #${IDS4.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS4.group} button, #${IDS4.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS4.group} button:hover, #${IDS4.bar} button:hover { background:#f4f4f5; }
-      #${IDS4.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS4.leave}:hover { background:#b85400 !important; }
-      #${IDS4.group} [hidden], #${IDS4.bar} [hidden] { display:none !important; }
+      #${IDS7.group}, #${IDS7.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS7.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS7.group}.is-active, #${IDS7.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS7.group} > strong, #${IDS7.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS7.group}.is-active > strong, #${IDS7.bar}.is-active > strong { color:#b85400; }
+      #${IDS7.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS7.group} button, #${IDS7.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS7.group} button:hover, #${IDS7.bar} button:hover { background:#f4f4f5; }
+      #${IDS7.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS7.leave}:hover { background:#b85400 !important; }
+      #${IDS7.group} [hidden], #${IDS7.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS4.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS4.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS4.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS4.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS4.dialog} input[type=text], #${IDS4.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS4.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS4.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS4.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS4.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS7.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS7.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS7.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS7.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS7.dialog} input[type=text], #${IDS7.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS7.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS7.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS7.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS7.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -8486,18 +8521,9 @@
           return;
         }
       }
-      const select = document.getElementById(IDS4.select);
-      if (select) select.disabled = true;
-      const extra = await resolveExtra(mode, { ...scope, ...parseListState(before).filter }).finally(() => {
-        if (select) select.disabled = false;
-      });
-      if (!extra) {
-        render();
-        return;
-      }
       const previous = readActive();
       writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
-      location.hash = modeHash(mode, before, scope, extra);
+      location.hash = modeHash(mode, before, scope);
       render();
     }
     function leave() {
@@ -8514,13 +8540,13 @@
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS4.dialog)?.remove();
+      document.getElementById(IDS7.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS4.dialog;
+      overlay.id = IDS7.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -8597,7 +8623,7 @@
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS4.select;
+      select.id = IDS7.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       select.addEventListener("change", () => {
         const mode = allModes().find((entry) => entry.id === select.value);
@@ -8606,19 +8632,19 @@
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS4.leave;
+      leaveButton.id = IDS7.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS4.save;
+      saveButton.id = IDS7.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS4.remove;
+      removeButton.id = IDS7.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -8630,14 +8656,14 @@
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS4.group);
-      let ownBar = document.getElementById(IDS4.bar);
+      let group = document.getElementById(IDS7.group);
+      let ownBar = document.getElementById(IDS7.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS4.group;
+        group.id = IDS7.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -8647,7 +8673,7 @@
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS4.bar;
+      ownBar.id = IDS7.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
@@ -8681,17 +8707,28 @@
     function setHidden(element, hidden) {
       if (element && element.hidden !== hidden) element.hidden = hidden;
     }
+    let onPage = false;
     function render() {
       if (!isTargetPage3()) {
-        clearColumnFocus(document);
-        document.getElementById(IDS4.group)?.remove();
-        document.getElementById(IDS4.bar)?.remove();
-        closeDialog();
+        if (onPage) {
+          onPage = false;
+          clearColumnFocus(document);
+          document.getElementById(IDS7.group)?.remove();
+          document.getElementById(IDS7.bar)?.remove();
+          closeDialog();
+        }
         return;
       }
+      onPage = true;
       ensureStyle3();
       const own = storage.load();
       const state = parseListState(location.hash);
+      if (hasStaleEmployerIds(state.filter)) {
+        const filter = { ...state.filter };
+        delete filter.employerIds;
+        location.hash = buildListHash({ ...state, filter });
+        return;
+      }
       let active = readActive();
       let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
       if (active && !modeMatchesState(mode, state)) {
@@ -8705,9 +8742,9 @@
       if (!container) return;
       const isActive = Boolean(mode);
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS4.select}`), own, mode?.id || "");
-      setHidden(container.querySelector(`#${IDS4.leave}`), !isActive);
-      setHidden(container.querySelector(`#${IDS4.remove}`), !isActive || Boolean(mode?.builtIn));
+      fillSelect(container.querySelector(`#${IDS7.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS7.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS7.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -8762,6 +8799,7 @@
       columnLabels: COLUMN_LABELS,
       request,
       helpTip,
+      idPrefix: "werkia-cem-focus",
       ...options
     });
   }
@@ -9212,7 +9250,7 @@
   }
 
   // ../../shared/js/vertretungen/index.js
-  var IDS5 = {
+  var IDS4 = {
     button: "werkia-vertretungen-button",
     bar: "werkia-vertretungen-bar",
     dialog: "werkia-vertretungen-dialog",
@@ -9258,7 +9296,7 @@
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS5.button && /^filter hinzuf/i.test(element.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && /^filter hinzuf/i.test(element.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -9266,7 +9304,7 @@
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS5.button && element.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element) => element.id !== IDS4.button && element.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -9293,40 +9331,40 @@
       return element?.dataset.werkiaVertretungenOwner === sourcePath ? element : null;
     };
     function ensureStyle3() {
-      if (document.getElementById(IDS5.style)) return;
+      if (document.getElementById(IDS4.style)) return;
       const style = document.createElement("style");
-      style.id = IDS5.style;
+      style.id = IDS4.style;
       style.textContent = `
-      #${IDS5.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS5.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS5.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS5.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS5.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS5.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS5.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS5.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS5.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS5.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS5.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS5.dialog} .wv-admins { margin-top:16px; }
-      #${IDS5.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS5.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS5.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS5.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS5.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS5.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS5.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS5.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS5.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS5.dialog} select, #${IDS5.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS5.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS5.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS5.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS5.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS5.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS5.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS5.dialog} .wv-status.wv-error { color:#a02334; }
+      #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS4.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS4.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS4.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS4.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS4.dialog} .wv-admins { margin-top:16px; }
+      #${IDS4.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS4.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS4.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS4.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS4.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS4.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS4.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS4.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS4.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS4.dialog} select, #${IDS4.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS4.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS4.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS4.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS4.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS4.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS4.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS4.dialog} .wv-status.wv-error { color:#a02334; }
     `;
       document.head.appendChild(style);
     }
@@ -9368,17 +9406,17 @@
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function closeDialog() {
-      owned(IDS5.dialog)?.remove();
+      owned(IDS4.dialog)?.remove();
       editing = null;
     }
     function setStatus(text, isError = false) {
-      const status2 = owned(IDS5.dialog)?.querySelector(".wv-status");
+      const status2 = owned(IDS4.dialog)?.querySelector(".wv-status");
       if (!status2) return;
       status2.textContent = text;
       status2.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS5.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
+      owned(IDS4.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element) => {
         element.disabled = busy;
       });
     }
@@ -9491,7 +9529,7 @@
       return details;
     }
     function card() {
-      return owned(IDS5.dialog)?.querySelector(".wv-body");
+      return owned(IDS4.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
@@ -9515,7 +9553,7 @@
     async function openDialog() {
       closeDialog();
       ensureStyle3();
-      const overlay = el4("div", { id: IDS5.dialog });
+      const overlay = el4("div", { id: IDS4.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -9538,21 +9576,21 @@
     }
     function placeButton() {
       if (!isTargetPage3()) {
-        owned(IDS5.button)?.remove();
-        owned(IDS5.bar)?.remove();
+        owned(IDS4.button)?.remove();
+        owned(IDS4.bar)?.remove();
         return;
       }
       ensureStyle3();
       const slot = findSlot(document);
-      const existing = owned(IDS5.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS5.bar)) return;
+      const existing = owned(IDS4.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
       existing?.remove();
       const vertretungenButton = button2("Vertretungen", openDialog);
-      vertretungenButton.id = IDS5.button;
+      vertretungenButton.id = IDS4.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (slot) {
-        owned(IDS5.bar)?.remove();
+        owned(IDS4.bar)?.remove();
         const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
@@ -9574,15 +9612,15 @@
         return;
       }
       vertretungenButton.className = "wv-own";
-      owned(IDS5.bar)?.remove();
+      owned(IDS4.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el4("div", { id: IDS5.bar }, [vertretungenButton]);
+      const bar = el4("div", { id: IDS4.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS5.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS4.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -9604,8 +9642,8 @@
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     runtime.addCleanup?.(() => {
-      owned(IDS5.button)?.remove();
-      owned(IDS5.bar)?.remove();
+      owned(IDS4.button)?.remove();
+      owned(IDS4.bar)?.remove();
       closeDialog();
     });
     schedule();
@@ -10915,7 +10953,7 @@
   var BUTTON_CLASS = "werkia-wa-button";
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
-  var IDS6 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
+  var IDS5 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
   var CACHE_MS2 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
@@ -10923,69 +10961,69 @@
   .${CELL_CLASS} { width:1%; white-space:nowrap; padding-left:4px !important; padding-right:4px !important; text-align:center; }
   th.${CELL_CLASS} { font-weight:500; }
   .${BUTTON_CLASS}:hover { background:#1f9a6b; color:#fff; }
-  #${IDS6.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
-  #${IDS6.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS6.menu} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS6.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
-  #${IDS6.dialog} .wa-head button { cursor:pointer; }
-  #${IDS6.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
-  #${IDS6.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
-  #${IDS6.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
-  #${IDS6.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
-  #${IDS6.dialog} select, #${IDS6.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS6.dialog} select:focus, #${IDS6.dialog} textarea:focus { outline:2px solid #b6a4ff; }
-  #${IDS6.dialog} textarea { min-height:440px; resize:vertical; }
-  #${IDS6.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-  #${IDS6.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
-  #${IDS6.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
-  #${IDS6.dialog} .wa-loading { color:#6b6775; }
-  #${IDS6.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
-  #${IDS6.dialog} .wa-foot button, #${IDS6.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
-  #${IDS6.dialog} .wa-primary:hover { background:#5535d6; }
-  #${IDS6.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
-  #${IDS6.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS6.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
-  #${IDS6.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
-  #${IDS6.menu} button.wa-action { color:#6d4aff; font-weight:600; }
-  #${IDS6.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
-  #${IDS6.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
-  #${IDS6.menu} .wa-group-items { padding-left:8px; }
-  #${IDS6.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS6.context} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS6.context} button.wa-delete { color:#c23f3f; }
-  #${IDS6.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
-  #${IDS6.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS6.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS6.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
-  #${IDS6.confirm} p { margin:0; padding:16px 18px; }
-  #${IDS6.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
-  #${IDS6.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS6.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
-  #${IDS6.confirm} .wa-delete-solid:hover { background:#a83232; }
-  #${IDS6.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
-  #${IDS6.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS6.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
-  #${IDS6.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
-  #${IDS6.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS6.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
-  #${IDS6.dialog} .wa-note { color:#6b6775; font-size:12px; }
-  #${IDS6.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
-  #${IDS6.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
-  #${IDS6.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
-  #${IDS6.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
-  #${IDS6.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
-  #${IDS6.dialog} .wa-move { padding:4px 9px !important; }
-  #${IDS6.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
-  #${IDS6.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
-  #${IDS6.dialog} .wa-spacer { flex:1; }
-  #${IDS6.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #${IDS6.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
+  #${IDS5.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS5.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
+  #${IDS5.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS5.menu} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS5.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS5.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
+  #${IDS5.dialog} .wa-head button { cursor:pointer; }
+  #${IDS5.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
+  #${IDS5.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
+  #${IDS5.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
+  #${IDS5.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
+  #${IDS5.dialog} select, #${IDS5.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS5.dialog} select:focus, #${IDS5.dialog} textarea:focus { outline:2px solid #b6a4ff; }
+  #${IDS5.dialog} textarea { min-height:440px; resize:vertical; }
+  #${IDS5.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  #${IDS5.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
+  #${IDS5.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
+  #${IDS5.dialog} .wa-loading { color:#6b6775; }
+  #${IDS5.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
+  #${IDS5.dialog} .wa-foot button, #${IDS5.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS5.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
+  #${IDS5.dialog} .wa-primary:hover { background:#5535d6; }
+  #${IDS5.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
+  #${IDS5.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS5.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
+  #${IDS5.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
+  #${IDS5.menu} button.wa-action { color:#6d4aff; font-weight:600; }
+  #${IDS5.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
+  #${IDS5.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
+  #${IDS5.menu} .wa-group-items { padding-left:8px; }
+  #${IDS5.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS5.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS5.context} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS5.context} button.wa-delete { color:#c23f3f; }
+  #${IDS5.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
+  #${IDS5.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS5.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS5.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
+  #${IDS5.confirm} p { margin:0; padding:16px 18px; }
+  #${IDS5.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
+  #${IDS5.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS5.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS5.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
+  #${IDS5.confirm} .wa-delete-solid:hover { background:#a83232; }
+  #${IDS5.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
+  #${IDS5.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS5.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
+  #${IDS5.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  #${IDS5.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS5.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
+  #${IDS5.dialog} .wa-note { color:#6b6775; font-size:12px; }
+  #${IDS5.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
+  #${IDS5.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
+  #${IDS5.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
+  #${IDS5.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
+  #${IDS5.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
+  #${IDS5.dialog} .wa-move { padding:4px 9px !important; }
+  #${IDS5.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
+  #${IDS5.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
+  #${IDS5.dialog} .wa-spacer { flex:1; }
+  #${IDS5.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #${IDS5.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
 `;
   function executeWaTemplates(runtime) {
     runtime.registerSource(SOURCE_PATH2);
@@ -10993,9 +11031,9 @@
     let syncTimer = null;
     let toastTimer = null;
     function ensureStyle3() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS5.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
@@ -11106,14 +11144,14 @@
     let activeMenu = null;
     let followFrame = 0;
     function closeMenu() {
-      document.getElementById(IDS6.menu)?.remove();
+      document.getElementById(IDS5.menu)?.remove();
       activeMenu = null;
       closeContextMenu();
     }
     function openMenu(button2, target) {
       closeMenu();
       const menu = document.createElement("div");
-      menu.id = IDS6.menu;
+      menu.id = IDS5.menu;
       const place = () => {
         const rect = button2.getBoundingClientRect();
         const height = menu.offsetHeight;
@@ -11176,11 +11214,11 @@
       activeMenu = { button: button2, place };
     }
     function closeContextMenu() {
-      document.getElementById(IDS6.context)?.remove();
+      document.getElementById(IDS5.context)?.remove();
     }
     function openContextMenu(event, template) {
       closeContextMenu();
-      const context = element("div", { id: IDS6.context });
+      const context = element("div", { id: IDS5.context });
       const editButton = element("button", { type: "button", textContent: "Bearbeiten" });
       editButton.addEventListener("click", () => {
         closeMenu();
@@ -11198,9 +11236,9 @@
       Object.assign(context.style, { left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` });
     }
     function confirmDelete(template, onDeleted) {
-      document.getElementById(IDS6.confirm)?.remove();
+      document.getElementById(IDS5.confirm)?.remove();
       const close = () => {
-        document.getElementById(IDS6.confirm)?.remove();
+        document.getElementById(IDS5.confirm)?.remove();
         window.removeEventListener("keydown", onKey, true);
       };
       const onKey = (keyEvent) => {
@@ -11210,7 +11248,7 @@
       };
       const cancelButton = element("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const deleteButton = element("button", { type: "button", className: "wa-delete-solid", textContent: "Löschen" });
-      const overlay = element("div", { id: IDS6.confirm }, [element("div", { className: "wa-card" }, [
+      const overlay = element("div", { id: IDS5.confirm }, [element("div", { className: "wa-card" }, [
         element("h2", { textContent: "Vorlage löschen?" }),
         element("p", { textContent: `Möchtest du die Vorlage „${template.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.` }),
         element("div", { className: "wa-foot" }, [cancelButton, deleteButton])
@@ -11229,14 +11267,14 @@
       cancelButton.focus();
     }
     function onDocumentClick(event) {
-      const context = document.getElementById(IDS6.context);
+      const context = document.getElementById(IDS5.context);
       if (context?.contains(event.target)) return;
       closeContextMenu();
-      const menu = document.getElementById(IDS6.menu);
+      const menu = document.getElementById(IDS5.menu);
       if (menu && !menu.contains(event.target)) closeMenu();
     }
     function onDocumentScroll(event) {
-      const menu = document.getElementById(IDS6.menu);
+      const menu = document.getElementById(IDS5.menu);
       if (!menu || event.target instanceof Node && menu.contains(event.target)) return;
       closeContextMenu();
       if (followFrame) return;
@@ -11259,7 +11297,7 @@
       return node;
     }
     function closeDialog() {
-      document.getElementById(IDS6.dialog)?.remove();
+      document.getElementById(IDS5.dialog)?.remove();
       document.removeEventListener("keydown", onDialogKey, true);
     }
     function onDialogKey(event) {
@@ -11294,7 +11332,7 @@
       const cancelButton = element("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const card = element("div", { className: "wa-card" }, [head, body, element("div", { className: "wa-foot" }, [cancelButton, copyButton])]);
       makeDraggable(card, head);
-      const overlay = element("div", { id: IDS6.dialog }, [card]);
+      const overlay = element("div", { id: IDS5.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -11430,7 +11468,7 @@ Trotzdem kopieren?`)) return;
       const foot = element("div", { className: "wa-foot" });
       const card = element("div", { className: "wa-card" }, [head, body, foot]);
       makeDraggable(card, head);
-      const overlay = element("div", { id: IDS6.dialog }, [card]);
+      const overlay = element("div", { id: IDS5.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -11613,9 +11651,9 @@ Trotzdem speichern?`)) return void 0;
       }
     }
     function showNotice(message) {
-      document.getElementById(IDS6.toast)?.remove();
+      document.getElementById(IDS5.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
-      const toast = element("div", { id: IDS6.toast, textContent: message });
+      const toast = element("div", { id: IDS5.toast, textContent: message });
       document.body.appendChild(toast);
       toastTimer = runtime.setTimeout(() => {
         toastTimer = null;
@@ -11623,10 +11661,10 @@ Trotzdem speichern?`)) return void 0;
       }, 4e3);
     }
     function showToast(template, context, text) {
-      document.getElementById(IDS6.toast)?.remove();
+      document.getElementById(IDS5.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
       const preview = text.split("\n").filter((line) => line.trim()).slice(0, 2).join("\n");
-      const toast = element("div", { id: IDS6.toast }, [
+      const toast = element("div", { id: IDS5.toast }, [
         element("div", { textContent: `✓ Kopiert: ${template.label}${context.candidateFirstName ? ` für ${context.candidateFirstName}` : ""}` }),
         element("div", { className: "wa-preview", textContent: preview })
       ]);
@@ -11649,9 +11687,9 @@ Trotzdem speichern?`)) return void 0;
       if (followFrame) window.cancelAnimationFrame(followFrame);
       removeAll();
       closeDialog();
-      document.getElementById(IDS6.confirm)?.remove();
-      document.getElementById(IDS6.toast)?.remove();
-      document.getElementById(IDS6.style)?.remove();
+      document.getElementById(IDS5.confirm)?.remove();
+      document.getElementById(IDS5.toast)?.remove();
+      document.getElementById(IDS5.style)?.remove();
     });
     scheduleSync();
   }
@@ -12143,40 +12181,40 @@ Trotzdem speichern?`)) return void 0;
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
-  var IDS7 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var IDS6 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
   var FONT3 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
   .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT3}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT3}; color:#09090b; -webkit-font-smoothing:antialiased; }
-  #${IDS7.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS7.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
-  #${IDS7.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS7.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT3}; }
-  #${IDS7.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS7.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
-  #${IDS7.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS7.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
-  #${IDS7.dialog} dd a { color:#b85400; text-decoration:none; }
-  #${IDS7.dialog} dd a:hover { text-decoration:underline; }
-  #${IDS7.dialog} .sd-muted { color:#8b8b94; }
-  #${IDS7.dialog} .sd-warn { color:#8a6700; }
-  #${IDS7.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS7.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT3}; resize:vertical; }
-  #${IDS7.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
-  #${IDS7.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
-  #${IDS7.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
-  #${IDS7.dialog} .sd-status.sd-error { color:#b52f2f; }
-  #${IDS7.dialog} .sd-status.sd-ok { color:#0a7c0a; }
-  #${IDS7.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS7.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT3}; }
-  #${IDS7.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
-  #${IDS7.dialog} .sd-secondary:hover { background:#f4f4f5; }
-  #${IDS7.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
-  #${IDS7.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
-  #${IDS7.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+  #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT3}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS6.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS6.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS6.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS6.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT3}; }
+  #${IDS6.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS6.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS6.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS6.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS6.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS6.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS6.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS6.dialog} .sd-warn { color:#8a6700; }
+  #${IDS6.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS6.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT3}; resize:vertical; }
+  #${IDS6.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS6.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS6.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS6.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS6.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS6.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS6.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT3}; }
+  #${IDS6.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS6.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS6.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS6.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS6.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
 `;
   function executeSlackDm(runtime, {
     routes = [],
@@ -12199,9 +12237,9 @@ Trotzdem speichern?`)) return void 0;
     let closeTimer = null;
     const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
     function ensureStyle3() {
-      if (document.getElementById(IDS7.style)) return;
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS7.style;
+      style.id = IDS6.style;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
@@ -12248,7 +12286,7 @@ Trotzdem speichern?`)) return void 0;
         runtime.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      document.getElementById(IDS7.dialog)?.remove();
+      document.getElementById(IDS6.dialog)?.remove();
       document.removeEventListener("keydown", onKeydown, true);
     }
     function onKeydown(event) {
@@ -12283,7 +12321,7 @@ Trotzdem speichern?`)) return void 0;
     async function openDialog(matchId) {
       closeDialog();
       ensureStyle3();
-      const comment = el4("textarea", { id: `${IDS7.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const comment = el4("textarea", { id: `${IDS6.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el4("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
@@ -12295,7 +12333,7 @@ Trotzdem speichern?`)) return void 0;
         el4("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
         el4("div", { className: "sd-head" }, [el4("h2", { text: `${config.label} schicken` }), tip]),
         el4("dl", {}, [el4("dt", { text: "Match" }), el4("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el4("label", { for: `${IDS7.dialog}-comment`, text: "Kommentar" }),
+        el4("label", { for: `${IDS6.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
         el4("div", { className: "sd-status" }),
@@ -12304,7 +12342,7 @@ Trotzdem speichern?`)) return void 0;
           sendButton
         ])
       ]);
-      const dialog = el4("div", { id: IDS7.dialog }, card);
+      const dialog = el4("div", { id: IDS6.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -12360,7 +12398,7 @@ Trotzdem speichern?`)) return void 0;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       closeDialog();
       removeButtons();
-      document.getElementById(IDS7.style)?.remove();
+      document.getElementById(IDS6.style)?.remove();
     });
     scheduleSync();
   }

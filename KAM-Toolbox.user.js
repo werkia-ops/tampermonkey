@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.12.232
+// @version      1.12.233
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -3461,7 +3461,7 @@
       ],
       notes: [
         "Wer selbst am Filter dreht, verlässt den Modus damit. Die Spalte steht dann wieder an ihrem Platz.",
-        "„Nur AG mit Kontakt“ bleibt auch beim Filtern an. Die Arbeitgeber werden beim Einschalten geladen: Wer danach den Kontakt eines Arbeitgebers ändert, schaltet den Modus einmal aus und wieder an.",
+        "„Nur AG mit Kontakt“ bleibt auch beim Filtern an. Ändert jemand den Kontakt eines Arbeitgebers, wirkt das nach spätestens fünf Minuten oder nach Neuladen der Seite.",
         "Der Modus behält die KAM-Auswahl und „Von“ der aktuellen Ansicht.",
         "„Als Focus-Mode speichern“ sichert den aktuellen Filter mit einer Spalte deiner Wahl. Eigene Modi liegen nur in deinem Browser."
       ]
@@ -4150,7 +4150,7 @@
       team,
       isTargetPage: isTargetPage8,
       getRequest,
-      ids: IDS10,
+      ids: IDS9,
       fields,
       columns,
       statusOptions,
@@ -4230,13 +4230,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS10,
-      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
+      ids: IDS9,
+      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -4376,13 +4376,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS10.feedbackShortcuts;
+      shortcuts.id = IDS9.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -4682,10 +4682,10 @@
     function installHeaderButtons() {
       if (!isTargetPage8()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -11899,13 +11899,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   // ../../shared/js/focus-modes/core.js
   var STORE_VERSION2 = 1;
   var GOOD_EMPLOYER_CONTACTS = ["direct_contact", "indirect_contact"];
+  var CONTACT_MARKER = "werkiaEmployerContacts";
   var EMPLOYER_CONTACT_MODE = {
     id: "ag-kontakt",
     name: "Nur AG mit Kontakt",
     description: "Nur Matches von Arbeitgebern mit direktem oder indirektem Kontakt",
-    filter: {},
+    filter: { [CONTACT_MARKER]: GOOD_EMPLOYER_CONTACTS },
     keepFilter: true,
-    employerContacts: GOOD_EMPLOYER_CONTACTS,
     sort: "",
     order: "",
     perPage: 0,
@@ -11913,6 +11913,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     front: false,
     builtIn: true
   };
+  var STALE_EMPLOYER_IDS = 100;
+  function hasStaleEmployerIds(filter) {
+    return Array.isArray(filter?.employerIds) && filter.employerIds.length > STALE_EMPLOYER_IDS;
+  }
   function hashHasFilter(hash = "") {
     return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
   }
@@ -11943,11 +11947,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
       return scope;
     }
-    function applyModeToState2(mode, currentState, scope = pickScope2(currentState?.filter), extra = {}) {
+    function applyModeToState2(mode, currentState, scope = pickScope2(currentState?.filter)) {
       let filter;
-      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter, ...extra };
-      else if (mode.builtIn) filter = { ...scope, ...mode.filter, ...extra };
-      else filter = { ...mode.filter || {}, ...extra };
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter };
+      else if (mode.builtIn) filter = { ...scope, ...mode.filter };
+      else filter = { ...mode.filter || {} };
       return {
         route: isRoute(currentState?.route) ? currentState.route : routes[0],
         filter,
@@ -11956,14 +11960,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         perPage: mode.perPage || currentState?.perPage || 0
       };
     }
-    function modeHash2(mode, hash, scope, extra) {
+    function modeHash2(mode, hash, scope) {
       const state = parseListState(hash);
-      return buildListHash(applyModeToState2(mode, state, scope, extra));
+      return buildListHash(applyModeToState2(mode, state, scope));
     }
     function modeMatchesState2(mode, state) {
       if (!mode || !state) return false;
       if (!isRoute(state.route)) return false;
-      if (mode.employerContacts) return Array.isArray(state.filter?.employerIds) && state.filter.employerIds.length > 0;
+      if (mode.keepFilter) {
+        return Object.keys(mode.filter).every((key) => JSON.stringify(state.filter?.[key]) === JSON.stringify(mode.filter[key]));
+      }
       if (mode.builtIn) return filterKey(withoutScope2(state.filter)) === filterKey(mode.filter);
       return filterKey(state.filter) === filterKey(mode.filter);
     }
@@ -11971,7 +11977,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const state = parseListState(currentHash);
       if (mode?.keepFilter && isRoute(state.route)) {
         const filter = { ...state.filter };
-        if (mode.employerContacts) delete filter.employerIds;
+        Object.keys(mode.filter).forEach((key) => {
+          delete filter[key];
+        });
         return buildListHash({ ...state, filter });
       }
       if (previousHash && isRoute(parseListState(previousHash).route)) return previousHash;
@@ -12039,6 +12047,43 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     } catch {
       return null;
     }
+  }
+
+  // ../../shared/js/focus-modes/employer-contact-rewrite.js
+  var NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
+  var INSTALLED_FLAG2 = "__werkiaFocusEmployerContactRewrite";
+  function bodyHasMarker(body) {
+    return typeof body === "string" && body.includes(`"${CONTACT_MARKER}"`);
+  }
+  function rewriteVariables(node, employers) {
+    if (Array.isArray(node)) return node.map((item) => rewriteVariables(item, employers));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== CONTACT_MARKER) out[key] = rewriteVariables(node[key], employers);
+    });
+    if (!Object.prototype.hasOwnProperty.call(node, CONTACT_MARKER)) return out;
+    const contacts = Array.isArray(node[CONTACT_MARKER]) ? node[CONTACT_MARKER] : [];
+    const ids = contactEmployerIds(employers, { contacts, filter: out });
+    out.employerIds = ids.length ? ids : [NO_MATCH_ID];
+    return out;
+  }
+  function rewriteBody(body, employers) {
+    const payload = JSON.parse(body);
+    const rewrite = (operation) => operation && typeof operation === "object" ? { ...operation, variables: rewriteVariables(operation.variables, employers) } : operation;
+    return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
+  }
+  function installEmployerContactRewrite({ pageWindow, loadEmployers }) {
+    if (!pageWindow || pageWindow[INSTALLED_FLAG2] || typeof pageWindow.fetch !== "function") return false;
+    pageWindow[INSTALLED_FLAG2] = true;
+    const originalFetch = pageWindow.fetch;
+    pageWindow.fetch = function werkiaFocusEmployerContactFetch(input, init) {
+      const body = init?.body;
+      const url = typeof input === "string" ? input : input?.url;
+      if (!bodyHasMarker(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      return Promise.resolve().then(() => loadEmployers()).then((employers) => originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody(body, employers) })));
+    };
+    return true;
   }
 
   // ../../shared/js/focus-modes/columns.js
@@ -12109,16 +12154,18 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
 
   // ../../shared/js/focus-modes/index.js
   var EMPLOYER_CACHE_MS = 5 * 60 * 1e3;
-  var IDS6 = {
-    group: "werkia-focus-group",
-    bar: "werkia-focus-bar",
-    select: "werkia-focus-select",
-    leave: "werkia-focus-leave",
-    save: "werkia-focus-save",
-    remove: "werkia-focus-remove",
-    style: "werkia-focus-style",
-    dialog: "werkia-focus-dialog"
-  };
+  function makeIds(prefix) {
+    return {
+      group: `${prefix}-group`,
+      bar: `${prefix}-bar`,
+      select: `${prefix}-select`,
+      leave: `${prefix}-leave`,
+      save: `${prefix}-save`,
+      remove: `${prefix}-remove`,
+      style: `${prefix}-style`,
+      dialog: `${prefix}-dialog`
+    };
+  }
   var PRESETS_BAR_ID = "werkia-filter-presets-bar";
   var ME_QUERY = `query WerkiaFocusModesMe {
   me: currentEmployee { id roles { name } }
@@ -12158,9 +12205,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     storage = createDefaultStorage(STORAGE_KEY3),
     request,
     helpTip = () => null,
+    idPrefix = "werkia-focus",
+    pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow,
     now = () => Date.now()
   }) {
     runtime.registerSource(sourcePath);
+    const IDS9 = makeIds(idPrefix);
     const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
     const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -12185,50 +12235,35 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
       return employers.promise;
     };
-    async function resolveExtra(mode, filter) {
-      if (!mode.employerContacts) return {};
-      let list;
-      try {
-        list = await loadEmployers();
-      } catch {
-        window.alert(`Focus-Mode „${mode.name}“: Die Arbeitgeber ließen sich nicht laden. Bitte die Seite neu laden und es erneut versuchen.`);
-        return null;
-      }
-      const employerIds = contactEmployerIds(list, { contacts: mode.employerContacts, filter });
-      if (!employerIds.length) {
-        window.alert(`Focus-Mode „${mode.name}“: In dieser Ansicht gibt es keinen Arbeitgeber mit direktem oder indirektem Kontakt.`);
-        return null;
-      }
-      return { employerIds };
-    }
+    installEmployerContactRewrite({ pageWindow, loadEmployers });
     function ensureStyle4() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS9.style;
       style.textContent = `
-      #${IDS6.group}, #${IDS6.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS6.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS6.group}.is-active, #${IDS6.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS6.group} > strong, #${IDS6.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS6.group}.is-active > strong, #${IDS6.bar}.is-active > strong { color:#b85400; }
-      #${IDS6.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS6.group} button, #${IDS6.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS6.group} button:hover, #${IDS6.bar} button:hover { background:#f4f4f5; }
-      #${IDS6.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS6.leave}:hover { background:#b85400 !important; }
-      #${IDS6.group} [hidden], #${IDS6.bar} [hidden] { display:none !important; }
+      #${IDS9.group}, #${IDS9.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS9.bar} { display:flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS9.group}.is-active, #${IDS9.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS9.group} > strong, #${IDS9.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS9.group}.is-active > strong, #${IDS9.bar}.is-active > strong { color:#b85400; }
+      #${IDS9.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS9.group} button, #${IDS9.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS9.group} button:hover, #${IDS9.bar} button:hover { background:#f4f4f5; }
+      #${IDS9.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS9.leave}:hover { background:#b85400 !important; }
+      #${IDS9.group} [hidden], #${IDS9.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS6.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS6.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS6.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS6.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS6.dialog} input[type=text], #${IDS6.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS6.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS6.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS6.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS6.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS9.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS9.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS9.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS9.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS9.dialog} input[type=text], #${IDS9.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS9.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS9.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS9.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS9.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -12246,18 +12281,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           return;
         }
       }
-      const select = document.getElementById(IDS6.select);
-      if (select) select.disabled = true;
-      const extra = await resolveExtra(mode, { ...scope, ...parseListState(before).filter }).finally(() => {
-        if (select) select.disabled = false;
-      });
-      if (!extra) {
-        render();
-        return;
-      }
       const previous = readActive();
       writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
-      location.hash = modeHash2(mode, before, scope, extra);
+      location.hash = modeHash2(mode, before, scope);
       render();
     }
     function leave() {
@@ -12274,13 +12300,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS6.dialog)?.remove();
+      document.getElementById(IDS9.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS6.dialog;
+      overlay.id = IDS9.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -12357,7 +12383,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS6.select;
+      select.id = IDS9.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       select.addEventListener("change", () => {
         const mode = allModes().find((entry) => entry.id === select.value);
@@ -12366,19 +12392,19 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS6.leave;
+      leaveButton.id = IDS9.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS6.save;
+      saveButton.id = IDS9.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS6.remove;
+      removeButton.id = IDS9.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -12390,14 +12416,14 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS6.group);
-      let ownBar = document.getElementById(IDS6.bar);
+      let group = document.getElementById(IDS9.group);
+      let ownBar = document.getElementById(IDS9.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS6.group;
+        group.id = IDS9.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -12407,7 +12433,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS6.bar;
+      ownBar.id = IDS9.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
@@ -12441,17 +12467,28 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function setHidden(element2, hidden) {
       if (element2 && element2.hidden !== hidden) element2.hidden = hidden;
     }
+    let onPage = false;
     function render() {
       if (!isTargetPage8()) {
-        clearColumnFocus(document);
-        document.getElementById(IDS6.group)?.remove();
-        document.getElementById(IDS6.bar)?.remove();
-        closeDialog();
+        if (onPage) {
+          onPage = false;
+          clearColumnFocus(document);
+          document.getElementById(IDS9.group)?.remove();
+          document.getElementById(IDS9.bar)?.remove();
+          closeDialog();
+        }
         return;
       }
+      onPage = true;
       ensureStyle4();
       const own = storage.load();
       const state = parseListState(location.hash);
+      if (hasStaleEmployerIds(state.filter)) {
+        const filter = { ...state.filter };
+        delete filter.employerIds;
+        location.hash = buildListHash({ ...state, filter });
+        return;
+      }
       let active = readActive();
       let mode = active ? [...BUILT_IN_MODES2, ...own].find((entry) => entry.id === active.id) : null;
       if (active && !modeMatchesState2(mode, state)) {
@@ -12465,9 +12502,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!container) return;
       const isActive = Boolean(mode);
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS6.select}`), own, mode?.id || "");
-      setHidden(container.querySelector(`#${IDS6.leave}`), !isActive);
-      setHidden(container.querySelector(`#${IDS6.remove}`), !isActive || Boolean(mode?.builtIn));
+      fillSelect(container.querySelector(`#${IDS9.select}`), own, mode?.id || "");
+      setHidden(container.querySelector(`#${IDS9.leave}`), !isActive);
+      setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -12673,7 +12710,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   }
 
   // ../../shared/js/vertretungen/index.js
-  var IDS7 = {
+  var IDS6 = {
     button: "werkia-vertretungen-button",
     bar: "werkia-vertretungen-bar",
     dialog: "werkia-vertretungen-dialog",
@@ -12719,7 +12756,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     return null;
   }
   function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS7.button && /^filter hinzuf/i.test(element2.textContent.trim()));
+    const filterButton = [...root.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && /^filter hinzuf/i.test(element2.textContent.trim()));
     if (filterButton) {
       let before = filterButton;
       while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
@@ -12727,7 +12764,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     const toolbar = findToolbar(root);
     if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS7.button && element2.textContent.trim());
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element2) => element2.id !== IDS6.button && element2.textContent.trim());
     return { parent: toolbar, before: toolbar.firstElementChild, sample };
   }
   function executeVertretungen(runtime, {
@@ -12754,40 +12791,40 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return element2?.dataset.werkiaVertretungenOwner === sourcePath ? element2 : null;
     };
     function ensureStyle4() {
-      if (document.getElementById(IDS7.style)) return;
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS7.style;
+      style.id = IDS6.style;
       style.textContent = `
-      #${IDS7.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS7.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS7.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS7.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS7.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS7.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS7.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS7.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS7.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS7.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS7.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS7.dialog} .wv-admins { margin-top:16px; }
-      #${IDS7.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS7.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS7.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS7.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS7.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS7.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS7.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS7.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS7.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS7.dialog} select, #${IDS7.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS7.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS7.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS7.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS7.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS7.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS7.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS7.dialog} .wv-status.wv-error { color:#a02334; }
+      #${IDS6.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS6.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS6.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS6.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS6.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS6.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS6.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS6.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS6.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS6.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS6.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS6.dialog} .wv-admins { margin-top:16px; }
+      #${IDS6.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS6.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS6.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS6.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS6.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS6.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS6.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS6.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS6.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS6.dialog} select, #${IDS6.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS6.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS6.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS6.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS6.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS6.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS6.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS6.dialog} .wv-status.wv-error { color:#a02334; }
     `;
       document.head.appendChild(style);
     }
@@ -12829,17 +12866,17 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function closeDialog() {
-      owned(IDS7.dialog)?.remove();
+      owned(IDS6.dialog)?.remove();
       editing = null;
     }
     function setStatus(text, isError = false) {
-      const status = owned(IDS7.dialog)?.querySelector(".wv-status");
+      const status = owned(IDS6.dialog)?.querySelector(".wv-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wv-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS7.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
+      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element2) => {
         element2.disabled = busy;
       });
     }
@@ -12952,7 +12989,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return details;
     }
     function card() {
-      return owned(IDS7.dialog)?.querySelector(".wv-body");
+      return owned(IDS6.dialog)?.querySelector(".wv-body");
     }
     function render() {
       const target = card();
@@ -12976,7 +13013,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     async function openDialog() {
       closeDialog();
       ensureStyle4();
-      const overlay = el7("div", { id: IDS7.dialog });
+      const overlay = el7("div", { id: IDS6.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -12999,21 +13036,21 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function placeButton() {
       if (!isTargetPage8()) {
-        owned(IDS7.button)?.remove();
-        owned(IDS7.bar)?.remove();
+        owned(IDS6.button)?.remove();
+        owned(IDS6.bar)?.remove();
         return;
       }
       ensureStyle4();
       const slot = findSlot(document);
-      const existing = owned(IDS7.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS7.bar)) return;
+      const existing = owned(IDS6.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
       existing?.remove();
       const vertretungenButton = button4("Vertretungen", openDialog);
-      vertretungenButton.id = IDS7.button;
+      vertretungenButton.id = IDS6.button;
       vertretungenButton.title = "Vertretungen eintragen und ansehen";
       vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
       if (slot) {
-        owned(IDS7.bar)?.remove();
+        owned(IDS6.bar)?.remove();
         const look = nativeLookFrom(slot.sample);
         if (look) {
           vertretungenButton.className = "wv-native";
@@ -13035,15 +13072,15 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         return;
       }
       vertretungenButton.className = "wv-own";
-      owned(IDS7.bar)?.remove();
+      owned(IDS6.bar)?.remove();
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return;
-      const bar = el7("div", { id: IDS7.bar }, [vertretungenButton]);
+      const bar = el7("div", { id: IDS6.bar }, [vertretungenButton]);
       bar.dataset.werkiaVertretungenOwner = sourcePath;
       anchor.parentElement.insertBefore(bar, anchor);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS7.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS6.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -13065,8 +13102,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", schedule);
     runtime.addCleanup?.(() => {
-      owned(IDS7.button)?.remove();
-      owned(IDS7.bar)?.remove();
+      owned(IDS6.button)?.remove();
+      owned(IDS6.bar)?.remove();
       closeDialog();
     });
     schedule();
@@ -13366,7 +13403,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   }
 
   // ../../shared/js/prio-liste/index.js
-  var IDS8 = {
+  var IDS7 = {
     button: "werkia-prio-button",
     bar: "werkia-prio-bar",
     panel: "werkia-prio-panel",
@@ -13492,21 +13529,21 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     const button4 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
     function ensureStyle4() {
-      if (document.getElementById(IDS8.style)) return;
-      const style = el7("style", { id: IDS8.style });
-      const P = `#${IDS8.panel}`;
-      const R = `#${IDS8.review}`;
+      if (document.getElementById(IDS7.style)) return;
+      const style = el7("style", { id: IDS7.style });
+      const P = `#${IDS7.panel}`;
+      const R = `#${IDS7.review}`;
       style.textContent = `
-      #${IDS8.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
-      #${IDS8.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS8.button}.wp-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS8.button}.wp-native svg { flex:none; fill:currentColor; }
-      #${IDS8.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS8.button}[data-active="1"] { color:${T.accentInk} !important; }
+      #${IDS7.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
+      #${IDS7.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS7.button}.wp-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS7.button}.wp-native svg { flex:none; fill:currentColor; }
+      #${IDS7.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS7.button}[data-active="1"] { color:${T.accentInk} !important; }
       ${P}, ${R} .wp-card { box-sizing:border-box; color:${T.ink}; background:${T.surface}; border:1px solid ${T.line}; border-radius:10px; box-shadow:${T.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
-      #${IDS8.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS8.tab}:hover { border-color:${T.accent}; }
-      #${IDS8.tab} svg { width:14px; height:14px; fill:currentColor; }
+      #${IDS7.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS7.tab}:hover { border-color:${T.accent}; }
+      #${IDS7.tab} svg { width:14px; height:14px; fill:currentColor; }
       ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
       ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T.line}; }
       ${P} .wp-title { font-weight:650; font-size:13px; }
@@ -13663,7 +13700,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function slotBefore(slot) {
       let before = slot.before;
-      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS8.button) {
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS7.button) {
         before = before.previousElementSibling;
       }
       return before;
@@ -13674,7 +13711,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function placeButton() {
       const slot = findSlot(document);
-      let existing = owned(IDS8.button);
+      let existing = owned(IDS7.button);
       if (existing && slot) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -13682,17 +13719,17 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           existing.remove();
           existing = null;
         }
-      } else if (existing && !slot && existing.parentElement?.id !== IDS8.bar) {
+      } else if (existing && !slot && existing.parentElement?.id !== IDS7.bar) {
         existing.remove();
         existing = null;
       }
       if (!existing) {
         const prioButton = button4("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
-        prioButton.id = IDS8.button;
+        prioButton.id = IDS7.button;
         prioButton.dataset.werkiaPrioOwner = sourcePath;
         prioButton.append(el7("span", { className: "wp-label" }));
         if (slot) {
-          owned(IDS8.bar)?.remove();
+          owned(IDS7.bar)?.remove();
           const look = nativeLookFrom(slot.sample);
           if (look) {
             prioButton.className = "wp-native";
@@ -13706,8 +13743,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
           const anchor = findListAnchor(document);
           if (!anchor?.parentElement) return;
           prioButton.className = "wp-own";
-          owned(IDS8.bar)?.remove();
-          const bar = el7("div", { id: IDS8.bar }, [prioButton]);
+          owned(IDS7.bar)?.remove();
+          const bar = el7("div", { id: IDS7.bar }, [prioButton]);
           bar.dataset.werkiaPrioOwner = sourcePath;
           anchor.parentElement.insertBefore(bar, anchor);
         }
@@ -13736,14 +13773,14 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       tick();
     }
     function placeTab() {
-      let tab = owned(IDS8.tab);
+      let tab = owned(IDS7.tab);
       if (!collapsed()) {
         tab?.remove();
         return;
       }
       if (!tab) {
         tab = button4("", togglePanel, "", "Prio-Liste öffnen");
-        tab.id = IDS8.tab;
+        tab.id = IDS7.tab;
         tab.dataset.werkiaPrioOwner = sourcePath;
         tab.append(starIcon("14px"), el7("span", { className: "wp-label" }));
         document.body.appendChild(tab);
@@ -13753,14 +13790,14 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (label.textContent !== text) label.textContent = text;
     }
     function placePanel2() {
-      let panel = owned(IDS8.panel);
+      let panel = owned(IDS7.panel);
       placeTab();
       if (collapsed()) {
         panel?.remove();
         return;
       }
       if (!panel) {
-        panel = el7("div", { id: IDS8.panel });
+        panel = el7("div", { id: IDS7.panel });
         panel.dataset.werkiaPrioOwner = sourcePath;
         panel.setAttribute("role", "region");
         panel.setAttribute("aria-label", "Prio-Liste");
@@ -13856,7 +13893,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return select;
     }
     function renderPanel() {
-      const panel = owned(IDS8.panel);
+      const panel = owned(IDS7.panel);
       if (!panel) return;
       const day = today();
       const tip = helpTip?.() || null;
@@ -13973,7 +14010,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       wasSorted = on;
     }
     function closeReview() {
-      owned(IDS8.review)?.remove();
+      owned(IDS7.review)?.remove();
     }
     function openReview() {
       closeReview();
@@ -14031,7 +14068,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
         status,
         el7("div", { className: "wp-foot" }, [later, save])
       );
-      const overlay = el7("div", { id: IDS8.review }, [card]);
+      const overlay = el7("div", { id: IDS7.review }, [card]);
       overlay.dataset.werkiaPrioOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeReview();
@@ -14045,16 +14082,16 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!reviewDue({ now: date, lastShownDay, openCount: 1 })) return;
       await load2();
       if (!loaded) return;
-      if (owned(IDS8.review)) return;
+      if (owned(IDS7.review)) return;
       store.set(STORAGE_KEYS.reviewDay, day);
       if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
     }
     function tick() {
       if (!isTargetPage8()) {
-        owned(IDS8.button)?.remove();
-        owned(IDS8.bar)?.remove();
-        owned(IDS8.panel)?.remove();
-        owned(IDS8.tab)?.remove();
+        owned(IDS7.button)?.remove();
+        owned(IDS7.bar)?.remove();
+        owned(IDS7.panel)?.remove();
+        owned(IDS7.tab)?.remove();
         return;
       }
       ensureStyle4();
@@ -14062,7 +14099,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       placePanel2();
       renderRows();
       const pageKey = pageEmployers().map(([id]) => id).join(",");
-      const panel = owned(IDS8.panel);
+      const panel = owned(IDS7.panel);
       if (panel && pageKey !== lastPageKey && !panel.contains(document.activeElement)) {
         lastPageKey = pageKey;
         renderPanel();
@@ -14081,7 +14118,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }, 200);
     };
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS8.review)) return;
+      if (event.key !== "Escape" || !owned(IDS7.review)) return;
       event.stopPropagation();
       closeReview();
     }, true);
@@ -14094,10 +14131,10 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
     }, REVIEW_CHECK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS8.button)?.remove();
-      owned(IDS8.bar)?.remove();
-      owned(IDS8.panel)?.remove();
-      owned(IDS8.tab)?.remove();
+      owned(IDS7.button)?.remove();
+      owned(IDS7.bar)?.remove();
+      owned(IDS7.panel)?.remove();
+      owned(IDS7.tab)?.remove();
       closeReview();
       document.querySelectorAll(`.${STAR_CLASS}`).forEach((star) => {
         if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
@@ -14205,7 +14242,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS10 = {
+    const IDS9 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -14217,9 +14254,9 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS10.style)) return;
+      if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
-      style.id = IDS10.style;
+      style.id = IDS9.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -14390,8 +14427,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS10.dialog, style: IDS10.dialogStyle, status: IDS10.dialogStatus },
-      buttonIds: [IDS10.bulkButton],
+      ids: { dialog: IDS9.dialog, style: IDS9.dialogStyle, status: IDS9.dialogStatus },
+      buttonIds: [IDS9.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -14466,7 +14503,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS10.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS9.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -14488,8 +14525,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS10.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS10.dialog)?.remove();
+      document.getElementById(IDS9.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS9.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -14504,8 +14541,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS10.style)?.remove();
-      document.getElementById(IDS10.dialogStyle)?.remove();
+      document.getElementById(IDS9.style)?.remove();
+      document.getElementById(IDS9.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
@@ -15583,7 +15620,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   }
 
   // ../../shared/js/tagesplan/index.js
-  var IDS9 = {
+  var IDS8 = {
     style: "werkia-tagesplan-style",
     button: "werkia-tagesplan-button",
     panel: "werkia-tagesplan-panel",
@@ -15652,42 +15689,42 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
   .wtp .wtp-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .wtp .wtp-grid { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
   .wtp ul { list-style:none; margin:0; padding:0; }
-  #${IDS9.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS9.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
-  #${IDS9.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
-  #${IDS9.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
-  #${IDS9.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
-  #${IDS9.panel} .wtp-title { font-weight:600; }
-  #${IDS9.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
-  #${IDS9.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
-  #${IDS9.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
-  #${IDS9.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
-  #${IDS9.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
-  #${IDS9.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
-  #${IDS9.panel} .wtp-late { color:var(--bad); font-weight:600; }
-  #${IDS9.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
-  #${IDS9.panel} details summary { cursor:pointer; color:var(--ink-2); }
-  #${IDS9.panel} details li { padding:3px 0; }
-  #${IDS9.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
-  #${IDS9.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
-  #${IDS9.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
-  #${IDS9.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
-  #${IDS9.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
-  #${IDS9.popup} .wtp-item:last-of-type { border-bottom:0; }
-  #${IDS9.popup} .wtp-title { font-weight:600; }
-  #${IDS9.popup} .wtp-row { margin-top:6px; }
-  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-  #${IDS9.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
-  #${IDS9.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
-  #${IDS9.dialog} li span { flex:1; }
+  #${IDS8.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS8.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
+  #${IDS8.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
+  #${IDS8.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
+  #${IDS8.panel} .wtp-title { font-weight:600; }
+  #${IDS8.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
+  #${IDS8.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
+  #${IDS8.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
+  #${IDS8.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
+  #${IDS8.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
+  #${IDS8.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
+  #${IDS8.panel} .wtp-late { color:var(--bad); font-weight:600; }
+  #${IDS8.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
+  #${IDS8.panel} details summary { cursor:pointer; color:var(--ink-2); }
+  #${IDS8.panel} details li { padding:3px 0; }
+  #${IDS8.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+  #${IDS8.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
+  #${IDS8.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
+  #${IDS8.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
+  #${IDS8.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.popup} .wtp-item:last-of-type { border-bottom:0; }
+  #${IDS8.popup} .wtp-title { font-weight:600; }
+  #${IDS8.popup} .wtp-row { margin-top:6px; }
+  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+  #${IDS8.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
+  #${IDS8.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  #${IDS8.dialog} li span { flex:1; }
   .${ROW_BUTTON_CLASS} { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-left:4px; padding:0; border:0; border-radius:50%; background:transparent; color:#8b8b94; cursor:pointer; vertical-align:middle; }
   .${ROW_BUTTON_CLASS}:hover { background:#f4f4f5; color:#52525b; }
   .${ROW_BUTTON_CLASS} svg { fill:currentColor; }
   .${ROW_BUTTON_CLASS}.wtp-has { color:#ef6c00; }
-  #${IDS9.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-  #${IDS9.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
-  #${IDS9.button}.wtp-native svg { flex:none; fill:currentColor; }
-  #${IDS9.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
+  #${IDS8.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+  #${IDS8.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
+  #${IDS8.button}.wtp-native svg { flex:none; fill:currentColor; }
+  #${IDS8.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
 `;
   function executeTagesplan(runtime, {
     routes = [],
@@ -15722,8 +15759,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return element2;
     };
     function ensureStyle4() {
-      if (document.getElementById(IDS9.style)) return;
-      document.head.appendChild(el6("style", { id: IDS9.style, textContent: CSS2 }));
+      if (document.getElementById(IDS8.style)) return;
+      document.head.appendChild(el6("style", { id: IDS8.style, textContent: CSS2 }));
     }
     function readGesehen() {
       try {
@@ -15875,7 +15912,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function renderPopup() {
       const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
-      const existing = owned(IDS9.popup);
+      const existing = owned(IDS8.popup);
       if (!items.length) {
         existing?.remove();
         return;
@@ -15883,7 +15920,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
       ensureStyle4();
-      const popup = existing || own(el6("div", { id: IDS9.popup, role: "alert" }));
+      const popup = existing || own(el6("div", { id: IDS8.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
       popup.append(
@@ -15913,12 +15950,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       return `${new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" }).format(date)} ${time}`;
     }
     function closeDialog() {
-      owned(IDS9.dialog)?.remove();
+      owned(IDS8.dialog)?.remove();
     }
     function openReminderDialog(matchId) {
       closeDialog();
       ensureStyle4();
-      const overlay = own(el6("div", { id: IDS9.dialog }));
+      const overlay = own(el6("div", { id: IDS8.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -16026,13 +16063,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       }
     }
     function closePanel() {
-      owned(IDS9.panel)?.remove();
+      owned(IDS8.panel)?.remove();
       teamEditing = null;
     }
     async function openPanel() {
       ensureStyle4();
-      if (!owned(IDS9.panel)) {
-        const panel = own(el6("aside", { id: IDS9.panel, "aria-label": "Tages-Timeline" }));
+      if (!owned(IDS8.panel)) {
+        const panel = own(el6("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
       }
       renderPanel("Lädt …");
@@ -16183,13 +16220,13 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       ]);
     }
     function renderStatus(text, isError = false) {
-      const status = owned(IDS9.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
+      const status = owned(IDS8.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wtp-error", isError);
     }
     function renderPanel(message = "", isError = false) {
-      const panel = owned(IDS9.panel);
+      const panel = owned(IDS8.panel);
       if (!panel) return;
       const day = berlinDay2(now());
       const close = button3("×", closePanel, "wtp-icon");
@@ -16226,11 +16263,11 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     function placeButton() {
       if (!isTargetPage8()) {
-        owned(IDS9.button)?.remove();
+        owned(IDS8.button)?.remove();
         return;
       }
       const slot = findSlot(document);
-      const existing = owned(IDS9.button);
+      const existing = owned(IDS8.button);
       if (existing && slot && existing.parentElement === slot.parent) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -16240,8 +16277,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       existing?.remove();
       if (!slot) return;
       ensureStyle4();
-      const heute = button3("Heute", () => owned(IDS9.panel) ? closePanel() : openPanel(), "");
-      heute.id = IDS9.button;
+      const heute = button3("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
+      heute.id = IDS8.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
       heute.dataset.werkiaTagesplanOwner = sourcePath;
       const look = nativeLookFrom(slot.sample);
@@ -16261,7 +16298,7 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     function refreshViews() {
       renderPopup();
       decorateRows();
-      if (owned(IDS9.panel) && !teamEditing) renderPanel();
+      if (owned(IDS8.panel) && !teamEditing) renderPanel();
     }
     async function tick() {
       const time = now().getTime();
@@ -16276,12 +16313,12 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
     }
     runtime.addWindowListener("keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (owned(IDS9.dialog)) {
+      if (owned(IDS8.dialog)) {
         event.stopPropagation();
         closeDialog();
         return;
       }
-      if (owned(IDS9.panel)) {
+      if (owned(IDS8.panel)) {
         event.stopPropagation();
         closePanel();
       }
@@ -16316,8 +16353,8 @@ ${operations.map((operation) => `• ${operation.beschreibung}`).join("\n")}`)) 
       });
     }, CLOCK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS9.button)?.remove();
-      owned(IDS9.popup)?.remove();
+      owned(IDS8.button)?.remove();
+      owned(IDS8.popup)?.remove();
       closeDialog();
       closePanel();
       document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element2) => {

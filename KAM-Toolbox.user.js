@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.14.257
+// @version      1.15.259
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -4658,6 +4658,26 @@
     },
     vertretungenTopic({ page: MY_MATCHES, routes: onMyMatches }),
     {
+      id: "arbeitgeber-pause",
+      title: "Arbeitgeber-Pause",
+      page: `${MY_MATCHES} und Arbeitgeber`,
+      routes: [ROUTES.kamMyMatches, ROUTES.employer],
+      kind: "write",
+      summary: "Pausiert einen Arbeitgeber samt aller veröffentlichten Stellen bis zu einem Datum. Der Status wird „Standort pausiert“, die Stellen „Pausiert“. Am Morgen von „Wieder aktiv ab“ kommt beides automatisch zurück.",
+      steps: [
+        "„AG-Pause“ oben in Meine Matches klicken oder „Pausieren“ in der Leiste des Arbeitgebers.",
+        "Arbeitgeber suchen (Name, ID oder Link) und „Auswählen“. Vom Arbeitgeber aus ist er schon gewählt.",
+        "„Wieder aktiv ab“ und optional einen Grund eintragen, dann zweimal „Pausieren“ klicken."
+      ],
+      notes: [
+        "Jeder darf pausieren, verlängern („Ändern“) und vorzeitig beenden („Jetzt beenden“).",
+        "Laufende Matches und Termine bleiben unverändert. Neue Matches gibt es erst wieder, wenn Arbeitgeber und Stellen nicht mehr pausiert sind.",
+        "Zurück kommen nur die Stellen, die die Pause selbst pausiert hat. Was jemand in der Zwischenzeit von Hand geändert hat, bleibt so.",
+        "Wer pausiert hat und der KAM des Arbeitgebers bekommen eine Slack-Nachricht, wenn die Pause anfängt, sich ändert oder endet.",
+        "Geschrieben wird über den n8n-Workflow „Arbeitgeber Pause“, in der Historie steht „Automation Werkia“."
+      ]
+    },
+    {
       id: "prio-liste",
       title: "Prio-Liste",
       page: MY_MATCHES,
@@ -5341,7 +5361,7 @@
       team,
       isTargetPage: isTargetPage8,
       getRequest,
-      ids: IDS9,
+      ids: IDS10,
       fields,
       columns,
       statusOptions,
@@ -5421,13 +5441,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS9,
-      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
+      ids: IDS10,
+      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -5567,13 +5587,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS9.feedbackShortcuts;
+      shortcuts.id = IDS10.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -5873,10 +5893,10 @@
     function installHeaderButtons() {
       if (!isTargetPage8()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -11141,11 +11161,11 @@
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS5 = 35e3;
+    const REQUEST_TIMEOUT_MS6 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS5);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS6);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -13554,7 +13574,7 @@ ${buildCbreBody(current)}`;
     employerCache = null
   }) {
     runtime.registerSource(sourcePath);
-    const IDS9 = makeIds(idPrefix);
+    const IDS10 = makeIds(idPrefix);
     const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
     const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -13577,42 +13597,42 @@ ${buildCbreBody(current)}`;
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle6() {
-      if (document.getElementById(IDS9.style)) return;
+      if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
-      style.id = IDS9.style;
+      style.id = IDS10.style;
       style.textContent = `
-      #${IDS9.group}, #${IDS9.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS9.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS9.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
-      #${IDS9.group} + #${IDS9.side} { margin:0 0 0 8px; }
-      #${IDS9.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS9.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS9.side}.is-active > strong { color:#b85400; }
-      #${IDS9.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.side} button:hover { background:#f4f4f5; }
-      #${IDS9.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
-      #${IDS9.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
-      #${IDS9.group}.is-active, #${IDS9.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS9.group} > strong, #${IDS9.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS9.group}.is-active > strong, #${IDS9.bar}.is-active > strong { color:#b85400; }
-      #${IDS9.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS9.group} button, #${IDS9.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.group} button:hover, #${IDS9.bar} button:hover { background:#f4f4f5; }
-      #${IDS9.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS9.leave}:hover { background:#b85400 !important; }
-      #${IDS9.group} [hidden], #${IDS9.bar} [hidden] { display:none !important; }
+      #${IDS10.group}, #${IDS10.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS10.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS10.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
+      #${IDS10.group} + #${IDS10.side} { margin:0 0 0 8px; }
+      #${IDS10.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS10.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS10.side}.is-active > strong { color:#b85400; }
+      #${IDS10.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.side} button:hover { background:#f4f4f5; }
+      #${IDS10.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS10.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
+      #${IDS10.group}.is-active, #${IDS10.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS10.group} > strong, #${IDS10.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS10.group}.is-active > strong, #${IDS10.bar}.is-active > strong { color:#b85400; }
+      #${IDS10.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS10.group} button, #${IDS10.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.group} button:hover, #${IDS10.bar} button:hover { background:#f4f4f5; }
+      #${IDS10.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS10.leave}:hover { background:#b85400 !important; }
+      #${IDS10.group} [hidden], #${IDS10.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS9.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS9.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS9.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS9.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS9.dialog} input[type=text], #${IDS9.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS9.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS9.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS9.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS10.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS10.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS10.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS10.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS10.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS10.dialog} input[type=text], #${IDS10.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS10.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS10.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS10.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -13649,13 +13669,13 @@ ${buildCbreBody(current)}`;
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS9.dialog)?.remove();
+      document.getElementById(IDS10.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS9.dialog;
+      overlay.id = IDS10.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -13732,7 +13752,7 @@ ${buildCbreBody(current)}`;
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS9.select;
+      select.id = IDS10.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       const warm = () => {
         if (hasContactMode()) employers.prefetch();
@@ -13746,19 +13766,19 @@ ${buildCbreBody(current)}`;
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS9.leave;
+      leaveButton.id = IDS10.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS9.save;
+      saveButton.id = IDS10.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS9.remove;
+      removeButton.id = IDS10.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -13770,14 +13790,14 @@ ${buildCbreBody(current)}`;
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS9.group);
-      let ownBar = document.getElementById(IDS9.bar);
+      let group = document.getElementById(IDS10.group);
+      let ownBar = document.getElementById(IDS10.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS9.group;
+        group.id = IDS10.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -13787,13 +13807,13 @@ ${buildCbreBody(current)}`;
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS9.bar;
+      ownBar.id = IDS10.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
     }
     function ensureSide(container) {
-      let side = document.getElementById(IDS9.side);
+      let side = document.getElementById(IDS10.side);
       if (!SIDE_MODES.length) {
         side?.remove();
         return null;
@@ -13801,7 +13821,7 @@ ${buildCbreBody(current)}`;
       if (side && side.previousElementSibling === container) return side;
       side?.remove();
       side = document.createElement("span");
-      side.id = IDS9.side;
+      side.id = IDS10.side;
       const title = document.createElement("strong");
       title.textContent = SIDE_MODES[0].side.box || "Filter";
       side.appendChild(title);
@@ -13859,9 +13879,9 @@ ${buildCbreBody(current)}`;
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
-          document.getElementById(IDS9.group)?.remove();
-          document.getElementById(IDS9.bar)?.remove();
-          document.getElementById(IDS9.side)?.remove();
+          document.getElementById(IDS10.group)?.remove();
+          document.getElementById(IDS10.bar)?.remove();
+          document.getElementById(IDS10.side)?.remove();
           closeDialog();
         }
         return;
@@ -13898,8 +13918,8 @@ ${buildCbreBody(current)}`;
       const sideActive = Boolean(mode?.side);
       const isActive = Boolean(mode) && !sideActive;
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS9.select}`), own, isActive ? mode.id : "");
-      setHidden(container.querySelector(`#${IDS9.leave}`), !isActive);
+      fillSelect(container.querySelector(`#${IDS10.select}`), own, isActive ? mode.id : "");
+      setHidden(container.querySelector(`#${IDS10.leave}`), !isActive);
       const side = ensureSide(container);
       if (side) {
         if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
@@ -13908,7 +13928,7 @@ ${buildCbreBody(current)}`;
           if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
         });
       }
-      setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
+      setHidden(container.querySelector(`#${IDS10.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -15647,7 +15667,7 @@ ${buildCbreBody(current)}`;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS9 = {
+    const IDS10 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -15659,9 +15679,9 @@ ${buildCbreBody(current)}`;
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS9.style)) return;
+      if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
-      style.id = IDS9.style;
+      style.id = IDS10.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -15832,8 +15852,8 @@ ${buildCbreBody(current)}`;
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS9.dialog, style: IDS9.dialogStyle, status: IDS9.dialogStatus },
-      buttonIds: [IDS9.bulkButton],
+      ids: { dialog: IDS10.dialog, style: IDS10.dialogStyle, status: IDS10.dialogStatus },
+      buttonIds: [IDS10.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -15908,7 +15928,7 @@ ${buildCbreBody(current)}`;
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS9.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS10.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -15930,8 +15950,8 @@ ${buildCbreBody(current)}`;
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS9.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS9.dialog)?.remove();
+      document.getElementById(IDS10.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS10.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -15946,8 +15966,8 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS9.style)?.remove();
-      document.getElementById(IDS9.dialogStyle)?.remove();
+      document.getElementById(IDS10.style)?.remove();
+      document.getElementById(IDS10.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
@@ -17784,6 +17804,529 @@ ${buildCbreBody(current)}`;
     });
   }
 
+  // src/features/arbeitgeber-pause/core.js
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS5 = 15e3;
+  var WRITE_TIMEOUT_MS = 65e3;
+  var OFFLINE_MESSAGE5 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var DEFAULT_DAYS = 7;
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaArbeitgeberPauseMe {
+  me: currentEmployee { id __typename }
+}`;
+  var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
+  function parseResponse4(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createPauseClient({ request, url = WEBHOOK_URL5 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS5,
+        onload(response) {
+          try {
+            resolve(parseResponse4(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
+      });
+    });
+  }
+  function employerIdFromHash(hash) {
+    const match = String(hash || "").match(/^#\/Employer\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?]|$)/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+  function addDays(day, days) {
+    const date = /* @__PURE__ */ new Date(`${day}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+  function formatDay3(day) {
+    const [year, month, date] = String(day || "").split("-");
+    return year && month && date ? `${date}.${month}.${year}` : String(day || "");
+  }
+  function lastPausedDay(wiederAktivAb) {
+    const day = wiederAktivAb ? addDays(wiederAktivAb, -1) : "";
+    const [, month, date] = day.split("-");
+    return month && date ? `${date}.${month}.` : "";
+  }
+  function stellenText(count) {
+    return `${count} ${count === 1 ? "Stelle" : "Stellen"}`;
+  }
+  function entryMeta(entry) {
+    return [
+      `wieder aktiv ab ${formatDay3(entry.wiederAktivAb)}`,
+      `${stellenText(entry.stellen)} pausiert`,
+      entry.grund,
+      entry.pausiertVon ? `von ${entry.pausiertVon}` : ""
+    ].filter(Boolean).join(" · ");
+  }
+  function findEntry(entries, employerId) {
+    const id = String(employerId || "").toLowerCase();
+    return (entries || []).find((entry) => String(entry.employerId).toLowerCase() === id) || null;
+  }
+
+  // src/features/arbeitgeber-pause/index.js
+  var IDS9 = {
+    button: "werkia-arbeitgeber-pause-button",
+    dialog: "werkia-arbeitgeber-pause-dialog",
+    style: "werkia-arbeitgeber-pause-style"
+  };
+  var OWNER_KEY = "werkiaArbeitgeberPauseOwner";
+  var CACHE_MS5 = 5 * 60 * 1e3;
+  var CONFIRM_MS2 = 4e3;
+  var T2 = {
+    surface: "#ffffff",
+    sunken: "#f4f4f5",
+    ink: "#09090b",
+    ink2: "#52525b",
+    muted: "#8b8b94",
+    line: "#e4e4e7",
+    lineStrong: "#d4d4d8",
+    accent: "#ef6c00",
+    accentInk: "#b85400",
+    accentSoft: "#fff3e8",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec",
+    badHover: "#f9dcdc"
+  };
+  var PAUSE_ICON_PATH = "M9 16h2V8H9v8zm3-14C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-4h2V8h-2v8z";
+  function executeArbeitgeberPause(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    helpTip,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createPauseClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let cache = null;
+    let loading = null;
+    let state = { entries: [], heute: "", hits: null, query: "", selected: null, editing: "" };
+    const owned = (id) => {
+      const element5 = document.getElementById(id);
+      return element5?.dataset[OWNER_KEY] === sourcePath ? element5 : null;
+    };
+    const currentEmployerId = () => employerIdFromHash(location.hash || "");
+    const isButtonPage = () => ROUTES.kamMyMatches.test(location.hash || "") || Boolean(currentEmployerId());
+    function ensureStyle6() {
+      if (document.getElementById(IDS9.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS9.style;
+      const d = `#${IDS9.dialog}`;
+      style.textContent = `
+      #${IDS9.button}.wap-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS9.button}.wap-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS9.button}.wap-native svg { flex:none; fill:currentColor; }
+      #${IDS9.button}.wap-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T2.line}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS9.button}.wap-paused { color:${T2.accentInk} !important; background:${T2.accentSoft} !important; }
+      ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+      ${d} .wap-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T2.line}; border-radius:12px; background:${T2.surface}; color:${T2.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wap-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T2.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wap-close:hover { background:${T2.sunken}; }
+      ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
+      ${d} h3 { margin:18px 0 8px; color:${T2.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T2.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T2.line}; }
+      ${d} li { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
+      ${d} .wap-who { flex:1; min-width:200px; }
+      ${d} .wap-name { font-weight:600; }
+      ${d} .wap-name a { color:inherit; text-decoration:none; }
+      ${d} .wap-name a:hover { text-decoration:underline; }
+      ${d} .wap-meta { color:${T2.muted}; font-size:11px; }
+      ${d} .wap-chip { padding:2px 8px; border-radius:999px; background:${T2.accentSoft}; color:${T2.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wap-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+      ${d} .wap-form { margin-top:10px; padding:12px; border:1px solid ${T2.line}; border-radius:10px; background:${T2.sunken}; }
+      ${d} .wap-form label { display:flex; flex-direction:column; gap:4px; color:${T2.ink2}; font-size:11px; font-weight:600; }
+      ${d} .wap-form .wap-grow { flex:1; min-width:200px; }
+      ${d} input { min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T2.lineStrong}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} .wap-row > input[type="search"] { flex:1; }
+      ${d} input:focus { outline:2px solid ${T2.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T2.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} button:disabled { cursor:default; opacity:.6; }
+      ${d} button.wap-secondary { border:1px solid ${T2.line}; background:${T2.surface}; color:${T2.ink}; }
+      ${d} button.wap-secondary:hover { background:${T2.sunken}; }
+      ${d} button.wap-danger { background:${T2.badSoft}; color:${T2.badInk}; }
+      ${d} button.wap-danger:hover { background:${T2.badHover}; }
+      ${d} .wap-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+      ${d} .wap-status { min-height:18px; margin-top:10px; color:${T2.ink2}; font-size:12px; }
+      ${d} .wap-status.wap-error { color:${T2.badInk}; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el7(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
+    }
+    function button3(text, onClick, className = "") {
+      return el7("button", { type: "button", textContent: text, className, onclick: onClick });
+    }
+    function pauseIcon(size) {
+      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon2.setAttribute("viewBox", "0 0 24 24");
+      icon2.setAttribute("aria-hidden", "true");
+      if (size) {
+        icon2.style.width = size;
+        icon2.style.height = size;
+      }
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", PAUSE_ICON_PATH);
+      icon2.append(path);
+      return icon2;
+    }
+    function confirmButton(label, question, onConfirm, className = "wap-danger") {
+      let armed = false;
+      let timer = null;
+      const element5 = button3(label, () => {
+        if (!armed) {
+          armed = true;
+          element5.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element5.textContent = label;
+          }, CONFIRM_MS2);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, className);
+      return element5;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function fetchList() {
+      if (!loading) {
+        loading = call({ action: "liste" }).then((data) => {
+          cache = { at: Date.now(), entries: data.eintraege || [], heute: data.heute || "" };
+          return cache;
+        }).finally(() => {
+          loading = null;
+        });
+      }
+      return loading;
+    }
+    function loadList() {
+      if (cache && Date.now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
+      return fetchList().catch((error) => {
+        console.warn("[Arbeitgeber-Pause] Liste nicht geladen:", error?.message || error);
+        return cache;
+      });
+    }
+    function setStatus(text, isError = false) {
+      const status = owned(IDS9.dialog)?.querySelector(".wap-status");
+      if (!status) return;
+      status.textContent = text;
+      status.classList.toggle("wap-error", isError);
+    }
+    function setBusy(busy) {
+      owned(IDS9.dialog)?.querySelectorAll(".wap-body button, .wap-body input").forEach((element5) => {
+        element5.disabled = busy;
+      });
+    }
+    function closeDialog() {
+      owned(IDS9.dialog)?.remove();
+    }
+    async function refresh(message = "") {
+      const list = await fetchList();
+      state.entries = list.entries;
+      state.heute = list.heute;
+      render();
+      if (message) setStatus(message);
+      scheduleButton(true);
+    }
+    async function run(payload, busyText, after = () => {
+    }) {
+      setBusy(true);
+      setStatus(busyText);
+      try {
+        const data = await call(payload);
+        after();
+        await refresh(data.meldung || "Gespeichert.");
+      } catch (error) {
+        setBusy(false);
+        setStatus(error.message || String(error), true);
+      }
+    }
+    function employerLink(id, name) {
+      return el7("a", { href: `#/Employer/${id}/show`, textContent: name, target: "_blank", rel: "noopener" });
+    }
+    function dateInput(value) {
+      const min = state.heute ? addDays(state.heute, 1) : "";
+      return el7("input", { type: "date", value, min, required: true });
+    }
+    function entryRow(entry) {
+      const parts = [
+        el7("div", { className: "wap-who" }, [
+          el7("div", { className: "wap-name" }, [employerLink(entry.employerId, entry.employerName)]),
+          el7("div", { className: "wap-meta", textContent: entryMeta(entry) })
+        ])
+      ];
+      if (state.editing === entry.id) {
+        const until = dateInput(entry.wiederAktivAb);
+        parts.push(el7("label", { className: "wap-meta", textContent: "Wieder aktiv ab " }, [until]));
+        parts.push(button3("Speichern", () => run(
+          { action: "verlaengern", id: entry.id, wiederAktivAb: until.value },
+          "Speichert …",
+          () => {
+            state.editing = "";
+          }
+        )));
+        parts.push(button3("Abbrechen", () => {
+          state.editing = "";
+          render();
+        }, "wap-secondary"));
+      } else {
+        parts.push(button3("Ändern", () => {
+          state.editing = entry.id;
+          render();
+        }, "wap-secondary"));
+        parts.push(confirmButton("Jetzt beenden", "Wirklich beenden?", () => run(
+          { action: "beenden", id: entry.id },
+          `Beendet die Pause und veröffentlicht ${stellenText(entry.stellen)} wieder …`
+        )));
+      }
+      return el7("li", {}, parts);
+    }
+    function hitRow(hit) {
+      const meta = [hit.status, `${stellenText(hit.stellen)} veröffentlicht`].filter(Boolean).join(" · ");
+      const action = hit.pauseId ? el7("span", { className: "wap-chip", textContent: `pausiert bis ${lastPausedDay(hit.wiederAktivAb)}` }) : button3("Auswählen", () => {
+        state.selected = hit;
+        render();
+      }, "wap-secondary");
+      return el7("li", {}, [
+        el7("div", { className: "wap-who" }, [
+          el7("div", { className: "wap-name" }, [employerLink(hit.id, hit.name)]),
+          el7("div", { className: "wap-meta", textContent: meta })
+        ]),
+        action
+      ]);
+    }
+    function pauseForm(hit) {
+      const until = dateInput(state.heute ? addDays(state.heute, DEFAULT_DAYS) : "");
+      const reason = el7("input", { type: "text", placeholder: "z. B. „Urlaub HR bis Ende Oktober“", maxLength: 300 });
+      const submit = confirmButton(
+        `Pausieren (${stellenText(hit.stellen)})`,
+        "Wirklich pausieren?",
+        () => run(
+          { action: "pausieren", employerId: hit.id, wiederAktivAb: until.value, grund: reason.value },
+          `Pausiert ${hit.name} und ${stellenText(hit.stellen)}, das kann bei vielen Stellen bis zu einer Minute dauern …`,
+          () => {
+            state.selected = null;
+            state.hits = null;
+            state.query = "";
+          }
+        ),
+        ""
+      );
+      return el7("div", { className: "wap-form" }, [
+        el7("div", { className: "wap-name", textContent: hit.name }),
+        el7("p", { textContent: `Status „${hit.status || "leer"}“ wird zu „Standort pausiert“, ${stellenText(hit.stellen)} von Veröffentlicht zu Pausiert. Am Morgen von „Wieder aktiv ab“ kommt beides automatisch zurück.` }),
+        el7("div", { className: "wap-row" }, [
+          el7("label", { textContent: "Wieder aktiv ab" }, [until]),
+          el7("label", { className: "wap-grow", textContent: "Grund (optional)" }, [reason])
+        ]),
+        el7("div", { className: "wap-actions" }, [
+          button3("Abbrechen", () => {
+            state.selected = null;
+            render();
+          }, "wap-secondary"),
+          submit
+        ])
+      ]);
+    }
+    async function search(query) {
+      state.query = String(query || "").trim();
+      setBusy(true);
+      setStatus("Sucht …");
+      try {
+        const data = await call({ action: "suche", suche: state.query });
+        state.hits = data.treffer || [];
+        state.selected = state.hits.length === 1 && !state.hits[0].pauseId ? state.hits[0] : null;
+        render();
+        if (!state.hits.length) setStatus("Kein Arbeitgeber gefunden.");
+      } catch (error) {
+        setBusy(false);
+        setStatus(error.message || String(error), true);
+      }
+    }
+    function searchSection() {
+      const input = el7("input", { type: "search", value: state.query, placeholder: "Name, Employer-ID oder Link zum Arbeitgeber" });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          search(input.value);
+        }
+      });
+      const parts = [
+        el7("h3", { textContent: "Arbeitgeber pausieren" }),
+        el7("div", { className: "wap-row" }, [input, button3("Suchen", () => search(input.value))])
+      ];
+      if (state.selected) {
+        parts.push(pauseForm(state.selected));
+      } else if (state.hits?.length) {
+        const list = el7("ul");
+        state.hits.forEach((hit) => list.append(hitRow(hit)));
+        parts.push(list);
+      }
+      return parts;
+    }
+    function render() {
+      const target = owned(IDS9.dialog)?.querySelector(".wap-body");
+      if (!target) return;
+      target.textContent = "";
+      const list = el7("ul");
+      if (!state.entries.length) list.append(el7("li", { textContent: "Gerade ist kein Arbeitgeber pausiert." }));
+      state.entries.forEach((entry) => list.append(entryRow(entry)));
+      const tip = helpTip?.();
+      target.append(
+        el7("h2", {}, [document.createTextNode("Arbeitgeber-Pause "), tip]),
+        el7("p", { textContent: "Pausiert einen Arbeitgeber („Standort pausiert“) und alle seine veröffentlichten Stellen bis zu einem Datum. Laufende Matches und Termine bleiben, neue Matches gibt es erst wieder nach der Pause. Pausierende Person und KAM bekommen eine Slack-Nachricht." }),
+        el7("h3", { textContent: `Pausiert (${state.entries.length})` }),
+        list,
+        ...searchSection(),
+        el7("div", { className: "wap-status" }),
+        el7("div", { className: "wap-actions" }, [button3("Schließen", closeDialog, "wap-secondary")])
+      );
+      if (!state.selected) target.querySelector('input[type="search"]')?.focus();
+    }
+    async function openDialog({ employerId = "" } = {}) {
+      closeDialog();
+      ensureStyle6();
+      state = { entries: cache?.entries || [], heute: cache?.heute || "", hits: null, query: "", selected: null, editing: "" };
+      const overlay = el7("div", { id: IDS9.dialog });
+      overlay.dataset[OWNER_KEY] = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const close = button3("×", closeDialog, "wap-close");
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el7("div", { className: "wap-body" }, [
+        el7("h2", { textContent: "Arbeitgeber-Pause" }),
+        el7("div", { className: "wap-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(el7("div", { className: "wap-card" }, [close, target]));
+      document.body.appendChild(overlay);
+      try {
+        await refresh();
+        if (employerId && !findEntry(state.entries, employerId)) await search(employerId);
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        target.append(el7("div", { className: "wap-actions" }, [button3("Schließen", closeDialog, "wap-secondary")]));
+      }
+    }
+    function buttonLabel(employerId) {
+      if (!employerId) return { text: "AG-Pause", title: "Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
+      const entry = findEntry(cache?.entries, employerId);
+      if (entry) return { text: `Pausiert bis ${lastPausedDay(entry.wiederAktivAb)}`, title: `Wieder aktiv ab ${formatDay3(entry.wiederAktivAb)}. Klicken zum Ändern oder Beenden.`, paused: true };
+      return { text: "Pausieren", title: "Diesen Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
+    }
+    function placeButton() {
+      if (!isButtonPage()) {
+        owned(IDS9.button)?.remove();
+        return;
+      }
+      const slot = findSlot(document);
+      const existing = owned(IDS9.button);
+      const employerId = currentEmployerId();
+      const label = buttonLabel(employerId);
+      if (existing && slot && existing.parentElement === slot.parent && existing.dataset.employerId === employerId && existing.dataset.label === label.text) {
+        if (slot.before === existing) return;
+        let next = existing.nextElementSibling;
+        while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
+        if (next === slot.before) return;
+      }
+      if (existing && !slot) return;
+      existing?.remove();
+      const target = findSlot(document);
+      if (!target) return;
+      ensureStyle6();
+      const pauseButton = button3(label.text, () => openDialog({ employerId: currentEmployerId() }));
+      pauseButton.id = IDS9.button;
+      pauseButton.title = label.title;
+      pauseButton.dataset[OWNER_KEY] = sourcePath;
+      pauseButton.dataset.employerId = employerId;
+      pauseButton.dataset.label = label.text;
+      const look = nativeLookFrom(target.sample);
+      if (look) {
+        pauseButton.className = "wap-native";
+        Object.assign(pauseButton.style, look.style);
+        const svg = pauseIcon(look.iconSize);
+        svg.style.marginRight = look.iconGap;
+        pauseButton.prepend(svg);
+      } else {
+        pauseButton.className = "wap-own";
+      }
+      if (label.paused) pauseButton.classList.add("wap-paused");
+      let before = target.before;
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id)) before = before.previousElementSibling;
+      target.parent.insertBefore(pauseButton, before);
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS9.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand("KAM-Toolbox: Arbeitgeber-Pause", () => openDialog({ employerId: currentEmployerId() }));
+      } catch {
+      }
+    }
+    let buttonScheduled = false;
+    function scheduleButton(now = false) {
+      if (now) {
+        placeButton();
+        return;
+      }
+      if (buttonScheduled) return;
+      buttonScheduled = true;
+      runtime.setTimeout(() => {
+        buttonScheduled = false;
+        placeButton();
+      }, 250);
+    }
+    function onChange() {
+      scheduleButton();
+      if (currentEmployerId()) loadList().then(() => scheduleButton());
+    }
+    runtime.createMutationObserver(() => scheduleButton()).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", onChange);
+    runtime.addCleanup?.(() => {
+      owned(IDS9.button)?.remove();
+      closeDialog();
+    });
+    onChange();
+  }
+
   // ../../shared/js/om-notes-templates/index.js
   var OM_NOTE_TEMPLATES = [
     { group: "Unterlagen", label: "CV", value: "[CV]" },
@@ -18402,6 +18945,11 @@ ${next}`;
     { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
     { id: "prio-liste", execute: executePrioListe2 },
     { id: "tagesplan", execute: executeTagesplan2 },
+    { id: "arbeitgeber-pause", execute: (runtime) => executeArbeitgeberPause(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      sourcePath: "kam/toolbox/src/features/arbeitgeber-pause/index.js",
+      helpTip: () => kamHelp.tip("arbeitgeber-pause")
+    }) },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
     { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
     { id: "match-mention", execute: executeKamMatchMention },

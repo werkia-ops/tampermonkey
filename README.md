@@ -43,6 +43,7 @@ Enthaltene Funktionen:
 - Erwähnt man im Kommentar-Editor jemanden, der heute vertreten wird, kommt die Vertretung als zweite Erwähnung direkt dahinter. Wer sie wieder löscht, bekommt sie nicht erneut. Ohne Toolbox taggt der n8n-Workflow Vertretungen Erwähnungen per Folgekommentar nach.
 - In Outlook Web: zur geöffneten Mail eines Arbeitgebers der Vorschlag aus dem n8n-Workflow KAM Mail Assistent (Status, Grund, Kommentar mit CEM-Erwähnung, WVL, AG-Notiz). Blauer Knopf unten rechts, jede Aktion einzeln abwählbar, „Übernehmen“ schreibt mit der eigenen Anmeldung.
 - Prio-Liste in Meine Matches: Knopf "Prio-Liste" oben rechts klappt ein Panel mit den heute markierten Arbeitgebern auf. Markieren per Stern vor dem Arbeitgeber oder im Panel, abhaken, Notiz bearbeiten. Um 17:30 ein Fenster zum Tagesabschluss, Offenes wandert auf den nächsten Arbeitstag. Schalter "Prio zuerst" sortiert die Zeilen der Seite. Gespeichert pro Person über Toolbox-Daten, lesbar für die heutige Vertretung.
+- Knopf „AG-Pause“ in Meine Matches und „Pausieren“ in der Leiste des Arbeitgebers: pausiert einen Arbeitgeber (Standort pausiert) samt veröffentlichter Stellen bis zu einem Datum. Am Morgen von „Wieder aktiv ab“ setzt der n8n-Workflow Arbeitgeber Pause beides zurück, pausierende Person und KAM bekommen eine Slack-DM. Verlängern und vorzeitig beenden im selben Dialog.
 
 ## CEM Toolbox
 

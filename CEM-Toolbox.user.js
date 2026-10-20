@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.272
+// @version      1.19.273
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6355,6 +6355,7 @@ ${add}` : add;
         "Nach dem ersten Hover färbt sich der Knopf: grün bis 50 Min, rot mit 💀 über 50 Min bei einer ortsgebundenen Vakanz. 🏠, 🗺️ und 🧳 stehen für Start von Zuhause, landes-/bundesweit und Montage; dort ist die Fahrzeit nur zur Info.",
         "Gerechnet wird wie im Fragebogen. Berechnete Routen bleiben eine Woche im Browser gespeichert.",
         "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet, dann gibt es auch keine Karte.",
+        "Die Karte lässt sich an der Ecke unten rechts größer oder kleiner ziehen. Die Größe bleibt für die nächsten Male gespeichert.",
         "Esc, ein Klick daneben oder Scrollen schließt die Karte."
       ]
     },
@@ -16568,8 +16569,11 @@ Trotzdem speichern?`)) return void 0;
   var BUTTON_CLASS3 = "werkia-cem-match-commute-button";
   var IDS10 = { style: "werkia-cem-match-commute-style", tooltip: "werkia-cem-match-commute-tooltip", popover: "werkia-cem-match-commute-popover" };
   var OWNED_SELECTOR = `.${BUTTON_CLASS3}, #${IDS10.tooltip}, #${IDS10.popover}`;
-  var MAP_WIDTH = 360;
-  var MAP_HEIGHT = 220;
+  var MAP_WIDTH = 560;
+  var MAP_HEIGHT = 340;
+  var POPOVER_PADDING_X = 42;
+  var MIN_POPOVER = { width: 360, height: 380 };
+  var SIZE_STORAGE_KEY = "werkia_cem_match_commute_size_v1";
   var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var MATCH_QUERY3 = `query WerkiaCemMatchCommute($filter: MatchFilter, $perPage: Int) {
   items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
@@ -16606,33 +16610,36 @@ Trotzdem speichern?`)) return void 0;
     };
   }
   var CSS3 = `
-  .${BUTTON_CLASS3} { display:inline-flex; align-items:center; justify-content:center; margin:4px 0 0 6px; width:30px; height:26px; padding:0; border:1px solid #d4d4d8; border-radius:6px; background:#fff; cursor:pointer; font:400 14px/1 ${FONT8}; vertical-align:middle; }
+  .${BUTTON_CLASS3} { display:inline-flex; align-items:center; justify-content:center; margin:4px 0 0 6px; width:40px; height:32px; padding:0; border:1px solid #d4d4d8; border-radius:8px; background:#fff; cursor:pointer; font:400 19px/1 ${FONT8}; vertical-align:middle; }
   .${BUTTON_CLASS3}:hover { border-color:#ef6c00; background:#fff3e8; }
   .${BUTTON_CLASS3}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
   .${BUTTON_CLASS3}[data-level="ok"] { border-color:#8ce99a; background:#ebfbee; }
   .${BUTTON_CLASS3}[data-level="skull"] { border-color:#e03131; background:#ffe3e3; }
   .${BUTTON_CLASS3}[data-level="unknown"] { border-style:dashed; }
-  #${IDS10.tooltip} { position:fixed; z-index:2147483001; max-width:280px; padding:6px 10px; border-radius:6px; background:#18181b; color:#fff; font:550 12px/1.4 ${FONT8}; box-shadow:0 4px 14px rgba(9,9,11,.25); pointer-events:none; white-space:normal; }
-  #${IDS10.tooltip} .mc-sub { display:block; color:#a1a1aa; font-weight:400; }
-  #${IDS10.popover} { position:fixed; z-index:2147483000; width:${MAP_WIDTH + 34}px; box-sizing:border-box; padding:14px 16px 14px; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT8}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
+  #${IDS10.tooltip} { position:fixed; z-index:2147483001; max-width:340px; padding:8px 12px; border-radius:8px; background:#18181b; color:#fff; font:600 14px/1.45 ${FONT8}; box-shadow:0 4px 14px rgba(9,9,11,.25); pointer-events:none; white-space:normal; }
+  #${IDS10.tooltip} .mc-sub { display:block; color:#a1a1aa; font-size:12px; font-weight:400; }
+  #${IDS10.popover} { position:fixed; z-index:2147483000; display:flex; flex-direction:column; width:${MAP_WIDTH + POPOVER_PADDING_X}px; min-width:${MIN_POPOVER.width}px; min-height:${MIN_POPOVER.height}px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); box-sizing:border-box; padding:18px 20px; overflow:hidden; resize:both; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 14px/1.5 ${FONT8}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
   #${IDS10.popover} .mc-head { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding-right:28px; }
-  #${IDS10.popover} h2 { margin:0; font-size:14px; font-weight:600; }
+  #${IDS10.popover} h2 { margin:0; font-size:16px; font-weight:600; }
   #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT8}; }
   #${IDS10.popover} .mc-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS10.popover} .mc-value { font-size:16px; font-weight:700; }
+  #${IDS10.popover} .mc-value { font-size:20px; font-weight:700; }
   #${IDS10.popover} .mc-value.mc-skull { color:#c92a2a; }
-  #${IDS10.popover} .mc-hint { margin:2px 0 10px; color:#52525b; font-size:12px; line-height:1.4; }
-  #${IDS10.popover} .mc-map { position:relative; width:${MAP_WIDTH}px; height:${MAP_HEIGHT}px; overflow:hidden; border:1px solid #e4e4e7; border-radius:8px; background:#f4f4f5; }
+  #${IDS10.popover} .mc-hint { margin:2px 0 12px; color:#52525b; font-size:13px; line-height:1.45; }
+  #${IDS10.popover} > * { flex:0 0 auto; }
+  #${IDS10.popover} > .mc-map { flex:1 1 auto; }
+  #${IDS10.popover} > .mc-google { align-self:flex-start; }
+  #${IDS10.popover} .mc-map { position:relative; height:${MAP_HEIGHT}px; min-height:160px; overflow:hidden; border:1px solid #e4e4e7; border-radius:8px; background:#f4f4f5; }
   #${IDS10.popover} .mc-map img { position:absolute; width:256px; height:256px; max-width:none; user-select:none; }
   #${IDS10.popover} .mc-map svg { position:absolute; inset:0; }
-  #${IDS10.popover} .mc-attr { position:absolute; right:0; bottom:0; padding:1px 5px; background:rgba(255,255,255,.8); color:#52525b; font-size:10px; }
+  #${IDS10.popover} .mc-attr { position:absolute; right:0; bottom:0; padding:1px 6px; background:rgba(255,255,255,.8); color:#52525b; font-size:11px; }
   #${IDS10.popover} .mc-attr a { color:inherit; }
   #${IDS10.popover} .mc-nomap { padding:10px; border:1px dashed #d4d4d8; border-radius:8px; color:#52525b; font-size:12px; }
   #${IDS10.popover} dl { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:10px 0 12px; }
-  #${IDS10.popover} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS10.popover} dd { margin:0; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS10.popover} dt { color:#8b8b94; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:24px; }
+  #${IDS10.popover} dd { margin:0; font-size:14px; line-height:24px; overflow-wrap:anywhere; }
   #${IDS10.popover} .mc-dot { display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; vertical-align:1px; }
-  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:32px; padding:0 14px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:550 13px/1 ${FONT8}; text-decoration:none; }
+  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:38px; padding:0 18px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:600 14px/1 ${FONT8}; text-decoration:none; }
   #${IDS10.popover} .mc-google:hover { background:#b85400; border-color:#b85400; }
   #${IDS10.popover} .mc-muted { color:#8b8b94; }
 `;
@@ -16645,6 +16652,7 @@ Trotzdem speichern?`)) return void 0;
     let syncTimer = null;
     let hoverButton = null;
     let openMatchId = "";
+    let resizeObserver = null;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "") || ROUTES.cemMyCandidates.test(location.hash || "");
     function el4(tag, props = {}, children = []) {
       const element5 = document.createElement(tag);
@@ -16774,37 +16782,61 @@ Trotzdem speichern?`)) return void 0;
       document.getElementById(IDS10.tooltip)?.remove();
     }
     function mapView(entry) {
-      const map = fitStaticMap(entry?.previewCoordinates, { width: MAP_WIDTH, height: MAP_HEIGHT });
-      if (!map) {
+      if (!fitStaticMap(entry?.previewCoordinates)) {
         const reason = entry?.quality === "fallback" ? "Keine Kartenvorschau: Der Routenservice hat nicht geantwortet, die Angabe ist Luftlinie." : "Keine Kartenvorschau verfügbar.";
         return el4("div", { className: "mc-nomap", text: reason });
       }
       const container = el4("div", { className: "mc-map" });
+      container.werkiaEntry = entry;
+      return container;
+    }
+    function drawMap(container) {
+      const width = Math.round(container.clientWidth);
+      const height = Math.round(container.clientHeight);
+      if (!width || !height || container.dataset.size === `${width}x${height}`) return;
+      const map = fitStaticMap(container.werkiaEntry?.previewCoordinates, { width, height, padding: 40 });
+      if (!map) return;
+      container.dataset.size = `${width}x${height}`;
+      const nodes = [];
       for (const tile of map.tiles) {
         const img = el4("img", { src: tile.url, alt: "", draggable: "false", referrerpolicy: "strict-origin-when-cross-origin" });
         img.style.left = `${tile.left}px`;
         img.style.top = `${tile.top}px`;
-        container.append(img);
+        nodes.push(img);
       }
       const svgNs = "http://www.w3.org/2000/svg";
       const svg = document.createElementNS(svgNs, "svg");
-      svg.setAttribute("width", String(MAP_WIDTH));
-      svg.setAttribute("height", String(MAP_HEIGHT));
-      svg.setAttribute("viewBox", `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+      svg.setAttribute("width", String(width));
+      svg.setAttribute("height", String(height));
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
       const points = map.points.map((point) => point.join(",")).join(" ");
       const shape = (tag, attrs) => {
         const node = document.createElementNS(svgNs, tag);
         for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
         svg.append(node);
       };
-      shape("polyline", { points, fill: "none", stroke: "#fff", "stroke-width": 7, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.85 });
-      shape("polyline", { points, fill: "none", stroke: "#1971c2", "stroke-width": 4, "stroke-linecap": "round", "stroke-linejoin": "round" });
+      shape("polyline", { points, fill: "none", stroke: "#fff", "stroke-width": 9, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.85 });
+      shape("polyline", { points, fill: "none", stroke: "#1971c2", "stroke-width": 5, "stroke-linecap": "round", "stroke-linejoin": "round" });
       const [start, end] = [map.points[0], map.points.at(-1)];
-      shape("circle", { cx: start[0], cy: start[1], r: 7, fill: "#2f9e44", stroke: "#fff", "stroke-width": 3 });
-      shape("circle", { cx: end[0], cy: end[1], r: 7, fill: "#e03131", stroke: "#fff", "stroke-width": 3 });
-      container.append(svg);
-      container.append(el4("div", { className: "mc-attr" }, el4("a", { href: "https://www.openstreetmap.org/copyright", target: "_blank", rel: "noopener noreferrer", text: OSM_ATTRIBUTION })));
-      return container;
+      shape("circle", { cx: start[0], cy: start[1], r: 9, fill: "#2f9e44", stroke: "#fff", "stroke-width": 3 });
+      shape("circle", { cx: end[0], cy: end[1], r: 9, fill: "#e03131", stroke: "#fff", "stroke-width": 3 });
+      nodes.push(svg, el4("div", { className: "mc-attr" }, el4("a", { href: "https://www.openstreetmap.org/copyright", target: "_blank", rel: "noopener noreferrer", text: OSM_ATTRIBUTION })));
+      container.replaceChildren(...nodes);
+    }
+    function loadSize() {
+      try {
+        const size = JSON.parse(localStorage.getItem(SIZE_STORAGE_KEY) || "null");
+        return Number(size?.width) > 0 && Number(size?.height) > 0 ? size : null;
+      } catch {
+        return null;
+      }
+    }
+    function saveSize(popover) {
+      if (!popover.style.width || !popover.style.height) return;
+      try {
+        localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify({ width: popover.offsetWidth, height: popover.offsetHeight }));
+      } catch {
+      }
     }
     function renderPopover(popover, result) {
       const head = el4("div", { className: "mc-head" }, [el4("h2", { text: "Distanz zur Vakanz" }), cemHelp.tip("match-commute")]);
@@ -16830,6 +16862,11 @@ Trotzdem speichern?`)) return void 0;
         );
       }
       popover.replaceChildren(close, head, ...body);
+      const map = popover.querySelector(".mc-map");
+      if (map) {
+        if (popover.style.height) map.style.height = "0px";
+        drawMap(map);
+      }
     }
     function openPopover(button2) {
       closePopover();
@@ -16837,7 +16874,26 @@ Trotzdem speichern?`)) return void 0;
       openMatchId = matchId;
       const popover = el4("div", { id: IDS10.popover, role: "dialog", "aria-label": "Distanz zur Vakanz" });
       popover.addEventListener("click", (event) => event.stopPropagation());
+      const size = loadSize();
+      if (size) {
+        popover.style.width = `${Math.max(MIN_POPOVER.width, size.width)}px`;
+        popover.style.height = `${Math.max(MIN_POPOVER.height, size.height)}px`;
+      }
       document.body.appendChild(popover);
+      let resizeTimer = null;
+      resizeObserver = new ResizeObserver(() => {
+        const map = popover.querySelector(".mc-map");
+        if (map && popover.style.height && map.style.height !== "0px") map.style.height = "0px";
+        if (resizeTimer !== null) runtime.clearTimeout(resizeTimer);
+        resizeTimer = runtime.setTimeout(() => {
+          resizeTimer = null;
+          if (!popover.isConnected) return;
+          const current = popover.querySelector(".mc-map");
+          if (current) drawMap(current);
+          saveSize(popover);
+        }, 120);
+      });
+      resizeObserver.observe(popover);
       renderPopover(popover, results.get(matchId) || null);
       place(popover, button2);
       if (!results.has(matchId)) {
@@ -16851,6 +16907,8 @@ Trotzdem speichern?`)) return void 0;
     }
     function closePopover() {
       openMatchId = "";
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       document.getElementById(IDS10.popover)?.remove();
     }
     runtime.addDocumentListener("mousedown", (event) => {

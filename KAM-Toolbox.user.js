@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.17.281
+// @version      1.18.282
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -149,16 +149,16 @@
         already_worked_for_this_organisation: "War schon bei diesem AG"
       });
       var NO_REASON2 = "ohne Grund";
-      function clean6(value) {
+      function clean7(value) {
         return String(value ?? "").replace(/\s+/g, " ").trim();
       }
       function feedbackLabel2(value) {
-        const text = clean6(value);
+        const text = clean7(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(FEEDBACK_LABELS2, text) ? FEEDBACK_LABELS2[text] : text;
       }
       function declineLabel2(value) {
-        const text = clean6(value);
+        const text = clean7(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
       }
@@ -4641,9 +4641,9 @@
     const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
     if (!parsed || typeof parsed !== "object") return emptyStore();
     const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean6 = {};
+    const clean7 = {};
     Object.keys(routes).forEach((route) => {
-      clean6[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+      clean7[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
         id: String(preset.id || createPresetId()),
         name: String(preset.name),
         filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
@@ -4652,7 +4652,7 @@
         perPage: Number.parseInt(preset.perPage, 10) || 0
       }));
     });
-    return { version: STORE_VERSION, routes: clean6 };
+    return { version: STORE_VERSION, routes: clean7 };
   }
   function presetsForRoute(store, route) {
     return store?.routes?.[route] ? [...store.routes[route]] : [];
@@ -6295,7 +6295,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID15 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID16 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -6303,9 +6303,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID15)) return;
+      if (document.getElementById(STYLE_ID16)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID15;
+      style.id = STYLE_ID16;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -6813,6 +6813,23 @@ ${add}` : add;
       notes: [
         "Vakanzen, die den Status schon haben, bleiben unverändert und werden in der Rückfrage mitgezählt.",
         "Nach dem Schließen lädt die Liste neu. Filter und Seite bleiben erhalten."
+      ]
+    },
+    {
+      id: "tags-wvl",
+      title: "KAM WVL in der Tags-Ansicht",
+      page: `${MY_MATCHES} › Tags`,
+      routes: onMyMatches,
+      kind: "write",
+      summary: "In der Tags-Ansicht steht KAM WVL als Datumsfeld wie in der normalen Liste.",
+      steps: [
+        "In der Filterleiste „TAGS“ klicken.",
+        "In der Spalte KAM WVL ein Datum eintragen oder auswählen. Es wird kurz danach gespeichert, darunter steht „Gespeichert“.",
+        "Feld leeren entfernt die KAM WVL."
+      ],
+      notes: [
+        "Erlaubt sind Daten vom Vorjahr bis fünf Jahre voraus.",
+        "Nach dem Schließen der Tags-Ansicht lädt die Liste neu und zeigt das neue Datum."
       ]
     },
     urgentVacancyTopic(),
@@ -7433,8 +7450,16 @@ ${add}` : add;
       const rect = element6.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
+    function isMatchRow(row2) {
+      return row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
+    }
+    function activeScope() {
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR3)].some(isMatchRow));
+      return dialogs.at(-1) || null;
+    }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      const scope = activeScope();
+      return [...(scope || document).querySelectorAll(ROW_SELECTOR3)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
     }
     function shownOnPage(element6) {
       if (!element6.isConnected || element6.closest("[hidden]")) return false;
@@ -7915,7 +7940,11 @@ ${add}` : add;
       }
     }
     function installButton(column, id, label, title, render) {
-      kit.installButton(document.querySelector(`th.column-${column}`), id, label, title, () => {
+      const scope = activeScope();
+      const header = scope ? scope.querySelector(`th.column-${column}`) : [...document.querySelectorAll(`th.column-${column}`)].find((th) => !th.closest('[role="dialog"]'));
+      const existing = document.getElementById(id);
+      if (existing && header && existing.parentNode !== header) header.appendChild(existing);
+      kit.installButton(header || null, id, label, title, () => {
         openWhenListReady(render);
       });
     }
@@ -8326,6 +8355,190 @@ ${add}` : add;
     scheduleContactBadges();
   }
 
+  // src/features/tags-wvl.js
+  var SOURCE_PATH = "kam/toolbox/src/features/tags-wvl.js";
+  var STYLE_ID7 = "werkia-kam-tags-wvl-style";
+  var CELL_ATTR = "data-werkia-tags-wvl";
+  var WRAP_CLASS = "werkia-kam-tags-wvl";
+  var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
+  var SAVE_DELAY_MS = 900;
+  var clean3 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  function germanDateToIso(text) {
+    const match = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(String(text || ""));
+    if (!match) return "";
+    return `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  function isoToGerman(iso) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+    return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+  }
+  function matchIdFromHref4(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function isTagsDialog(element6) {
+    if (!element6) return false;
+    const title = element6.querySelector(".MuiDialogTitle-root, h2");
+    return clean3(title?.textContent) === "Tags" && Boolean(element6.querySelector(WVL_CELL_SELECTOR2));
+  }
+  function tagsDialogs(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog);
+  }
+  function executeTagsWvl(runtime, { getRequest = () => getKamGraphqlAdapter().request } = {}) {
+    runtime.registerSource?.(SOURCE_PATH);
+    const written = /* @__PURE__ */ new Map();
+    let wroteSinceOpen = false;
+    let dialogWasOpen = false;
+    function injectStyle() {
+      if (document.getElementById(STYLE_ID7)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID7;
+      style.textContent = `
+      td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
+      .${WRAP_CLASS} { display: inline-flex; flex-direction: column; gap: 2px; font: 400 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${WRAP_CLASS} input { box-sizing: border-box; width: 150px; padding: 6px 8px; border: 1px solid #c4c4c4; border-radius: 4px; background: #fff; color: #1c1a22; font: 400 14px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${WRAP_CLASS} input:hover { border-color: #1c1a22; }
+      .${WRAP_CLASS} input:focus-visible { outline: 2px solid #1976d2; outline-offset: -1px; }
+      .${WRAP_CLASS} input:disabled { opacity: .6; cursor: wait; }
+      .${WRAP_CLASS} [data-state] { min-height: 15px; font-weight: 600; }
+      .${WRAP_CLASS} [data-state="ok"] { color: #18752b; }
+      .${WRAP_CLASS} [data-state="error"] { color: #b3261e; }
+      .${WRAP_CLASS} [data-state="busy"] { color: #995000; }
+    `;
+      document.head.appendChild(style);
+    }
+    function cellText(cell) {
+      return clean3([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
+    }
+    function currentIso(matchId, cell) {
+      const text = cellText(cell);
+      const own = written.get(matchId);
+      if (own && own.staleText === text) return own.iso;
+      if (own) written.delete(matchId);
+      return germanDateToIso(text);
+    }
+    function setState(wrap2, state, text = "") {
+      const marker = wrap2.querySelector("[data-state]");
+      marker.dataset.state = state;
+      marker.textContent = text;
+    }
+    async function save(wrap2, cell) {
+      const input = wrap2.querySelector("input");
+      const matchId = wrap2.dataset.matchId;
+      const previous = wrap2.dataset.value || "";
+      const { iso, error } = checkFollowUpDate(input.value, { badInput: Boolean(input.validity?.badInput) });
+      if (error) {
+        setState(wrap2, "error", error);
+        return;
+      }
+      const next = iso || "";
+      if (next === previous) {
+        setState(wrap2, "");
+        return;
+      }
+      input.disabled = true;
+      setState(wrap2, "busy", "Speichert …");
+      try {
+        const result = await getRequest()(UPDATE_MATCH_WVL_MUTATION, { id: matchId, kamFollowUpDate: next || null });
+        const saved = result?.data;
+        if (saved?.id !== matchId || (saved.kamFollowUpDate || "") !== next) {
+          throw new Error("Das Adminpanel hat das neue Datum nicht bestätigt");
+        }
+        written.set(matchId, { iso: next, staleText: cellText(cell) });
+        wrap2.dataset.value = next;
+        wroteSinceOpen = true;
+        setState(wrap2, "ok", next ? `Gespeichert: ${isoToGerman(next)}` : "WVL entfernt");
+        runtime.setTimeout(() => {
+          if (wrap2.querySelector('[data-state="ok"]')) setState(wrap2, "");
+        }, 2500);
+      } catch (failure) {
+        input.value = previous;
+        setState(wrap2, "error", `Nicht gespeichert: ${failure.message}`);
+      } finally {
+        input.disabled = false;
+      }
+    }
+    function buildWrap(matchId, cell) {
+      const wrap2 = document.createElement("span");
+      wrap2.className = WRAP_CLASS;
+      wrap2.dataset.matchId = matchId;
+      wrap2.innerHTML = '<input type="date" aria-label="KAM WVL"><span data-state=""></span>';
+      ["click", "mousedown", "mouseup", "pointerdown", "pointerup", "keydown"].forEach((type) => {
+        wrap2.addEventListener(type, (event) => event.stopPropagation());
+      });
+      const input = wrap2.querySelector("input");
+      let timer = null;
+      const flush = () => {
+        if (timer === null) return;
+        runtime.clearTimeout?.(timer);
+        timer = null;
+        save(wrap2, wrap2.parentElement || cell);
+      };
+      input.addEventListener("change", () => {
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        setState(wrap2, "");
+        timer = runtime.setTimeout(() => {
+          timer = null;
+          save(wrap2, wrap2.parentElement || cell);
+        }, SAVE_DELAY_MS);
+      });
+      input.addEventListener("blur", flush);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") flush();
+      });
+      return wrap2;
+    }
+    function installCell(cell) {
+      const row2 = cell.closest("tr");
+      const matchId = matchIdFromHref4(row2?.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+      if (!matchId) return;
+      let wrap2 = cell.querySelector(`:scope > .${WRAP_CLASS}`);
+      if (wrap2 && wrap2.dataset.matchId !== matchId) {
+        wrap2.remove();
+        wrap2 = null;
+      }
+      if (!wrap2) {
+        wrap2 = buildWrap(matchId, cell);
+        cell.setAttribute(CELL_ATTR, "");
+        cell.appendChild(wrap2);
+      }
+      const input = wrap2.querySelector("input");
+      if (input.disabled || document.activeElement === input) return;
+      const value = currentIso(matchId, cell);
+      if (wrap2.dataset.value === value && input.value === value) return;
+      wrap2.dataset.value = value;
+      input.value = value;
+    }
+    function scan() {
+      const dialogs = tagsDialogs();
+      if (dialogs.length) {
+        injectStyle();
+        dialogWasOpen = true;
+        dialogs.forEach((dialog) => dialog.querySelectorAll(`tbody tr ${WVL_CELL_SELECTOR2}`).forEach(installCell));
+        return;
+      }
+      if (dialogWasOpen) {
+        dialogWasOpen = false;
+        if (wroteSinceOpen) {
+          wroteSinceOpen = false;
+          written.clear();
+          reloadAdminPanel();
+        }
+      }
+    }
+    let scheduled = false;
+    const scheduleScan = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        scan();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    scheduleScan();
+  }
+
   // src/features/kam-suite/employer-notes.js
   var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR4 = 'a[href*="#/Employer/"]';
@@ -8430,7 +8643,7 @@ ${add}` : add;
   // src/features/kam-suite/vacancy-city-badges.js
   var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID7 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID8 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage3(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -8461,9 +8674,9 @@ ${add}` : add;
       return [...ids];
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID7)) return;
+      if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID7;
+      style.id = STYLE_ID8;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -8623,9 +8836,9 @@ ${add}` : add;
   // src/features/kam-suite/cem-status-line.js
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID8 = "werkia-kam-cem-line-style";
+  var STYLE_ID9 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH2 = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
@@ -8651,12 +8864,12 @@ ${add}` : add;
       return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
     function matchIdFromRow2(row2) {
-      return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+      return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -8848,8 +9061,8 @@ ${add}` : add;
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean6 = [...new Set(statuses)].filter(Boolean);
-    if (clean6.length) next[field] = clean6;
+    const clean7 = [...new Set(statuses)].filter(Boolean);
+    if (clean7.length) next[field] = clean7;
     else delete next[field];
     return next;
   }
@@ -8862,7 +9075,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID9 = "werkia-match-status-filter-style";
+  var STYLE_ID10 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -8880,9 +9093,9 @@ ${add}` : add;
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage8 = () => route.test(location.hash);
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID9)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -10562,7 +10775,7 @@ ${add}` : add;
 
   // src/features/kam-suite/candidate-file-popup.js
   var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
-  var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
+  var WVL_CELL_SELECTOR3 = "td.column-kamFollowUpDate";
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
   var BULK_DIALOG_ID = "werkia-kam-wvl-bulk-dialog";
@@ -10574,7 +10787,7 @@ ${add}` : add;
     let pendingCandidateId = "";
     let pendingCandidateAt = 0;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR3));
     }
     function visibleOverlay(element6) {
       if (!element6) return false;
@@ -10926,9 +11139,9 @@ ${add}` : add;
   var BANNER_CACHE_MAX_ENTRIES = 300;
   var BANNER_REFRESH_INTERVAL = 30 * 1e3;
   var isBannerCacheEntryExpired = (entry, now = Date.now()) => !entry || typeof entry !== "object" || !(now - Number(entry.time) < BANNER_CACHE_TTL);
-  var clean3 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
+  var clean4 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
   function badgeColor(value) {
-    const v = clean3(value);
+    const v = clean4(value);
     if (!v || v === "-" || v === "–" || v.includes("lädt")) return "#e9ecef";
     if (v.includes("out") || v.includes("absage") || v.includes("abgelehnt") || v.includes("nicht passend") || v.includes("entfernung")) return "#ff6b6b";
     if (v.includes("senden") || v.includes("send") || v.includes("wvl") || v.includes("akzeptiert") || v.includes("terminbestätigung")) return "#d8f5d0";
@@ -11108,10 +11321,10 @@ ${add}` : add;
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
   var ROW_SELECTOR9 = "tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row2) {
-    const link = row2?.querySelector(MATCH_LINK_SELECTOR6);
+    const link = row2?.querySelector(MATCH_LINK_SELECTOR7);
     return link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
   }
   function getEmployerIdFromChatRow(row2) {
@@ -11673,11 +11886,11 @@ ${add}` : add;
   var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
   var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID10 = "werkia-kam-match-actions-style";
+  var STYLE_ID11 = "werkia-kam-match-actions-style";
   var STORE_KEY = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
@@ -11688,7 +11901,7 @@ ${add}` : add;
   function jobPositionIdFromHref(href) {
     return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
   }
-  function matchIdFromHref4(href) {
+  function matchIdFromHref5(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function formatAt(iso) {
@@ -11774,16 +11987,16 @@ ${add}` : add;
     function rowIds(row2) {
       return {
         jobPositionId: jobPositionIdFromHref(row2.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR7)?.href)
+        matchId: matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR8)?.href)
       };
     }
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -11971,7 +12184,7 @@ ${add}` : add;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID10)?.remove();
+      document.getElementById(STYLE_ID11)?.remove();
     });
     scheduleSync();
   }
@@ -12004,7 +12217,7 @@ ${add}` : add;
     return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
   var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref5(href) {
+  function matchIdFromHref6(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
     return UUID_RE2.test(id) ? id : "";
   }
@@ -12084,7 +12297,7 @@ ${add}` : add;
 
   // ../../shared/js/slack-dm/index.js
   var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS = "werkia-slack-dm-button";
   var IDS5 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
@@ -12167,8 +12380,8 @@ ${add}` : add;
     }
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
-      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR8)).find(Boolean);
-      const matchId = matchIdFromHref5(link?.getAttribute("href"));
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR9)).find(Boolean);
+      const matchId = matchIdFromHref6(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function addButtons(row2) {
@@ -15716,14 +15929,14 @@ ${buildCbreBody(current)}`;
   } = KAM_FOCUS_CORE;
 
   // src/features/focus-modes/index.js
-  var SOURCE_PATH = "kam/toolbox/src/features/focus-modes/index.js";
+  var SOURCE_PATH2 = "kam/toolbox/src/features/focus-modes/index.js";
   function executeFocusModes2(runtime, {
     request = (...args) => getKamGraphqlAdapter().request(...args),
     helpTip = () => kamHelp.tip("focus-modes"),
     ...options
   } = {}) {
     executeFocusModes(runtime, {
-      sourcePath: SOURCE_PATH,
+      sourcePath: SOURCE_PATH2,
       core: KAM_FOCUS_CORE,
       builtInModes: BUILT_IN_MODES,
       storageKey: STORAGE_KEY2,
@@ -16844,8 +17057,8 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/vacancy-status/index.js
-  var CELL_ATTR = "data-werkia-vacancy-status";
-  var WRAP_CLASS = "werkia-vacancy-status";
+  var CELL_ATTR2 = "data-werkia-vacancy-status";
+  var WRAP_CLASS2 = "werkia-vacancy-status";
   var STATUS_TONES = {
     Draft: "#6b6775",
     Completed: "#5b4bb7",
@@ -16860,7 +17073,7 @@ ${buildCbreBody(current)}`;
     if (runtime.MutationObserver) return new runtime.MutationObserver(callback);
     return new MutationObserver(callback);
   }
-  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean5 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function executeVacancyStatus(runtime, config) {
     const { sourcePath, getRequest, namespace, runLock = null, lockId = "vacancy-status" } = config;
     const inMatchList = config.placement === "match-list";
@@ -16884,23 +17097,23 @@ ${buildCbreBody(current)}`;
       const style = document.createElement("style");
       style.id = IDS11.style;
       style.textContent = `
-      td[${CELL_ATTR}] { font-size: 0 !important; }
-      td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
-      .${WRAP_CLASS} { display: inline-flex; align-items: center; gap: 4px; font: 400 13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
-      .${WRAP_CLASS} select { --wvs-tone: #6b6775; max-width: 170px; padding: 4px 22px 4px 8px; border: 1px solid #d5d1dd; border-left: 4px solid var(--wvs-tone); border-radius: 6px; background-color: #fff; color: #1c1a22; font: 600 13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor: pointer; }
-      .${WRAP_CLASS} select:hover { border-color: #b6a4ff; border-left-color: var(--wvs-tone); }
-      .${WRAP_CLASS} select:focus-visible { outline: 2px solid #b6a4ff; outline-offset: 1px; }
-      .${WRAP_CLASS} select:disabled { opacity: .6; cursor: wait; }
-      .${WRAP_CLASS}[data-placement="match-list"] { display: flex; margin-top: 4px; }
-      .${WRAP_CLASS} [data-state] { min-width: 14px; font-weight: 700; }
-      .${WRAP_CLASS} [data-state="ok"] { color: #18752b; }
-      .${WRAP_CLASS} [data-state="error"] { color: #b3261e; }
-      .${WRAP_CLASS} [data-state="busy"] { color: #995000; }
+      td[${CELL_ATTR2}] { font-size: 0 !important; }
+      td[${CELL_ATTR2}] > :not(.${WRAP_CLASS2}) { display: none !important; }
+      .${WRAP_CLASS2} { display: inline-flex; align-items: center; gap: 4px; font: 400 13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${WRAP_CLASS2} select { --wvs-tone: #6b6775; max-width: 170px; padding: 4px 22px 4px 8px; border: 1px solid #d5d1dd; border-left: 4px solid var(--wvs-tone); border-radius: 6px; background-color: #fff; color: #1c1a22; font: 600 13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor: pointer; }
+      .${WRAP_CLASS2} select:hover { border-color: #b6a4ff; border-left-color: var(--wvs-tone); }
+      .${WRAP_CLASS2} select:focus-visible { outline: 2px solid #b6a4ff; outline-offset: 1px; }
+      .${WRAP_CLASS2} select:disabled { opacity: .6; cursor: wait; }
+      .${WRAP_CLASS2}[data-placement="match-list"] { display: flex; margin-top: 4px; }
+      .${WRAP_CLASS2} [data-state] { min-width: 14px; font-weight: 700; }
+      .${WRAP_CLASS2} [data-state="ok"] { color: #18752b; }
+      .${WRAP_CLASS2} [data-state="error"] { color: #b3261e; }
+      .${WRAP_CLASS2} [data-state="busy"] { color: #995000; }
     `;
       document.head.appendChild(style);
     }
     function cellText(cell) {
-      return clean4([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
+      return clean5([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS2))).map((node) => node.textContent).join(" "));
     }
     function vacancyIdFromRow(row2) {
       for (const link of row2.querySelectorAll('a[href*="#/JobPosition/"]')) {
@@ -16989,7 +17202,7 @@ ${buildCbreBody(current)}`;
     }
     function buildWrap(entry) {
       const wrap2 = document.createElement("span");
-      wrap2.className = WRAP_CLASS;
+      wrap2.className = WRAP_CLASS2;
       wrap2.dataset.vacancyId = entry.id;
       wrap2.dataset.placement = placement;
       wrap2.innerHTML = '<select aria-label="Vakanz-Status"></select><span data-state=""></span>';
@@ -17029,14 +17242,14 @@ ${buildCbreBody(current)}`;
       return wrap2;
     }
     function installRow(entry) {
-      let wrap2 = entry.cell.querySelector(`:scope > .${WRAP_CLASS}`);
+      let wrap2 = entry.cell.querySelector(`:scope > .${WRAP_CLASS2}`);
       if (wrap2 && wrap2.dataset.vacancyId !== entry.id) {
         wrap2.remove();
         wrap2 = null;
       }
       if (!wrap2) {
         wrap2 = buildWrap(entry);
-        if (!inMatchList) entry.cell.setAttribute(CELL_ATTR, "");
+        if (!inMatchList) entry.cell.setAttribute(CELL_ATTR2, "");
         entry.cell.appendChild(wrap2);
       }
       const select = wrap2.querySelector("select");
@@ -17049,8 +17262,8 @@ ${buildCbreBody(current)}`;
       setTone(select);
     }
     function removeInline() {
-      document.querySelectorAll(`.${WRAP_CLASS}[data-placement="${placement}"]`).forEach((wrap2) => wrap2.remove());
-      if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
+      document.querySelectorAll(`.${WRAP_CLASS2}[data-placement="${placement}"]`).forEach((wrap2) => wrap2.remove());
+      if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR2}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR2));
     }
     const kit = bulk ? createBulkDialogKit({
       ids: { dialog: IDS11.dialog, style: IDS11.dialogStyle, status: IDS11.dialogStatus },
@@ -17061,9 +17274,9 @@ ${buildCbreBody(current)}`;
     function bulkEntries() {
       const seen = /* @__PURE__ */ new Set();
       return visibleRows().filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => {
-        const title = clean4(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
-        const place = clean4(entry.row.querySelector(".column-location\\.name")?.textContent);
-        const employer = clean4(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
+        const title = clean5(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
+        const place = clean5(entry.row.querySelector(".column-location\\.name")?.textContent);
+        const employer = clean5(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
         const status = currentStatus(entry);
         const label = [title, place].filter(Boolean).join(" · ");
         return { ...entry, employer, status, label: `${label.length > 80 ? `${label.slice(0, 79)}…` : label} (${statusLabel(status)})` };
@@ -17174,20 +17387,20 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/vacancy-status.js
-  var SOURCE_PATH2 = "kam/toolbox/src/features/vacancy-status.js";
+  var SOURCE_PATH3 = "kam/toolbox/src/features/vacancy-status.js";
   function isKamMyMatchesRoute(hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(String(hash || ""));
   }
   function executeVacancyStatus2(runtime) {
     const getRequest = () => getKamGraphqlAdapter().request;
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH2,
+      sourcePath: SOURCE_PATH3,
       getRequest,
       namespace: "kam",
       bulk: { team: "KAM", tipHtml: () => kamHelp.tipHtml("vacancy-status-bulk", { tone: "dark" }) }
     });
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH2,
+      sourcePath: SOURCE_PATH3,
       getRequest,
       namespace: "kam-matches",
       placement: "match-list",
@@ -17394,7 +17607,7 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID11 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID12 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -17430,9 +17643,9 @@ ${buildCbreBody(current)}`;
     }
   }
   function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID11)) return;
+    if (doc.getElementById(STYLE_ID12)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID11;
+    style.id = STYLE_ID12;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -17507,7 +17720,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/comment-shortcuts/index.js
   var PREFIX2 = "werkia-shortcuts";
-  var STYLE_ID12 = `${PREFIX2}-style`;
+  var STYLE_ID13 = `${PREFIX2}-style`;
   var BAR_CLASS3 = `${PREFIX2}-bar`;
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
@@ -17584,9 +17797,9 @@ ${buildCbreBody(current)}`;
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
   function ensureStyle5() {
-    if (document.getElementById(STYLE_ID12)) return;
+    if (document.getElementById(STYLE_ID13)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID12;
+    style.id = STYLE_ID13;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -18256,7 +18469,7 @@ ${buildCbreBody(current)}`;
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
   var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
   var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
   var CLOCK_MS = 1e3;
   var tickSlot = (nowMs) => Math.floor(nowMs / TICK_MS2);
@@ -18661,7 +18874,7 @@ ${buildCbreBody(current)}`;
     function decorateRows() {
       if (!isTargetPage8()) return;
       for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
-        const link = row2.querySelector(MATCH_LINK_SELECTOR9);
+        const link = row2.querySelector(MATCH_LINK_SELECTOR10);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
         const cell = row2.querySelector("td.column-buttons") || link.closest("td");
@@ -19555,12 +19768,12 @@ ${buildCbreBody(current)}`;
   function isOpenKamStatus(status) {
     return !CLOSED_KAM_STATUSES.includes(String(status || "").trim().toLowerCase());
   }
-  function clean5(value) {
+  function clean6(value) {
     return String(value ?? "").replace(/\s+/g, " ").trim();
   }
   function openApplicants(matches = [], candidates = [], jobs = []) {
-    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean5([c.firstName, c.lastName].filter(Boolean).join(" "))]));
-    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean5(j.mainTitle)]));
+    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean6([c.firstName, c.lastName].filter(Boolean).join(" "))]));
+    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean6(j.mainTitle)]));
     const seen = /* @__PURE__ */ new Set();
     const list = [];
     for (const match of matches) {
@@ -19644,7 +19857,7 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID13 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID14 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -19678,9 +19891,9 @@ ${buildCbreBody(current)}`;
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
   function ensureStyle6(doc) {
-    if (doc.getElementById(STYLE_ID13)) return;
+    if (doc.getElementById(STYLE_ID14)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID13;
+    style.id = STYLE_ID14;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -20081,7 +20294,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID14 = "werkia-om-notes-template-style";
+  var STYLE_ID15 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -20150,11 +20363,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID14)) {
+    if (document.getElementById(STYLE_ID15)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID14;
+    style.id = STYLE_ID15;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -20388,7 +20601,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID14)?.remove();
+      document.getElementById(STYLE_ID15)?.remove();
     });
     renderToolbar();
   }
@@ -20408,7 +20621,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID15 = "werkia-urgent-vacancy-style";
+      const STYLE_ID16 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -20547,9 +20760,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID15)) return;
+        if (document.getElementById(STYLE_ID16)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID15;
+        style.id = STYLE_ID16;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -20639,6 +20852,7 @@ ${next}`;
     { id: "toolbox-help", execute: executeToolboxHelp },
     { id: "update-check", execute: (runtime) => updateCheck(runtime, { label: "KAM", fileName: "KAM-Toolbox.user.js" }) },
     { id: "kam-suite-bulk-match-actions", execute: executeBulkMatchActions2 },
+    { id: "tags-wvl", execute: executeTagsWvl },
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
     { id: "kam-suite-match-contact-person", execute: executeKamMatchContactPerson },
     { id: "kam-suite-employer-notes", execute: executeKamEmployerNotes },

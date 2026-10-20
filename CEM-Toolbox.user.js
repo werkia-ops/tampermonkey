@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.20.281
+// @version      1.20.282
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -10892,8 +10892,16 @@ ${add}` : add;
       const rect = element5.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
+    function isMatchRow(row2) {
+      return row2.querySelector(MATCH_LINK_SELECTOR5) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
+    }
+    function activeScope() {
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR4)].some(isMatchRow));
+      return dialogs.at(-1) || null;
+    }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR5) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      const scope = activeScope();
+      return [...(scope || document).querySelectorAll(ROW_SELECTOR4)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
     }
     function shownOnPage(element5) {
       if (!element5.isConnected || element5.closest("[hidden]")) return false;
@@ -11374,7 +11382,11 @@ ${add}` : add;
       }
     }
     function installButton(column, id, label2, title, render) {
-      kit.installButton(document.querySelector(`th.column-${column}`), id, label2, title, () => {
+      const scope = activeScope();
+      const header = scope ? scope.querySelector(`th.column-${column}`) : [...document.querySelectorAll(`th.column-${column}`)].find((th) => !th.closest('[role="dialog"]'));
+      const existing = document.getElementById(id);
+      if (existing && header && existing.parentNode !== header) header.appendChild(existing);
+      kit.installButton(header || null, id, label2, title, () => {
         openWhenListReady(render);
       });
     }

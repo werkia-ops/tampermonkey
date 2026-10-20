@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.274
+// @version      1.19.275
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -9042,7 +9042,9 @@ ${add}` : add;
       const style = document.createElement("style");
       style.id = STYLE_ID7;
       style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
-.werkia-cem-vta-origin { margin-left: 6px; padding-left: 6px; border-left: 1px solid rgba(0,0,0,.2); font-size: .75rem; opacity: .7; white-space: nowrap; }`;
+.werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
+.werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.werkia-cem-vta-origin { flex: 0 0 auto; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(0,0,0,.25); font-size: inherit; opacity: .75; white-space: nowrap; }`;
       document.head.appendChild(style);
     }
     function chipText(chip) {
@@ -9052,14 +9054,17 @@ ${add}` : add;
       const label2 = originLabel(interview);
       const host = chip.querySelector(".MuiChip-label") || chip;
       let tag = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
-      if (!label2) tag?.remove();
-      else if (!tag || tag.textContent !== label2) {
+      if (!label2) {
+        tag?.remove();
+        host.classList.remove("werkia-cem-vta-host");
+      } else if (!tag || tag.textContent !== label2) {
         tag?.remove();
         tag = document.createElement("span");
         tag.className = "werkia-cem-vta-origin";
         tag.setAttribute(ORIGIN_ATTRIBUTE, "");
         tag.title = label2 === "AG" ? "Termine vom Arbeitgeber (KAM-VTA)" : "Termine vom Kandidaten (CEM-VTA)";
         tag.textContent = label2;
+        host.classList.add("werkia-cem-vta-host");
         host.appendChild(tag);
       }
       if (needsBorder(interview)) chip.setAttribute(MARK2, "");

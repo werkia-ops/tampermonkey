@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.285
+// @version      1.19.297
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12156,28 +12156,8 @@ ${add}` : add;
     return index;
   }
 
-  // src/features/kam-suite/match-slack-actions.js
-  var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
-  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
-  var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
-  var BAR_CLASS2 = "werkia-kam-match-actions";
-  var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
-  var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID12 = "werkia-kam-match-actions-style";
-  var STORE_KEY2 = "werkia_kam_match_actions_v1";
-  var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
-  var PENDING_POLL_MS = 8e3;
+  // src/features/kam-suite/match-slack-actions-core.js
   var PENDING_TIMEOUT_MS = 20 * 60 * 1e3;
-  function isTargetPage8(hash = location.hash) {
-    return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
-  }
-  function jobPositionIdFromHref(href) {
-    return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-  }
-  function matchIdFromHref5(href) {
-    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
-  }
   function formatAt(iso) {
     return new Date(iso).toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
   }
@@ -12212,6 +12192,28 @@ ${add}` : add;
     return `Für diese Vakanz wurde am ${formatAt(sentAt)} schon ein Push Request gesendet. Trotzdem erneut senden?`;
   }
   var STOP_URGENT_CONFIRM_TEXT = 'Dringende Suche für diese Vakanz beenden? Der Bot postet "nicht dringend" im Dringend-Channel und entfernt den Tag.';
+
+  // src/features/kam-suite/match-slack-actions.js
+  var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
+  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var BAR_CLASS2 = "werkia-kam-match-actions";
+  var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
+  var INTERVIEW_CELL_SELECTOR = "td.column-interview";
+  var STYLE_ID12 = "werkia-kam-match-actions-style";
+  var STORE_KEY2 = "werkia_kam_match_actions_v1";
+  var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
+  var PENDING_POLL_MS = 8e3;
+  function isTargetPage8(hash = location.hash) {
+    return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
+  }
+  function jobPositionIdFromHref(href) {
+    return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+  }
+  function matchIdFromHref5(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
   function gmPost(url, payload) {
     return new Promise((resolve, reject) => GM_xmlhttpRequest({
       method: "POST",

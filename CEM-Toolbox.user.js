@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.276
+// @version      1.20.281
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -107,6 +107,77 @@
         exports2.addUniqueNumber = addUniqueNumber;
         exports2.generateUniqueNumber = generateUniqueNumber3;
       });
+    }
+  });
+
+  // ../../shared/js/out-gruende/labels.cjs
+  var require_labels = __commonJS({
+    "../../shared/js/out-gruende/labels.cjs"(exports, module) {
+      var FEEDBACK_LABELS2 = Object.freeze({
+        candidate_not_responsive: "BEW nicht responsive",
+        candidate_not_interested_in_employer: "BEW hat kein Interesse am AG",
+        employer_not_interested_in_candidate: "AG hat kein Interesse am BEW",
+        stays_with_current_employer: "BEW bleibt beim aktuellen AG",
+        found_privately: "Privat etwas gefunden",
+        hired_by_partner: "Hired bei Partner",
+        distance_too_far: "Entfernung zu weit",
+        technical_error: "Technischer Fehler",
+        candidate_known: "BEW bereits bekannt",
+        // nur KAM
+        willing_to_travel: "Montagebereitschaft",
+        conditions: "Konditionen",
+        experience: "Erfahrung",
+        applicant_not_responsive: "BEW nicht responsive",
+        position_filled: "Stelle besetzt",
+        qualification: "Qualifikation",
+        // nur CEM
+        salary_too_low: "Gehalt zu gering",
+        desired_position_not_available: "Wunschposition nicht verfügbar"
+      });
+      var DECLINE_LABELS2 = Object.freeze({
+        no_matching_qualifications: "Qualifikation passt nicht",
+        salary_too_low: "Gehalt zu gering",
+        distance_too_far: "Entfernung zu weit",
+        not_looking_for_a_job: "Sucht gerade keinen Job",
+        do_not_want_any_further_invitations: "Möchte keine weiteren Einladungen",
+        shifts_is_not_possible: "Schichtarbeit nicht möglich",
+        few_career_opportunities: "Wenig Aufstiegschancen",
+        already_worked_for_this_organisation: "War schon bei diesem AG"
+      });
+      var NO_REASON2 = "ohne Grund";
+      function clean4(value) {
+        return String(value ?? "").replace(/\s+/g, " ").trim();
+      }
+      function feedbackLabel2(value) {
+        const text = clean4(value);
+        if (!text) return "";
+        return Object.prototype.hasOwnProperty.call(FEEDBACK_LABELS2, text) ? FEEDBACK_LABELS2[text] : text;
+      }
+      function declineLabel2(value) {
+        const text = clean4(value);
+        if (!text) return "";
+        return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
+      }
+      function declineText2(values) {
+        const list = Array.isArray(values) ? values : [];
+        const seen = /* @__PURE__ */ new Set();
+        const out = [];
+        for (const value of list) {
+          const label2 = declineLabel2(value);
+          if (!/[\p{L}\p{N}]/u.test(label2) || seen.has(label2)) continue;
+          seen.add(label2);
+          out.push(label2);
+        }
+        return out.join(", ");
+      }
+      function outReason2({ feedback, declineFeedbacks } = {}) {
+        const label2 = feedbackLabel2(feedback);
+        if (label2) return label2;
+        const decline = declineText2(declineFeedbacks);
+        if (decline) return `Absage in der App: ${decline}`;
+        return NO_REASON2;
+      }
+      module.exports = { FEEDBACK_LABELS: FEEDBACK_LABELS2, DECLINE_LABELS: DECLINE_LABELS2, NO_REASON: NO_REASON2, feedbackLabel: feedbackLabel2, declineLabel: declineLabel2, declineText: declineText2, outReason: outReason2 };
     }
   });
 
@@ -6176,6 +6247,254 @@ ${add}` : add;
     onHashChange();
   }
 
+  // ../../shared/js/out-gruende/core.js
+  var import_labels = __toESM(require_labels(), 1);
+  var { FEEDBACK_LABELS, DECLINE_LABELS, NO_REASON, feedbackLabel, declineLabel, declineText, outReason } = import_labels.default;
+  var SIDE_LABELS = Object.freeze({ kam: "KAM-Out", cem: "CEM-Out" });
+  var OUT_REASONS_QUERY = `query outGruende($page: Int, $perPage: Int, $filter: MatchFilter) {
+  items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
+    id
+    kamStatus
+    kamFeedback
+    cemStatus
+    cemFeedback
+    connectionStatus
+    declineFeedbacks
+    __typename
+  }
+}`;
+  function getMatchId(href) {
+    return String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+  }
+  function outEntries(match, sides = ["kam", "cem"]) {
+    if (!match) return [];
+    const out = [];
+    for (const side of sides) {
+      if (side === "kam" && match.kamStatus === "out") {
+        out.push({ side, label: SIDE_LABELS.kam, reason: outReason({ feedback: match.kamFeedback }) });
+      }
+      if (side === "cem" && match.cemStatus === "out") {
+        const declineFeedbacks = match.connectionStatus === "declined" ? match.declineFeedbacks : [];
+        out.push({ side, label: SIDE_LABELS.cem, reason: outReason({ feedback: match.cemFeedback, declineFeedbacks }) });
+      }
+    }
+    return out;
+  }
+  function entriesKey(entries) {
+    return entries.map((entry) => `${entry.side}:${entry.reason}`).join("|");
+  }
+  function chunks(values, size) {
+    const result = [];
+    for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
+    return result;
+  }
+
+  // ../../shared/js/out-gruende/index.js
+  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var BATCH_SIZE2 = 25;
+  var CACHE_TTL_MS = 5 * 60 * 1e3;
+  var STATUS_CHANGE_DELAY_MS = 2e3;
+  function outGruendeTopic({ page, routes, statusName, id = "out-gruende" }) {
+    return {
+      id,
+      title: "Out-Grund neben dem Status",
+      page,
+      routes,
+      kind: "view",
+      summary: `Steht ein Match auf Out, steht klein unter dem ${statusName} der Grund, z. B. „KAM-Out: BEW bereits bekannt“ oder „CEM-Out: Entfernung zu weit“.`,
+      notes: [
+        "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
+        "Absagen aus der Kandidaten-App stehen als „Absage in der App: …“.",
+        "Bei jedem neuen Out schreibt zusätzlich der n8n-Workflow „Out-Gründe“ den Grund als Matchkommentar."
+      ]
+    };
+  }
+  function selectText(cell) {
+    return String(cell?.querySelector(".MuiSelect-select")?.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  function executeOutGruende(runtime, options = {}) {
+    const namespace = options.namespace || "werkia";
+    const views = options.views || [];
+    if (options.sourcePath) runtime.registerSource(options.sourcePath);
+    const LINE_CLASS = `werkia-${namespace}-out-grund`;
+    const STYLE_ID14 = `werkia-${namespace}-out-grund-style`;
+    const cache = /* @__PURE__ */ new Map();
+    const failed = /* @__PURE__ */ new Set();
+    const lastStatus = /* @__PURE__ */ new Map();
+    let loadPromise = null;
+    let reloadQueued = false;
+    const currentView = () => views.find((view) => view.route.test(location.hash || ""));
+    function ensureStyle4() {
+      if (document.getElementById(STYLE_ID14)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID14;
+      style.textContent = `
+      .${LINE_CLASS} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
+      .${LINE_CLASS}__label { font-weight: 600; color: #b42318; }
+      .${LINE_CLASS}-inline { font-size: 0.7rem; color: #b42318; font-weight: 600; }
+    `;
+      document.head.appendChild(style);
+    }
+    function rows(view) {
+      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(view.cellSelector));
+    }
+    function fresh(matchId) {
+      const entry = cache.get(matchId);
+      return entry && Date.now() - entry.at < CACHE_TTL_MS;
+    }
+    function entriesFor(view, cell, match) {
+      const own = view.sides[0];
+      const text = selectText(cell);
+      return outEntries(match, view.sides).filter((entry) => entry.side !== own || !text || text === "Out");
+    }
+    function placeLine(cell, line) {
+      const anchor = [...cell.children].find((child) => child !== line && child.querySelector?.(".MuiSelect-select, .MuiInputBase-root"));
+      if (anchor) {
+        if (anchor.nextSibling !== line) anchor.after(line);
+      } else if (line.parentNode !== cell) {
+        cell.appendChild(line);
+      }
+    }
+    function inlineTarget(view, row2) {
+      const inline = view.inline;
+      if (!inline) return null;
+      const cell = row2.querySelector(inline.cellSelector);
+      if (!cell) return null;
+      return [...cell.querySelectorAll("*")].find((node) => !node.classList.contains(`${LINE_CLASS}-inline`) && inline.pattern.test(String(node.firstChild?.textContent || node.textContent || "").trim()) && ![...node.children].some((child) => !child.classList.contains(`${LINE_CLASS}-inline`) && inline.pattern.test(child.textContent || ""))) || null;
+    }
+    function renderInline(view, row2, entries) {
+      const target = inlineTarget(view, row2);
+      const entry = entries.find((item) => item.side === view.inline?.side);
+      const existing = row2.querySelector(`.${LINE_CLASS}-inline`);
+      if (!target || !entry) {
+        existing?.remove();
+        return entries;
+      }
+      const text = ` (${entry.reason})`;
+      if (existing && existing.parentNode === target) {
+        if (existing.textContent !== text) existing.textContent = text;
+      } else {
+        existing?.remove();
+        const span = document.createElement("span");
+        span.className = `${LINE_CLASS}-inline`;
+        span.title = `${entry.label}: ${entry.reason}`;
+        span.textContent = text;
+        target.appendChild(span);
+      }
+      return entries.filter((item) => item !== entry);
+    }
+    function render() {
+      const view = currentView();
+      if (!view) return;
+      for (const row2 of rows(view)) {
+        const cell = row2.querySelector(view.cellSelector);
+        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+        let line = cell.querySelector(`.${LINE_CLASS}`);
+        const match = matchId ? cache.get(matchId)?.match : null;
+        const entries = renderInline(view, row2, match ? entriesFor(view, cell, match) : []);
+        if (!entries.length) {
+          line?.remove();
+          continue;
+        }
+        const key = `${matchId}|${entriesKey(entries)}`;
+        if (!line) {
+          line = document.createElement("div");
+          line.className = LINE_CLASS;
+        }
+        placeLine(cell, line);
+        if (line.dataset.key === key) continue;
+        line.dataset.key = key;
+        line.replaceChildren(...entries.map((entry) => {
+          const item = document.createElement("span");
+          const label2 = document.createElement("span");
+          label2.className = `${LINE_CLASS}__label`;
+          label2.textContent = `${entry.label}:`;
+          item.append(label2, ` ${entry.reason}`);
+          item.title = `${entry.label}: ${entry.reason}`;
+          return item;
+        }));
+      }
+    }
+    function trackStatusChanges(view) {
+      let changed = false;
+      for (const row2 of rows(view)) {
+        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+        if (!matchId) continue;
+        const text = selectText(row2.querySelector(view.cellSelector));
+        const before = lastStatus.get(matchId);
+        lastStatus.set(matchId, text);
+        if (before !== void 0 && before !== text) {
+          cache.delete(matchId);
+          failed.delete(matchId);
+          changed = true;
+        }
+      }
+      if (changed && !reloadQueued) {
+        reloadQueued = true;
+        runtime.setTimeout(() => {
+          reloadQueued = false;
+          load2().catch((error) => console.warn("[Werkia Out-Gründe]", error));
+        }, STATUS_CHANGE_DELAY_MS);
+      }
+      return changed;
+    }
+    async function load2({ force = false } = {}) {
+      if (loadPromise) return loadPromise;
+      const view = currentView();
+      if (!view) return;
+      const ids = [...new Set(rows(view).map((row2) => getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"))).filter(Boolean))].filter((id) => force || !fresh(id) && !failed.has(id));
+      if (!ids.length) return;
+      loadPromise = (async () => {
+        const request = options.getGraphqlAdapter().request;
+        for (const batch of chunks(ids, BATCH_SIZE2)) {
+          try {
+            const result = await request(OUT_REASONS_QUERY, { filter: { ids: batch }, page: 0, perPage: batch.length });
+            const byId2 = new Map((result?.items || []).filter((item) => item?.id).map((item) => [item.id, item]));
+            for (const id of batch) {
+              if (byId2.has(id)) {
+                cache.set(id, { match: byId2.get(id), at: Date.now() });
+                failed.delete(id);
+              } else if (!cache.has(id)) {
+                failed.add(id);
+              }
+            }
+          } catch (error) {
+            for (const id of batch) if (!cache.has(id)) failed.add(id);
+            console.warn("[Werkia Out-Gründe]", error);
+          }
+        }
+      })();
+      try {
+        await loadPromise;
+      } finally {
+        loadPromise = null;
+        render();
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        const view = currentView();
+        if (!view) return;
+        ensureStyle4();
+        const changed = trackStatusChanges(view);
+        render();
+        if (!changed) load2().catch((error) => console.warn("[Werkia Out-Gründe]", error));
+      }, 150);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.setInterval?.(() => {
+      if (currentView()) load2({ force: true }).catch((error) => console.warn("[Werkia Out-Gründe]", error));
+    }, CACHE_TTL_MS);
+    schedule();
+    return { load: load2, render };
+  }
+
   // src/help.js
   var onPotentialMatches = [ROUTES.potentialMatches];
   var MY_MATCHES = "CEM › Meine Matches";
@@ -6423,7 +6742,8 @@ ${add}` : add;
     matchMentionTopic({ kind: "kam", page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     matchContactPersonTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     employerCommentsReadTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
-    omQuestionnaireColumnTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages })
+    omQuestionnaireColumnTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
+    outGruendeTopic({ page: MY_MATCHES, routes: onMyMatches, statusName: "CEM Status" })
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -6907,7 +7227,7 @@ ${add}` : add;
   var MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
   var MATCH_PRESENT_OLD_ROW_CLASS = "werkia-cem-old-match-present-row";
   var MATCH_PRESENT_STYLE_ID = "werkia-cem-match-present-style";
-  var CACHE_TTL_MS = 30 * 60 * 1e3;
+  var CACHE_TTL_MS2 = 30 * 60 * 1e3;
   var MATCH_HIGHLIGHT_DAYS = 90;
   var POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   function getResourceIdFromRow(row2, resource) {
@@ -7018,7 +7338,7 @@ ${add}` : add;
       }
       return cached.status;
     }
-    const cacheStatus = (key, status2, ttl = CACHE_TTL_MS) => statusCache.set(key, { status: status2, expiresAt: Date.now() + ttl });
+    const cacheStatus = (key, status2, ttl = CACHE_TTL_MS2) => statusCache.set(key, { status: status2, expiresAt: Date.now() + ttl });
     function cachedSentEmployers(key) {
       const cached = sentEmployerCache.get(key);
       if (!cached) return void 0;
@@ -7031,7 +7351,7 @@ ${add}` : add;
     function loadSentEmployers(key, candidateId, load2) {
       if (sentEmployerLoads.has(key)) return sentEmployerLoads.get(key);
       const promise = load2().then((value) => {
-        sentEmployerCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+        sentEmployerCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS2 });
         if (isPotentialMatchesPage() && getCandidateIdFromRoute() === candidateId) renderRows();
         return value;
       }).catch((error) => console.warn("[CEM Match] Gesendete Matches konnten nicht geladen werden:", error)).finally(() => sentEmployerLoads.delete(key));
@@ -7065,7 +7385,7 @@ ${add}` : add;
         } catch (error) {
           console.warn("[CEM Match] KAM-Status konnte nicht geladen werden:", error);
         }
-        cacheStatus(task.key, statuses || null, statuses ? CACHE_TTL_MS : 15 * 1e3);
+        cacheStatus(task.key, statuses || null, statuses ? CACHE_TTL_MS2 : 15 * 1e3);
         tasks.delete(task.key);
         if (isPotentialMatchesPage()) renderRows();
       });
@@ -7258,8 +7578,8 @@ ${add}` : add;
       if (style.display === "none" || style.visibility === "hidden" || rect.width <= 0 || rect.height <= 0) return false;
       const text = dialog.innerText || dialog.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
-      return labels.has("Kandidat") && labels.has("Job") && QUESTIONNAIRE_LABELS.filter((label2) => labels.has(label2)).length >= 3;
+      const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
+      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS.filter((label2) => labels2.has(label2)).length >= 3;
     }) || null;
     function removePanel() {
       document.getElementById(PANEL_ID)?.remove();
@@ -7642,15 +7962,15 @@ ${add}` : add;
       const field = found[last ? found.length - 1 : 0];
       return field ? [...field.querySelectorAll("span.MuiTypography-body2")].find((element5) => element5.innerText?.trim()) || null : null;
     };
-    const anyValue = (dialog, labels, last = false) => labels.map((fieldName) => value(dialog, fieldName, last)).find(Boolean) || null;
+    const anyValue = (dialog, labels2, last = false) => labels2.map((fieldName) => value(dialog, fieldName, last)).find(Boolean) || null;
     const allowEmpty = (dialog, fieldName) => fields(dialog, fieldName)[0]?.querySelector("span.MuiTypography-body2") || fields(dialog, fieldName)[0] || null;
     const positionValues = (dialog, fieldName) => fields(dialog, fieldName)[0] ? [...fields(dialog, fieldName)[0].querySelectorAll("span.MuiTypography-body2")].filter((element5) => element5.innerText?.trim() && clean3(element5.innerText) !== "berufsausbildung") : [];
     const dialogIsQuestionnaire = (dialog) => {
       if (!dialog || /Matchkommentare|Kandidat Dateien/i.test(dialog.innerText || dialog.textContent || "")) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, span.ra-field p, div.ra-field p span, div.ra-field p, div.MuiStack-root p span, div.MuiStack-root p")].map((element5) => label(element5.innerText || element5.textContent)));
-      const hasCandidateHeader = [...labels].some((value2) => value2 === "kandidat" || value2.startsWith("kandidat "));
-      const hasJobHeader = [...labels].some((value2) => value2 === "job" || value2.startsWith("job "));
-      return hasCandidateHeader && hasJobHeader && QUESTIONNAIRE_LABELS2.filter((fieldName) => labels.has(label(fieldName))).length >= 3;
+      const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, span.ra-field p, div.ra-field p span, div.ra-field p, div.MuiStack-root p span, div.MuiStack-root p")].map((element5) => label(element5.innerText || element5.textContent)));
+      const hasCandidateHeader = [...labels2].some((value2) => value2 === "kandidat" || value2.startsWith("kandidat "));
+      const hasJobHeader = [...labels2].some((value2) => value2 === "job" || value2.startsWith("job "));
+      return hasCandidateHeader && hasJobHeader && QUESTIONNAIRE_LABELS2.filter((fieldName) => labels2.has(label(fieldName))).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && dialogIsQuestionnaire(dialog)) || null;
     const mark = (element5, color, title = "") => {
@@ -8478,8 +8798,8 @@ ${add}` : add;
     const isQuestionnaireDialog = (dialog) => {
       const text = dialog?.innerText || dialog?.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
-      return labels.has("Kandidat") && labels.has("Job") && QUESTIONNAIRE_LABELS3.filter((label2) => labels.has(label2)).length >= 3;
+      const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
+      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS3.filter((label2) => labels2.has(label2)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog(dialog)) || null;
     function previewSvg(coordinates, candidateAddress, jobPositionAddress) {
@@ -8651,7 +8971,7 @@ ${add}` : add;
   var REVERSE_MATCHES_ROUTE = /^#\/OnlineMatches\/ReverseMatches(?:\?|$)/i;
   var OM_MATCHES_ROUTE = /^#\/OnlineMatches\/(?:AllMatches|MyMatches)(?:[/?]|$)/i;
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
-  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
   function isInViewport(row2) {
     const rect = row2.getBoundingClientRect();
@@ -8693,7 +9013,7 @@ ${add}` : add;
       matches: (hash) => POTENTIAL_MATCHES_ROUTE5.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute2();
-        return [...document.querySelectorAll(ROW_SELECTOR2)].map((row2) => ({
+        return [...document.querySelectorAll(ROW_SELECTOR3)].map((row2) => ({
           row: row2,
           candidateId,
           jobId: getJobIdFromRow(row2),
@@ -8707,7 +9027,7 @@ ${add}` : add;
       matches: (hash) => OM_MATCHES_ROUTE.test(hash),
       collect() {
         const items = [];
-        for (const row2 of document.querySelectorAll(ROW_SELECTOR2)) {
+        for (const row2 of document.querySelectorAll(ROW_SELECTOR3)) {
           const link = getJobLinkFromRow(row2);
           if (!link || link.closest("tr") !== row2) continue;
           items.push({ row: row2, candidateId: getCandidateIdFromOmMatchRow(row2), jobId: getJobIdFromRow(row2), host: () => link.closest("td") || row2 });
@@ -9652,7 +9972,7 @@ ${add}` : add;
   // ../../shared/js/offline-match-bulk/index.js
   var CANDIDATE_POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
   var CREATE_OFFLINE_MATCH_ROUTE = /^#\/CreateOfflineMatch(?:[/?]|$)/i;
-  var MATCH_LINK_SELECTOR3 = 'a[aria-label="Offline Match erstellen"], a[href*="CreateOfflineMatch"]';
+  var MATCH_LINK_SELECTOR4 = 'a[aria-label="Offline Match erstellen"], a[href*="CreateOfflineMatch"]';
   var BULK_CHECKBOX_CLASS = "werkia-bulk-ofm-checkbox";
   var CANDIDATE_STATUS_ID = "werkia-bulk-ofm-candidate-status";
   var FORM_CONTROLS_ID = "werkia-bulk-ofm-form-controls";
@@ -9789,7 +10109,7 @@ ${add}` : add;
     header.appendChild(tip);
   }
   function addCandidateCheckboxes(selectedMatches) {
-    document.querySelectorAll(MATCH_LINK_SELECTOR3).forEach((link) => {
+    document.querySelectorAll(MATCH_LINK_SELECTOR4).forEach((link) => {
       const match = selectedMatchFromLink(link);
       if (!match) return;
       const key = matchSelectionKey(match);
@@ -9935,7 +10255,7 @@ ${add}` : add;
         currentCandidateId = candidateId;
         selectedMatches.clear();
       }
-      if (document.querySelector(MATCH_LINK_SELECTOR3)) {
+      if (document.querySelector(MATCH_LINK_SELECTOR4)) {
         ensureStyles();
         addCandidateCheckboxes(selectedMatches);
         if (helpTip) addHeaderHelpTip(helpTip);
@@ -9955,7 +10275,7 @@ ${add}` : add;
       runtime.setTimeout(refresh, 100);
     };
     runtime.addDocumentListener("click", (event) => {
-      const link = event.target.closest?.(MATCH_LINK_SELECTOR3);
+      const link = event.target.closest?.(MATCH_LINK_SELECTOR4);
       if (!link) return;
       const clickedMatch = selectedMatchFromLink(link);
       if (!clickedMatch) {
@@ -10516,11 +10836,11 @@ ${add}` : add;
   }
 
   // ../../shared/js/bulk-match-actions/index.js
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR2 = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR2 = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
@@ -10573,7 +10893,7 @@ ${add}` : add;
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR5) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element5) {
       if (!element5.isConnected || element5.closest("[hidden]")) return false;
@@ -10605,7 +10925,7 @@ ${add}` : add;
       return label2.length > 90 ? `${label2.slice(0, 89)}…` : label2;
     }
     function matchIdFromRow2(row2) {
-      const link = row2.querySelector(MATCH_LINK_SELECTOR4);
+      const link = row2.querySelector(MATCH_LINK_SELECTOR5);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
@@ -11158,7 +11478,7 @@ ${add}` : add;
     style: "werkia-cem-candidate-bulk-style",
     status: "werkia-cem-candidate-bulk-status"
   };
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
   var CANDIDATE_STATUS_OPTIONS = [
     { value: "onboarding", label: "Onboarding" },
@@ -11206,7 +11526,7 @@ ${add}` : add;
     const normalize7 = (value) => String(value || "").replace(/\s+/g, " ").trim();
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
+      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
         const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR3}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
         return id ? { id, name: normalize7(link.textContent) || id } : null;
@@ -11703,14 +12023,14 @@ ${add}` : add;
       else row2.appendChild(cell);
     });
   }
-  function visibleColumns(root, labels = {}) {
+  function visibleColumns(root, labels2 = {}) {
     const head = root.querySelector("table thead tr");
     if (!head) return [];
     return [...head.children].map((cell) => {
       const name = columnOf(cell).replace(/^column-/, "");
       if (!name || name === "buttons") return null;
       const text = (cell.textContent || "").replace(/\s+/g, " ").trim();
-      return { value: name, label: labels[name] || text || name };
+      return { value: name, label: labels2[name] || text || name };
     }).filter(Boolean);
   }
 
@@ -12148,7 +12468,7 @@ ${add}` : add;
   var STYLE_ID9 = "werkia-cem-focus-candidates-style";
   var INFO_ID = "werkia-cem-focus-candidates-info";
   var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
-  var CACHE_TTL_MS2 = 5 * 60 * 1e3;
+  var CACHE_TTL_MS3 = 5 * 60 * 1e3;
   var OPEN_CEM_STATUSES = [
     "onboarding",
     "confirm_appointment",
@@ -12233,7 +12553,7 @@ ${add}` : add;
     }
     const fresh = (key) => {
       const entry = known.get(key);
-      return entry && Date.now() - entry.at < CACHE_TTL_MS2 ? entry : null;
+      return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
     };
     async function load2(ids, contacts) {
       loading = (async () => {
@@ -12406,7 +12726,7 @@ ${add}` : add;
     const id = String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
     return UUID_RE2.test(id) ? id.toLowerCase() : "";
   }
-  function chunks(ids, size = MAX_IDS) {
+  function chunks2(ids, size = MAX_IDS) {
     const out = [];
     for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
     return out;
@@ -12520,8 +12840,8 @@ ${add}` : add;
   }
 
   // ../../shared/js/match-status-filter/core.js
-  function optionsFromLabels(labels) {
-    return Object.entries(labels || {}).map(([value, label2]) => ({ value, label: label2 }));
+  function optionsFromLabels(labels2) {
+    return Object.entries(labels2 || {}).map(([value, label2]) => ({ value, label: label2 }));
   }
   function statusTone(value) {
     if (value === "out") return "error";
@@ -12666,10 +12986,10 @@ ${add}` : add;
   var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
   var STYLE_ID11 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var CANDIDATE_LINK_SELECTOR5 = 'a[href*="#/Candidate/"]';
-  var CACHE_TTL_MS3 = 5 * 60 * 1e3;
-  var BATCH_SIZE2 = 25;
+  var CACHE_TTL_MS4 = 5 * 60 * 1e3;
+  var BATCH_SIZE3 = 25;
   var OPTIONS = optionsFromLabels(KAM_STATUS_LABELS);
   var MATCH_KAM_STATUS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
   items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
@@ -12721,7 +13041,7 @@ ${add}` : add;
       document.head.appendChild(style);
     }
     function matchRows(table) {
-      return [...table.querySelectorAll(MATCH_ROW_SELECTOR)].filter((row2) => row2.closest("table") === table && row2.querySelector(MATCH_LINK_SELECTOR5));
+      return [...table.querySelectorAll(MATCH_ROW_SELECTOR)].filter((row2) => row2.closest("table") === table && row2.querySelector(MATCH_LINK_SELECTOR6));
     }
     function expandedTables() {
       return [...document.querySelectorAll("tr table")].filter((table) => matchRows(table).length);
@@ -12737,10 +13057,10 @@ ${add}` : add;
       return forms.find((form) => form.classList.contains("RaFilterForm-root")) || forms[0] || null;
     }
     const tableByBar = /* @__PURE__ */ new WeakMap();
-    const rowMatchId = (row2) => matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+    const rowMatchId = (row2) => matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
     function freshStatus(matchId) {
       const entry = statusCache.get(matchId);
-      return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
+      return entry && Date.now() - entry.at < CACHE_TTL_MS4 ? entry : null;
     }
     async function loadStatuses(matchIds, { force = false } = {}) {
       if (loading) await loading;
@@ -12748,8 +13068,8 @@ ${add}` : add;
       if (!ids.length) return;
       loading = (async () => {
         const { request } = getCemGraphqlAdapter();
-        for (let index = 0; index < ids.length; index += BATCH_SIZE2) {
-          const batch = ids.slice(index, index + BATCH_SIZE2);
+        for (let index = 0; index < ids.length; index += BATCH_SIZE3) {
+          const batch = ids.slice(index, index + BATCH_SIZE3);
           try {
             const result = await request(MATCH_KAM_STATUS_QUERY, { filter: { ids: batch }, page: 0, perPage: batch.length });
             const now = Date.now();
@@ -13571,7 +13891,7 @@ ${add}` : add;
     };
     async function loadStatus(ids) {
       loading = (async () => {
-        for (const part of chunks(ids)) {
+        for (const part of chunks2(ids)) {
           const data = await call({ action: "status", candidateIds: part });
           const at = Date.now();
           (data.kandidaten || []).forEach((entry) => known.set(String(entry.id).toLowerCase(), { at, entry }));
@@ -14205,7 +14525,7 @@ ${add}` : add;
 
   // ../../shared/js/no-go-check/index.js
   var POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var LEVEL_STYLES2 = {
     direct: { badge: "border:2px solid #450a0a;background:#7f1d1d;color:#fff;", accent: "#7f1d1d", tint: "#f7dcdc" },
     group: { badge: "border:2px solid #7f1d1d;background:#b91c1c;color:#fff;", accent: "#b91c1c", tint: "#fae3e3" },
@@ -14308,7 +14628,7 @@ ${add}` : add;
         loadCandidateNoGos(candidateId);
         return;
       }
-      const rows = [...document.querySelectorAll(ROW_SELECTOR5)];
+      const rows = [...document.querySelectorAll(ROW_SELECTOR6)];
       if (!noGos.length) {
         rows.forEach(clearRow);
         return;
@@ -15093,7 +15413,7 @@ ${add}` : add;
   // src/features/wa-templates/index.js
   var SOURCE_PATH3 = "cem/toolbox/src/features/wa-templates/index.js";
   var ROUTE_RE2 = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
-  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
   var CANDIDATE_ID_RE = /#\/Candidate\/([0-9a-f-]{36})/i;
   var BUTTON_CLASS = "werkia-wa-button";
@@ -15277,7 +15597,7 @@ ${add}` : add;
         return;
       }
       ensureStyle4();
-      document.querySelectorAll(ROW_SELECTOR6).forEach(addButton);
+      document.querySelectorAll(ROW_SELECTOR7).forEach(addButton);
       widenExpandedPanels();
     }
     function scheduleSync() {
@@ -15947,12 +16267,12 @@ Trotzdem speichern?`)) return void 0;
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
-  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var COMMENTS_BUTTON_SELECTOR3 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
-  var CACHE_TTL_MS4 = 3 * 60 * 1e3;
-  var BATCH_SIZE3 = 25;
+  var CACHE_TTL_MS5 = 3 * 60 * 1e3;
+  var BATCH_SIZE4 = 25;
   var MATCH_COMMENTS_QUERY = `query allMatches($page: Int, $perPage: Int, $filter: MatchFilter) {
   items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
     id
@@ -15995,14 +16315,14 @@ Trotzdem speichern?`)) return void 0;
     `;
       document.head.appendChild(style);
     }
-    const rowMatchId = (row2) => matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
+    const rowMatchId = (row2) => matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR7)?.getAttribute("href"));
     function commentsButtonCount(button2) {
       const text = button2?.querySelector('.MuiBadge-badge, [class*="MuiBadge-badge"]')?.textContent || "";
       return text.replace(/\D/g, "");
     }
     function fresh(matchId) {
       const entry = cache.get(matchId);
-      return entry && Date.now() - entry.at < CACHE_TTL_MS4 ? entry : null;
+      return entry && Date.now() - entry.at < CACHE_TTL_MS5 ? entry : null;
     }
     async function load2(matchIds, { force = false } = {}) {
       if (loading) await loading;
@@ -16010,8 +16330,8 @@ Trotzdem speichern?`)) return void 0;
       if (!ids.length) return;
       loading = (async () => {
         const { request } = getCemGraphqlAdapter();
-        for (let index = 0; index < ids.length; index += BATCH_SIZE3) {
-          const batch = ids.slice(index, index + BATCH_SIZE3);
+        for (let index = 0; index < ids.length; index += BATCH_SIZE4) {
+          const batch = ids.slice(index, index + BATCH_SIZE4);
           try {
             const result = await request(MATCH_COMMENTS_QUERY, { filter: { ids: batch }, page: 0, perPage: batch.length });
             const now = Date.now();
@@ -16209,7 +16529,7 @@ Trotzdem speichern?`)) return void 0;
       if (!isTargetPage3()) return;
       ensureStyle4();
       const wanted = [];
-      document.querySelectorAll(ROW_SELECTOR7).forEach((row2) => syncRow(row2, wanted));
+      document.querySelectorAll(ROW_SELECTOR8).forEach((row2) => syncRow(row2, wanted));
       wanted.push(...syncDialog());
       if (wanted.length && !loading) load2(wanted);
     }
@@ -16224,7 +16544,7 @@ Trotzdem speichern?`)) return void 0;
     };
     runtime.addDocumentListener("click", (event) => {
       const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR3);
-      const row2 = button2?.closest(ROW_SELECTOR7);
+      const row2 = button2?.closest(ROW_SELECTOR8);
       const matchId = row2 ? rowMatchId(row2) : "";
       if (!matchId) return;
       dialogMatchId = matchId;
@@ -16343,8 +16663,8 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
   var IDS9 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
@@ -16427,7 +16747,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
-      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR8)).find(Boolean);
       const matchId = matchIdFromHref6(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
@@ -16557,7 +16877,7 @@ Trotzdem speichern?`)) return void 0;
         return;
       }
       ensureStyle4();
-      document.querySelectorAll(ROW_SELECTOR8).forEach(addButtons);
+      document.querySelectorAll(ROW_SELECTOR9).forEach(addButtons);
     }
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
@@ -16669,8 +16989,8 @@ Trotzdem speichern?`)) return void 0;
 
   // src/features/match-commute.js
   var SOURCE_PATH4 = "cem/toolbox/src/features/match-commute.js";
-  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS3 = "werkia-cem-match-commute-button";
   var IDS10 = { style: "werkia-cem-match-commute-style", popover: "werkia-cem-match-commute-popover" };
   var OWNED_SELECTOR = `.${BUTTON_CLASS3}, #${IDS10.popover}`;
@@ -16857,7 +17177,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function currentItems() {
       const items = [];
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR9)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
         const target = matchCellOf(row2);
         if (target?.cell) items.push(target);
       }
@@ -16903,7 +17223,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
-      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR8)).find(Boolean);
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR9)).find(Boolean);
       const matchId = matchIdFromHref7(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
@@ -17457,6 +17777,22 @@ Trotzdem speichern?`)) return void 0;
     });
   }
 
+  // src/features/out-gruende.js
+  function executeCemOutGruende(runtime) {
+    executeOutGruende(runtime, {
+      namespace: "cem",
+      sourcePath: "cem/toolbox/src/features/out-gruende.js",
+      getGraphqlAdapter: getCemGraphqlAdapter,
+      views: [ROUTES.cemMyMatches, ROUTES.cemMyCandidates].map((route) => ({
+        route,
+        cellSelector: "td.column-cemStatus",
+        sides: ["cem", "kam"],
+        // KAM-Grund hinter "KAM Status: Out" in der Job-Spalte (Wunsch Bella).
+        inline: { side: "kam", cellSelector: "td.column-jobPositionId", pattern: /^KAM Status:/ }
+      }))
+    });
+  }
+
   // src/main.js
   initCemGraphqlAdapter();
   bootstrapToolbox({ label: "CEM", marker: "data-werkia-cem-toolbox-loaded" }, [
@@ -17500,6 +17836,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "match-mention", execute: executeCemMatchMention },
     { id: "match-contact-person", execute: executeCemMatchContactPerson },
     { id: "employer-comments", execute: executeCemEmployerComments },
-    { id: "om-questionnaire-column", execute: executeCemOmQuestionnaireColumn }
+    { id: "om-questionnaire-column", execute: executeCemOmQuestionnaireColumn },
+    { id: "out-gruende", execute: executeCemOutGruende }
   ]);
 })();

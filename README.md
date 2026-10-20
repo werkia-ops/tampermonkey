@@ -18,6 +18,7 @@ Enthaltene Funktionen:
 - AG-Notizen mit Tags (Matches, AP, Vakanzen, Prozess) als Arbeitgeberkommentar. Oben im Matchkommentar-Dialog, unter dem Ansprechpartner, stehen die letzten Notizen mit Tag Matches, daneben speichert "Als AG-Notiz speichern" den Text aus dem Kommentarfeld mit den gewählten Tags am Arbeitgeber statt am Match. In Meine Matches zeigen Chips hinter der AG Response Rate die Notizen mit Tag AP und Prozess, das Vakanz-Panel die mit Tag Vakanzen.
 - Im Matchkommentar-Dialog an Stelle der Spalte "AG Fragebogen" der OM-Fragebogen des Matches, nur lesend: Anforderungen der Vakanz neben den Angaben des Kandidaten (Position, Berufserfahrung, Deutschkenntnisse, Führerschein, Auto, Reise-/Montagebereitschaft, Gehalt, Fachbereiche, Stellenumfang, Anerkennung, Entfernung) mit Bewertung passt/prüfen/passt nicht, darunter "Zusätzliche Information - OM". Der Haken "AG-Fragebogen anzeigen" blendet die native Spalte für diesen Dialog wieder ein.
 - Zeigt in Meine Matches unter dem KAM Status den CEM Status und die zustaendige CEM-Person. Ein Klick auf den Namen kopiert ihn.
+- Steht ein Match in Meine Matches auf Out, steht klein unter dem KAM Status der Grund (KAM-Out und CEM-Out), z. B. "KAM-Out: BEW bereits bekannt". Ohne hinterlegten Grund "ohne Grund", Absagen aus der Kandidaten-App als "Absage in der App: ...".
 - Technische Hintergrundfunktion ohne eigene Anzeige - merkt sich Kandidat/Vakanz des offenen Fragebogens fuer andere Funktionen.
 - Blendet neben dem OM-Fragebogen ein Panel mit den oeffentlichen Vakanzangaben ein ("Zustaendigkeiten", "Dein Profil").
 - Vergleicht Fragebogen-Antworten mit den Vakanzanforderungen und zeigt eine farbige Ampel-Empfehlung plus Notizfeld.
@@ -86,6 +87,7 @@ Enthaltene Funktionen:
 - Unter dem Ansprechpartner oben im Matchkommentar-Dialog die Arbeitgeberkommentare, neueste zuerst, nur lesend. Die neuesten 5, der Rest aufklappbar.
 - Im Matchkommentar-Dialog an Stelle der Spalte "AG Fragebogen" der OM-Fragebogen des Matches, nur lesend: Anforderungen der Vakanz neben den Angaben des Kandidaten (Position, Berufserfahrung, Deutschkenntnisse, Führerschein, Auto, Reise-/Montagebereitschaft, Gehalt, Fachbereiche, Stellenumfang, Anerkennung, Entfernung) mit Bewertung passt/prüfen/passt nicht, darunter "Zusätzliche Information - OM". Der Haken "AG-Fragebogen anzeigen" blendet die native Spalte für diesen Dialog wieder ein.
 - Feste VTA-Notiz je Arbeitgeber (z. B. Buchungslink): Box unter dem Notizfeld im Terminvorschlag-Dialog, bei neuen Terminen einmal ans Notizfeld angehängt. Pflege direkt in der Box oder im Tampermonkey-Menü. Gespeichert im n8n-Workflow VTA Notizen.
+- Steht ein Match in Meine Matches auf Out, steht klein unter dem CEM Status der Grund (CEM-Out und KAM-Out), z. B. "CEM-Out: Entfernung zu weit". Ohne hinterlegten Grund "ohne Grund", Absagen aus der Kandidaten-App als "Absage in der App: ...".
 
 ## OBC Toolbox
 

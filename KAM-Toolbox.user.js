@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.18.282
+// @version      1.19.283
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -14303,6 +14303,19 @@ ${buildCbreBody(current)}`;
       ausfuehren: ({ postfach, operationen }) => post({ op: "ausfuehren", postfach, operationen })
     };
   }
+  var CONFIRM_INTERVIEW_MUTATION = `mutation updateInterview($id: UUID, $status: String, $dates: [DateTime!], $confirmedByEmployer: Boolean, $confirmedByCandidate: Boolean) {
+  data: updateInterview(id: $id, status: $status, dates: $dates, confirmedByEmployer: $confirmedByEmployer, confirmedByCandidate: $confirmedByCandidate) {
+    id
+    status
+    dates
+  }
+}`;
+  function formatTermin(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return String(iso || "");
+    const text = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+    return `${text} Uhr`;
+  }
   var matchOf = (vorschlag, index) => (vorschlag?.matches || [])[index] || null;
   var preselect = (entry) => Boolean(entry?.matchId) && (Number(entry?.sicherheit) || 0) >= PRESELECT_FROM;
   function buildChoices(vorschlag, { mailText = "" } = {}) {
@@ -14335,6 +14348,20 @@ ${buildCbreBody(current)}`;
           aktiv: preselect(entry),
           moeglich: known,
           hinweis: entry.cem_erwaehnen && !entry.cem?.id ? "Keine CEM-Person am Kandidaten eingetragen." : ""
+        });
+      }
+      if (entry.terminVorschlag?.interviewId) {
+        const termin = entry.terminVorschlag;
+        choices.push({
+          key: `m${index}-termin`,
+          art: "termin",
+          match: index,
+          interviewId: termin.interviewId,
+          datum: termin.datum,
+          dates: [...termin.dates || [termin.datum]],
+          aktiv: preselect(entry) && !termin.bestaetigt,
+          moeglich: known && !termin.bestaetigt,
+          hinweis: termin.bestaetigt ? "Termin ist im Adminpanel schon bestätigt." : ""
         });
       }
       if (entry.wvl) {
@@ -14393,6 +14420,9 @@ ${buildCbreBody(current)}`;
         const text = commentHtml(choice);
         if (!text) continue;
         operations.push({ key: choice.key, beschreibung: `${who}: Matchkommentar${choice.cem ? ` mit @${choice.cem.label}` : ""}`, query: CREATE_MATCH_COMMENT_MUTATION, variables: { matchId: entry.matchId, text } });
+      } else if (choice.art === "termin") {
+        if (!choice.interviewId || !choice.datum) continue;
+        operations.push({ key: choice.key, beschreibung: `${who}: Termin ${formatTermin(choice.datum)} bestätigt`, query: CONFIRM_INTERVIEW_MUTATION, variables: { id: choice.interviewId, status: "confirmed", dates: [choice.datum], confirmedByEmployer: true, confirmedByCandidate: true } });
       } else if (choice.art === "wvl") {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(choice.wvl || ""))) continue;
         operations.push({ key: choice.key, beschreibung: `${who}: WVL ${choice.wvl}`, query: UPDATE_MATCH_WVL_MUTATION, variables: { id: entry.matchId, kamFollowUpDate: choice.wvl } });
@@ -14442,12 +14472,13 @@ ${buildCbreBody(current)}`;
         detail: `„${String(choice.kommentar || "").trim()}“${choice.mailtext ? " + Mailtext für CEM" : ""}`
       };
     }
+    if (choice.art === "termin") return { titel: "Termin im Adminpanel bestätigen", detail: formatTermin(choice.datum) };
     if (choice.art === "wvl") return { titel: `Wiedervorlage ${choice.wvl}`, detail: "" };
     if (choice.art === "agNotiz") return { titel: `AG-Notiz ${(choice.tags || []).map((tag) => `[${tag}]`).join("")}`, detail: `„${String(choice.text || "").trim()}“` };
     return { titel: choice.art, detail: "" };
   }
   function unsureText(choice, entry) {
-    if (!choice.moeglich) return choice.art === "agNotiz" ? "Kein Arbeitgeber zugeordnet, nur zur Info." : "Kein Match zugeordnet, nur zur Info.";
+    if (!choice.moeglich) return choice.hinweis || (choice.art === "agNotiz" ? "Kein Arbeitgeber zugeordnet, nur zur Info." : "Kein Match zugeordnet, nur zur Info.");
     if (choice.hinweis) return choice.hinweis;
     if (choice.art !== "agNotiz" && entry && (Number(entry.sicherheit) || 0) < PRESELECT_FROM) return "Zuordnung unsicher, bitte im Mailtext prüfen und dann einschalten.";
     if (choice.art === "status" && choice.kamStatus === "out" && !reasonOption(choice.outGrund)) return "Bitte einen Grund wählen.";
@@ -14661,6 +14692,14 @@ ${buildCbreBody(current)}`;
           details.append(summary, mail);
           box.appendChild(details);
         }
+      } else if (choice.art === "termin") {
+        const select = document.createElement("select");
+        choice.dates.forEach((value) => select.append(new Option(formatTermin(value), value, false, value === choice.datum)));
+        select.addEventListener("change", () => {
+          choice.datum = select.value;
+          rerender();
+        });
+        box.appendChild(select);
       } else if (choice.art === "wvl") {
         const date = document.createElement("input");
         date.type = "date";
@@ -14745,7 +14784,7 @@ ${buildCbreBody(current)}`;
       closePanel();
       ensureStyle3();
       const { vorschlag } = result;
-      const choices = buildChoices(vorschlag, { mailText: readMailText() });
+      const choices = buildChoices(vorschlag, { mailText: vorschlag.mailtext || readMailText() });
       choices.forEach((choice) => {
         if (choice.art === "kommentar") choice.cemPerson = choice.cem;
       });

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.16.271
+// @version      1.16.279
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -13819,10 +13819,14 @@ ${buildCbreBody(current)}`;
     return `<a data-type="mention" href="#/Employee/${id}/show" class="mention" data-id="${id}" data-label="${label}" data-resource="Employee">@${label}</a>`;
   }
   var paragraphs = (text) => String(text || "").trim().split(/\n{2,}/).map((block) => block.split("\n").map((line) => escapeHtml(line.trim())).join("<br>")).filter(Boolean).map((block) => `<p>${block}</p>`);
+  var COMMENT_TAG = "[Mail-Assistent]";
   function commentHtml({ kommentar = "", cem = null, mailtext = "" }) {
-    const head = `${cem ? `${mentionHtml(cem)} ` : ""}${escapeHtml(String(kommentar || "").trim())}`.trim();
-    const parts = head ? [`<p>${head}</p>`] : [];
-    if (String(mailtext || "").trim()) parts.push("<p>Mail des Arbeitgebers:</p>", ...paragraphs(mailtext));
+    const text = escapeHtml(String(kommentar || "").trim());
+    const hasMail = Boolean(String(mailtext || "").trim());
+    if (!text && !hasMail) return "";
+    const head = [COMMENT_TAG, cem ? mentionHtml(cem) : "", text].filter(Boolean).join(" ");
+    const parts = [`<p>${head}</p>`];
+    if (hasMail) parts.push("<p>Mail des Arbeitgebers:</p>", ...paragraphs(mailtext));
     return parts.join("");
   }
   function buildOperations(vorschlag, choices) {

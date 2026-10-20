@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.270
+// @version      1.19.272
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6342,8 +6342,8 @@ ${add}` : add;
     {
       id: "match-commute",
       title: "Distanz zur Vakanz je Match",
-      page: MY_MATCHES,
-      routes: onMyMatches,
+      page: "CEM › Meine Matches und Meine Kandidaten (aufgeklappte Matches)",
+      routes: [ROUTES.cemMyMatches, ROUTES.cemMyCandidates],
       kind: "view",
       summary: "Der 🚗-Knopf in jeder Match-Zeile zeigt, wie lange der Kandidat mit dem Auto zur Vakanz fährt, ohne dass du den Fragebogen öffnen musst.",
       steps: [
@@ -16645,7 +16645,7 @@ Trotzdem speichern?`)) return void 0;
     let syncTimer = null;
     let hoverButton = null;
     let openMatchId = "";
-    const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "");
+    const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "") || ROUTES.cemMyCandidates.test(location.hash || "");
     function el4(tag, props = {}, children = []) {
       const element5 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {

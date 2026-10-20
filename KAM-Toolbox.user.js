@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.283
+// @version      1.19.284
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -149,16 +149,16 @@
         already_worked_for_this_organisation: "War schon bei diesem AG"
       });
       var NO_REASON2 = "ohne Grund";
-      function clean7(value) {
+      function clean8(value) {
         return String(value ?? "").replace(/\s+/g, " ").trim();
       }
       function feedbackLabel2(value) {
-        const text = clean7(value);
+        const text = clean8(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(FEEDBACK_LABELS2, text) ? FEEDBACK_LABELS2[text] : text;
       }
       function declineLabel2(value) {
-        const text = clean7(value);
+        const text = clean8(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
       }
@@ -4641,9 +4641,9 @@
     const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
     if (!parsed || typeof parsed !== "object") return emptyStore();
     const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean7 = {};
+    const clean8 = {};
     Object.keys(routes).forEach((route) => {
-      clean7[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+      clean8[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
         id: String(preset.id || createPresetId()),
         name: String(preset.name),
         filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
@@ -4652,7 +4652,7 @@
         perPage: Number.parseInt(preset.perPage, 10) || 0
       }));
     });
-    return { version: STORE_VERSION, routes: clean7 };
+    return { version: STORE_VERSION, routes: clean8 };
   }
   function presetsForRoute(store, route) {
     return store?.routes?.[route] ? [...store.routes[route]] : [];
@@ -4740,7 +4740,7 @@
       const element6 = document.getElementById(id);
       return element6?.dataset.werkiaPresetsOwner === owner ? element6 : null;
     };
-    const isTargetPage8 = () => isTargetRoute(location.hash, routes);
+    const isTargetPage9 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
     function ensureStyle7() {
@@ -4929,7 +4929,7 @@
       select.value = active;
     }
     function render() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         ownElement(IDS.bar)?.remove();
         closeDialog();
         return;
@@ -5117,7 +5117,7 @@
     let state = null;
     let editing = null;
     let adminsOpen = false;
-    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element6 = document.getElementById(id);
       return element6?.dataset.werkiaVertretungenOwner === sourcePath ? element6 : null;
@@ -5367,7 +5367,7 @@
       }
     }
     function placeButton() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         owned(IDS2.button)?.remove();
         owned(IDS2.bar)?.remove();
         return;
@@ -6295,7 +6295,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID16 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID17 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -6303,9 +6303,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID16)) return;
+      if (document.getElementById(STYLE_ID17)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID17;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -6830,6 +6830,24 @@ ${add}` : add;
       notes: [
         "Erlaubt sind Daten vom Vorjahr bis fünf Jahre voraus.",
         "Nach dem Schließen der Tags-Ansicht lädt die Liste neu und zeigt das neue Datum."
+      ]
+    },
+    {
+      id: "tags-hc",
+      title: "Tags in Hot Cases und Hot Hot Cases",
+      page: `${MY_MATCHES} › Filterleiste`,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "Neben „TAGS“ steht „Tags in HC/HHC“ mit eigenem Zähler: Matches mit ungelesenem Tag für dich, deren KAM-Status Hot Case oder Hot Hot Case ist. So siehst du, welche Tags zuerst dran sind.",
+      steps: [
+        "Auf „Tags in HC/HHC“ klicken. Die Tags-Ansicht öffnet sich nur mit diesen Matches, im Titel steht „nur Hot Case und Hot Hot Case“.",
+        "Arbeiten wie in der normalen Tags-Ansicht. Der Schalter „Ungelesene Tags“ im Dialog zeigt auch gelesene Tags dieser Matches.",
+        "Nach dem Schließen zeigt „TAGS“ wieder alle Tags."
+      ],
+      notes: [
+        "Der Zähler lädt alle 2 Minuten neu, nach dem Schließen der Tags-Ansicht und sobald sich der TAGS-Zähler ändert.",
+        "Zählt nur den KAM-Status, der CEM-Status zählt nicht mit.",
+        "Ein rotes „!“ heißt, die Anzahl ließ sich nicht laden (Fehler im Tooltip). Meist hilft es, die Seite neu zu laden."
       ]
     },
     urgentVacancyTopic(),
@@ -7405,7 +7423,7 @@ ${add}` : add;
     runtime.registerSource(sourcePath);
     const {
       team,
-      isTargetPage: isTargetPage8,
+      isTargetPage: isTargetPage9,
       getRequest,
       ids: IDS11,
       fields,
@@ -7949,7 +7967,7 @@ ${add}` : add;
       });
     }
     function installHeaderButtons() {
-      if (!isTargetPage8()) return;
+      if (!isTargetPage9()) return;
       kit.injectStyle();
       installButton(columns.followUp, IDS11.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
       installButton(columns.status, IDS11.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
@@ -7962,7 +7980,7 @@ ${add}` : add;
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage8()) {
+        if (!isTargetPage9()) {
           kit.discard();
           return;
         }
@@ -8539,6 +8557,251 @@ ${add}` : add;
     scheduleScan();
   }
 
+  // src/features/tags-hc.js
+  var SOURCE_PATH2 = "kam/toolbox/src/features/tags-hc.js";
+  var STYLE_ID8 = "werkia-kam-tags-hc-style";
+  var ROOT_CLASS = "werkia-kam-tags-hc";
+  var DIALOG_ATTR = "data-werkia-tags-hc";
+  var STORE_KEY = "RaStore.UnreadMatchCommentMentionMatches.listParams";
+  var PENDING_KEY = "werkia_kam_tags_hc_pending_v1";
+  var HOT_STATUSES = ["hot_case", "hot_hot_case"];
+  var REFRESH_MS = 2 * 60 * 1e3;
+  var OPEN_TIMEOUT_MS = 6e3;
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaKamTagsHcMe {
+  me: currentEmployee { id __typename }
+}`;
+  var COUNT_QUERY = `query WerkiaKamTagsHcCount($filter: MatchFilter) {
+  total: _allMatchesMeta(filter: $filter) { count }
+}`;
+  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  function countFilter(employeeId) {
+    return {
+      hasUnreadMatchCommentMention: true,
+      mentionEmployeeIds: [String(employeeId)],
+      kamStatuses: [...HOT_STATUSES]
+    };
+  }
+  function parse(raw) {
+    try {
+      const value = JSON.parse(raw);
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  function addHotFilter(raw) {
+    const params = parse(raw) || {};
+    const page = Number.isInteger(params.page) ? params.page : null;
+    const next = { ...params, filter: { ...params.filter || {}, kamStatuses: [...HOT_STATUSES] }, page: 1 };
+    return { value: JSON.stringify(next), page };
+  }
+  function removeHotFilter(raw, { page = null } = {}) {
+    const params = parse(raw);
+    if (!params) return null;
+    const filter = { ...params.filter || {} };
+    delete filter.kamStatuses;
+    const next = { ...params, filter };
+    if (page === null) delete next.page;
+    else next.page = page;
+    const onlyDefaults = Object.keys(filter).length === 0 && Object.keys(next).every((key) => key === "filter");
+    return onlyDefaults ? null : JSON.stringify(next);
+  }
+  function hasHotFilter(raw) {
+    return Array.isArray(parse(raw)?.filter?.kamStatuses);
+  }
+  function findTagsButton(root = document) {
+    return [...root.querySelectorAll("button")].find((button3) => {
+      if (button3.closest(`.${ROOT_CLASS}`) || button3.closest('[role="dialog"]')) return false;
+      const own = [...button3.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join(" ");
+      return clean4(own) === "Tags" && Boolean(button3.querySelector(".MuiChip-root, .MuiButton-endIcon"));
+    }) || null;
+  }
+  function isTagsDialog2(element6) {
+    const title = element6?.querySelector(".MuiDialogTitle-root, h2");
+    return clean4(title?.textContent) === "Tags";
+  }
+  function tagsDialogs2(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog2);
+  }
+  function isTargetPage3(hash = location.hash) {
+    return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
+  }
+  function executeTagsHc(runtime, {
+    getRequest = () => getKamGraphqlAdapter().request,
+    storage = () => window.localStorage,
+    helpTip = () => kamHelp.tip("tags-hc")
+  } = {}) {
+    runtime.registerSource?.(SOURCE_PATH2);
+    let myId = "";
+    let count = null;
+    let failed = "";
+    let loading = false;
+    let lastLoad = 0;
+    let opening = false;
+    let openTimer = null;
+    let dialogSeen = false;
+    let nativeCountText = "";
+    function store() {
+      try {
+        return storage();
+      } catch {
+        return null;
+      }
+    }
+    function restoreStore() {
+      const ls = store();
+      if (!ls) return;
+      const pending = parse(ls.getItem(PENDING_KEY));
+      const raw = ls.getItem(STORE_KEY);
+      if (pending || hasHotFilter(raw)) {
+        const next = removeHotFilter(raw, { page: pending && Number.isInteger(pending.page) ? pending.page : null });
+        if (next === null) ls.removeItem(STORE_KEY);
+        else ls.setItem(STORE_KEY, next);
+      }
+      ls.removeItem(PENDING_KEY);
+    }
+    function injectStyle() {
+      if (document.getElementById(STYLE_ID8)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID8;
+      style.textContent = `
+      .${ROOT_CLASS} { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; flex-shrink: 0; }
+      .${ROOT_CLASS} > button { white-space: nowrap; }
+      .${ROOT_CLASS} [data-count] { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; margin-left: 8px; padding: 0 8px; box-sizing: border-box; border-radius: 16px; background: rgba(0,0,0,.08); color: rgba(0,0,0,.87); font: 400 0.8125rem/1 "Roboto","Helvetica","Arial",sans-serif; text-transform: none; }
+      .${ROOT_CLASS} [data-count][data-state="hot"] { background: #d32f2f; color: #fff; }
+      .${ROOT_CLASS} [data-count][data-state="error"] { background: #fdecea; color: #b3261e; }
+      [${DIALOG_ATTR}] .MuiDialogTitle-root::after { content: "nur Hot Case und Hot Hot Case"; margin-left: 12px; padding: 2px 8px; border-radius: 12px; background: #fff4e5; color: #995000; font: 600 12px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align: middle; }
+    `;
+      document.head.appendChild(style);
+    }
+    function render() {
+      const badge = document.querySelector(`.${ROOT_CLASS} [data-count]`);
+      if (!badge) return;
+      const button3 = badge.closest("button");
+      if (failed) {
+        badge.dataset.state = "error";
+        badge.textContent = "!";
+        button3.title = `Tags in HC/HHC: ${failed}`;
+        return;
+      }
+      badge.dataset.state = count ? "hot" : "";
+      badge.textContent = count === null ? "…" : String(count);
+      button3.title = "Matches mit ungelesenem Tag für dich, deren KAM-Status Hot Case oder Hot Hot Case ist. Klick öffnet die Tags-Ansicht nur mit diesen Matches.";
+    }
+    async function refresh() {
+      if (loading) return;
+      loading = true;
+      lastLoad = Date.now();
+      try {
+        const request = getRequest();
+        if (!myId) {
+          const data2 = await request(CURRENT_EMPLOYEE_QUERY3, {});
+          myId = String(data2?.me?.id || "");
+          if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
+        }
+        const data = await request(COUNT_QUERY, { filter: countFilter(myId) });
+        const total = Number(data?.total?.count);
+        if (!Number.isFinite(total)) throw new Error("Keine Anzahl erhalten.");
+        count = total;
+        failed = "";
+      } catch (error) {
+        failed = error?.message || "Anzahl nicht geladen.";
+      } finally {
+        loading = false;
+        render();
+      }
+    }
+    function openFiltered(tagsButton) {
+      const ls = store();
+      if (!ls) return;
+      restoreStore();
+      const { value, page } = addHotFilter(ls.getItem(STORE_KEY));
+      ls.setItem(PENDING_KEY, JSON.stringify({ page, at: Date.now() }));
+      ls.setItem(STORE_KEY, value);
+      opening = true;
+      tagsButton.click();
+      opening = false;
+      runtime.clearTimeout?.(openTimer);
+      openTimer = runtime.setTimeout(() => {
+        openTimer = null;
+        if (!tagsDialogs2().length) restoreStore();
+      }, OPEN_TIMEOUT_MS);
+    }
+    function install(tagsButton) {
+      let root = document.querySelector(`.${ROOT_CLASS}`);
+      if (root && root.previousElementSibling === tagsButton) return;
+      root?.remove();
+      root = document.createElement("span");
+      root.className = ROOT_CLASS;
+      const button3 = document.createElement("button");
+      button3.type = "button";
+      button3.className = tagsButton.className;
+      button3.append("Tags in HC/HHC");
+      const badge = document.createElement("span");
+      badge.dataset.count = "";
+      button3.appendChild(badge);
+      button3.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const target = findTagsButton();
+        if (target) openFiltered(target);
+      });
+      root.appendChild(button3);
+      const tip = helpTip?.();
+      if (tip) root.appendChild(tip);
+      tagsButton.insertAdjacentElement("afterend", root);
+      render();
+    }
+    function scan() {
+      const dialogs = tagsDialogs2();
+      const ls = store();
+      if (dialogs.length) {
+        const filtered = Boolean(ls?.getItem(PENDING_KEY));
+        dialogs.forEach((dialog) => dialog.toggleAttribute(DIALOG_ATTR, filtered));
+        if (filtered) injectStyle();
+        dialogSeen = true;
+      } else if (dialogSeen) {
+        dialogSeen = false;
+        restoreStore();
+        if (isTargetPage3()) refresh();
+      }
+      if (!isTargetPage3()) return;
+      const tagsButton = findTagsButton();
+      if (!tagsButton) return;
+      injectStyle();
+      install(tagsButton);
+      const text = clean4(tagsButton.querySelector(".MuiChip-label")?.textContent);
+      if (text !== nativeCountText) {
+        const first = nativeCountText === "";
+        nativeCountText = text;
+        if (!first || count === null) refresh();
+      } else if (count === null && !failed && !loading) {
+        refresh();
+      }
+    }
+    document.addEventListener("click", (event) => {
+      if (opening) return;
+      const target = event.target instanceof Element ? event.target.closest("button") : null;
+      if (target && target === findTagsButton()) restoreStore();
+    }, true);
+    restoreStore();
+    let scheduled = false;
+    const scheduleScan = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        scan();
+      }, 200);
+    };
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    runtime.setInterval?.(() => {
+      if (!isTargetPage3() || document.hidden || !document.querySelector(`.${ROOT_CLASS}`)) return;
+      if (Date.now() - lastLoad >= REFRESH_MS - 1e3) refresh();
+    }, REFRESH_MS);
+    scheduleScan();
+  }
+
   // src/features/kam-suite/employer-notes.js
   var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR4 = 'a[href*="#/Employer/"]';
@@ -8643,9 +8906,9 @@ ${add}` : add;
   // src/features/kam-suite/vacancy-city-badges.js
   var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID8 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID9 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
-  function isTargetPage3(hash = location.hash) {
+  function isTargetPage4(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function getJobPositionId(href) {
@@ -8674,9 +8937,9 @@ ${add}` : add;
       return [...ids];
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -8743,7 +9006,7 @@ ${add}` : add;
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage3()) return;
+        if (!isTargetPage4()) return;
         ensureStyle7();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
@@ -8752,7 +9015,7 @@ ${add}` : add;
     runtime.createMutationObserver(scheduleCityBadges).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleCityBadges);
     runtime.setInterval(() => {
-      if (isTargetPage3()) loadJobPositionCities({ force: true }).catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
+      if (isTargetPage4()) loadJobPositionCities({ force: true }).catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
     }, REFRESH_INTERVAL_MS2);
     scheduleCityBadges();
   }
@@ -8838,12 +9101,12 @@ ${add}` : add;
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID9 = "werkia-kam-cem-line-style";
+  var STYLE_ID10 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH2 = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
   var CHECK_ICON_PATH = "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
-  function isTargetPage4(hash = location.hash) {
+  function isTargetPage5(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function getMatchId2(href) {
@@ -8867,9 +9130,9 @@ ${add}` : add;
       return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID9)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -9003,7 +9266,7 @@ ${add}` : add;
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage4()) return;
+        if (!isTargetPage5()) return;
         ensureStyle7();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
@@ -9030,7 +9293,7 @@ ${add}` : add;
     runtime.createMutationObserver(scheduleLines).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleLines);
     runtime.setInterval(() => {
-      if (isTargetPage4()) loadCemInfo({ force: true }).catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
+      if (isTargetPage5()) loadCemInfo({ force: true }).catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
     }, REFRESH_INTERVAL_MS3);
     scheduleLines();
   }
@@ -9061,8 +9324,8 @@ ${add}` : add;
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean7 = [...new Set(statuses)].filter(Boolean);
-    if (clean7.length) next[field] = clean7;
+    const clean8 = [...new Set(statuses)].filter(Boolean);
+    if (clean8.length) next[field] = clean8;
     else delete next[field];
     return next;
   }
@@ -9075,7 +9338,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID10 = "werkia-match-status-filter-style";
+  var STYLE_ID11 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -9091,11 +9354,11 @@ ${add}` : add;
   } = {}) {
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
-    const isTargetPage8 = () => route.test(location.hash);
+    const isTargetPage9 = () => route.test(location.hash);
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -9149,7 +9412,7 @@ ${add}` : add;
     }
     function render() {
       let bar = document.getElementById(barId);
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         bar?.remove();
         return;
       }
@@ -9192,7 +9455,7 @@ ${add}` : add;
   // src/features/kam-suite/questionnaire-context.js
   var QUESTIONNAIRE_CONTEXT_KEY = "__werkiaKamQuestionnaireContext";
   var EMPTY_CONTEXT = Object.freeze({ key: "", candidateId: "", jobId: "", candidateUrl: "", jobPositionUrl: "" });
-  function isTargetPage5(hash = location.hash) {
+  function isTargetPage6(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function questionnaireResourceIdFromRow(row2, resource) {
@@ -9226,7 +9489,7 @@ ${add}` : add;
     runtime.registerSource("kam/toolbox/src/features/kam-suite/questionnaire-context.js");
     const context = getQuestionnaireContext();
     function captureContext(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button3) return;
       const row2 = button3.closest("tr");
@@ -9491,7 +9754,7 @@ ${add}` : add;
       document.body.appendChild(panel);
     }
     async function handleQuestionnaireButtonClick(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button3 = event.target.closest('button[aria-label="OM Fragebogen"]');
       if (!button3) return;
       const row2 = button3.closest("tr");
@@ -9521,7 +9784,7 @@ ${add}` : add;
     }, true);
     let questionnaireWasOpen = false;
     function cleanupIfDialogClosed() {
-      if (!isTargetPage5()) {
+      if (!isTargetPage6()) {
         removeVacancyPanel();
         questionnaireWasOpen = false;
         return;
@@ -10096,7 +10359,7 @@ ${add}` : add;
       document.getElementById(OM_NOTES_ID)?.remove();
     }
     function runQuestionnaireFeatures() {
-      if (!isTargetPage5()) {
+      if (!isTargetPage6()) {
         resetQuestionnaireFeatures();
         return;
       }
@@ -10706,7 +10969,7 @@ ${add}` : add;
     }
     function updateRouteBox() {
       const dialog = questionnaireDialog();
-      if (!isTargetPage5() || !dialog) {
+      if (!isTargetPage6() || !dialog) {
         document.getElementById(ROUTE_BOX_ID)?.remove();
         return;
       }
@@ -10744,7 +11007,7 @@ ${add}` : add;
       }, 200);
     }
     function waitForQuestionnaireDialog(routeKey, attempt = 0) {
-      if (context.key !== routeKey || !isTargetPage5()) return;
+      if (context.key !== routeKey || !isTargetPage6()) return;
       const dialog = questionnaireDialog();
       if (dialog) {
         scheduleUpdate();
@@ -10754,7 +11017,7 @@ ${add}` : add;
       runtime.setTimeout(() => waitForQuestionnaireDialog(routeKey, attempt + 1), 125);
     }
     function captureQuestionnaireClick(event) {
-      if (!isTargetPage5()) return;
+      if (!isTargetPage6()) return;
       const button3 = event.target?.closest?.('button[aria-label="OM Fragebogen"]');
       if (!button3) return;
       if (!context.key) return;
@@ -10779,7 +11042,7 @@ ${add}` : add;
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
   var BULK_DIALOG_ID = "werkia-kam-wvl-bulk-dialog";
-  function isTargetPage6(hash = location.hash) {
+  function isTargetPage7(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function executeCandidateFilePopup(runtime) {
@@ -10863,7 +11126,7 @@ ${add}` : add;
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        if (!isTargetPage6()) return;
+        if (!isTargetPage7()) return;
         injectStyle();
         installCandidateFileHooks();
         installCandidatePopupButton();
@@ -11139,9 +11402,9 @@ ${add}` : add;
   var BANNER_CACHE_MAX_ENTRIES = 300;
   var BANNER_REFRESH_INTERVAL = 30 * 1e3;
   var isBannerCacheEntryExpired = (entry, now = Date.now()) => !entry || typeof entry !== "object" || !(now - Number(entry.time) < BANNER_CACHE_TTL);
-  var clean4 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
+  var clean5 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
   function badgeColor(value) {
-    const v = clean4(value);
+    const v = clean5(value);
     if (!v || v === "-" || v === "–" || v.includes("lädt")) return "#e9ecef";
     if (v.includes("out") || v.includes("absage") || v.includes("abgelehnt") || v.includes("nicht passend") || v.includes("entfernung")) return "#ff6b6b";
     if (v.includes("senden") || v.includes("send") || v.includes("wvl") || v.includes("akzeptiert") || v.includes("terminbestätigung")) return "#d8f5d0";
@@ -11890,12 +12153,12 @@ ${add}` : add;
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID11 = "werkia-kam-match-actions-style";
-  var STORE_KEY = "werkia_kam_match_actions_v1";
+  var STYLE_ID12 = "werkia-kam-match-actions-style";
+  var STORE_KEY2 = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
   var PENDING_TIMEOUT_MS = 20 * 60 * 1e3;
-  function isTargetPage7(hash = location.hash) {
+  function isTargetPage8(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function jobPositionIdFromHref(href) {
@@ -11964,7 +12227,7 @@ ${add}` : add;
     let pollTimer = null;
     function loadStore() {
       try {
-        const store = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+        const store = JSON.parse(localStorage.getItem(STORE_KEY2) || "{}");
         return { pending: store.pending || {}, pushSent: store.pushSent || {} };
       } catch {
         return { pending: {}, pushSent: {} };
@@ -11972,7 +12235,7 @@ ${add}` : add;
     }
     function saveStore(store) {
       try {
-        localStorage.setItem(STORE_KEY, JSON.stringify(store));
+        localStorage.setItem(STORE_KEY2, JSON.stringify(store));
       } catch {
       }
     }
@@ -11994,9 +12257,9 @@ ${add}` : add;
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID11)) return;
+      if (document.getElementById(STYLE_ID12)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID11;
+      style.id = STYLE_ID12;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -12148,7 +12411,7 @@ ${add}` : add;
       if (pollTimer !== null) return;
       pollTimer = runtime.setTimeout(async () => {
         pollTimer = null;
-        if (!isTargetPage7()) return;
+        if (!isTargetPage8()) return;
         const ids = openPendingIds();
         if (!ids.length) return;
         await loadUrgency(ids);
@@ -12159,7 +12422,7 @@ ${add}` : add;
       document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element6) => element6.remove());
     }
     function sync() {
-      if (!isTargetPage7()) {
+      if (!isTargetPage8()) {
         removeBars();
         return;
       }
@@ -12178,13 +12441,13 @@ ${add}` : add;
     runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleSync);
     runtime.setInterval(() => {
-      if (isTargetPage7()) loadUrgency(visibleJobPositionIds());
+      if (isTargetPage8()) loadUrgency(visibleJobPositionIds());
     }, REFRESH_INTERVAL_MS4);
     runtime.addCleanup?.(() => {
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID11)?.remove();
+      document.getElementById(STYLE_ID12)?.remove();
     });
     scheduleSync();
   }
@@ -12207,7 +12470,7 @@ ${add}` : add;
       { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
     ]
   };
-  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaSlackDmMe {
+  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaSlackDmMe {
   me: currentEmployee { id slackId __typename }
 }`;
   var TEAMS = ["KAM", "CEM"];
@@ -12359,7 +12622,7 @@ ${add}` : add;
     let syncTimer = null;
     let closeTimer = null;
     let stopped = false;
-    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
     function ensureStyle7() {
       if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
@@ -12505,7 +12768,7 @@ ${add}` : add;
       }
     }
     function sync() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         removeButtons();
         return;
       }
@@ -12515,7 +12778,7 @@ ${add}` : add;
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
       try {
-        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY3, {});
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY4, {});
         if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
         if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
         scheduleSync();
@@ -15511,7 +15774,7 @@ ${buildCbreBody(current)}`;
     runtime.registerSource(sourcePath);
     const IDS11 = makeIds(idPrefix);
     const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
-    const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
+    const isTargetPage9 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
     const SIDE_MODES = BUILT_IN_MODES2.filter((mode) => mode.side);
     const SELECT_MODES = BUILT_IN_MODES2.filter((mode) => !mode.side);
@@ -15810,7 +16073,7 @@ ${buildCbreBody(current)}`;
     }
     let onPage = false;
     function render() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
@@ -15968,14 +16231,14 @@ ${buildCbreBody(current)}`;
   } = KAM_FOCUS_CORE;
 
   // src/features/focus-modes/index.js
-  var SOURCE_PATH2 = "kam/toolbox/src/features/focus-modes/index.js";
+  var SOURCE_PATH3 = "kam/toolbox/src/features/focus-modes/index.js";
   function executeFocusModes2(runtime, {
     request = (...args) => getKamGraphqlAdapter().request(...args),
     helpTip = () => kamHelp.tip("focus-modes"),
     ...options
   } = {}) {
     executeFocusModes(runtime, {
-      sourcePath: SOURCE_PATH2,
+      sourcePath: SOURCE_PATH3,
       core: KAM_FOCUS_CORE,
       builtInModes: BUILT_IN_MODES,
       storageKey: STORAGE_KEY2,
@@ -16001,7 +16264,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
-  var REFRESH_MS = 10 * 60 * 1e3;
+  var REFRESH_MS2 = 10 * 60 * 1e3;
   var RETRY_MS3 = 60 * 1e3;
   var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
   function tiptapOf3(element6) {
@@ -16032,7 +16295,7 @@ ${buildCbreBody(current)}`;
     let loading = null;
     let failedAt = 0;
     async function loadActive() {
-      const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
+      const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS2;
       if (fresh || Date.now() - failedAt < RETRY_MS3) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
@@ -16113,7 +16376,7 @@ ${buildCbreBody(current)}`;
   var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
   var REQUEST_TIMEOUT_MS5 = 15e3;
   var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaToolboxDatenMe {
+  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay2(date = /* @__PURE__ */ new Date()) {
@@ -16161,7 +16424,7 @@ ${buildCbreBody(current)}`;
     let pending = null;
     return () => {
       if (!pending) {
-        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY4, {}).then((data) => {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY5, {}).then((data) => {
           const id = String(data?.me?.id || "");
           if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
           return id;
@@ -16297,7 +16560,7 @@ ${buildCbreBody(current)}`;
   var ROW_SELECTOR12 = "tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
   var STAR_CLASS = "werkia-prio-star";
-  var REFRESH_MS2 = 5 * 60 * 1e3;
+  var REFRESH_MS3 = 5 * 60 * 1e3;
   var REVIEW_CHECK_MS = 60 * 1e3;
   var STAR_PATH = "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
   var T2 = {
@@ -16391,7 +16654,7 @@ ${buildCbreBody(current)}`;
     let epoch = 0;
     let wasSorted = false;
     let lastPageKey = "";
-    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element6 = document.getElementById(id);
       return element6?.dataset.werkiaPrioOwner === sourcePath ? element6 : null;
@@ -16480,7 +16743,7 @@ ${buildCbreBody(current)}`;
       document.head.appendChild(style);
     }
     async function load2({ force = false } = {}) {
-      if (!force && loaded && Date.now() - loadedAt < REFRESH_MS2) return entries;
+      if (!force && loaded && Date.now() - loadedAt < REFRESH_MS3) return entries;
       if (!loading) {
         loading = (async () => {
           try {
@@ -16821,7 +17084,7 @@ ${buildCbreBody(current)}`;
       panel.replaceChildren(head, switchRow, body);
     }
     function renderRows() {
-      if (!isTargetPage8()) return;
+      if (!isTargetPage9()) return;
       const day = today();
       const ids = prioEmployerIds(entries, day);
       const ready = loaded || Boolean(error);
@@ -16965,7 +17228,7 @@ ${buildCbreBody(current)}`;
       if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
     }
     function tick() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         owned(IDS8.button)?.remove();
         owned(IDS8.bar)?.remove();
         owned(IDS8.panel)?.remove();
@@ -16983,7 +17246,7 @@ ${buildCbreBody(current)}`;
         renderPanel();
       }
       if (!loaded && !loading && !error) load2();
-      else if (loaded && Date.now() - loadedAt >= REFRESH_MS2 && !loading) load2({ force: true });
+      else if (loaded && Date.now() - loadedAt >= REFRESH_MS3 && !loading) load2({ force: true });
       loadAbsentOnce();
     }
     let scheduled = false;
@@ -17001,7 +17264,7 @@ ${buildCbreBody(current)}`;
       closeReview();
     }, true);
     runtime.addWindowListener("hashchange", () => {
-      if (isTargetPage8()) load2();
+      if (isTargetPage9()) load2();
       schedule();
     });
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
@@ -17112,7 +17375,7 @@ ${buildCbreBody(current)}`;
     if (runtime.MutationObserver) return new runtime.MutationObserver(callback);
     return new MutationObserver(callback);
   }
-  var clean5 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean6 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function executeVacancyStatus(runtime, config) {
     const { sourcePath, getRequest, namespace, runLock = null, lockId = "vacancy-status" } = config;
     const inMatchList = config.placement === "match-list";
@@ -17152,7 +17415,7 @@ ${buildCbreBody(current)}`;
       document.head.appendChild(style);
     }
     function cellText(cell) {
-      return clean5([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS2))).map((node) => node.textContent).join(" "));
+      return clean6([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS2))).map((node) => node.textContent).join(" "));
     }
     function vacancyIdFromRow(row2) {
       for (const link of row2.querySelectorAll('a[href*="#/JobPosition/"]')) {
@@ -17313,9 +17576,9 @@ ${buildCbreBody(current)}`;
     function bulkEntries() {
       const seen = /* @__PURE__ */ new Set();
       return visibleRows().filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => {
-        const title = clean5(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
-        const place = clean5(entry.row.querySelector(".column-location\\.name")?.textContent);
-        const employer = clean5(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
+        const title = clean6(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
+        const place = clean6(entry.row.querySelector(".column-location\\.name")?.textContent);
+        const employer = clean6(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
         const status = currentStatus(entry);
         const label = [title, place].filter(Boolean).join(" · ");
         return { ...entry, employer, status, label: `${label.length > 80 ? `${label.slice(0, 79)}…` : label} (${statusLabel(status)})` };
@@ -17426,20 +17689,20 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/vacancy-status.js
-  var SOURCE_PATH3 = "kam/toolbox/src/features/vacancy-status.js";
+  var SOURCE_PATH4 = "kam/toolbox/src/features/vacancy-status.js";
   function isKamMyMatchesRoute(hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(String(hash || ""));
   }
   function executeVacancyStatus2(runtime) {
     const getRequest = () => getKamGraphqlAdapter().request;
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH3,
+      sourcePath: SOURCE_PATH4,
       getRequest,
       namespace: "kam",
       bulk: { team: "KAM", tipHtml: () => kamHelp.tipHtml("vacancy-status-bulk", { tone: "dark" }) }
     });
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH3,
+      sourcePath: SOURCE_PATH4,
       getRequest,
       namespace: "kam-matches",
       placement: "match-list",
@@ -17646,7 +17909,7 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID12 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID13 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -17682,9 +17945,9 @@ ${buildCbreBody(current)}`;
     }
   }
   function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID12)) return;
+    if (doc.getElementById(STYLE_ID13)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID12;
+    style.id = STYLE_ID13;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -17759,7 +18022,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/comment-shortcuts/index.js
   var PREFIX2 = "werkia-shortcuts";
-  var STYLE_ID13 = `${PREFIX2}-style`;
+  var STYLE_ID14 = `${PREFIX2}-style`;
   var BAR_CLASS3 = `${PREFIX2}-bar`;
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
@@ -17836,9 +18099,9 @@ ${buildCbreBody(current)}`;
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
   function ensureStyle5() {
-    if (document.getElementById(STYLE_ID13)) return;
+    if (document.getElementById(STYLE_ID14)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID13;
+    style.id = STYLE_ID14;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -18626,7 +18889,7 @@ ${buildCbreBody(current)}`;
     let myId = "";
     let teamEditing = null;
     const reported = /* @__PURE__ */ new Set();
-    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
       const element6 = document.getElementById(id);
       return element6?.dataset.werkiaTagesplanOwner === sourcePath ? element6 : null;
@@ -18911,7 +19174,7 @@ ${buildCbreBody(current)}`;
       render();
     }
     function decorateRows() {
-      if (!isTargetPage8()) return;
+      if (!isTargetPage9()) return;
       for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
         const link = row2.querySelector(MATCH_LINK_SELECTOR10);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
@@ -19140,7 +19403,7 @@ ${buildCbreBody(current)}`;
       panel.append(head, el6("div", { className: "wtp-body" }, parts));
     }
     function placeButton() {
-      if (!isTargetPage8()) {
+      if (!isTargetPage9()) {
         owned(IDS9.button)?.remove();
         return;
       }
@@ -19263,7 +19526,7 @@ ${buildCbreBody(current)}`;
   var WRITE_TIMEOUT_MS = 65e3;
   var OFFLINE_MESSAGE6 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
-  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaArbeitgeberPauseMe {
+  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaArbeitgeberPauseMe {
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
@@ -19467,7 +19730,7 @@ ${buildCbreBody(current)}`;
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY5, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY6, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -19807,12 +20070,12 @@ ${buildCbreBody(current)}`;
   function isOpenKamStatus(status) {
     return !CLOSED_KAM_STATUSES.includes(String(status || "").trim().toLowerCase());
   }
-  function clean6(value) {
+  function clean7(value) {
     return String(value ?? "").replace(/\s+/g, " ").trim();
   }
   function openApplicants(matches = [], candidates = [], jobs = []) {
-    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean6([c.firstName, c.lastName].filter(Boolean).join(" "))]));
-    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean6(j.mainTitle)]));
+    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean7([c.firstName, c.lastName].filter(Boolean).join(" "))]));
+    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean7(j.mainTitle)]));
     const seen = /* @__PURE__ */ new Set();
     const list = [];
     for (const match of matches) {
@@ -19896,7 +20159,7 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID14 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID15 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -19930,9 +20193,9 @@ ${buildCbreBody(current)}`;
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
   function ensureStyle6(doc) {
-    if (doc.getElementById(STYLE_ID14)) return;
+    if (doc.getElementById(STYLE_ID15)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID14;
+    style.id = STYLE_ID15;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -20333,7 +20596,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID15 = "werkia-om-notes-template-style";
+  var STYLE_ID16 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -20402,11 +20665,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID15)) {
+    if (document.getElementById(STYLE_ID16)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID15;
+    style.id = STYLE_ID16;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -20640,7 +20903,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID15)?.remove();
+      document.getElementById(STYLE_ID16)?.remove();
     });
     renderToolbar();
   }
@@ -20660,7 +20923,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID16 = "werkia-urgent-vacancy-style";
+      const STYLE_ID17 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -20799,9 +21062,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID16)) return;
+        if (document.getElementById(STYLE_ID17)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID16;
+        style.id = STYLE_ID17;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -20892,6 +21155,7 @@ ${next}`;
     { id: "update-check", execute: (runtime) => updateCheck(runtime, { label: "KAM", fileName: "KAM-Toolbox.user.js" }) },
     { id: "kam-suite-bulk-match-actions", execute: executeBulkMatchActions2 },
     { id: "tags-wvl", execute: executeTagsWvl },
+    { id: "tags-hc", execute: executeTagsHc },
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
     { id: "kam-suite-match-contact-person", execute: executeKamMatchContactPerson },
     { id: "kam-suite-employer-notes", execute: executeKamEmployerNotes },

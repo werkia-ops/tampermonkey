@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.273
+// @version      1.19.274
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -8978,28 +8978,129 @@ ${add}` : add;
   // src/features/cem-vta-pills.js
   var SOURCE = "cem/toolbox/src/features/cem-vta-pills.js";
   var MARK2 = "data-werkia-cem-vta-pill";
+  var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
   var STYLE_ID7 = "werkia-cem-vta-pill-style";
-  var OPEN_LABELS = /* @__PURE__ */ new Set(["Vorschlag", "Weitergeleitet"]);
-  function isOpenCemVtaChip(chip) {
-    if (!OPEN_LABELS.has(String(chip.getAttribute("aria-label") || "").trim())) return false;
-    const texts = [...chip.querySelectorAll("p")].map((p) => (p.textContent || "").trim());
-    return texts.length > 1 && texts[texts.length - 1] === "CEM";
+  var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
+  var CACHE_MS6 = 60 * 1e3;
+  var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
+  var MATCH_INTERVIEWS_QUERY = `query allMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
+  items: allMatches(filter: $filter, page: $page, perPage: $perPage) {
+    id
+    interviews { id status dates dateSuggestedBy }
+  }
+}`;
+  var DATE_FORMAT = new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  function normalize3(text) {
+    return String(text || "").replace(/[,\s]+/g, " ").trim();
+  }
+  function formatPillDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : normalize3(DATE_FORMAT.format(date));
+  }
+  function isCemRoute(hash) {
+    return ROUTES.cemMyMatches.test(hash) || ROUTES.cemMyCandidates.test(hash);
+  }
+  function originLabel(interview) {
+    if (interview?.dateSuggestedBy === "employer") return "AG";
+    if (interview?.dateSuggestedBy === "candidate") return "Kand.";
+    return "";
+  }
+  function needsBorder(interview) {
+    return interview?.dateSuggestedBy === "employer" && OPEN_STATUSES.has(interview.status);
+  }
+  function assignInterviews(chipTexts, interviews) {
+    const result = chipTexts.map(() => null);
+    const free = new Set(interviews.map((_, index) => index));
+    chipTexts.forEach((text, chipIndex) => {
+      const normalized = normalize3(text);
+      for (const index of free) {
+        const dates = (interviews[index].dates || []).map(formatPillDate).filter(Boolean);
+        if (dates.some((date) => normalized.includes(date))) {
+          result[chipIndex] = interviews[index];
+          free.delete(index);
+          return;
+        }
+      }
+    });
+    const open = result.flatMap((value, index) => value ? [] : [index]);
+    if (open.length === 1 && free.size === 1) result[open[0]] = interviews[[...free][0]];
+    return result;
   }
   function executeCemVtaPills(runtime) {
     runtime.registerSource(SOURCE);
+    const cache = /* @__PURE__ */ new Map();
+    const pending = /* @__PURE__ */ new Set();
     function ensureStyle4() {
       if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID7;
-      style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }`;
+      style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
+.werkia-cem-vta-origin { margin-left: 6px; padding-left: 6px; border-left: 1px solid rgba(0,0,0,.2); font-size: .75rem; opacity: .7; white-space: nowrap; }`;
       document.head.appendChild(style);
     }
-    function mark() {
-      document.querySelectorAll(".MuiChip-root[aria-label]").forEach((chip) => {
-        const open = isOpenCemVtaChip(chip);
-        if (open && !chip.hasAttribute(MARK2)) chip.setAttribute(MARK2, "");
-        else if (!open && chip.hasAttribute(MARK2)) chip.removeAttribute(MARK2);
+    function chipText(chip) {
+      return [...chip.querySelectorAll("p, span")].filter((node) => !node.hasAttribute(ORIGIN_ATTRIBUTE)).map((node) => node.textContent).join(" ") || chip.textContent;
+    }
+    function decorate(chip, interview) {
+      const label2 = originLabel(interview);
+      const host = chip.querySelector(".MuiChip-label") || chip;
+      let tag = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
+      if (!label2) tag?.remove();
+      else if (!tag || tag.textContent !== label2) {
+        tag?.remove();
+        tag = document.createElement("span");
+        tag.className = "werkia-cem-vta-origin";
+        tag.setAttribute(ORIGIN_ATTRIBUTE, "");
+        tag.title = label2 === "AG" ? "Termine vom Arbeitgeber (KAM-VTA)" : "Termine vom Kandidaten (CEM-VTA)";
+        tag.textContent = label2;
+        host.appendChild(tag);
+      }
+      if (needsBorder(interview)) chip.setAttribute(MARK2, "");
+      else chip.removeAttribute(MARK2);
+    }
+    async function load2(ids) {
+      ids.forEach((id) => pending.add(id));
+      try {
+        const data = await getCemGraphqlAdapter().request(MATCH_INTERVIEWS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
+        const now = Date.now();
+        for (const match of data?.items || []) cache.set(match.id, { at: now, interviews: match.interviews || [] });
+      } catch (error) {
+        console.warn("[CEM VTA-Herkunft]", error);
+      } finally {
+        ids.forEach((id) => pending.delete(id));
+        schedule();
+      }
+    }
+    function render() {
+      if (!isCemRoute(location.hash)) return;
+      ensureStyle4();
+      const rows = /* @__PURE__ */ new Map();
+      document.querySelectorAll(CHIP_SELECTOR).forEach((chip) => {
+        const row2 = chip.closest("tr");
+        const matchId = matchIdFromRow(row2);
+        if (!matchId) return;
+        if (!rows.has(matchId)) rows.set(matchId, []);
+        rows.get(matchId).push(chip);
       });
+      const missing = [];
+      const now = Date.now();
+      for (const [matchId, chips] of rows) {
+        const entry = cache.get(matchId);
+        if (!entry || now - entry.at > CACHE_MS6) {
+          if (!pending.has(matchId)) missing.push(matchId);
+          if (!entry) continue;
+        }
+        const assigned = assignInterviews(chips.map(chipText), entry.interviews);
+        chips.forEach((chip, index) => decorate(chip, assigned[index]));
+      }
+      for (let i = 0; i < missing.length; i += 100) load2(missing.slice(i, i + 100));
     }
     let scheduled = false;
     function schedule() {
@@ -9007,12 +9108,12 @@ ${add}` : add;
       scheduled = true;
       runtime.setTimeout(() => {
         scheduled = false;
-        mark();
+        render();
       }, 150);
     }
-    ensureStyle4();
+    runtime.addWindowListener?.("hashchange", schedule);
     runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
-    mark();
+    schedule();
   }
 
   // src/features/vacancy-candidate-info/candidate-table.js
@@ -9928,7 +10029,7 @@ ${add}` : add;
     </div>
     <div class="wkw-count" data-count>${items.length} von ${items.length} ausgewählt</div>`;
   }
-  var normalize3 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
+  var normalize4 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
   function syncBox(box, children) {
     const checked = children.filter((child) => child.checked).length;
     box.checked = checked === children.length && checked > 0;
@@ -9944,12 +10045,12 @@ ${add}` : add;
     const groups = [...root.querySelectorAll(".wkw-group")].map((group) => ({
       element: group,
       box: group.querySelector("[data-group]"),
-      label: normalize3(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
+      label: normalize4(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
       items: [...group.querySelectorAll('input[name="item"]')]
     }));
     let pristine = true;
     const shown = (list) => list.filter((item) => !isHiddenItem(item));
-    const query = () => normalize3(search?.value).replace(/\s+/g, " ");
+    const query = () => normalize4(search?.value).replace(/\s+/g, " ");
     const sync = () => {
       groups.forEach((group) => syncBox(group.box, shown(group.items)));
       const visible = shown(items);
@@ -9971,7 +10072,7 @@ ${add}` : add;
       const groupOf = new Map(groups.flatMap((group) => group.items.map((item) => [item, group])));
       items.forEach((item) => {
         const group = groupOf.get(item);
-        const haystack = `${group ? `${group.label} ` : ""}${normalize3(item.closest("label").textContent)}`;
+        const haystack = `${group ? `${group.label} ` : ""}${normalize4(item.closest("label").textContent)}`;
         item.closest("label").hidden = !haystack.replace(/\s+/g, " ").includes(text);
       });
       groups.forEach((group) => {
@@ -10320,7 +10421,7 @@ ${add}` : add;
   }
 }`;
   }
-  function normalize4(value) {
+  function normalize5(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
   function parseIsoDate(isoDate) {
@@ -10484,18 +10585,18 @@ ${add}` : add;
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
         id: match?.[1] || link.href,
-        name: normalize4(link.textContent) || "Unbekannter Arbeitgeber"
+        name: normalize5(link.textContent) || "Unbekannter Arbeitgeber"
       };
     }
     function candidateNameFromRow(row2) {
       const own = row2.querySelector(CANDIDATE_LINK_SELECTOR2);
-      if (own) return normalize4(own.textContent);
+      if (own) return normalize5(own.textContent);
       const parentRow = row2.closest("table")?.closest("tr")?.previousElementSibling;
-      return normalize4(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR2)?.textContent);
+      return normalize5(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR2)?.textContent);
     }
     function labelFromRow(row2) {
       const candidate = candidateNameFromRow(row2);
-      const vacancy = normalize4(row2.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
+      const vacancy = normalize5(row2.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
       const label2 = [candidate, vacancy].filter(Boolean).join(" – ");
       return label2.length > 90 ? `${label2.slice(0, 89)}…` : label2;
     }
@@ -10858,7 +10959,7 @@ ${add}` : add;
       const targetStatus = statusOptions.find((status2) => status2.value === targetValue);
       const outFeedbackValue = dialog.querySelector('[name="outFeedback"]').value;
       const outFeedback = outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
-      const outFeedbackText = normalize4(dialog.querySelector('[name="outFeedbackText"]').value);
+      const outFeedbackText = normalize5(dialog.querySelector('[name="outFeedbackText"]').value);
       if (!selection.length) return setStatus("Bitte mindestens ein Match anhaken.", "error");
       if (!targetStatus || targetValue === "__choose__") return setStatus(`Bitte einen ${team} Status auswählen.`, "error");
       const isOut = targetStatus.value === "out";
@@ -11098,13 +11199,13 @@ ${add}` : add;
     const kit = createBulkDialogKit({ ids: IDS5, buttonIds: [IDS5.wvlButton, IDS5.statusButton], stopNoun: "Kandidat" });
     const { setStatus } = kit;
     const tip = (id) => cemHelp.tipHtml(id, { tone: "dark" });
-    const normalize6 = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const normalize7 = (value) => String(value || "").replace(/\s+/g, " ").trim();
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
       return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
         const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR3}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
-        return id ? { id, name: normalize6(link.textContent) || id } : null;
+        return id ? { id, name: normalize7(link.textContent) || id } : null;
       }).filter((candidate) => candidate && !seen.has(candidate.id) && seen.add(candidate.id));
     }
     function candidateChecklist(candidates) {
@@ -12250,7 +12351,7 @@ ${add}` : add;
   var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/cem-ampel/d1d7ad22-6ac6-47c2-89f3-1fdba7ea1cf5";
   var REQUEST_TIMEOUT_MS3 = 2e4;
   var OFFLINE_MESSAGE3 = "Der Server für die CEM-Ampel ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CACHE_MS6 = 5 * 60 * 1e3;
+  var CACHE_MS7 = 5 * 60 * 1e3;
   var RETRY_MS3 = 60 * 1e3;
   var MAX_IDS = 100;
   var AMPEL_MARKER = "werkiaAmpel";
@@ -12881,7 +12982,7 @@ ${add}` : add;
   var ROW_CLASS2 = "werkia-cem-vta-sperre-row";
   var LABEL_CLASS = "werkia-cem-vta-sperre-label";
   var VERTRETUNGEN_BUTTON_ID = "werkia-vertretungen-button";
-  var CACHE_MS7 = 10 * 60 * 1e3;
+  var CACHE_MS8 = 10 * 60 * 1e3;
   var RETRY_MS4 = 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
   var T3 = {
@@ -13047,7 +13148,7 @@ ${add}` : add;
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS7) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS8) return Promise.resolve(cache);
       if (failedAt && Date.now() - failedAt < RETRY_MS4) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[CEM-VTA-Sperre] Liste nicht geladen:", error?.message || error);
@@ -13442,7 +13543,7 @@ ${add}` : add;
     function loadFarben(scope) {
       const key = scopeKey(scope);
       const cached = lists.get(key);
-      if (cached && Date.now() - cached.at < CACHE_MS6) return cached.promise;
+      if (cached && Date.now() - cached.at < CACHE_MS7) return cached.promise;
       const promise = call({ action: "liste", ...scope }).then((data) => {
         listError = "";
         return data.farben;
@@ -13462,7 +13563,7 @@ ${add}` : add;
     });
     const fresh = (id) => {
       const hit = known.get(id);
-      return hit && Date.now() - hit.at < CACHE_MS6 ? hit : null;
+      return hit && Date.now() - hit.at < CACHE_MS7 ? hit : null;
     };
     async function loadStatus(ids) {
       loading = (async () => {
@@ -14912,7 +15013,7 @@ ${add}` : add;
   function createTemplateId(now = Date.now(), entropy = Math.random()) {
     return `own-${now.toString(36)}-${Math.floor(entropy * 1e8).toString(36)}`;
   }
-  function normalize5(entry) {
+  function normalize6(entry) {
     if (!entry || typeof entry !== "object") return null;
     const name = String(entry.name || "").trim();
     const text = String(entry.text || "");
@@ -14934,10 +15035,10 @@ ${add}` : add;
       }
     }
     const list = Array.isArray(parsed?.templates) ? parsed.templates : [];
-    return { version: STORE_VERSION3, templates: list.map(normalize5).filter(Boolean) };
+    return { version: STORE_VERSION3, templates: list.map(normalize6).filter(Boolean) };
   }
   function upsertTemplate(store, template) {
-    const clean4 = normalize5(template);
+    const clean4 = normalize6(template);
     if (!clean4) throw new Error("Name und Text dürfen nicht leer sein.");
     const templates = [...store?.templates || []];
     const index = templates.findIndex((entry) => entry.id === clean4.id);
@@ -14995,7 +15096,7 @@ ${add}` : add;
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
   var IDS8 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
-  var CACHE_MS8 = 2 * 60 * 1e3;
+  var CACHE_MS9 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
   .${CELL_CLASS} .${BUTTON_CLASS} { margin:0; }
@@ -15082,7 +15183,7 @@ ${add}` : add;
       const entry = cache.get(key);
       if (entry && entry.expiresAt > Date.now()) return entry.promise;
       const promise = load2();
-      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS8 });
+      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS9 });
       promise.catch(() => cache.delete(key));
       return promise;
     }

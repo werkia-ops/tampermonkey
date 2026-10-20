@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.284
+// @version      1.19.285
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -6272,16 +6272,16 @@ ${add}` : add;
   var BATCH_SIZE2 = 25;
   var CACHE_TTL_MS = 5 * 60 * 1e3;
   var STATUS_CHANGE_DELAY_MS = 2e3;
-  function outGruendeTopic({ page, routes, statusName, id = "out-gruende" }) {
+  function outGruendeTopic({ page, routes, statusName, id = "out-gruende", summary, scopeNote }) {
     return {
       id,
       title: "Out-Grund neben dem Status",
       page,
       routes,
       kind: "view",
-      summary: `Steht ein Match auf Out, steht klein unter dem ${statusName} der Grund, z. B. „KAM-Out: BEW bereits bekannt“ oder „CEM-Out: Entfernung zu weit“.`,
+      summary: summary || `Steht ein Match auf Out, steht klein unter dem ${statusName} der Grund, z. B. „KAM-Out: BEW bereits bekannt“ oder „CEM-Out: Entfernung zu weit“.`,
       notes: [
-        "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
+        scopeNote || "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
         "Absagen aus der Kandidaten-App stehen als „Absage in der App: …“.",
         "Bei jedem neuen Out schreibt zusätzlich der n8n-Workflow „Out-Gründe“ den Grund als Matchkommentar."
       ]
@@ -6321,11 +6321,16 @@ ${add}` : add;
       return entry && Date.now() - entry.at < CACHE_TTL_MS;
     }
     function entriesFor(view, cell, match) {
-      const own = view.sides[0];
+      const own = view.ownSide || view.sides[0];
       const text = selectText(cell);
       return outEntries(match, view.sides).filter((entry) => entry.side !== own || !text || text === "Out");
     }
-    function placeLine(cell, line) {
+    function placeLine(cell, line, view) {
+      const after = view?.after ? cell.querySelector(view.after) : null;
+      if (after) {
+        if (after.nextSibling !== line) after.after(line);
+        return;
+      }
       const anchor = [...cell.children].find((child) => child !== line && child.querySelector?.(".MuiSelect-select, .MuiInputBase-root"));
       if (anchor) {
         if (anchor.nextSibling !== line) anchor.after(line);
@@ -6379,7 +6384,7 @@ ${add}` : add;
           line = document.createElement("div");
           line.className = LINE_CLASS2;
         }
-        placeLine(cell, line);
+        placeLine(cell, line, view);
         if (line.dataset.key === key) continue;
         line.dataset.key = key;
         line.replaceChildren(...entries.map((entry) => {
@@ -6630,7 +6635,13 @@ ${add}` : add;
       summary: "Unter dem KAM Status steht der CEM Status des Matches und wer auf CEM-Seite zuständig ist.",
       notes: ["Ein Klick auf den Namen kopiert ihn in die Zwischenablage, zum Beispiel für Slack."]
     },
-    outGruendeTopic({ page: MY_MATCHES, routes: onMyMatches, statusName: "KAM Status" }),
+    outGruendeTopic({
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      statusName: "KAM Status",
+      summary: "Hat CEM einen Match geoutet, steht klein unter der CEM-Zeile der Grund, z. B. „CEM-Out: Entfernung zu weit“.",
+      scopeNote: "Gezeigt wird nur der Grund der Gegenseite (CEM). Den eigenen KAM-Grund kennst du, er steht als Matchkommentar am Match. Ohne hinterlegten Grund steht „ohne Grund“."
+    }),
     matchStatusFilterTopic({ id: "cem-status-filter", team: "CEM", page: MY_MATCHES, routes: onMyMatches }),
     {
       id: "candidate-file-popup",
@@ -9304,7 +9315,7 @@ ${add}` : add;
       namespace: "kam",
       sourcePath: "kam/toolbox/src/features/out-gruende.js",
       getGraphqlAdapter: getKamGraphqlAdapter,
-      views: [{ route: ROUTES.kamMyMatches, cellSelector: "td.column-kamStatus", sides: ["kam", "cem"] }]
+      views: [{ route: ROUTES.kamMyMatches, cellSelector: "td.column-kamStatus", sides: ["cem"], ownSide: "kam", after: ".werkia-kam-cem-line" }]
     });
   }
 

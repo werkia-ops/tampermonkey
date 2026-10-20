@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.20.282
+// @version      1.20.285
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6295,16 +6295,16 @@ ${add}` : add;
   var BATCH_SIZE2 = 25;
   var CACHE_TTL_MS = 5 * 60 * 1e3;
   var STATUS_CHANGE_DELAY_MS = 2e3;
-  function outGruendeTopic({ page, routes, statusName, id = "out-gruende" }) {
+  function outGruendeTopic({ page, routes, statusName, id = "out-gruende", summary, scopeNote }) {
     return {
       id,
       title: "Out-Grund neben dem Status",
       page,
       routes,
       kind: "view",
-      summary: `Steht ein Match auf Out, steht klein unter dem ${statusName} der Grund, z. B. „KAM-Out: BEW bereits bekannt“ oder „CEM-Out: Entfernung zu weit“.`,
+      summary: summary || `Steht ein Match auf Out, steht klein unter dem ${statusName} der Grund, z. B. „KAM-Out: BEW bereits bekannt“ oder „CEM-Out: Entfernung zu weit“.`,
       notes: [
-        "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
+        scopeNote || "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
         "Absagen aus der Kandidaten-App stehen als „Absage in der App: …“.",
         "Bei jedem neuen Out schreibt zusätzlich der n8n-Workflow „Out-Gründe“ den Grund als Matchkommentar."
       ]
@@ -6344,11 +6344,16 @@ ${add}` : add;
       return entry && Date.now() - entry.at < CACHE_TTL_MS;
     }
     function entriesFor(view, cell, match) {
-      const own = view.sides[0];
+      const own = view.ownSide || view.sides[0];
       const text = selectText(cell);
       return outEntries(match, view.sides).filter((entry) => entry.side !== own || !text || text === "Out");
     }
-    function placeLine(cell, line) {
+    function placeLine(cell, line, view) {
+      const after = view?.after ? cell.querySelector(view.after) : null;
+      if (after) {
+        if (after.nextSibling !== line) after.after(line);
+        return;
+      }
       const anchor = [...cell.children].find((child) => child !== line && child.querySelector?.(".MuiSelect-select, .MuiInputBase-root"));
       if (anchor) {
         if (anchor.nextSibling !== line) anchor.after(line);
@@ -6402,7 +6407,7 @@ ${add}` : add;
           line = document.createElement("div");
           line.className = LINE_CLASS;
         }
-        placeLine(cell, line);
+        placeLine(cell, line, view);
         if (line.dataset.key === key) continue;
         line.dataset.key = key;
         line.replaceChildren(...entries.map((entry) => {

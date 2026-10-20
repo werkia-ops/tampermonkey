@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.19.269
+// @version      1.19.270
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6339,6 +6339,25 @@ ${add}` : add;
         "Einzelne Personen (derzeit die CEM-Leitung) sehen zusätzlich „An CEM“. Damit geht die DM an die CEM-Person, die beim Kandidaten eingetragen ist, und deren Vertretung. Bist du das selbst, meldet der Dialog das. Freischalten lässt sich das nur im Code der Toolbox."
       ]
     },
+    {
+      id: "match-commute",
+      title: "Distanz zur Vakanz je Match",
+      page: MY_MATCHES,
+      routes: onMyMatches,
+      kind: "view",
+      summary: "Der 🚗-Knopf in jeder Match-Zeile zeigt, wie lange der Kandidat mit dem Auto zur Vakanz fährt, ohne dass du den Fragebogen öffnen musst.",
+      steps: [
+        "Mit der Maus über 🚗 fahren: Fahrzeit und Strecke erscheinen. Beim ersten Mal wird kurz gerechnet.",
+        "Auf 🚗 klicken: Eine kleine Karte zeigt die Route mit beiden Adressen (grün Kandidat, rot Vakanz).",
+        "„In Google Maps öffnen“ zeigt dieselbe Strecke in Google Maps, falls du sie genauer prüfen willst."
+      ],
+      notes: [
+        "Nach dem ersten Hover färbt sich der Knopf: grün bis 50 Min, rot mit 💀 über 50 Min bei einer ortsgebundenen Vakanz. 🏠, 🗺️ und 🧳 stehen für Start von Zuhause, landes-/bundesweit und Montage; dort ist die Fahrzeit nur zur Info.",
+        "Gerechnet wird wie im Fragebogen. Berechnete Routen bleiben eine Woche im Browser gespeichert.",
+        "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet, dann gibt es auch keine Karte.",
+        "Esc, ein Klick daneben oder Scrollen schließt die Karte."
+      ]
+    },
     vertretungenTopic({ page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates, ROUTES.cemMyMatches] }),
     {
       id: "cem-vta-sperre",
@@ -8729,7 +8748,7 @@ ${add}` : add;
     const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
     const bigSkullUrl = options.bigSkullUrl || "";
     const BAR_CLASS4 = `werkia-${namespace}-commute-hidden-bar`;
-    const OWNED_SELECTOR = `.${BADGE_CLASS2}, .${BAR_CLASS4}`;
+    const OWNED_SELECTOR2 = `.${BADGE_CLASS2}, .${BAR_CLASS4}`;
     let showHidden = false;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
@@ -8936,8 +8955,8 @@ ${add}` : add;
     }
     runtime.createMutationObserver((mutations) => {
       const foreign = mutations.some((mutation) => {
-        if (mutation.target?.closest?.(OWNED_SELECTOR)) return false;
-        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(OWNED_SELECTOR));
+        if (mutation.target?.closest?.(OWNED_SELECTOR2)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(OWNED_SELECTOR2));
       });
       if (foreign) scheduleRender();
     }).observe(document.body, { childList: true, subtree: true });
@@ -10404,7 +10423,7 @@ ${add}` : add;
       team,
       isTargetPage: isTargetPage3,
       getRequest,
-      ids: IDS10,
+      ids: IDS11,
       fields,
       columns,
       statusOptions,
@@ -10484,13 +10503,13 @@ ${add}` : add;
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS10,
-      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
+      ids: IDS11,
+      buttonIds: [IDS11.button, IDS11.statusButton, IDS11.forwardButton, IDS11.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS11.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS11.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -10630,13 +10649,13 @@ ${add}` : add;
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS11.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS10.feedbackShortcuts;
+      shortcuts.id = IDS11.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -10936,10 +10955,10 @@ ${add}` : add;
     function installHeaderButtons() {
       if (!isTargetPage3()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS11.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS11.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS11.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS11.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -11647,7 +11666,7 @@ ${add}` : add;
     employerCache = null
   }) {
     runtime.registerSource(sourcePath);
-    const IDS10 = makeIds(idPrefix);
+    const IDS11 = makeIds(idPrefix);
     const { defaultScope, leaveHash, modeHash, modeMatchesState, pickScope } = core;
     const isTargetPage3 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -11670,42 +11689,42 @@ ${add}` : add;
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle4() {
-      if (document.getElementById(IDS10.style)) return;
+      if (document.getElementById(IDS11.style)) return;
       const style = document.createElement("style");
-      style.id = IDS10.style;
+      style.id = IDS11.style;
       style.textContent = `
-      #${IDS10.group}, #${IDS10.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS10.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS10.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
-      #${IDS10.group} + #${IDS10.side} { margin:0 0 0 8px; }
-      #${IDS10.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS10.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS10.side}.is-active > strong { color:#b85400; }
-      #${IDS10.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.side} button:hover { background:#f4f4f5; }
-      #${IDS10.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
-      #${IDS10.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
-      #${IDS10.group}.is-active, #${IDS10.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS10.group} > strong, #${IDS10.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS10.group}.is-active > strong, #${IDS10.bar}.is-active > strong { color:#b85400; }
-      #${IDS10.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS10.group} button, #${IDS10.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.group} button:hover, #${IDS10.bar} button:hover { background:#f4f4f5; }
-      #${IDS10.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS10.leave}:hover { background:#b85400 !important; }
-      #${IDS10.group} [hidden], #${IDS10.bar} [hidden] { display:none !important; }
+      #${IDS11.group}, #${IDS11.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS11.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS11.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
+      #${IDS11.group} + #${IDS11.side} { margin:0 0 0 8px; }
+      #${IDS11.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS11.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS11.side}.is-active > strong { color:#b85400; }
+      #${IDS11.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.side} button:hover { background:#f4f4f5; }
+      #${IDS11.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS11.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
+      #${IDS11.group}.is-active, #${IDS11.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS11.group} > strong, #${IDS11.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS11.group}.is-active > strong, #${IDS11.bar}.is-active > strong { color:#b85400; }
+      #${IDS11.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS11.group} button, #${IDS11.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.group} button:hover, #${IDS11.bar} button:hover { background:#f4f4f5; }
+      #${IDS11.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS11.leave}:hover { background:#b85400 !important; }
+      #${IDS11.group} [hidden], #${IDS11.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS10.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS10.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS10.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS10.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS10.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS10.dialog} input[type=text], #${IDS10.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS10.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS10.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS10.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS11.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS11.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS11.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS11.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS11.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS11.dialog} input[type=text], #${IDS11.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS11.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS11.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS11.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -11742,13 +11761,13 @@ ${add}` : add;
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS10.dialog)?.remove();
+      document.getElementById(IDS11.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS10.dialog;
+      overlay.id = IDS11.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -11825,7 +11844,7 @@ ${add}` : add;
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS10.select;
+      select.id = IDS11.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       const warm = () => {
         if (hasContactMode()) employers.prefetch();
@@ -11839,19 +11858,19 @@ ${add}` : add;
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS10.leave;
+      leaveButton.id = IDS11.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS10.save;
+      saveButton.id = IDS11.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS10.remove;
+      removeButton.id = IDS11.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -11863,14 +11882,14 @@ ${add}` : add;
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS10.group);
-      let ownBar = document.getElementById(IDS10.bar);
+      let group = document.getElementById(IDS11.group);
+      let ownBar = document.getElementById(IDS11.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS10.group;
+        group.id = IDS11.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -11880,13 +11899,13 @@ ${add}` : add;
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS10.bar;
+      ownBar.id = IDS11.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
     }
     function ensureSide(container) {
-      let side = document.getElementById(IDS10.side);
+      let side = document.getElementById(IDS11.side);
       if (!SIDE_MODES.length) {
         side?.remove();
         return null;
@@ -11894,7 +11913,7 @@ ${add}` : add;
       if (side && side.previousElementSibling === container) return side;
       side?.remove();
       side = document.createElement("span");
-      side.id = IDS10.side;
+      side.id = IDS11.side;
       const title = document.createElement("strong");
       title.textContent = SIDE_MODES[0].side.box || "Filter";
       side.appendChild(title);
@@ -11952,9 +11971,9 @@ ${add}` : add;
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
-          document.getElementById(IDS10.group)?.remove();
-          document.getElementById(IDS10.bar)?.remove();
-          document.getElementById(IDS10.side)?.remove();
+          document.getElementById(IDS11.group)?.remove();
+          document.getElementById(IDS11.bar)?.remove();
+          document.getElementById(IDS11.side)?.remove();
           closeDialog();
         }
         return;
@@ -11991,8 +12010,8 @@ ${add}` : add;
       const sideActive = Boolean(mode?.side);
       const isActive = Boolean(mode) && !sideActive;
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS10.select}`), own, isActive ? mode.id : "");
-      setHidden(container.querySelector(`#${IDS10.leave}`), !isActive);
+      fillSelect(container.querySelector(`#${IDS11.select}`), own, isActive ? mode.id : "");
+      setHidden(container.querySelector(`#${IDS11.leave}`), !isActive);
       const side = ensureSide(container);
       if (side) {
         if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
@@ -12001,7 +12020,7 @@ ${add}` : add;
           if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
         });
       }
-      setHidden(container.querySelector(`#${IDS10.remove}`), !isActive || Boolean(mode?.builtIn));
+      setHidden(container.querySelector(`#${IDS11.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -14750,10 +14769,10 @@ ${add}` : add;
     id name postalCode city __typename
   }
 }`;
-  function optional(unavailable, label2, promise, fallback) {
+  function optional(unavailable2, label2, promise, fallback) {
     return promise.catch((error) => {
       console.warn(`[Werkia WA] ${label2} nicht ladbar:`, error?.message || error);
-      unavailable.push(label2);
+      unavailable2.push(label2);
       return fallback;
     });
   }
@@ -14764,10 +14783,10 @@ ${add}` : add;
   }
   var loadMe = (request) => request(WA_ME_QUERY, {}).then((result) => result?.me || null);
   async function loadCandidateContext(request, candidateId) {
-    const unavailable = [];
+    const unavailable2 = [];
     const [result, cem] = await Promise.all([
       request(WA_CANDIDATE_QUERY, { id: candidateId }),
-      optional(unavailable, "eigener Name/E-Mail", loadMe(request), null)
+      optional(unavailable2, "eigener Name/E-Mail", loadMe(request), null)
     ]);
     const candidate = result?.data;
     if (!candidate?.id) throw new Error("Kandidat konnte nicht geladen werden.");
@@ -14775,15 +14794,15 @@ ${add}` : add;
       candidateId: candidate.id,
       candidateFirstName: candidate.firstName || "",
       cem,
-      obc: await optional(unavailable, "OBC-Mitarbeiter", loadEmployee(request, candidate.obcEmployeeId), null),
-      unavailable
+      obc: await optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, candidate.obcEmployeeId), null),
+      unavailable: unavailable2
     };
   }
   async function loadMatchContext(request, matchId) {
-    const unavailable = [];
+    const unavailable2 = [];
     const [result, cem] = await Promise.all([
       request(WA_MATCH_QUERY, { id: matchId }),
-      optional(unavailable, "eigener Name/E-Mail", loadMe(request), null)
+      optional(unavailable2, "eigener Name/E-Mail", loadMe(request), null)
     ]);
     const match = result?.data;
     const jobPosition = match?.jobPosition;
@@ -14791,11 +14810,11 @@ ${add}` : add;
     if (!match?.id || !match.candidate?.id || !jobPosition?.id || !employer?.id) throw new Error("Matchdaten konnten nicht vollständig geladen werden.");
     const items = (query) => (result2) => result2?.[query] || [];
     const [obc, jobLocation, contacts, interviewLocations, employerLocations] = await Promise.all([
-      optional(unavailable, "OBC-Mitarbeiter", loadEmployee(request, match.candidate.obcEmployeeId), null),
-      optional(unavailable, "Ort der Vakanz", request(WA_JOB_LOCATION_QUERY, { id: jobPosition.id }).then((result2) => result2?.data?.location || null), null),
-      optional(unavailable, "Ansprechpartner", request(WA_CONTACTS_QUERY, { employerId: employer.id }).then(items("items")), []),
-      optional(unavailable, "Terminadressen", request(WA_INTERVIEW_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), []),
-      optional(unavailable, "Standorte", request(WA_EMPLOYER_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), [])
+      optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, match.candidate.obcEmployeeId), null),
+      optional(unavailable2, "Ort der Vakanz", request(WA_JOB_LOCATION_QUERY, { id: jobPosition.id }).then((result2) => result2?.data?.location || null), null),
+      optional(unavailable2, "Ansprechpartner", request(WA_CONTACTS_QUERY, { employerId: employer.id }).then(items("items")), []),
+      optional(unavailable2, "Terminadressen", request(WA_INTERVIEW_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), []),
+      optional(unavailable2, "Standorte", request(WA_EMPLOYER_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), [])
     ]);
     return {
       matchId: match.id,
@@ -14812,7 +14831,7 @@ ${add}` : add;
       defaultContact: pickContact(contacts),
       interviewLocations,
       employerLocations,
-      unavailable
+      unavailable: unavailable2
     };
   }
   function addressFor(context, interview) {
@@ -16484,6 +16503,379 @@ Trotzdem speichern?`)) return void 0;
     });
   }
 
+  // ../../shared/js/route-commute/static-map.js
+  var TILE_SIZE = 256;
+  var OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  var OSM_ATTRIBUTION = "© OpenStreetMap";
+  function lonLatToWorldPx(lon, lat, zoom) {
+    const scale = TILE_SIZE * 2 ** zoom;
+    const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+    const sin = Math.sin(clampedLat * Math.PI / 180);
+    return [
+      (lon + 180) / 360 * scale,
+      (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale
+    ];
+  }
+  function fitStaticMap(coordinates, { width = 360, height = 220, padding = 28, minZoom = 3, maxZoom = 15 } = {}) {
+    const points = (Array.isArray(coordinates) ? coordinates : []).map((point) => [Number(point?.[0]), Number(point?.[1])]).filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    if (points.length < 2) return null;
+    let zoom = minZoom;
+    let projected = points.map(([lon, lat]) => lonLatToWorldPx(lon, lat, zoom));
+    for (let candidate = maxZoom; candidate >= minZoom; candidate -= 1) {
+      const candidatePoints = points.map(([lon, lat]) => lonLatToWorldPx(lon, lat, candidate));
+      const xs2 = candidatePoints.map((point) => point[0]);
+      const ys2 = candidatePoints.map((point) => point[1]);
+      if (Math.max(...xs2) - Math.min(...xs2) <= width - padding * 2 && Math.max(...ys2) - Math.min(...ys2) <= height - padding * 2) {
+        zoom = candidate;
+        projected = candidatePoints;
+        break;
+      }
+    }
+    const xs = projected.map((point) => point[0]);
+    const ys = projected.map((point) => point[1]);
+    const originX = (Math.min(...xs) + Math.max(...xs)) / 2 - width / 2;
+    const originY = (Math.min(...ys) + Math.max(...ys)) / 2 - height / 2;
+    const tileCount = 2 ** zoom;
+    const tiles = [];
+    for (let tileY = Math.floor(originY / TILE_SIZE); tileY <= Math.floor((originY + height - 1) / TILE_SIZE); tileY += 1) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      for (let tileX = Math.floor(originX / TILE_SIZE); tileX <= Math.floor((originX + width - 1) / TILE_SIZE); tileX += 1) {
+        const wrappedX = (tileX % tileCount + tileCount) % tileCount;
+        tiles.push({
+          url: OSM_TILE_URL.replace("{z}", zoom).replace("{x}", wrappedX).replace("{y}", tileY),
+          left: Math.round(tileX * TILE_SIZE - originX),
+          top: Math.round(tileY * TILE_SIZE - originY)
+        });
+      }
+    }
+    return {
+      zoom,
+      width,
+      height,
+      tiles,
+      points: projected.map(([x, y]) => [Number((x - originX).toFixed(1)), Number((y - originY).toFixed(1))])
+    };
+  }
+  function googleMapsDirectionsUrl(fromAddress, toAddress) {
+    const params = new URLSearchParams({ api: "1", origin: String(fromAddress || ""), destination: String(toAddress || ""), travelmode: "driving" });
+    return `https://www.google.com/maps/dir/?${params}`;
+  }
+
+  // src/features/match-commute.js
+  var SOURCE_PATH4 = "cem/toolbox/src/features/match-commute.js";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var BUTTON_CLASS3 = "werkia-cem-match-commute-button";
+  var IDS10 = { style: "werkia-cem-match-commute-style", tooltip: "werkia-cem-match-commute-tooltip", popover: "werkia-cem-match-commute-popover" };
+  var OWNED_SELECTOR = `.${BUTTON_CLASS3}, #${IDS10.tooltip}, #${IDS10.popover}`;
+  var MAP_WIDTH = 360;
+  var MAP_HEIGHT = 220;
+  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var MATCH_QUERY3 = `query WerkiaCemMatchCommute($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
+}`;
+  function matchIdFromHref7(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function tooltipText(result) {
+    if (!result) return "Fahrzeit wird berechnet …";
+    if (result.state !== "ready") return `Keine Fahrzeit: ${result.reason}`;
+    const { commute } = result;
+    return [commute.text, commute.kmText].filter(Boolean).join(" · ");
+  }
+  var unavailable = (reason) => ({ state: "missing", reason });
+  async function loadMatchCommute(matchId, { request, provider, route = getRoute }) {
+    const result = await request(MATCH_QUERY3, { filter: { ids: [matchId] }, perPage: 1 });
+    const match = result?.items?.[0];
+    if (!match?.candidateId || !match?.jobPositionId) return unavailable("Match konnte nicht gelesen werden.");
+    const [candidateLocation, job] = await Promise.all([
+      provider.loadCandidateLocation(match.candidateId),
+      provider.loadJob(match.jobPositionId)
+    ]);
+    if (!candidateLocation?.address) return unavailable("Beim Kandidaten ist keine Adresse hinterlegt.");
+    if (!job) return unavailable("Vakanz konnte nicht gelesen werden.");
+    if (!job.location?.address) return unavailable("Bei der Vakanz ist keine Adresse hinterlegt.");
+    const entry = await route(candidateLocation, job.location, { withPreview: true });
+    if (!entry || entry.unavailable) return unavailable("Adresse nicht gefunden oder der Routenservice hat keine Route geliefert.");
+    return {
+      state: "ready",
+      entry,
+      commute: describeCommute(classifyCommute(job), entry),
+      candidateAddress: candidateLocation.address,
+      jobAddress: job.location.address
+    };
+  }
+  var CSS3 = `
+  .${BUTTON_CLASS3} { display:inline-flex; align-items:center; justify-content:center; margin:4px 0 0 6px; width:30px; height:26px; padding:0; border:1px solid #d4d4d8; border-radius:6px; background:#fff; cursor:pointer; font:400 14px/1 ${FONT8}; vertical-align:middle; }
+  .${BUTTON_CLASS3}:hover { border-color:#ef6c00; background:#fff3e8; }
+  .${BUTTON_CLASS3}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
+  .${BUTTON_CLASS3}[data-level="ok"] { border-color:#8ce99a; background:#ebfbee; }
+  .${BUTTON_CLASS3}[data-level="skull"] { border-color:#e03131; background:#ffe3e3; }
+  .${BUTTON_CLASS3}[data-level="unknown"] { border-style:dashed; }
+  #${IDS10.tooltip} { position:fixed; z-index:2147483001; max-width:280px; padding:6px 10px; border-radius:6px; background:#18181b; color:#fff; font:550 12px/1.4 ${FONT8}; box-shadow:0 4px 14px rgba(9,9,11,.25); pointer-events:none; white-space:normal; }
+  #${IDS10.tooltip} .mc-sub { display:block; color:#a1a1aa; font-weight:400; }
+  #${IDS10.popover} { position:fixed; z-index:2147483000; width:${MAP_WIDTH + 34}px; box-sizing:border-box; padding:14px 16px 14px; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT8}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
+  #${IDS10.popover} .mc-head { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding-right:28px; }
+  #${IDS10.popover} h2 { margin:0; font-size:14px; font-weight:600; }
+  #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT8}; }
+  #${IDS10.popover} .mc-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS10.popover} .mc-value { font-size:16px; font-weight:700; }
+  #${IDS10.popover} .mc-value.mc-skull { color:#c92a2a; }
+  #${IDS10.popover} .mc-hint { margin:2px 0 10px; color:#52525b; font-size:12px; line-height:1.4; }
+  #${IDS10.popover} .mc-map { position:relative; width:${MAP_WIDTH}px; height:${MAP_HEIGHT}px; overflow:hidden; border:1px solid #e4e4e7; border-radius:8px; background:#f4f4f5; }
+  #${IDS10.popover} .mc-map img { position:absolute; width:256px; height:256px; max-width:none; user-select:none; }
+  #${IDS10.popover} .mc-map svg { position:absolute; inset:0; }
+  #${IDS10.popover} .mc-attr { position:absolute; right:0; bottom:0; padding:1px 5px; background:rgba(255,255,255,.8); color:#52525b; font-size:10px; }
+  #${IDS10.popover} .mc-attr a { color:inherit; }
+  #${IDS10.popover} .mc-nomap { padding:10px; border:1px dashed #d4d4d8; border-radius:8px; color:#52525b; font-size:12px; }
+  #${IDS10.popover} dl { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:10px 0 12px; }
+  #${IDS10.popover} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS10.popover} dd { margin:0; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS10.popover} .mc-dot { display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; vertical-align:1px; }
+  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:32px; padding:0 14px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:550 13px/1 ${FONT8}; text-decoration:none; }
+  #${IDS10.popover} .mc-google:hover { background:#b85400; border-color:#b85400; }
+  #${IDS10.popover} .mc-muted { color:#8b8b94; }
+`;
+  function executeMatchCommute(runtime, options = {}) {
+    runtime.registerSource(SOURCE_PATH4);
+    const getRequest = options.request ? () => options.request : () => getCemGraphqlAdapter().request;
+    const getProvider = options.provider ? () => options.provider : () => getCemGraphqlAdapter().commuteProvider;
+    const loading = /* @__PURE__ */ new Map();
+    const results = /* @__PURE__ */ new Map();
+    let syncTimer = null;
+    let hoverButton = null;
+    let openMatchId = "";
+    const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "");
+    function el4(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      for (const [key, value] of Object.entries(props)) {
+        if (key === "className") element5.className = value;
+        else if (key === "text") element5.textContent = value;
+        else if (key.startsWith("on")) element5.addEventListener(key.slice(2), value);
+        else element5.setAttribute(key, value);
+      }
+      for (const child of [].concat(children)) if (child) element5.append(child);
+      return element5;
+    }
+    function ensureStyle4() {
+      if (document.getElementById(IDS10.style)) return;
+      document.head.appendChild(el4("style", { id: IDS10.style, text: CSS3 }));
+    }
+    function load2(matchId) {
+      if (results.has(matchId)) return Promise.resolve(results.get(matchId));
+      if (!loading.has(matchId)) {
+        const promise = loadMatchCommute(matchId, { request: getRequest(), provider: getProvider() }).then((result) => {
+          results.set(matchId, result);
+          return result;
+        }).catch((error) => {
+          console.warn("[Werkia CEM Distanz] Route nicht berechenbar:", matchId, error);
+          return unavailable(`Anfrage fehlgeschlagen: ${error?.message || error}`);
+        }).finally(() => loading.delete(matchId));
+        loading.set(matchId, promise);
+      }
+      return loading.get(matchId);
+    }
+    function matchCellOf(row2) {
+      if (row2.querySelector("tr")) return null;
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR8)).find(Boolean);
+      const matchId = matchIdFromHref7(link?.getAttribute("href"));
+      return matchId ? { matchId, cell: link.closest("td") } : null;
+    }
+    function paintButton(button2) {
+      const result = results.get(button2.dataset.matchId);
+      const level = result?.state === "ready" ? result.commute.level : result ? "unknown" : "";
+      const icon = result?.state === "ready" ? result.commute.icon : "🚗";
+      if (button2.textContent !== icon) button2.textContent = icon;
+      if ((button2.dataset.level || "") !== level) {
+        if (level) button2.dataset.level = level;
+        else delete button2.dataset.level;
+      }
+    }
+    function addButton(row2) {
+      const target = matchCellOf(row2);
+      if (!target?.cell) return;
+      const existing = target.cell.querySelector(`.${BUTTON_CLASS3}`);
+      if (existing?.dataset.matchId === target.matchId) {
+        paintButton(existing);
+        return;
+      }
+      existing?.remove();
+      const button2 = el4("button", { type: "button", className: BUTTON_CLASS3, "aria-label": "Distanz zur Vakanz" });
+      button2.dataset.matchId = target.matchId;
+      button2.dataset.werkiaOwned = "true";
+      button2.addEventListener("mouseenter", () => showTooltip(button2));
+      button2.addEventListener("focus", () => showTooltip(button2));
+      button2.addEventListener("mouseleave", hideTooltip);
+      button2.addEventListener("blur", hideTooltip);
+      button2.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        hideTooltip();
+        if (openMatchId === target.matchId) closePopover();
+        else openPopover(button2);
+      });
+      paintButton(button2);
+      target.cell.appendChild(button2);
+    }
+    function sync() {
+      syncTimer = null;
+      if (!isTargetPage3()) {
+        document.querySelectorAll(`.${BUTTON_CLASS3}`).forEach((button2) => button2.remove());
+        hideTooltip();
+        closePopover();
+        return;
+      }
+      ensureStyle4();
+      document.querySelectorAll(ROW_SELECTOR9).forEach(addButton);
+      if (openMatchId && !findButton(openMatchId)) closePopover();
+    }
+    function scheduleSync() {
+      if (syncTimer !== null) return;
+      syncTimer = runtime.setTimeout(sync, 250);
+    }
+    const findButton = (matchId) => [...document.querySelectorAll(`.${BUTTON_CLASS3}`)].find((button2) => button2.dataset.matchId === matchId) || null;
+    function place(element5, anchor, gap = 6) {
+      const rect = anchor.getBoundingClientRect();
+      const box = element5.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+      const left = Math.max(8, Math.min(rect.left, viewportWidth - box.width - 8));
+      const below = rect.bottom + gap;
+      const top = below + box.height <= viewportHeight - 8 ? below : Math.max(8, rect.top - gap - box.height);
+      element5.style.left = `${left}px`;
+      element5.style.top = `${top}px`;
+    }
+    function renderTooltip(button2, result = results.get(button2.dataset.matchId)) {
+      if (hoverButton !== button2 || !button2.isConnected) return;
+      let tooltip = document.getElementById(IDS10.tooltip);
+      if (!tooltip) {
+        tooltip = el4("div", { id: IDS10.tooltip, role: "tooltip" });
+        document.body.appendChild(tooltip);
+      }
+      tooltip.replaceChildren(
+        document.createTextNode(tooltipText(result)),
+        el4("span", { className: "mc-sub", text: result && result.state !== "ready" ? "" : "Klicken für die Karte" })
+      );
+      place(tooltip, button2);
+    }
+    function showTooltip(button2) {
+      if (openMatchId === button2.dataset.matchId) return;
+      hoverButton = button2;
+      renderTooltip(button2);
+      if (!results.has(button2.dataset.matchId)) {
+        load2(button2.dataset.matchId).then((result) => {
+          paintButton(button2);
+          renderTooltip(button2, result);
+        });
+      }
+    }
+    function hideTooltip() {
+      hoverButton = null;
+      document.getElementById(IDS10.tooltip)?.remove();
+    }
+    function mapView(entry) {
+      const map = fitStaticMap(entry?.previewCoordinates, { width: MAP_WIDTH, height: MAP_HEIGHT });
+      if (!map) {
+        const reason = entry?.quality === "fallback" ? "Keine Kartenvorschau: Der Routenservice hat nicht geantwortet, die Angabe ist Luftlinie." : "Keine Kartenvorschau verfügbar.";
+        return el4("div", { className: "mc-nomap", text: reason });
+      }
+      const container = el4("div", { className: "mc-map" });
+      for (const tile of map.tiles) {
+        const img = el4("img", { src: tile.url, alt: "", draggable: "false", referrerpolicy: "strict-origin-when-cross-origin" });
+        img.style.left = `${tile.left}px`;
+        img.style.top = `${tile.top}px`;
+        container.append(img);
+      }
+      const svgNs = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNs, "svg");
+      svg.setAttribute("width", String(MAP_WIDTH));
+      svg.setAttribute("height", String(MAP_HEIGHT));
+      svg.setAttribute("viewBox", `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+      const points = map.points.map((point) => point.join(",")).join(" ");
+      const shape = (tag, attrs) => {
+        const node = document.createElementNS(svgNs, tag);
+        for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+        svg.append(node);
+      };
+      shape("polyline", { points, fill: "none", stroke: "#fff", "stroke-width": 7, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.85 });
+      shape("polyline", { points, fill: "none", stroke: "#1971c2", "stroke-width": 4, "stroke-linecap": "round", "stroke-linejoin": "round" });
+      const [start, end] = [map.points[0], map.points.at(-1)];
+      shape("circle", { cx: start[0], cy: start[1], r: 7, fill: "#2f9e44", stroke: "#fff", "stroke-width": 3 });
+      shape("circle", { cx: end[0], cy: end[1], r: 7, fill: "#e03131", stroke: "#fff", "stroke-width": 3 });
+      container.append(svg);
+      container.append(el4("div", { className: "mc-attr" }, el4("a", { href: "https://www.openstreetmap.org/copyright", target: "_blank", rel: "noopener noreferrer", text: OSM_ATTRIBUTION })));
+      return container;
+    }
+    function renderPopover(popover, result) {
+      const head = el4("div", { className: "mc-head" }, [el4("h2", { text: "Distanz zur Vakanz" }), cemHelp.tip("match-commute")]);
+      const close = el4("button", { type: "button", className: "mc-close", "aria-label": "Schließen", text: "×", onclick: closePopover });
+      const body = [];
+      if (!result) {
+        body.push(el4("div", { className: "mc-muted", text: "Route wird berechnet …" }));
+      } else if (result.state !== "ready") {
+        body.push(el4("div", { className: "mc-hint", text: result.reason }));
+      } else {
+        const { commute } = result;
+        body.push(
+          el4("div", { className: `mc-value${commute.level === "skull" ? " mc-skull" : ""}`, text: tooltipText(result) }),
+          el4("div", { className: "mc-hint", text: commute.title }),
+          mapView(result.entry),
+          el4("dl", {}, [
+            el4("dt", { text: "Kandidat" }),
+            el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#2f9e44" }), result.candidateAddress]),
+            el4("dt", { text: "Vakanz" }),
+            el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#e03131" }), result.jobAddress])
+          ]),
+          el4("a", { className: "mc-google", href: googleMapsDirectionsUrl(result.candidateAddress, result.jobAddress), target: "_blank", rel: "noopener noreferrer", text: "In Google Maps öffnen ↗" })
+        );
+      }
+      popover.replaceChildren(close, head, ...body);
+    }
+    function openPopover(button2) {
+      closePopover();
+      const matchId = button2.dataset.matchId;
+      openMatchId = matchId;
+      const popover = el4("div", { id: IDS10.popover, role: "dialog", "aria-label": "Distanz zur Vakanz" });
+      popover.addEventListener("click", (event) => event.stopPropagation());
+      document.body.appendChild(popover);
+      renderPopover(popover, results.get(matchId) || null);
+      place(popover, button2);
+      if (!results.has(matchId)) {
+        load2(matchId).then((result) => {
+          paintButton(button2);
+          if (openMatchId !== matchId || !popover.isConnected) return;
+          renderPopover(popover, result);
+          place(popover, button2);
+        });
+      }
+    }
+    function closePopover() {
+      openMatchId = "";
+      document.getElementById(IDS10.popover)?.remove();
+    }
+    runtime.addDocumentListener("mousedown", (event) => {
+      if (!openMatchId) return;
+      if (event.target?.closest?.(`#${IDS10.popover}, .${BUTTON_CLASS3}`)) return;
+      closePopover();
+    }, true);
+    runtime.addDocumentListener("keydown", (event) => {
+      if (event.key === "Escape" && openMatchId) closePopover();
+    }, true);
+    runtime.addWindowListener("scroll", (event) => {
+      if (openMatchId && !event.target?.closest?.(`#${IDS10.popover}`)) closePopover();
+      hideTooltip();
+    }, true);
+    runtime.addWindowListener("hashchange", scheduleSync);
+    runtime.createMutationObserver((mutations) => {
+      const foreign = mutations.some((mutation) => {
+        if (mutation.target?.closest?.(OWNED_SELECTOR)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(OWNED_SELECTOR));
+      });
+      if (foreign) scheduleSync();
+    }).observe(document.body, { childList: true, subtree: true });
+    scheduleSync();
+  }
+
   // ../../shared/js/comment-shortcuts/core.js
   var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
   var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
@@ -16824,6 +17216,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "wa-templates", execute: executeWaTemplates },
     { id: "cem-todo", execute: executeCemTodo },
     { id: "slack-dm", execute: executeSlackDm2 },
+    { id: "match-commute", execute: executeMatchCommute },
     { id: "shortcut-explainer", execute: executeCemShortcutExplainer },
     { id: "match-mention", execute: executeCemMatchMention },
     { id: "match-contact-person", execute: executeCemMatchContactPerson },

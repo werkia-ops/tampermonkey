@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.16.269
+// @version      1.16.271
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -19315,6 +19315,7 @@ ${buildCbreBody(current)}`;
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
   var EMPLOYER_BUTTON_ATTRIBUTE = "data-werkia-kam-applicants-employer";
+  var MAIL_DIALOG_TIMEOUT_MS = 2e3;
   var EMAIL_ICON_SELECTOR = 'svg[data-testid="EmailIcon"]';
   var BODY_SELECTOR = 'textarea[name="bodyPreview"]';
   var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -19543,6 +19544,10 @@ ${buildCbreBody(current)}`;
       mailContext = { matchId: matchIdFromRow(row2) || matchId, employerId: employerIdFromRow(row2) };
       button3.click();
       schedule();
+      runtime.setTimeout(() => {
+        if (!message.isConnected || findSendMailDialogs(document).length) return;
+        message.textContent = "Der Mail-Dialog hat sich nicht geöffnet. Hat dein Account die Rolle für KAM-Mails?";
+      }, MAIL_DIALOG_TIMEOUT_MS);
     }
     function renderOpenButton() {
       const dialog = findMatchCommentsDialog(document);

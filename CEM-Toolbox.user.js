@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.18.257
+// @version      1.19.269
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4493,6 +4493,1689 @@
     schedule();
   }
 
+  // ../../shared/js/list-filter-presets/core.js
+  var STORAGE_KEY = "werkia_list_filter_presets_v1";
+  var STORE_VERSION = 1;
+  function parseJsonObject(value, fallback) {
+    if (!value) return fallback;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function safeCall(callback) {
+    if (typeof callback !== "function") return "";
+    try {
+      return callback();
+    } catch {
+      return "";
+    }
+  }
+  function routeFromHash(hash = "") {
+    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
+  }
+  function parseListState(hash = "") {
+    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
+    const perPage = Number.parseInt(params.get("perPage") || "", 10);
+    return {
+      route: routeFromHash(hash),
+      filter: parseJsonObject(params.get("filter"), {}),
+      sort: params.get("sort") || "",
+      order: params.get("order") || "",
+      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
+    };
+  }
+  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
+    const params = new URLSearchParams({
+      displayedFilters: JSON.stringify({}),
+      filter: JSON.stringify(filter || {})
+    });
+    if (order) params.set("order", order);
+    params.set("page", "1");
+    if (perPage) params.set("perPage", String(perPage));
+    if (sort) params.set("sort", sort);
+    return `#/${route}?${params}`;
+  }
+  function isTargetRoute(hash, routes = []) {
+    const route = routeFromHash(hash).toLowerCase();
+    return routes.some((candidate) => String(candidate).toLowerCase() === route);
+  }
+  function isEmptyFilterValue(value) {
+    if (value === null || value === void 0 || value === "") return true;
+    return Array.isArray(value) && value.length === 0;
+  }
+  function filterKey(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return JSON.stringify(
+      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
+    );
+  }
+  function filterFields(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
+  }
+  function describePreset(preset) {
+    const fields = filterFields(preset?.filter);
+    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
+  }
+  function createPresetId(now = Date.now(), entropy = Math.random()) {
+    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
+  }
+  function presetFromState(name, state) {
+    return {
+      id: createPresetId(),
+      name: String(name || "").trim(),
+      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
+      sort: state?.sort || "",
+      order: state?.order || "",
+      perPage: state?.perPage || 0
+    };
+  }
+  function applyPresetToState(preset, currentState) {
+    return {
+      route: currentState?.route || "",
+      filter: preset?.filter || {},
+      sort: preset?.sort || currentState?.sort || "",
+      order: preset?.order || currentState?.order || "",
+      perPage: preset?.perPage || currentState?.perPage || 0
+    };
+  }
+  function findActivePresetId(presets, state) {
+    const key = filterKey(state?.filter);
+    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
+  }
+  function emptyStore() {
+    return { version: STORE_VERSION, routes: {} };
+  }
+  function parseStore(raw) {
+    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
+    if (!parsed || typeof parsed !== "object") return emptyStore();
+    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
+    const clean4 = {};
+    Object.keys(routes).forEach((route) => {
+      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+        id: String(preset.id || createPresetId()),
+        name: String(preset.name),
+        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
+        sort: preset.sort || "",
+        order: preset.order || "",
+        perPage: Number.parseInt(preset.perPage, 10) || 0
+      }));
+    });
+    return { version: STORE_VERSION, routes: clean4 };
+  }
+  function presetsForRoute(store, route) {
+    return store?.routes?.[route] ? [...store.routes[route]] : [];
+  }
+  function upsertPreset(store, route, preset) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
+    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+    if (sameName >= 0) kept.splice(sameName, 1, preset);
+    else kept.push(preset);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function removePreset(store, route, id) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function mergeStores(base, incoming) {
+    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
+    const routes = incoming?.routes || {};
+    Object.keys(routes).forEach((route) => {
+      routes[route].forEach((preset) => {
+        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
+      });
+    });
+    return result;
+  }
+  function createPresetStorage({ read, write, backupRead, backupWrite }) {
+    return {
+      load() {
+        const primary = parseStore(safeCall(read));
+        if (Object.keys(primary.routes).length) return primary;
+        const backup = parseStore(safeCall(backupRead));
+        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
+        return backup;
+      },
+      save(store) {
+        const serialized = JSON.stringify(store);
+        safeCall(() => write(serialized));
+        safeCall(() => backupWrite(serialized));
+      }
+    };
+  }
+
+  // ../../shared/js/list-filter-presets/index.js
+  var IDS = {
+    bar: "werkia-filter-presets-bar",
+    select: "werkia-filter-presets-select",
+    style: "werkia-filter-presets-style",
+    dialog: "werkia-filter-presets-dialog"
+  };
+  var LIST_ANCHOR_SELECTORS = [
+    ".RaList-content",
+    ".RaList-main",
+    "table.RaDataTable-table",
+    "main table"
+  ];
+  function findListAnchor(root = document) {
+    for (const selector of LIST_ANCHOR_SELECTORS) {
+      const element5 = root.querySelector(selector);
+      if (element5) return element5;
+    }
+    return null;
+  }
+  function executeListFilterPresets(runtime, {
+    routes = [],
+    sourcePath,
+    label: label2 = "Filtervorlagen",
+    builtInPresets = [],
+    storage,
+    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
+    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
+    helpTip
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const presetStorage = storage || createPresetStorage({
+      read: () => localStorage.getItem(STORAGE_KEY),
+      write: (value) => localStorage.setItem(STORAGE_KEY, value),
+      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
+      backupWrite: (value) => {
+        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
+      }
+    });
+    const owner = sourcePath || routes.join(",");
+    const ownElement = (id) => {
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaPresetsOwner === owner ? element5 : null;
+    };
+    const isTargetPage3 = () => isTargetRoute(location.hash, routes);
+    const currentRoute = () => routeFromHash(location.hash);
+    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
+    function ensureStyle4() {
+      if (document.getElementById(IDS.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS.style;
+      style.textContent = `
+      #${IDS.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      #${IDS.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS.bar} button:hover { background:#3643c7; }
+      #${IDS.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
+      #${IDS.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS.dialog} h2 { margin:0 0 12px; font-size:15px; }
+      #${IDS.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
+      #${IDS.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
+      #${IDS.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
+      #${IDS.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
+      #${IDS.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function applyPreset(preset) {
+      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
+    }
+    function saveCurrentFilter() {
+      const state = parseListState(location.hash);
+      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
+      const name = window.prompt("Name der Vorlage:", "");
+      if (!name || !name.trim()) return;
+      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
+      render();
+    }
+    function closeDialog() {
+      ownElement(IDS.dialog)?.remove();
+    }
+    function renderManager() {
+      closeDialog();
+      const route = currentRoute();
+      const overlay = document.createElement("div");
+      overlay.id = IDS.dialog;
+      overlay.dataset.werkiaPresetsOwner = owner;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const card = document.createElement("div");
+      card.className = "werkia-filter-presets-card";
+      const heading = document.createElement("h2");
+      heading.textContent = `Filtervorlagen verwalten – ${route}`;
+      card.appendChild(heading);
+      const list = document.createElement("ul");
+      const presets = ownPresets();
+      if (!presets.length) {
+        const empty2 = document.createElement("li");
+        empty2.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
+        list.appendChild(empty2);
+      }
+      presets.forEach((preset) => {
+        const row2 = document.createElement("li");
+        const name = document.createElement("span");
+        name.className = "werkia-filter-presets-name";
+        name.textContent = preset.name;
+        const fields = document.createElement("span");
+        fields.className = "werkia-filter-presets-fields";
+        fields.textContent = describePreset(preset);
+        const rename = document.createElement("button");
+        rename.type = "button";
+        rename.className = "werkia-filter-presets-secondary";
+        rename.textContent = "Umbenennen";
+        rename.addEventListener("click", () => {
+          const next = window.prompt("Neuer Name:", preset.name);
+          if (!next || !next.trim()) return;
+          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
+          renderManager();
+          render();
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "werkia-filter-presets-danger";
+        remove.textContent = "Loeschen";
+        remove.addEventListener("click", () => {
+          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
+          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
+          renderManager();
+          render();
+        });
+        row2.append(name, fields, rename, remove);
+        list.appendChild(row2);
+      });
+      card.appendChild(list);
+      const hint = document.createElement("p");
+      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
+      card.appendChild(hint);
+      const transfer = document.createElement("textarea");
+      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
+      transfer.spellcheck = false;
+      card.appendChild(transfer);
+      const importButton = document.createElement("button");
+      importButton.type = "button";
+      importButton.textContent = "Aus Textfeld importieren";
+      importButton.addEventListener("click", () => {
+        const incoming = parseStore(transfer.value);
+        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
+        presetStorage.save(mergeStores(presetStorage.load(), incoming));
+        renderManager();
+        render();
+      });
+      const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "werkia-filter-presets-secondary";
+      closeButton.textContent = "Schliessen";
+      closeButton.addEventListener("click", closeDialog);
+      card.append(importButton, closeButton);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.id = IDS.bar;
+      bar.dataset.werkiaPresetsOwner = owner;
+      const title = document.createElement("strong");
+      title.textContent = label2;
+      const select = document.createElement("select");
+      select.id = IDS.select;
+      select.addEventListener("change", () => {
+        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
+        if (preset) applyPreset(preset);
+      });
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.textContent = "Aktuellen Filter speichern";
+      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
+      saveButton.addEventListener("click", saveCurrentFilter);
+      const manageButton = document.createElement("button");
+      manageButton.type = "button";
+      manageButton.className = "werkia-filter-presets-secondary";
+      manageButton.textContent = "Verwalten";
+      manageButton.addEventListener("click", renderManager);
+      const resetButton = document.createElement("button");
+      resetButton.type = "button";
+      resetButton.className = "werkia-filter-presets-secondary";
+      resetButton.textContent = "Filter zuruecksetzen";
+      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
+      const tip = helpTip?.();
+      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
+      return bar;
+    }
+    const optionSignatures = /* @__PURE__ */ new WeakMap();
+    function fillSelect(select) {
+      if (!select) return;
+      const own = ownPresets();
+      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
+      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
+      if (optionSignatures.get(select) === signature) {
+        if (select.value !== active) select.value = active;
+        return;
+      }
+      optionSignatures.set(select, signature);
+      select.textContent = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
+      select.appendChild(placeholder);
+      const addGroup = (groupLabel, groupPresets) => {
+        if (!groupPresets.length) return;
+        const group = document.createElement("optgroup");
+        group.label = groupLabel;
+        groupPresets.forEach((preset) => {
+          const option = document.createElement("option");
+          option.value = preset.id;
+          option.textContent = preset.name;
+          option.title = describePreset(preset);
+          group.appendChild(option);
+        });
+        select.appendChild(group);
+      };
+      addGroup("Team-Vorlagen", builtInPresets);
+      addGroup("Eigene Vorlagen", own);
+      select.value = active;
+    }
+    function render() {
+      if (!isTargetPage3()) {
+        ownElement(IDS.bar)?.remove();
+        closeDialog();
+        return;
+      }
+      ensureStyle4();
+      let bar = document.getElementById(IDS.bar);
+      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
+      if (!bar) {
+        const anchor = findListAnchor(document);
+        if (!anchor?.parentElement) return;
+        bar = buildBar();
+        anchor.parentElement.insertBefore(bar, anchor);
+      }
+      fillSelect(bar.querySelector(`#${IDS.select}`));
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // ../../shared/js/vertretungen/core.js
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS = 15e3;
+  var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
+  me: currentEmployee { id __typename }
+}`;
+  function berlinDay(date = /* @__PURE__ */ new Date()) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  }
+  function formatDay(day, withYear = false) {
+    const [year, month, date] = String(day || "").split("-");
+    if (!year || !month || !date) return String(day || "");
+    return withYear ? `${date}.${month}.${year}` : `${date}.${month}.`;
+  }
+  function formatRange(von, bis) {
+    if (von === bis) return formatDay(von, true);
+    const sameYear = String(von).slice(0, 4) === String(bis).slice(0, 4);
+    return `${formatDay(von, !sameYear)} – ${formatDay(bis, true)}`;
+  }
+  function canEditDraft(me, draft) {
+    if (!me) return false;
+    if (me.darfAlles) return true;
+    return draft.abwesendId === me.id || draft.vertretungId === me.id;
+  }
+  function validateDraft(me, draft, today = berlinDay()) {
+    if (!draft.abwesendId) return "Bitte auswählen, wer abwesend ist.";
+    if (!draft.vertretungId) return "Bitte die Vertretung auswählen.";
+    if (draft.abwesendId === draft.vertretungId) return "Niemand kann sich selbst vertreten.";
+    if (!draft.von || !draft.bis) return "Bitte „Von“ und „Bis“ ausfüllen.";
+    if (draft.von > draft.bis) return "„Von“ liegt nach „Bis“.";
+    if (draft.bis < today) return "„Bis“ liegt in der Vergangenheit.";
+    if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
+    return "";
+  }
+  function parseResponse(status2, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status2}).`);
+  }
+  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+      });
+    });
+  }
+  function plannedSubstituteMentions(mentions, aktiv, handled = /* @__PURE__ */ new Set()) {
+    const present = new Set(mentions.map((mention) => mention.id));
+    const planned = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const mention of mentions) {
+      for (const entry of aktiv || []) {
+        if (entry.abwesendId !== mention.id || !entry.vertretungId || entry.vertretungId === mention.id) continue;
+        const key = `${entry.abwesendId}|${entry.vertretungId}`;
+        if (present.has(entry.vertretungId) || handled.has(key) || seen.has(entry.vertretungId)) continue;
+        seen.add(entry.vertretungId);
+        planned.push({ key, pos: mention.end, vertretungId: entry.vertretungId, vertretungName: entry.vertretungName || "Vertretung" });
+      }
+    }
+    return planned.sort((a, b) => b.pos - a.pos);
+  }
+
+  // ../../shared/js/vertretungen/index.js
+  var IDS2 = {
+    button: "werkia-vertretungen-button",
+    bar: "werkia-vertretungen-bar",
+    dialog: "werkia-vertretungen-dialog",
+    style: "werkia-vertretungen-style"
+  };
+  var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
+  var CONFIRM_MS = 4e3;
+  var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
+  var COPIED_STYLES = [
+    "color",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "letterSpacing",
+    "textTransform",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderRadius",
+    "minWidth",
+    "minHeight"
+  ];
+  function nativeLookFrom(sample, view = sample?.ownerDocument?.defaultView) {
+    if (!sample || !view) return null;
+    const computed = view.getComputedStyle(sample);
+    const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
+    const icon = sample.querySelector("svg");
+    const iconStyle = icon ? view.getComputedStyle(icon) : null;
+    const iconBox = icon?.parentElement && icon.parentElement !== sample ? view.getComputedStyle(icon.parentElement) : null;
+    return {
+      style,
+      iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
+      iconGap: iconBox?.marginRight && iconBox.marginRight !== "0px" ? iconBox.marginRight : "8px"
+    };
+  }
+  function findToolbar(root = document) {
+    for (const selector of TOOLBAR_SELECTORS) {
+      const element5 = root.querySelector(selector);
+      if (element5) return element5;
+    }
+    return null;
+  }
+  function findSlot(root = document) {
+    const filterButton = [...root.querySelectorAll("button, a")].find((element5) => element5.id !== IDS2.button && /^filter hinzuf/i.test(element5.textContent.trim()));
+    if (filterButton) {
+      let before = filterButton;
+      while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
+      return { parent: before.parentElement, before, sample: filterButton };
+    }
+    const toolbar = findToolbar(root);
+    if (!toolbar) return null;
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element5) => element5.id !== IDS2.button && element5.textContent.trim());
+    return { parent: toolbar, before: toolbar.firstElementChild, sample };
+  }
+  function executeVertretungen(runtime, {
+    routes = [],
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createVertretungenClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let state = null;
+    let editing = null;
+    let adminsOpen = false;
+    const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
+    const owned = (id) => {
+      const element5 = document.getElementById(id);
+      return element5?.dataset.werkiaVertretungenOwner === sourcePath ? element5 : null;
+    };
+    function ensureStyle4() {
+      if (document.getElementById(IDS2.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS2.style;
+      style.textContent = `
+      #${IDS2.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS2.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS2.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS2.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS2.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS2.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS2.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS2.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS2.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS2.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS2.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS2.dialog} .wv-admins { margin-top:16px; }
+      #${IDS2.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS2.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS2.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS2.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS2.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS2.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS2.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS2.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS2.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS2.dialog} select, #${IDS2.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS2.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS2.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS2.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS2.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS2.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS2.dialog} .wv-status.wv-error { color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0));
+      return element5;
+    }
+    function button2(text, onClick, className = "") {
+      return el4("button", { type: "button", textContent: text, className, onclick: onClick });
+    }
+    function confirmButton(label2, question, onConfirm) {
+      let armed = false;
+      let timer = null;
+      const element5 = button2(label2, () => {
+        if (!armed) {
+          armed = true;
+          element5.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element5.textContent = label2;
+          }, CONFIRM_MS);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, "wv-danger");
+      return element5;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function closeDialog() {
+      owned(IDS2.dialog)?.remove();
+      editing = null;
+    }
+    function setStatus(text, isError = false) {
+      const status2 = owned(IDS2.dialog)?.querySelector(".wv-status");
+      if (!status2) return;
+      status2.textContent = text;
+      status2.classList.toggle("wv-error", isError);
+    }
+    function setBusy(busy) {
+      owned(IDS2.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element5) => {
+        element5.disabled = busy;
+      });
+    }
+    async function refresh(message = "") {
+      state = await call({ action: "liste" });
+      render();
+      if (message) setStatus(message);
+    }
+    async function run(action, success) {
+      setBusy(true);
+      setStatus("Speichert …");
+      try {
+        await call(action);
+        editing = null;
+        await refresh(success);
+      } catch (error) {
+        setBusy(false);
+        setStatus(error.message || String(error), true);
+      }
+    }
+    function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
+      const select = el4("select");
+      select.append(el4("option", { value: "", textContent: "Bitte wählen …" }));
+      for (const person of people) {
+        select.append(el4("option", { value: person.id, textContent: person.name }));
+      }
+      select.value = value || "";
+      if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
+      return select;
+    }
+    function entryRow(entry) {
+      const who = el4("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el4("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el4("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const actions = entry.darfBearbeiten ? [
+        button2("Bearbeiten", () => {
+          editing = entry;
+          render();
+        }, "wv-secondary"),
+        confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
+      ] : [];
+      const row2 = el4("li", {}, [who, when, badge, ...actions]);
+      if (entry.geaendertVon) row2.title = `Zuletzt geändert von ${entry.geaendertVon}`;
+      return row2;
+    }
+    function form() {
+      const today = berlinDay();
+      const { ich } = state;
+      const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
+      const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
+      const von = el4("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el4("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const save = button2(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+        const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
+        const problem = validateDraft(ich, draft, today);
+        if (problem) {
+          setStatus(problem, true);
+          return;
+        }
+        run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
+      });
+      const cancel = editing ? button2("Abbrechen", () => {
+        editing = null;
+        render();
+      }, "wv-secondary") : null;
+      return [
+        el4("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el4("div", { className: "wv-form" }, [
+          el4("label", { textContent: "Abwesend" }),
+          abwesend,
+          el4("label", { textContent: "Vertretung" }),
+          vertretung,
+          el4("label", { textContent: "Von" }),
+          von,
+          el4("label", { textContent: "Bis (einschließlich)" }),
+          bis
+        ]),
+        el4("div", { className: "wv-actions" }, [save, cancel])
+      ];
+    }
+    function adminSection() {
+      const { ich } = state;
+      const admins = state.admins || [];
+      const list = el4("ul");
+      admins.forEach((admin) => {
+        const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
+        list.append(el4("li", {}, [el4("span", { className: "wv-who", textContent: admin.name }), remove]));
+      });
+      const parts = [
+        el4("summary", { textContent: `Admins (${admins.length})` }),
+        el4("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        list
+      ];
+      if (ich.darfAlles) {
+        const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
+        const add = button2("Als Admin eintragen", () => {
+          if (!candidate.value) {
+            setStatus("Bitte auswählen, wer Admin werden soll.", true);
+            return;
+          }
+          run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
+        }, "wv-secondary");
+        parts.push(el4("div", { className: "wv-actions" }, [candidate, add]));
+      }
+      const details = el4("details", { className: "wv-admins" }, parts);
+      details.open = adminsOpen;
+      details.addEventListener("toggle", () => {
+        adminsOpen = details.open;
+      });
+      return details;
+    }
+    function card() {
+      return owned(IDS2.dialog)?.querySelector(".wv-body");
+    }
+    function render() {
+      const target = card();
+      if (!target) return;
+      target.textContent = "";
+      const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
+      const list = el4("ul");
+      if (!state.eintraege.length) list.append(el4("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      state.eintraege.forEach((entry) => list.append(entryRow(entry)));
+      const tip = helpTip?.();
+      target.append(
+        el4("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el4("p", { textContent: intro }),
+        list,
+        ...form(),
+        adminSection(),
+        el4("div", { className: "wv-status" }),
+        el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
+      );
+    }
+    async function openDialog() {
+      closeDialog();
+      ensureStyle4();
+      const overlay = el4("div", { id: IDS2.dialog });
+      overlay.dataset.werkiaVertretungenOwner = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const close = button2("×", closeDialog, "wv-close");
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el4("div", { className: "wv-body" }, [
+        el4("h2", { textContent: "Vertretungen" }),
+        el4("div", { className: "wv-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(el4("div", { className: "wv-card" }, [close, target]));
+      document.body.appendChild(overlay);
+      try {
+        await refresh();
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        target.append(el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
+      }
+    }
+    function placeButton() {
+      if (!isTargetPage3()) {
+        owned(IDS2.button)?.remove();
+        owned(IDS2.bar)?.remove();
+        return;
+      }
+      ensureStyle4();
+      const slot = findSlot(document);
+      const existing = owned(IDS2.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS2.bar)) return;
+      existing?.remove();
+      const vertretungenButton = button2("Vertretungen", openDialog);
+      vertretungenButton.id = IDS2.button;
+      vertretungenButton.title = "Vertretungen eintragen und ansehen";
+      vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
+      if (slot) {
+        owned(IDS2.bar)?.remove();
+        const look = nativeLookFrom(slot.sample);
+        if (look) {
+          vertretungenButton.className = "wv-native";
+          Object.assign(vertretungenButton.style, look.style);
+          const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon.setAttribute("viewBox", "0 0 24 24");
+          icon.setAttribute("aria-hidden", "true");
+          icon.style.width = look.iconSize;
+          icon.style.height = look.iconSize;
+          icon.style.marginRight = look.iconGap;
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", PEOPLE_ICON_PATH);
+          icon.append(path);
+          vertretungenButton.prepend(icon);
+        } else {
+          vertretungenButton.className = "wv-own";
+        }
+        slot.parent.insertBefore(vertretungenButton, slot.before);
+        return;
+      }
+      vertretungenButton.className = "wv-own";
+      owned(IDS2.bar)?.remove();
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return;
+      const bar = el4("div", { id: IDS2.bar }, [vertretungenButton]);
+      bar.dataset.werkiaVertretungenOwner = sourcePath;
+      anchor.parentElement.insertBefore(bar, anchor);
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS2.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());
+      } catch {
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        placeButton();
+      }, 200);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.addCleanup?.(() => {
+      owned(IDS2.button)?.remove();
+      owned(IDS2.bar)?.remove();
+      closeDialog();
+    });
+    schedule();
+  }
+
+  // ../../shared/js/vta-notizen/core.js
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
+  var REQUEST_TIMEOUT_MS2 = 15e3;
+  var OFFLINE_MESSAGE2 = "Der Server für die VTA-Notizen ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var MAX_NOTE = 1e3;
+  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVtaNotizenMe {
+  me: currentEmployee { id __typename }
+}`;
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function parseResponse2(status2, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`VTA-Notizen: unerwartete Antwort (HTTP ${status2}).`);
+  }
+  function createNotizenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse2(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+      });
+    });
+  }
+  function employerIdFromHref2(href) {
+    const id = String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function matchIdFromHref3(href) {
+    const id = String(href || "").match(/#\/Match\/([^/?]+)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function createLookup(entries = []) {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const entry of entries) if (entry?.employerId) byId2.set(String(entry.employerId).toLowerCase(), entry);
+    return (employerId) => byId2.get(String(employerId || "").toLowerCase()) || null;
+  }
+  var squash = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  function hasNote(notes, notiz) {
+    const needle = squash(notiz);
+    return Boolean(needle) && squash(notes).includes(needle);
+  }
+  function withNote(notes, notiz) {
+    const text = String(notes || "");
+    const add = String(notiz || "").trim();
+    if (!add || hasNote(text, add)) return text;
+    return text.trim() ? `${text.replace(/\s+$/, "")}
+
+${add}` : add;
+  }
+  function formatDay2(iso) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  }
+  function entryMeta(entry) {
+    if (!entry) return "";
+    const day = formatDay2(entry.geaendertAm);
+    return [entry.geaendertVon ? `von ${entry.geaendertVon}` : "", day ? `am ${day}` : ""].filter(Boolean).join(" ");
+  }
+
+  // ../../shared/js/vta-notizen/index.js
+  var IDS3 = {
+    button: "werkia-vta-notiz-button",
+    dialog: "werkia-vta-notiz-dialog",
+    style: "werkia-vta-notiz-style"
+  };
+  var BOX_CLASS = "werkia-vta-notiz-box";
+  var OWNER_KEY = "werkiaVtaNotizOwner";
+  var CACHE_MS5 = 5 * 60 * 1e3;
+  var RETRY_MS2 = 60 * 1e3;
+  var CLICK_MAX_AGE_MS = 10 * 60 * 1e3;
+  var CONFIRM_MS2 = 4e3;
+  var APPOINTMENT_INPUT_SELECTOR = ".RaArrayInput-root input.MuiPickersInputBase-input";
+  var ROW_SELECTOR = "tr, .MuiTableRow-root";
+  var T = {
+    surface: "#ffffff",
+    sunken: "#f4f4f5",
+    ink: "#09090b",
+    ink2: "#52525b",
+    muted: "#8b8b94",
+    line: "#e4e4e7",
+    lineStrong: "#d4d4d8",
+    accent: "#ef6c00",
+    accentInk: "#b85400",
+    accentSoft: "#fff3e8",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec",
+    badHover: "#f9dcdc"
+  };
+  var FONT6 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  var NOTE_ICON_PATH = "M19 3H4.99C3.89 3 3 3.9 3 5l.01 14c0 1.1.89 2 1.99 2h10l6-6V5c0-1.1-.9-2-2-2zM7 8h10v2H7V8zm5 6H7v-2h5v2zm2 5.5V14h5.5L14 19.5z";
+  function findAppointmentDialog(root = document) {
+    return [...root.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => dialog.querySelector(APPOINTMENT_INPUT_SELECTOR) && dialog.querySelector('textarea[name="notes"]')).at(-1) || null;
+  }
+  function isExistingAppointment(dialog) {
+    if (!dialog) return false;
+    const buttons = [...dialog.querySelectorAll("button")].map((button2) => (button2.textContent || "").trim());
+    if (buttons.some((text) => /^(weiterleiten|löschen)$/i.test(text))) return true;
+    const titles = [...dialog.querySelectorAll("h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root")].map((title) => title.textContent || "");
+    return titles.some((text) => /bearbeit/i.test(text));
+  }
+  function targetFromRow(row2) {
+    if (!row2?.querySelector) return { matchId: "", employerId: "" };
+    const employerLink = row2.querySelector('a[href*="#/Employer/"]');
+    const matchLink = row2.querySelector('a[href*="#/Match/"]');
+    return {
+      employerId: employerIdFromHref2(employerLink?.getAttribute("href")),
+      matchId: matchIdFromHref3(matchLink?.getAttribute("href"))
+    };
+  }
+  function vtaNotizenTopic({ page, routes }) {
+    return {
+      id: "vta-notizen",
+      title: "VTA-Notizen je Arbeitgeber",
+      page,
+      routes,
+      kind: "external",
+      summary: "Pro Arbeitgeber eine feste Notiz für Terminvorschläge, z. B. ein Buchungslink oder „Termine nur Di/Do“. Beim Anlegen eines Terminvorschlags hängt die Toolbox sie ans Notizfeld an.",
+      steps: [
+        "Am Arbeitgeber auf „VTA-Notiz“ in der Leiste klicken, Text eintragen und „Speichern“.",
+        "Alternativ im Terminvorschlag-Dialog unter dem Notizfeld auf „Bearbeiten“ bzw. „VTA-Notiz anlegen“ klicken. Alle Notizen zeigt der Tampermonkey-Menüeintrag „VTA-Notizen“.",
+        "Beim nächsten neuen Terminvorschlag für diesen Arbeitgeber steht die Notiz schon im Notizfeld. Was dort vorher stand, bleibt davor stehen."
+      ],
+      notes: [
+        "Die Notiz bleibt im Notizfeld sichtbar und lässt sich vor dem Speichern ändern oder löschen. Gespeichert wird erst mit dem Speichern-Knopf des Dialogs.",
+        "In einem bestehenden Termin fügt die Toolbox nichts von selbst ein; dort hilft „Ins Notizfeld übernehmen“.",
+        "Erkannt wird der Arbeitgeber über die Zeile, in der du den Dialog geöffnet hast, sonst über die Seite (Match oder Arbeitgeber). Steht „Arbeitgeber nicht erkannt“ da, den Dialog aus der Zeile des Matches öffnen.",
+        "Ändern darf jeder. Im Editor steht, wer zuletzt geändert hat und wann. Eine leer gespeicherte Notiz wird gelöscht.",
+        "Jeder Standort ist im Adminpanel ein eigener Arbeitgeber und hat seine eigene Notiz.",
+        "Die Toolbox lädt die Notizen höchstens alle 5 Minuten neu. Eigene Änderungen sind sofort zu sehen."
+      ]
+    };
+  }
+  function executeVtaNotizen(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip = () => null,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createNotizenClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let cache = null;
+    let failedAt = 0;
+    let loading = null;
+    let clicked = { matchId: "", employerId: "", at: 0 };
+    let box = null;
+    let dialogState = { entries: [], hits: null, query: "", selected: null };
+    const owned = (id) => {
+      const element5 = document.getElementById(id);
+      return element5?.dataset[OWNER_KEY] === sourcePath ? element5 : null;
+    };
+    const currentEmployerId = () => employerIdFromHref2(location.hash || "");
+    function ensureStyle4() {
+      if (document.getElementById(IDS3.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS3.style;
+      const d = `#${IDS3.dialog}`;
+      const b = `.${BOX_CLASS}`;
+      style.textContent = `
+      #${IDS3.button}.wvn-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS3.button}.wvn-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS3.button}.wvn-native svg { flex:none; fill:currentColor; }
+      #${IDS3.button}.wvn-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T.line}; border-radius:8px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 ${FONT6}; }
+      ${b} { box-sizing:border-box; width:100%; margin:6px 0 10px; padding:9px 11px; border:1px solid ${T.line}; border-radius:8px; background:#fafafa; color:${T.ink}; font:400 13px/1.45 ${FONT6}; }
+      ${b}[data-state="none"], ${b}[data-state="loading"], ${b}[data-state="error"] { padding:5px 11px; background:transparent; border-style:dashed; color:${T.muted}; font-size:12px; }
+      ${b} .wvn-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+      ${b} .wvn-title { font-weight:650; font-size:12px; color:${T.ink2}; }
+      ${b} .wvn-meta { color:${T.muted}; font-size:11px; }
+      ${b} .wvn-text { margin-top:4px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${b} .wvn-spacer { flex:1; }
+      ${b} .wvn-done { color:#1f9a6b; font-size:12px; font-weight:600; }
+      ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+      ${d} .wvn-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T.line}; border-radius:12px; background:${T.surface}; color:${T.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 ${FONT6}; }
+      ${d} .wvn-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T.ink2}; font:400 22px/30px ${FONT6}; }
+      ${d} .wvn-close:hover { background:${T.sunken}; }
+      ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
+      ${d} h3 { margin:18px 0 8px; color:${T.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T.line}; }
+      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${d} .wvn-who { flex:1; min-width:0; }
+      ${d} .wvn-name { font-weight:600; }
+      ${d} .wvn-name a { color:inherit; text-decoration:none; }
+      ${d} .wvn-name a:hover { text-decoration:underline; }
+      ${d} .wvn-meta { color:${T.muted}; font-size:11px; }
+      ${d} .wvn-text { white-space:pre-wrap; overflow-wrap:anywhere; color:${T.ink2}; font-size:12px; }
+      ${d} .wvn-chip { padding:2px 8px; border-radius:999px; background:${T.accentSoft}; color:${T.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wvn-row { display:flex; gap:8px; align-items:center; }
+      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T.lineStrong}; border-radius:8px; background:${T.surface}; color:${T.ink}; font-family:inherit; font-size:13px; }
+      ${d} .wvn-status { min-height:18px; margin-top:10px; color:${T.ink2}; font-size:12px; }
+      ${d} .wvn-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+      .wvn-editor { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+      .wvn-editor textarea { width:100%; min-height:84px; box-sizing:border-box; padding:7px 10px; border:1px solid ${T.lineStrong}; border-radius:8px; background:${T.surface}; color:${T.ink}; font:400 13px/1.45 ${FONT6}; resize:vertical; }
+      .wvn-editor textarea:focus, ${d} input:focus { outline:2px solid ${T.accent}; outline-offset:-1px; }
+      .wvn-editor .wvn-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      .wvn-status.wvn-error, .wvn-editor .wvn-status.wvn-error { color:${T.badInk}; }
+      .wvn-editor .wvn-status { min-height:16px; color:${T.ink2}; font-size:12px; }
+      .wvn-btn { min-height:28px; padding:4px 11px; border:0; border-radius:8px; background:${T.accent}; color:#fff; cursor:pointer; font:600 12px/1 ${FONT6}; white-space:nowrap; }
+      .wvn-btn:disabled { cursor:default; opacity:.6; }
+      .wvn-btn.wvn-secondary { border:1px solid ${T.line}; background:${T.surface}; color:${T.ink}; }
+      .wvn-btn.wvn-secondary:hover { background:${T.sunken}; }
+      .wvn-btn.wvn-danger { background:${T.badSoft}; color:${T.badInk}; }
+      .wvn-btn.wvn-danger:hover { background:${T.badHover}; }
+      .wvn-btn.wvn-link { min-height:0; padding:2px 4px; background:transparent; color:${T.accentInk}; }
+      .wvn-btn.wvn-link:hover { text-decoration:underline; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
+    }
+    function button2(text, onClick2, variant = "") {
+      return el4("button", {
+        type: "button",
+        textContent: text,
+        className: `wvn-btn${variant ? ` wvn-${variant}` : ""}`,
+        onclick: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClick2(event);
+        }
+      });
+    }
+    function noteIcon(size) {
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("aria-hidden", "true");
+      if (size) {
+        icon.style.width = size;
+        icon.style.height = size;
+      }
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", NOTE_ICON_PATH);
+      icon.append(path);
+      return icon;
+    }
+    function confirmButton(label2, question, onConfirm) {
+      let armed = false;
+      let timer = null;
+      const element5 = button2(label2, () => {
+        if (!armed) {
+          armed = true;
+          element5.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element5.textContent = label2;
+          }, CONFIRM_MS2);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, "danger");
+      return element5;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function fetchList() {
+      if (!loading) {
+        loading = call({ action: "liste" }).then((data) => {
+          const entries = data.eintraege || [];
+          cache = { at: now(), entries, lookup: createLookup(entries) };
+          failedAt = 0;
+          return cache;
+        }).catch((error) => {
+          failedAt = now();
+          throw error;
+        }).finally(() => {
+          loading = null;
+        });
+      }
+      return loading;
+    }
+    function loadList() {
+      if (cache && now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
+      if (failedAt && now() - failedAt < RETRY_MS2) return Promise.resolve(cache);
+      return fetchList().catch((error) => {
+        console.warn("[VTA-Notizen] Liste nicht geladen:", error?.message || error);
+        return cache;
+      });
+    }
+    async function save(employerId, notiz) {
+      await call({ action: "speichern", employerId, notiz });
+      await fetchList();
+      afterChange();
+    }
+    function afterChange() {
+      if (box) renderBox(box);
+      scheduleButton();
+    }
+    async function employerName(employerId) {
+      const entry = cache?.lookup(employerId);
+      if (entry?.employerName) return entry.employerName;
+      try {
+        const data = await call({ action: "suche", suche: employerId });
+        return (data.treffer || []).find((hit) => String(hit.id).toLowerCase() === employerId)?.name || "";
+      } catch {
+        return "";
+      }
+    }
+    function editorForm({ employerId, entry, onDone, autofocus = true }) {
+      const textarea = el4("textarea", { value: entry?.notiz || "", maxLength: MAX_NOTE, placeholder: "z. B. Buchungslink oder „Termine nur Di/Do“" });
+      const status2 = el4("div", { className: "wvn-status" });
+      const setStatus = (text, isError = false) => {
+        status2.textContent = text;
+        status2.classList.toggle("wvn-error", isError);
+      };
+      const controls = [];
+      const setBusy = (busy) => {
+        textarea.disabled = busy;
+        controls.forEach((control) => {
+          control.disabled = busy;
+        });
+      };
+      const run = async (notiz, success) => {
+        setBusy(true);
+        setStatus("Speichert …");
+        try {
+          await save(employerId, notiz);
+          onDone?.(success);
+        } catch (error) {
+          setBusy(false);
+          setStatus(error.message || String(error), true);
+        }
+      };
+      controls.push(button2("Speichern", () => run(textarea.value, textarea.value.trim() ? "VTA-Notiz gespeichert." : "VTA-Notiz gelöscht.")));
+      if (entry) controls.push(confirmButton("Notiz löschen", "Wirklich löschen?", () => run("", "VTA-Notiz gelöscht.")));
+      if (onDone) controls.push(button2("Abbrechen", () => onDone(""), "secondary"));
+      const meta = entry ? el4("span", { className: "wvn-meta", textContent: `Zuletzt geändert ${entryMeta(entry)}` }) : null;
+      const form = el4("div", { className: "wvn-editor" }, [textarea, el4("div", { className: "wvn-row" }, [...controls, meta]), status2]);
+      textarea.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") event.stopPropagation();
+      });
+      if (autofocus) runtime.setTimeout(() => textarea.focus(), 0);
+      return form;
+    }
+    function notesField(dialog) {
+      return dialog.querySelector('textarea[name="notes"]');
+    }
+    function setNotes(textarea, value) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      if (setter) setter.call(textarea, value);
+      else textarea.value = value;
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function insertInto(current, entry) {
+      const textarea = notesField(current.dialog);
+      if (!textarea || !entry) return false;
+      const next = withNote(textarea.value, entry.notiz);
+      if (next !== textarea.value) setNotes(textarea, next);
+      return true;
+    }
+    function placeBox(current) {
+      const textarea = notesField(current.dialog);
+      if (!textarea) return;
+      const anchor = textarea.closest(".MuiFormControl-root, .MuiTextField-root") || textarea;
+      if (anchor.nextElementSibling !== current.element) anchor.insertAdjacentElement("afterend", current.element);
+    }
+    function renderBox(current) {
+      if (box !== current) return;
+      const { element: element5 } = current;
+      element5.textContent = "";
+      if (current.editing) element5.dataset.state = "edit";
+      else element5.dataset.state = current.state;
+      const tip = helpTip?.();
+      if (current.state === "loading") {
+        element5.append(el4("span", { textContent: "VTA-Notiz: Arbeitgeber wird ermittelt …" }));
+        return;
+      }
+      if (current.state === "error") {
+        element5.append(el4("span", { textContent: current.message || "VTA-Notiz: Arbeitgeber nicht erkannt." }));
+        if (tip) element5.append(tip);
+        return;
+      }
+      const entry = cache?.lookup(current.employerId) || null;
+      const head = el4("div", { className: "wvn-head" });
+      element5.append(head);
+      if (current.editing) {
+        head.append(el4("span", { className: "wvn-title", textContent: `VTA-Notiz für ${current.employerName || "diesen Arbeitgeber"}` }));
+        if (tip) head.append(tip);
+        element5.append(editorForm({
+          employerId: current.employerId,
+          entry,
+          // Neu angelegt oder geändert: bei einem neuen Termin gleich ins
+          // Notizfeld (die alte Fassung bleibt stehen, falls schon drin).
+          onDone: (message) => {
+            current.editing = false;
+            const saved = message ? cache?.lookup(current.employerId) : null;
+            if (saved && !isExistingAppointment(current.dialog)) insertInto(current, saved);
+            renderBox(current);
+          }
+        }));
+        return;
+      }
+      if (!entry) {
+        element5.dataset.state = "none";
+        head.append(
+          el4("span", { textContent: "Keine VTA-Notiz für diesen Arbeitgeber." }),
+          button2("VTA-Notiz anlegen", () => {
+            current.editing = true;
+            renderBox(current);
+          }, "link")
+        );
+        if (tip) head.append(tip);
+        return;
+      }
+      element5.dataset.state = "note";
+      const inserted = hasNote(notesField(current.dialog)?.value, entry.notiz);
+      head.append(el4("span", { className: "wvn-title", textContent: `VTA-Notiz ${entry.employerName ? `· ${entry.employerName}` : ""}` }));
+      if (tip) head.append(tip);
+      head.append(el4("span", { className: "wvn-spacer" }));
+      head.append(inserted ? el4("span", { className: "wvn-done", textContent: "Steht im Notizfeld" }) : button2("Ins Notizfeld übernehmen", () => {
+        insertInto(current, entry);
+        renderBox(current);
+      }));
+      head.append(button2("Bearbeiten", () => {
+        current.editing = true;
+        renderBox(current);
+      }, "secondary"));
+      element5.append(el4("div", { className: "wvn-text", textContent: entry.notiz }));
+      element5.dataset.inserted = String(inserted);
+    }
+    function currentTarget() {
+      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS && (clicked.matchId || clicked.employerId)) return clicked;
+      const hash = location.hash || "";
+      return { matchId: matchIdFromHref3(hash), employerId: employerIdFromHref2(hash) };
+    }
+    async function resolveEmployer(target) {
+      if (target.employerId) return target.employerId;
+      if (!target.matchId) return "";
+      const provider = employerNotesProviderFor(getGraphqlAdapter());
+      return String(await provider.employerIdForMatch(target.matchId) || "").toLowerCase();
+    }
+    async function startBox(current) {
+      try {
+        const employerId = await resolveEmployer(current.target);
+        if (box !== current) return;
+        if (!employerId) {
+          current.state = "error";
+          current.message = "VTA-Notiz: Arbeitgeber nicht erkannt. Den Dialog aus der Zeile des Matches öffnen.";
+          renderBox(current);
+          return;
+        }
+        current.employerId = employerId;
+        const list = await loadList();
+        if (box !== current) return;
+        if (!list) {
+          current.state = "error";
+          current.message = "VTA-Notiz: Server nicht erreichbar.";
+          renderBox(current);
+          return;
+        }
+        const entry = list.lookup(employerId);
+        current.employerName = entry?.employerName || "";
+        current.state = "ready";
+        if (entry && !current.autoDone && !isExistingAppointment(current.dialog)) insertInto(current, entry);
+        current.autoDone = true;
+        renderBox(current);
+        if (!entry) employerName(employerId).then((name) => {
+          if (box === current && name) current.employerName = name;
+        });
+      } catch (error) {
+        console.warn("[VTA-Notizen]", error);
+        if (box !== current) return;
+        current.state = "error";
+        current.message = "VTA-Notiz: Arbeitgeber konnte nicht ermittelt werden.";
+        renderBox(current);
+      }
+    }
+    function teardownBox() {
+      if (!box) return;
+      box.element.remove();
+      if (box.dialog.dataset[OWNER_KEY] === sourcePath) delete box.dialog.dataset[OWNER_KEY];
+      box = null;
+    }
+    function syncBox2() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (box) {
+          teardownBox();
+          clicked = { matchId: "", employerId: "", at: 0 };
+        }
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY];
+      if (claimedBy && claimedBy !== sourcePath) return;
+      if (box && box.dialog !== dialog) teardownBox();
+      if (!box) {
+        ensureStyle4();
+        dialog.dataset[OWNER_KEY] = sourcePath;
+        const element5 = el4("div", { className: BOX_CLASS });
+        element5.dataset[OWNER_KEY] = sourcePath;
+        box = { dialog, element: element5, target: currentTarget(), employerId: "", employerName: "", state: "loading", editing: false, autoDone: false };
+        placeBox(box);
+        renderBox(box);
+        startBox(box);
+        return;
+      }
+      placeBox(box);
+      if (box.state === "ready" && !box.editing) {
+        const entry = cache?.lookup(box.employerId);
+        if (entry && String(hasNote(notesField(dialog)?.value, entry.notiz)) !== box.element.dataset.inserted) renderBox(box);
+      }
+    }
+    function setDialogStatus(text, isError = false) {
+      const status2 = owned(IDS3.dialog)?.querySelector(".wvn-card > .wvn-body > .wvn-status");
+      if (!status2) return;
+      status2.textContent = text;
+      status2.classList.toggle("wvn-error", isError);
+    }
+    function closeDialog() {
+      owned(IDS3.dialog)?.remove();
+    }
+    function employerLink(id, name) {
+      return el4("a", { href: `#/Employer/${id}/show`, textContent: name || id, target: "_blank", rel: "noopener" });
+    }
+    function select(id, name) {
+      dialogState.selected = { id, name };
+      renderDialog();
+    }
+    function entryRow(entry) {
+      return el4("li", {}, [
+        el4("div", { className: "wvn-who" }, [
+          el4("div", { className: "wvn-name" }, [employerLink(entry.employerId, entry.employerName)]),
+          el4("div", { className: "wvn-text", textContent: entry.notiz }),
+          el4("div", { className: "wvn-meta", textContent: entryMeta(entry) })
+        ]),
+        button2("Bearbeiten", () => select(entry.employerId, entry.employerName), "secondary")
+      ]);
+    }
+    function hitRow(hit) {
+      const meta = [hit.status, `${hit.stellen} ${hit.stellen === 1 ? "Stelle" : "Stellen"}`].filter(Boolean).join(" · ");
+      return el4("li", {}, [
+        el4("div", { className: "wvn-who" }, [
+          el4("div", { className: "wvn-name" }, [employerLink(hit.id, hit.name)]),
+          el4("div", { className: "wvn-meta", textContent: meta })
+        ]),
+        hit.hatNotiz ? el4("span", { className: "wvn-chip", textContent: "hat Notiz" }) : null,
+        button2(hit.hatNotiz ? "Bearbeiten" : "Auswählen", () => select(String(hit.id).toLowerCase(), hit.name), hit.hatNotiz ? "secondary" : "")
+      ]);
+    }
+    function searchSection() {
+      const input = el4("input", { type: "search", value: dialogState.query, placeholder: "Name, Employer-ID oder Link zum Arbeitgeber" });
+      const search = async () => {
+        dialogState.query = input.value.trim();
+        setDialogStatus("Sucht …");
+        try {
+          const data = await call({ action: "suche", suche: dialogState.query });
+          dialogState.hits = data.treffer || [];
+          renderDialog();
+          if (!dialogState.hits.length) setDialogStatus("Kein Arbeitgeber gefunden.");
+        } catch (error) {
+          setDialogStatus(error.message || String(error), true);
+        }
+      };
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          search();
+        }
+      });
+      const parts = [
+        el4("h3", { textContent: "Arbeitgeber suchen" }),
+        el4("div", { className: "wvn-row" }, [input, button2("Suchen", search)])
+      ];
+      if (dialogState.hits?.length) {
+        const list = el4("ul");
+        dialogState.hits.forEach((hit) => list.append(hitRow(hit)));
+        parts.push(list);
+      }
+      return parts;
+    }
+    function renderDialog() {
+      const target = owned(IDS3.dialog)?.querySelector(".wvn-body");
+      if (!target) return;
+      target.textContent = "";
+      const tip = helpTip?.();
+      const { selected } = dialogState;
+      if (selected) {
+        const entry = cache?.lookup(selected.id) || null;
+        target.append(
+          el4("h2", {}, [document.createTextNode("VTA-Notiz "), tip]),
+          el4("p", {}, [document.createTextNode("Für "), employerLink(selected.id, selected.name || entry?.employerName), document.createTextNode(". Kommt bei jedem neuen Terminvorschlag für diesen Arbeitgeber ans Ende des Notizfelds.")]),
+          editorForm({
+            employerId: selected.id,
+            entry,
+            // Gespeichert: aus der Übersicht zurück zur Liste, vom Arbeitgeber
+            // aus bleibt der Editor mit dem neuen Stand offen. Abbrechen:
+            // zurück zur Liste bzw. Dialog zu.
+            onDone: (message) => {
+              if (!message && !dialogState.fromOverview) {
+                closeDialog();
+                return;
+              }
+              if (dialogState.fromOverview) dialogState.selected = null;
+              dialogState.entries = cache?.entries || [];
+              renderDialog();
+              if (message) setDialogStatus(message);
+            }
+          }),
+          el4("div", { className: "wvn-status" }),
+          el4("div", { className: "wvn-actions" }, [button2("Schließen", closeDialog, "secondary")])
+        );
+        return;
+      }
+      const list = el4("ul");
+      if (!dialogState.entries.length) list.append(el4("li", { textContent: "Noch keine VTA-Notiz hinterlegt." }));
+      dialogState.entries.forEach((entry) => list.append(entryRow(entry)));
+      target.append(
+        el4("h2", {}, [document.createTextNode("VTA-Notizen "), tip]),
+        el4("p", { textContent: "Feste Notizen je Arbeitgeber, z. B. Buchungslink oder „Termine nur Di/Do“. Bei einem neuen Terminvorschlag hängt die Toolbox sie ans Notizfeld an." }),
+        el4("h3", { textContent: `Hinterlegt (${dialogState.entries.length})` }),
+        list,
+        ...searchSection(),
+        el4("div", { className: "wvn-status" }),
+        el4("div", { className: "wvn-actions" }, [button2("Schließen", closeDialog, "secondary")])
+      );
+    }
+    async function openDialog({ employerId = "" } = {}) {
+      closeDialog();
+      ensureStyle4();
+      dialogState = { entries: cache?.entries || [], hits: null, query: "", selected: null, fromOverview: !employerId };
+      const overlay = el4("div", { id: IDS3.dialog });
+      overlay.dataset[OWNER_KEY] = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const close = button2("×", closeDialog);
+      close.className = "wvn-close wvn-btn wvn-secondary";
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el4("div", { className: "wvn-body" }, [
+        el4("h2", { textContent: "VTA-Notizen" }),
+        el4("div", { className: "wvn-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(el4("div", { className: "wvn-card" }, [close, target]));
+      document.body.appendChild(overlay);
+      try {
+        const list = await fetchList();
+        dialogState.entries = list.entries;
+        if (employerId) {
+          const name = list.lookup(employerId)?.employerName || await employerName(employerId);
+          dialogState.selected = { id: employerId, name };
+        }
+        renderDialog();
+      } catch (error) {
+        setDialogStatus(error.message || String(error), true);
+        target.append(el4("div", { className: "wvn-actions" }, [button2("Schließen", closeDialog, "secondary")]));
+      }
+    }
+    function placeButton() {
+      const employerId = currentEmployerId();
+      const existing = document.getElementById(IDS3.button);
+      if (existing && existing.dataset[OWNER_KEY] !== sourcePath) return;
+      if (!employerId) {
+        existing?.remove();
+        return;
+      }
+      const has2 = Boolean(cache?.lookup(employerId));
+      const text = has2 ? "VTA-Notiz ✓" : "VTA-Notiz";
+      const slot = findSlot(document);
+      if (existing && slot && existing.parentElement === slot.parent && existing.dataset.employerId === employerId && existing.dataset.label === text) {
+        if (slot.before === existing) return;
+        let next = existing.nextElementSibling;
+        while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
+        if (next === slot.before) return;
+      }
+      if (existing && !slot) return;
+      existing?.remove();
+      const target = findSlot(document);
+      if (!target) return;
+      ensureStyle4();
+      const noteButton = el4("button", { type: "button", textContent: text, onclick: () => openDialog({ employerId: currentEmployerId() }) });
+      noteButton.id = IDS3.button;
+      noteButton.title = has2 ? "VTA-Notiz dieses Arbeitgebers ansehen oder ändern" : "Feste Notiz für Terminvorschläge bei diesem Arbeitgeber anlegen";
+      noteButton.dataset[OWNER_KEY] = sourcePath;
+      noteButton.dataset.employerId = employerId;
+      noteButton.dataset.label = text;
+      const look = nativeLookFrom(target.sample);
+      if (look) {
+        noteButton.className = "wvn-native";
+        Object.assign(noteButton.style, look.style);
+        const svg = noteIcon(look.iconSize);
+        svg.style.marginRight = look.iconGap;
+        noteButton.prepend(svg);
+      } else {
+        noteButton.className = "wvn-own";
+      }
+      let before = target.before;
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id)) before = before.previousElementSibling;
+      target.parent.insertBefore(noteButton, before);
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS3.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: VTA-Notizen`, () => openDialog({ employerId: currentEmployerId() }));
+      } catch {
+      }
+    }
+    const onClick = (event) => {
+      const row2 = event.target?.closest?.(ROW_SELECTOR);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const target = targetFromRow(row2);
+      if (target.matchId || target.employerId) clicked = { ...target, at: now() };
+    };
+    runtime.addDocumentListener("click", onClick, true);
+    let buttonScheduled = false;
+    function scheduleButton() {
+      if (buttonScheduled) return;
+      buttonScheduled = true;
+      runtime.setTimeout(() => {
+        buttonScheduled = false;
+        placeButton();
+      }, 250);
+    }
+    let boxScheduled = false;
+    function scheduleBox() {
+      if (boxScheduled) return;
+      boxScheduled = true;
+      runtime.setTimeout(() => {
+        boxScheduled = false;
+        syncBox2();
+      }, 150);
+    }
+    function onChange() {
+      scheduleBox();
+      scheduleButton();
+    }
+    function onHashChange() {
+      onChange();
+      if (currentEmployerId()) loadList().then(() => scheduleButton());
+    }
+    runtime.createMutationObserver(onChange).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", onHashChange);
+    runtime.addWindowListener("input", scheduleBox);
+    runtime.addCleanup?.(() => {
+      teardownBox();
+      owned(IDS3.button)?.remove();
+      closeDialog();
+    });
+    onHashChange();
+  }
+
   // src/help.js
   var onPotentialMatches = [ROUTES.potentialMatches];
   var MY_MATCHES = "CEM › Meine Matches";
@@ -4589,6 +6272,7 @@
     responseSpeedBadgesTopic({ routes: [ROUTES.cemMyCandidates, ROUTES.potentialMatches], page: "Meine Kandidaten und Potenzielle Matches" }),
     matchSentMarkerTopic({ extra: "Geht es um dieselbe Vakanz, zeigt der Hinweis zusätzlich den KAM Status." }),
     appointmentPrioTopic({ team: "CEM", page: "Terminvorschlag-Dialog", routes: onBulkPages }),
+    vtaNotizenTopic({ page: "Terminvorschlag-Dialog und Arbeitgeber", routes: [...onBulkPages, ROUTES.employer] }),
     noGoCheckTopic(),
     companyFlagTopic(),
     urgentVacancyTopic(),
@@ -4650,7 +6334,9 @@
       notes: [
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die KAM-Person, die beim Arbeitgeber eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
         "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
-        "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht."
+        "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht.",
+        "Der Link in der Nachricht öffnet bei der KAM-Person das Match in KAM › Meine Matches, bei der CEM-Person die Kandidatenansicht.",
+        "Einzelne Personen (derzeit die CEM-Leitung) sehen zusätzlich „An CEM“. Damit geht die DM an die CEM-Person, die beim Kandidaten eingetragen ist, und deren Vertretung. Bist du das selbst, meldet der Dialog das. Freischalten lässt sich das nur im Code der Toolbox."
       ]
     },
     vertretungenTopic({ page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates, ROUTES.cemMyMatches] }),
@@ -5196,7 +6882,7 @@
   }
 
   // src/features/cem-ofm/reverse-match-kam-status.js
-  var OWNER_KEY = "kam-status-potentialMatches";
+  var OWNER_KEY2 = "kam-status-potentialMatches";
   var TAG_CLASS = "werkia-cem-kam-status-tag";
   var SENT_MATCH_TAG_CLASS = "werkia-cem-sent-match-tag";
   var MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -5369,7 +7055,7 @@
       if (!isPotentialMatchesPage()) return;
       const candidateId = getCandidateIdFromRoute();
       if (!candidateId) return;
-      if (!claimPage(OWNER_KEY, "cem")) return;
+      if (!claimPage(OWNER_KEY2, "cem")) return;
       if (waitForAdminpanel()) return;
       const provider = getCemGraphqlAdapter().matchProvider;
       const current = cachedSentEmployers(candidateId);
@@ -6946,7 +8632,7 @@
   var REVERSE_MATCHES_ROUTE = /^#\/OnlineMatches\/ReverseMatches(?:\?|$)/i;
   var OM_MATCHES_ROUTE = /^#\/OnlineMatches\/(?:AllMatches|MyMatches)(?:[/?]|$)/i;
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
-  var ROW_SELECTOR = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
   function isInViewport(row2) {
     const rect = row2.getBoundingClientRect();
@@ -6988,7 +8674,7 @@
       matches: (hash) => POTENTIAL_MATCHES_ROUTE5.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute2();
-        return [...document.querySelectorAll(ROW_SELECTOR)].map((row2) => ({
+        return [...document.querySelectorAll(ROW_SELECTOR2)].map((row2) => ({
           row: row2,
           candidateId,
           jobId: getJobIdFromRow(row2),
@@ -7002,7 +8688,7 @@
       matches: (hash) => OM_MATCHES_ROUTE.test(hash),
       collect() {
         const items = [];
-        for (const row2 of document.querySelectorAll(ROW_SELECTOR)) {
+        for (const row2 of document.querySelectorAll(ROW_SELECTOR2)) {
           const link = getJobLinkFromRow(row2);
           if (!link || link.closest("tr") !== row2) continue;
           items.push({ row: row2, candidateId: getCandidateIdFromOmMatchRow(row2), jobId: getJobIdFromRow(row2), host: () => link.closest("td") || row2 });
@@ -7049,7 +8735,7 @@
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
-    const RETRY_MS5 = 60 * 1e3;
+    const RETRY_MS6 = 60 * 1e3;
     let scheduled = false;
     function ensureStyles2() {
       if (document.getElementById(STYLE_ID14)) return;
@@ -7233,7 +8919,7 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation !== null && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS5) {
+        if (job && candidateLocation !== null && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS6) {
           toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }
@@ -8705,7 +10391,7 @@
   }
 
   // ../../shared/js/bulk-match-actions/index.js
-  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR2 = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
@@ -8718,7 +10404,7 @@
       team,
       isTargetPage: isTargetPage3,
       getRequest,
-      ids: IDS9,
+      ids: IDS10,
       fields,
       columns,
       statusOptions,
@@ -8762,7 +10448,7 @@
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
     function shownOnPage(element5) {
       if (!element5.isConnected || element5.closest("[hidden]")) return false;
@@ -8798,13 +10484,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS9,
-      buttonIds: [IDS9.button, IDS9.statusButton, IDS9.forwardButton, IDS9.declinePastButton],
+      ids: IDS10,
+      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS9.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS9.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -8944,13 +10630,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS9.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS9.feedbackShortcuts;
+      shortcuts.id = IDS10.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -9250,10 +10936,10 @@
     function installHeaderButtons() {
       if (!isTargetPage3()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS9.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS9.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS9.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS9.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -9275,7 +10961,7 @@
   }
 
   // src/features/bulk-match-actions.js
-  var IDS = {
+  var IDS4 = {
     button: "werkia-cem-wvl-bulk-button",
     statusButton: "werkia-cem-status-bulk-button",
     forwardButton: "werkia-cem-interview-forward-bulk-button",
@@ -9322,7 +11008,7 @@
       team: "CEM",
       isTargetPage,
       getRequest: () => getCemGraphqlAdapter().request,
-      ids: IDS,
+      ids: IDS4,
       fields: { status: "cemStatus", feedback: "cemFeedback", followUp: "cemFollowUpDate" },
       columns: { status: "cemStatus", followUp: "cemFollowUpDate", interview: "matchInterview" },
       statusOptions: CEM_STATUS_OPTIONS,
@@ -9340,14 +11026,14 @@
   }
 
   // src/features/candidate-bulk-actions.js
-  var IDS2 = {
+  var IDS5 = {
     wvlButton: "werkia-cem-candidate-wvl-bulk-button",
     statusButton: "werkia-cem-candidate-status-bulk-button",
     dialog: "werkia-cem-candidate-bulk-dialog",
     style: "werkia-cem-candidate-bulk-style",
     status: "werkia-cem-candidate-bulk-status"
   };
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
   var CANDIDATE_STATUS_OPTIONS = [
     { value: "onboarding", label: "Onboarding" },
@@ -9389,13 +11075,13 @@
   }
   function executeCandidateBulkActions(runtime) {
     runtime.registerSource("cem/toolbox/src/features/candidate-bulk-actions.js");
-    const kit = createBulkDialogKit({ ids: IDS2, buttonIds: [IDS2.wvlButton, IDS2.statusButton], stopNoun: "Kandidat" });
+    const kit = createBulkDialogKit({ ids: IDS5, buttonIds: [IDS5.wvlButton, IDS5.statusButton], stopNoun: "Kandidat" });
     const { setStatus } = kit;
     const tip = (id) => cemHelp.tipHtml(id, { tone: "dark" });
     const normalize6 = (value) => String(value || "").replace(/\s+/g, " ").trim();
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
-      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
+      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
         const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR3}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
         return id ? { id, name: normalize6(link.textContent) || id } : null;
@@ -9498,8 +11184,8 @@
     }
     function installHeaderButtons() {
       kit.injectStyle();
-      kit.installButton(document.querySelector("th.column-status"), IDS2.statusButton, "Alle ändern", "Status für alle angehakten sichtbaren Kandidaten ändern", renderStatusDialog);
-      kit.installButton(document.querySelector("th.column-followUpDate"), IDS2.wvlButton, "Alle ändern", "Kandidat-WVL für alle angehakten sichtbaren Kandidaten ändern", renderWvlDialog);
+      kit.installButton(document.querySelector("th.column-status"), IDS5.statusButton, "Alle ändern", "Status für alle angehakten sichtbaren Kandidaten ändern", renderStatusDialog);
+      kit.installButton(document.querySelector("th.column-followUpDate"), IDS5.wvlButton, "Alle ändern", "Kandidat-WVL für alle angehakten sichtbaren Kandidaten ändern", renderWvlDialog);
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -9517,424 +11203,6 @@
     runtime.createMutationObserver(scheduleInstall).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleInstall);
     scheduleInstall();
-  }
-
-  // ../../shared/js/list-filter-presets/core.js
-  var STORAGE_KEY = "werkia_list_filter_presets_v1";
-  var STORE_VERSION = 1;
-  function parseJsonObject(value, fallback) {
-    if (!value) return fallback;
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
-    } catch {
-      return fallback;
-    }
-  }
-  function safeCall(callback) {
-    if (typeof callback !== "function") return "";
-    try {
-      return callback();
-    } catch {
-      return "";
-    }
-  }
-  function routeFromHash(hash = "") {
-    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
-  }
-  function parseListState(hash = "") {
-    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
-    const perPage = Number.parseInt(params.get("perPage") || "", 10);
-    return {
-      route: routeFromHash(hash),
-      filter: parseJsonObject(params.get("filter"), {}),
-      sort: params.get("sort") || "",
-      order: params.get("order") || "",
-      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
-    };
-  }
-  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
-    const params = new URLSearchParams({
-      displayedFilters: JSON.stringify({}),
-      filter: JSON.stringify(filter || {})
-    });
-    if (order) params.set("order", order);
-    params.set("page", "1");
-    if (perPage) params.set("perPage", String(perPage));
-    if (sort) params.set("sort", sort);
-    return `#/${route}?${params}`;
-  }
-  function isTargetRoute(hash, routes = []) {
-    const route = routeFromHash(hash).toLowerCase();
-    return routes.some((candidate) => String(candidate).toLowerCase() === route);
-  }
-  function isEmptyFilterValue(value) {
-    if (value === null || value === void 0 || value === "") return true;
-    return Array.isArray(value) && value.length === 0;
-  }
-  function filterKey(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return JSON.stringify(
-      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
-    );
-  }
-  function filterFields(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
-  }
-  function describePreset(preset) {
-    const fields = filterFields(preset?.filter);
-    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
-  }
-  function createPresetId(now = Date.now(), entropy = Math.random()) {
-    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
-  }
-  function presetFromState(name, state) {
-    return {
-      id: createPresetId(),
-      name: String(name || "").trim(),
-      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
-      sort: state?.sort || "",
-      order: state?.order || "",
-      perPage: state?.perPage || 0
-    };
-  }
-  function applyPresetToState(preset, currentState) {
-    return {
-      route: currentState?.route || "",
-      filter: preset?.filter || {},
-      sort: preset?.sort || currentState?.sort || "",
-      order: preset?.order || currentState?.order || "",
-      perPage: preset?.perPage || currentState?.perPage || 0
-    };
-  }
-  function findActivePresetId(presets, state) {
-    const key = filterKey(state?.filter);
-    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
-  }
-  function emptyStore() {
-    return { version: STORE_VERSION, routes: {} };
-  }
-  function parseStore(raw) {
-    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
-    if (!parsed || typeof parsed !== "object") return emptyStore();
-    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean4 = {};
-    Object.keys(routes).forEach((route) => {
-      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
-        id: String(preset.id || createPresetId()),
-        name: String(preset.name),
-        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
-        sort: preset.sort || "",
-        order: preset.order || "",
-        perPage: Number.parseInt(preset.perPage, 10) || 0
-      }));
-    });
-    return { version: STORE_VERSION, routes: clean4 };
-  }
-  function presetsForRoute(store, route) {
-    return store?.routes?.[route] ? [...store.routes[route]] : [];
-  }
-  function upsertPreset(store, route, preset) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
-    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-    if (sameName >= 0) kept.splice(sameName, 1, preset);
-    else kept.push(preset);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function removePreset(store, route, id) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function mergeStores(base, incoming) {
-    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
-    const routes = incoming?.routes || {};
-    Object.keys(routes).forEach((route) => {
-      routes[route].forEach((preset) => {
-        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
-      });
-    });
-    return result;
-  }
-  function createPresetStorage({ read, write, backupRead, backupWrite }) {
-    return {
-      load() {
-        const primary = parseStore(safeCall(read));
-        if (Object.keys(primary.routes).length) return primary;
-        const backup = parseStore(safeCall(backupRead));
-        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
-        return backup;
-      },
-      save(store) {
-        const serialized = JSON.stringify(store);
-        safeCall(() => write(serialized));
-        safeCall(() => backupWrite(serialized));
-      }
-    };
-  }
-
-  // ../../shared/js/list-filter-presets/index.js
-  var IDS3 = {
-    bar: "werkia-filter-presets-bar",
-    select: "werkia-filter-presets-select",
-    style: "werkia-filter-presets-style",
-    dialog: "werkia-filter-presets-dialog"
-  };
-  var LIST_ANCHOR_SELECTORS = [
-    ".RaList-content",
-    ".RaList-main",
-    "table.RaDataTable-table",
-    "main table"
-  ];
-  function findListAnchor(root = document) {
-    for (const selector of LIST_ANCHOR_SELECTORS) {
-      const element5 = root.querySelector(selector);
-      if (element5) return element5;
-    }
-    return null;
-  }
-  function executeListFilterPresets(runtime, {
-    routes = [],
-    sourcePath,
-    label: label2 = "Filtervorlagen",
-    builtInPresets = [],
-    storage,
-    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
-    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
-    helpTip
-  } = {}) {
-    runtime.registerSource(sourcePath);
-    const presetStorage = storage || createPresetStorage({
-      read: () => localStorage.getItem(STORAGE_KEY),
-      write: (value) => localStorage.setItem(STORAGE_KEY, value),
-      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
-      backupWrite: (value) => {
-        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
-      }
-    });
-    const owner = sourcePath || routes.join(",");
-    const ownElement = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaPresetsOwner === owner ? element5 : null;
-    };
-    const isTargetPage3 = () => isTargetRoute(location.hash, routes);
-    const currentRoute = () => routeFromHash(location.hash);
-    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle4() {
-      if (document.getElementById(IDS3.style)) return;
-      const style = document.createElement("style");
-      style.id = IDS3.style;
-      style.textContent = `
-      #${IDS3.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS3.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
-      #${IDS3.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS3.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS3.bar} button:hover { background:#3643c7; }
-      #${IDS3.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS3.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
-      #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS3.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS3.dialog} h2 { margin:0 0 12px; font-size:15px; }
-      #${IDS3.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS3.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
-      #${IDS3.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS3.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
-      #${IDS3.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
-      #${IDS3.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
-      #${IDS3.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS3.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS3.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
-    `;
-      document.head.appendChild(style);
-    }
-    function applyPreset(preset) {
-      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
-    }
-    function saveCurrentFilter() {
-      const state = parseListState(location.hash);
-      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
-      const name = window.prompt("Name der Vorlage:", "");
-      if (!name || !name.trim()) return;
-      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
-      render();
-    }
-    function closeDialog() {
-      ownElement(IDS3.dialog)?.remove();
-    }
-    function renderManager() {
-      closeDialog();
-      const route = currentRoute();
-      const overlay = document.createElement("div");
-      overlay.id = IDS3.dialog;
-      overlay.dataset.werkiaPresetsOwner = owner;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDialog();
-      });
-      const card = document.createElement("div");
-      card.className = "werkia-filter-presets-card";
-      const heading = document.createElement("h2");
-      heading.textContent = `Filtervorlagen verwalten – ${route}`;
-      card.appendChild(heading);
-      const list = document.createElement("ul");
-      const presets = ownPresets();
-      if (!presets.length) {
-        const empty2 = document.createElement("li");
-        empty2.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
-        list.appendChild(empty2);
-      }
-      presets.forEach((preset) => {
-        const row2 = document.createElement("li");
-        const name = document.createElement("span");
-        name.className = "werkia-filter-presets-name";
-        name.textContent = preset.name;
-        const fields = document.createElement("span");
-        fields.className = "werkia-filter-presets-fields";
-        fields.textContent = describePreset(preset);
-        const rename = document.createElement("button");
-        rename.type = "button";
-        rename.className = "werkia-filter-presets-secondary";
-        rename.textContent = "Umbenennen";
-        rename.addEventListener("click", () => {
-          const next = window.prompt("Neuer Name:", preset.name);
-          if (!next || !next.trim()) return;
-          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
-          renderManager();
-          render();
-        });
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "werkia-filter-presets-danger";
-        remove.textContent = "Loeschen";
-        remove.addEventListener("click", () => {
-          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
-          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
-          renderManager();
-          render();
-        });
-        row2.append(name, fields, rename, remove);
-        list.appendChild(row2);
-      });
-      card.appendChild(list);
-      const hint = document.createElement("p");
-      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
-      card.appendChild(hint);
-      const transfer = document.createElement("textarea");
-      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
-      transfer.spellcheck = false;
-      card.appendChild(transfer);
-      const importButton = document.createElement("button");
-      importButton.type = "button";
-      importButton.textContent = "Aus Textfeld importieren";
-      importButton.addEventListener("click", () => {
-        const incoming = parseStore(transfer.value);
-        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
-        presetStorage.save(mergeStores(presetStorage.load(), incoming));
-        renderManager();
-        render();
-      });
-      const closeButton = document.createElement("button");
-      closeButton.type = "button";
-      closeButton.className = "werkia-filter-presets-secondary";
-      closeButton.textContent = "Schliessen";
-      closeButton.addEventListener("click", closeDialog);
-      card.append(importButton, closeButton);
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-    }
-    function buildBar() {
-      const bar = document.createElement("div");
-      bar.id = IDS3.bar;
-      bar.dataset.werkiaPresetsOwner = owner;
-      const title = document.createElement("strong");
-      title.textContent = label2;
-      const select = document.createElement("select");
-      select.id = IDS3.select;
-      select.addEventListener("change", () => {
-        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
-        if (preset) applyPreset(preset);
-      });
-      const saveButton = document.createElement("button");
-      saveButton.type = "button";
-      saveButton.textContent = "Aktuellen Filter speichern";
-      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
-      saveButton.addEventListener("click", saveCurrentFilter);
-      const manageButton = document.createElement("button");
-      manageButton.type = "button";
-      manageButton.className = "werkia-filter-presets-secondary";
-      manageButton.textContent = "Verwalten";
-      manageButton.addEventListener("click", renderManager);
-      const resetButton = document.createElement("button");
-      resetButton.type = "button";
-      resetButton.className = "werkia-filter-presets-secondary";
-      resetButton.textContent = "Filter zuruecksetzen";
-      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
-      const tip = helpTip?.();
-      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
-      return bar;
-    }
-    const optionSignatures = /* @__PURE__ */ new WeakMap();
-    function fillSelect(select) {
-      if (!select) return;
-      const own = ownPresets();
-      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
-      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
-      if (optionSignatures.get(select) === signature) {
-        if (select.value !== active) select.value = active;
-        return;
-      }
-      optionSignatures.set(select, signature);
-      select.textContent = "";
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
-      select.appendChild(placeholder);
-      const addGroup = (groupLabel, groupPresets) => {
-        if (!groupPresets.length) return;
-        const group = document.createElement("optgroup");
-        group.label = groupLabel;
-        groupPresets.forEach((preset) => {
-          const option = document.createElement("option");
-          option.value = preset.id;
-          option.textContent = preset.name;
-          option.title = describePreset(preset);
-          group.appendChild(option);
-        });
-        select.appendChild(group);
-      };
-      addGroup("Team-Vorlagen", builtInPresets);
-      addGroup("Eigene Vorlagen", own);
-      select.value = active;
-    }
-    function render() {
-      if (!isTargetPage3()) {
-        ownElement(IDS3.bar)?.remove();
-        closeDialog();
-        return;
-      }
-      ensureStyle4();
-      let bar = document.getElementById(IDS3.bar);
-      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
-      if (!bar) {
-        const anchor = findListAnchor(document);
-        if (!anchor?.parentElement) return;
-        bar = buildBar();
-        anchor.parentElement.insertBefore(bar, anchor);
-      }
-      fillSelect(bar.querySelector(`#${IDS3.select}`));
-    }
-    let scheduled = false;
-    const scheduleRender = () => {
-      if (scheduled) return;
-      scheduled = true;
-      runtime.setTimeout(() => {
-        scheduled = false;
-        render();
-      }, 150);
-    };
-    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", scheduleRender);
-    scheduleRender();
   }
 
   // src/features/filter-presets.js
@@ -10379,7 +11647,7 @@
     employerCache = null
   }) {
     runtime.registerSource(sourcePath);
-    const IDS9 = makeIds(idPrefix);
+    const IDS10 = makeIds(idPrefix);
     const { defaultScope, leaveHash, modeHash, modeMatchesState, pickScope } = core;
     const isTargetPage3 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -10402,42 +11670,42 @@
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
     function ensureStyle4() {
-      if (document.getElementById(IDS9.style)) return;
+      if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
-      style.id = IDS9.style;
+      style.id = IDS10.style;
       style.textContent = `
-      #${IDS9.group}, #${IDS9.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS9.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS9.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
-      #${IDS9.group} + #${IDS9.side} { margin:0 0 0 8px; }
-      #${IDS9.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS9.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS9.side}.is-active > strong { color:#b85400; }
-      #${IDS9.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.side} button:hover { background:#f4f4f5; }
-      #${IDS9.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
-      #${IDS9.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
-      #${IDS9.group}.is-active, #${IDS9.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS9.group} > strong, #${IDS9.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS9.group}.is-active > strong, #${IDS9.bar}.is-active > strong { color:#b85400; }
-      #${IDS9.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS9.group} button, #${IDS9.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.group} button:hover, #${IDS9.bar} button:hover { background:#f4f4f5; }
-      #${IDS9.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS9.leave}:hover { background:#b85400 !important; }
-      #${IDS9.group} [hidden], #${IDS9.bar} [hidden] { display:none !important; }
+      #${IDS10.group}, #${IDS10.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS10.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS10.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
+      #${IDS10.group} + #${IDS10.side} { margin:0 0 0 8px; }
+      #${IDS10.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS10.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS10.side}.is-active > strong { color:#b85400; }
+      #${IDS10.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.side} button:hover { background:#f4f4f5; }
+      #${IDS10.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS10.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
+      #${IDS10.group}.is-active, #${IDS10.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS10.group} > strong, #${IDS10.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS10.group}.is-active > strong, #${IDS10.bar}.is-active > strong { color:#b85400; }
+      #${IDS10.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS10.group} button, #${IDS10.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.group} button:hover, #${IDS10.bar} button:hover { background:#f4f4f5; }
+      #${IDS10.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS10.leave}:hover { background:#b85400 !important; }
+      #${IDS10.group} [hidden], #${IDS10.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS9.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS9.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS9.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS9.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS9.dialog} input[type=text], #${IDS9.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS9.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS9.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS9.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS9.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS10.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS10.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS10.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS10.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS10.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS10.dialog} input[type=text], #${IDS10.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS10.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS10.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS10.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS10.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -10474,13 +11742,13 @@
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS9.dialog)?.remove();
+      document.getElementById(IDS10.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS9.dialog;
+      overlay.id = IDS10.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -10557,7 +11825,7 @@
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS9.select;
+      select.id = IDS10.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       const warm = () => {
         if (hasContactMode()) employers.prefetch();
@@ -10571,19 +11839,19 @@
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS9.leave;
+      leaveButton.id = IDS10.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS9.save;
+      saveButton.id = IDS10.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS9.remove;
+      removeButton.id = IDS10.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -10595,14 +11863,14 @@
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS9.group);
-      let ownBar = document.getElementById(IDS9.bar);
+      let group = document.getElementById(IDS10.group);
+      let ownBar = document.getElementById(IDS10.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS9.group;
+        group.id = IDS10.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -10612,13 +11880,13 @@
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS9.bar;
+      ownBar.id = IDS10.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
     }
     function ensureSide(container) {
-      let side = document.getElementById(IDS9.side);
+      let side = document.getElementById(IDS10.side);
       if (!SIDE_MODES.length) {
         side?.remove();
         return null;
@@ -10626,7 +11894,7 @@
       if (side && side.previousElementSibling === container) return side;
       side?.remove();
       side = document.createElement("span");
-      side.id = IDS9.side;
+      side.id = IDS10.side;
       const title = document.createElement("strong");
       title.textContent = SIDE_MODES[0].side.box || "Filter";
       side.appendChild(title);
@@ -10684,9 +11952,9 @@
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
-          document.getElementById(IDS9.group)?.remove();
-          document.getElementById(IDS9.bar)?.remove();
-          document.getElementById(IDS9.side)?.remove();
+          document.getElementById(IDS10.group)?.remove();
+          document.getElementById(IDS10.bar)?.remove();
+          document.getElementById(IDS10.side)?.remove();
           closeDialog();
         }
         return;
@@ -10723,8 +11991,8 @@
       const sideActive = Boolean(mode?.side);
       const isActive = Boolean(mode) && !sideActive;
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS9.select}`), own, isActive ? mode.id : "");
-      setHidden(container.querySelector(`#${IDS9.leave}`), !isActive);
+      fillSelect(container.querySelector(`#${IDS10.select}`), own, isActive ? mode.id : "");
+      setHidden(container.querySelector(`#${IDS10.leave}`), !isActive);
       const side = ensureSide(container);
       if (side) {
         if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
@@ -10733,7 +12001,7 @@
           if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
         });
       }
-      setHidden(container.querySelector(`#${IDS9.remove}`), !isActive || Boolean(mode?.builtIn));
+      setHidden(container.querySelector(`#${IDS10.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -10959,26 +12227,26 @@
   }
 
   // src/features/cem-ampel/core.js
-  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/cem-ampel/d1d7ad22-6ac6-47c2-89f3-1fdba7ea1cf5";
-  var REQUEST_TIMEOUT_MS = 2e4;
-  var OFFLINE_MESSAGE = "Der Server für die CEM-Ampel ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CACHE_MS5 = 5 * 60 * 1e3;
-  var RETRY_MS2 = 60 * 1e3;
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/cem-ampel/d1d7ad22-6ac6-47c2-89f3-1fdba7ea1cf5";
+  var REQUEST_TIMEOUT_MS3 = 2e4;
+  var OFFLINE_MESSAGE3 = "Der Server für die CEM-Ampel ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CACHE_MS6 = 5 * 60 * 1e3;
+  var RETRY_MS3 = 60 * 1e3;
   var MAX_IDS = 100;
   var AMPEL_MARKER = "werkiaAmpel";
-  var CURRENT_EMPLOYEE_QUERY = `query WerkiaCemAmpelMe {
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaCemAmpelMe {
   me: currentEmployee { id __typename }
 }`;
-  var T = tokensFor("light");
+  var T2 = tokensFor("light");
   var FARBEN = {
-    gruen: { label: "Grün", fill: T.good, ring: T.goodInk },
-    gelb: { label: "Gelb", fill: "#f2c200", ring: T.warnInk },
-    rot: { label: "Rot", fill: T.bad, ring: T.badInk }
+    gruen: { label: "Grün", fill: T2.good, ring: T2.goodInk },
+    gelb: { label: "Gelb", fill: "#f2c200", ring: T2.warnInk },
+    rot: { label: "Rot", fill: T2.bad, ring: T2.badInk }
   };
   var FARB_IDS = Object.keys(FARBEN);
-  var THEME = T;
-  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function parseResponse(status2, text) {
+  var THEME = T2;
+  var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function parseResponse3(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -10989,7 +12257,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`CEM-Ampel: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createAmpelClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+  function createAmpelClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -10999,19 +12267,19 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse(response.status, response.responseText));
+            resolve(parseResponse3(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
       });
     });
   }
   function candidateIdFromHref3(href) {
     const id = String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE.test(id) ? id.toLowerCase() : "";
+    return UUID_RE2.test(id) ? id.toLowerCase() : "";
   }
   function chunks(ids, size = MAX_IDS) {
     const out = [];
@@ -11032,7 +12300,7 @@
     return list.map(String).find((farbe) => FARB_IDS.includes(farbe)) || "";
   }
   function listScope(filter = {}) {
-    const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE.test(id)).map((id) => id.toLowerCase()) : [];
+    const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE2.test(id)).map((id) => id.toLowerCase()) : [];
     const statuses = Array.isArray(filter.statuses) ? filter.statuses.map(String) : [];
     return { cemEmployeeIds: [...new Set(ids)].sort(), statuses: [...new Set(statuses)].sort() };
   }
@@ -11285,7 +12553,7 @@
     __typename
   }
 }`;
-  function matchIdFromHref3(href) {
+  function matchIdFromHref4(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function isMatchShown(kamStatus, selected) {
@@ -11344,7 +12612,7 @@
       return forms.find((form) => form.classList.contains("RaFilterForm-root")) || forms[0] || null;
     }
     const tableByBar = /* @__PURE__ */ new WeakMap();
-    const rowMatchId = (row2) => matchIdFromHref3(row2.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+    const rowMatchId = (row2) => matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
     function freshStatus(matchId) {
       const entry = statusCache.get(matchId);
       return entry && Date.now() - entry.at < CACHE_TTL_MS3 ? entry : null;
@@ -11489,488 +12757,6 @@
     scheduleRender();
   }
 
-  // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS2 = 15e3;
-  var OFFLINE_MESSAGE2 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVertretungenMe {
-  me: currentEmployee { id __typename }
-}`;
-  function berlinDay(date = /* @__PURE__ */ new Date()) {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
-  }
-  function formatDay(day, withYear = false) {
-    const [year, month, date] = String(day || "").split("-");
-    if (!year || !month || !date) return String(day || "");
-    return withYear ? `${date}.${month}.${year}` : `${date}.${month}.`;
-  }
-  function formatRange(von, bis) {
-    if (von === bis) return formatDay(von, true);
-    const sameYear = String(von).slice(0, 4) === String(bis).slice(0, 4);
-    return `${formatDay(von, !sameYear)} – ${formatDay(bis, true)}`;
-  }
-  function canEditDraft(me, draft) {
-    if (!me) return false;
-    if (me.darfAlles) return true;
-    return draft.abwesendId === me.id || draft.vertretungId === me.id;
-  }
-  function validateDraft(me, draft, today = berlinDay()) {
-    if (!draft.abwesendId) return "Bitte auswählen, wer abwesend ist.";
-    if (!draft.vertretungId) return "Bitte die Vertretung auswählen.";
-    if (draft.abwesendId === draft.vertretungId) return "Niemand kann sich selbst vertreten.";
-    if (!draft.von || !draft.bis) return "Bitte „Von“ und „Bis“ ausfüllen.";
-    if (draft.von > draft.bis) return "„Von“ liegt nach „Bis“.";
-    if (draft.bis < today) return "„Bis“ liegt in der Vergangenheit.";
-    if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
-    return "";
-  }
-  function parseResponse2(status2, text) {
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-    if (data && data.ok === true) return data;
-    if (data && data.fehler) throw new Error(data.fehler);
-    throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status2}).`);
-  }
-  function createVertretungenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
-    return (payload) => new Promise((resolve, reject) => {
-      request({
-        method: "POST",
-        url,
-        headers: { "Content-Type": "application/json" },
-        data: JSON.stringify(payload),
-        timeout: timeoutMs,
-        onload(response) {
-          try {
-            resolve(parseResponse2(response.status, response.responseText));
-          } catch (error) {
-            reject(error);
-          }
-        },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
-      });
-    });
-  }
-  function plannedSubstituteMentions(mentions, aktiv, handled = /* @__PURE__ */ new Set()) {
-    const present = new Set(mentions.map((mention) => mention.id));
-    const planned = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const mention of mentions) {
-      for (const entry of aktiv || []) {
-        if (entry.abwesendId !== mention.id || !entry.vertretungId || entry.vertretungId === mention.id) continue;
-        const key = `${entry.abwesendId}|${entry.vertretungId}`;
-        if (present.has(entry.vertretungId) || handled.has(key) || seen.has(entry.vertretungId)) continue;
-        seen.add(entry.vertretungId);
-        planned.push({ key, pos: mention.end, vertretungId: entry.vertretungId, vertretungName: entry.vertretungName || "Vertretung" });
-      }
-    }
-    return planned.sort((a, b) => b.pos - a.pos);
-  }
-
-  // ../../shared/js/vertretungen/index.js
-  var IDS4 = {
-    button: "werkia-vertretungen-button",
-    bar: "werkia-vertretungen-bar",
-    dialog: "werkia-vertretungen-dialog",
-    style: "werkia-vertretungen-style"
-  };
-  var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
-  var CONFIRM_MS = 4e3;
-  var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
-  var COPIED_STYLES = [
-    "color",
-    "fontFamily",
-    "fontSize",
-    "fontWeight",
-    "lineHeight",
-    "letterSpacing",
-    "textTransform",
-    "paddingTop",
-    "paddingRight",
-    "paddingBottom",
-    "paddingLeft",
-    "borderRadius",
-    "minWidth",
-    "minHeight"
-  ];
-  function nativeLookFrom(sample, view = sample?.ownerDocument?.defaultView) {
-    if (!sample || !view) return null;
-    const computed = view.getComputedStyle(sample);
-    const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
-    const icon = sample.querySelector("svg");
-    const iconStyle = icon ? view.getComputedStyle(icon) : null;
-    const iconBox = icon?.parentElement && icon.parentElement !== sample ? view.getComputedStyle(icon.parentElement) : null;
-    return {
-      style,
-      iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
-      iconGap: iconBox?.marginRight && iconBox.marginRight !== "0px" ? iconBox.marginRight : "8px"
-    };
-  }
-  function findToolbar(root = document) {
-    for (const selector of TOOLBAR_SELECTORS) {
-      const element5 = root.querySelector(selector);
-      if (element5) return element5;
-    }
-    return null;
-  }
-  function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element5) => element5.id !== IDS4.button && /^filter hinzuf/i.test(element5.textContent.trim()));
-    if (filterButton) {
-      let before = filterButton;
-      while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
-      return { parent: before.parentElement, before, sample: filterButton };
-    }
-    const toolbar = findToolbar(root);
-    if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element5) => element5.id !== IDS4.button && element5.textContent.trim());
-    return { parent: toolbar, before: toolbar.firstElementChild, sample };
-  }
-  function executeVertretungen(runtime, {
-    routes = [],
-    getGraphqlAdapter,
-    sourcePath,
-    toolboxName = "Toolbox",
-    helpTip,
-    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
-  } = {}) {
-    runtime.registerSource(sourcePath);
-    const post = createVertretungenClient({
-      request: request || (() => {
-        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
-    });
-    let myId = "";
-    let state = null;
-    let editing = null;
-    let adminsOpen = false;
-    const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
-    const owned = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaVertretungenOwner === sourcePath ? element5 : null;
-    };
-    function ensureStyle4() {
-      if (document.getElementById(IDS4.style)) return;
-      const style = document.createElement("style");
-      style.id = IDS4.style;
-      style.textContent = `
-      #${IDS4.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS4.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS4.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS4.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS4.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS4.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS4.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS4.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS4.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS4.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS4.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS4.dialog} .wv-admins { margin-top:16px; }
-      #${IDS4.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS4.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS4.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS4.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS4.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS4.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS4.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS4.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS4.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS4.dialog} select, #${IDS4.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS4.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS4.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS4.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS4.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS4.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS4.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS4.dialog} .wv-status.wv-error { color:#a02334; }
-    `;
-      document.head.appendChild(style);
-    }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
-      Object.assign(element5, props);
-      element5.append(...children.filter((child) => child !== null && child !== void 0));
-      return element5;
-    }
-    function button2(text, onClick, className = "") {
-      return el4("button", { type: "button", textContent: text, className, onclick: onClick });
-    }
-    function confirmButton(label2, question, onConfirm) {
-      let armed = false;
-      let timer = null;
-      const element5 = button2(label2, () => {
-        if (!armed) {
-          armed = true;
-          element5.textContent = question;
-          timer = runtime.setTimeout(() => {
-            armed = false;
-            element5.textContent = label2;
-          }, CONFIRM_MS);
-          return;
-        }
-        if (timer !== null) runtime.clearTimeout?.(timer);
-        onConfirm();
-      }, "wv-danger");
-      return element5;
-    }
-    async function loadMyId() {
-      if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
-      myId = String(data?.me?.id || "");
-      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
-      return myId;
-    }
-    async function call(payload) {
-      return post({ ...payload, employeeId: await loadMyId() });
-    }
-    function closeDialog() {
-      owned(IDS4.dialog)?.remove();
-      editing = null;
-    }
-    function setStatus(text, isError = false) {
-      const status2 = owned(IDS4.dialog)?.querySelector(".wv-status");
-      if (!status2) return;
-      status2.textContent = text;
-      status2.classList.toggle("wv-error", isError);
-    }
-    function setBusy(busy) {
-      owned(IDS4.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element5) => {
-        element5.disabled = busy;
-      });
-    }
-    async function refresh(message = "") {
-      state = await call({ action: "liste" });
-      render();
-      if (message) setStatus(message);
-    }
-    async function run(action, success) {
-      setBusy(true);
-      setStatus("Speichert …");
-      try {
-        await call(action);
-        editing = null;
-        await refresh(success);
-      } catch (error) {
-        setBusy(false);
-        setStatus(error.message || String(error), true);
-      }
-    }
-    function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el4("select");
-      select.append(el4("option", { value: "", textContent: "Bitte wählen …" }));
-      for (const person of people) {
-        select.append(el4("option", { value: person.id, textContent: person.name }));
-      }
-      select.value = value || "";
-      if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
-      return select;
-    }
-    function entryRow(entry) {
-      const who = el4("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el4("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el4("span", { className: "wv-badge", textContent: "läuft" }) : null;
-      const actions = entry.darfBearbeiten ? [
-        button2("Bearbeiten", () => {
-          editing = entry;
-          render();
-        }, "wv-secondary"),
-        confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
-      ] : [];
-      const row2 = el4("li", {}, [who, when, badge, ...actions]);
-      if (entry.geaendertVon) row2.title = `Zuletzt geändert von ${entry.geaendertVon}`;
-      return row2;
-    }
-    function form() {
-      const today = berlinDay();
-      const { ich } = state;
-      const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
-      const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el4("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el4("input", { type: "date", value: editing ? editing.bis : today, min: today });
-      const save = button2(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
-        const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
-        const problem = validateDraft(ich, draft, today);
-        if (problem) {
-          setStatus(problem, true);
-          return;
-        }
-        run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
-      });
-      const cancel = editing ? button2("Abbrechen", () => {
-        editing = null;
-        render();
-      }, "wv-secondary") : null;
-      return [
-        el4("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el4("div", { className: "wv-form" }, [
-          el4("label", { textContent: "Abwesend" }),
-          abwesend,
-          el4("label", { textContent: "Vertretung" }),
-          vertretung,
-          el4("label", { textContent: "Von" }),
-          von,
-          el4("label", { textContent: "Bis (einschließlich)" }),
-          bis
-        ]),
-        el4("div", { className: "wv-actions" }, [save, cancel])
-      ];
-    }
-    function adminSection() {
-      const { ich } = state;
-      const admins = state.admins || [];
-      const list = el4("ul");
-      admins.forEach((admin) => {
-        const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el4("li", {}, [el4("span", { className: "wv-who", textContent: admin.name }), remove]));
-      });
-      const parts = [
-        el4("summary", { textContent: `Admins (${admins.length})` }),
-        el4("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
-        list
-      ];
-      if (ich.darfAlles) {
-        const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
-        const add = button2("Als Admin eintragen", () => {
-          if (!candidate.value) {
-            setStatus("Bitte auswählen, wer Admin werden soll.", true);
-            return;
-          }
-          run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
-        }, "wv-secondary");
-        parts.push(el4("div", { className: "wv-actions" }, [candidate, add]));
-      }
-      const details = el4("details", { className: "wv-admins" }, parts);
-      details.open = adminsOpen;
-      details.addEventListener("toggle", () => {
-        adminsOpen = details.open;
-      });
-      return details;
-    }
-    function card() {
-      return owned(IDS4.dialog)?.querySelector(".wv-body");
-    }
-    function render() {
-      const target = card();
-      if (!target) return;
-      target.textContent = "";
-      const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el4("ul");
-      if (!state.eintraege.length) list.append(el4("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
-      state.eintraege.forEach((entry) => list.append(entryRow(entry)));
-      const tip = helpTip?.();
-      target.append(
-        el4("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el4("p", { textContent: intro }),
-        list,
-        ...form(),
-        adminSection(),
-        el4("div", { className: "wv-status" }),
-        el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")])
-      );
-    }
-    async function openDialog() {
-      closeDialog();
-      ensureStyle4();
-      const overlay = el4("div", { id: IDS4.dialog });
-      overlay.dataset.werkiaVertretungenOwner = sourcePath;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDialog();
-      });
-      const close = button2("×", closeDialog, "wv-close");
-      close.title = "Schließen (Esc)";
-      close.setAttribute("aria-label", "Schließen");
-      const target = el4("div", { className: "wv-body" }, [
-        el4("h2", { textContent: "Vertretungen" }),
-        el4("div", { className: "wv-status", textContent: "Lädt …" })
-      ]);
-      overlay.append(el4("div", { className: "wv-card" }, [close, target]));
-      document.body.appendChild(overlay);
-      try {
-        await refresh();
-      } catch (error) {
-        setStatus(error.message || String(error), true);
-        target.append(el4("div", { className: "wv-actions" }, [button2("Schließen", closeDialog, "wv-secondary")]));
-      }
-    }
-    function placeButton() {
-      if (!isTargetPage3()) {
-        owned(IDS4.button)?.remove();
-        owned(IDS4.bar)?.remove();
-        return;
-      }
-      ensureStyle4();
-      const slot = findSlot(document);
-      const existing = owned(IDS4.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS4.bar)) return;
-      existing?.remove();
-      const vertretungenButton = button2("Vertretungen", openDialog);
-      vertretungenButton.id = IDS4.button;
-      vertretungenButton.title = "Vertretungen eintragen und ansehen";
-      vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
-      if (slot) {
-        owned(IDS4.bar)?.remove();
-        const look = nativeLookFrom(slot.sample);
-        if (look) {
-          vertretungenButton.className = "wv-native";
-          Object.assign(vertretungenButton.style, look.style);
-          const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          icon.setAttribute("viewBox", "0 0 24 24");
-          icon.setAttribute("aria-hidden", "true");
-          icon.style.width = look.iconSize;
-          icon.style.height = look.iconSize;
-          icon.style.marginRight = look.iconGap;
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", PEOPLE_ICON_PATH);
-          icon.append(path);
-          vertretungenButton.prepend(icon);
-        } else {
-          vertretungenButton.className = "wv-own";
-        }
-        slot.parent.insertBefore(vertretungenButton, slot.before);
-        return;
-      }
-      vertretungenButton.className = "wv-own";
-      owned(IDS4.bar)?.remove();
-      const anchor = findListAnchor(document);
-      if (!anchor?.parentElement) return;
-      const bar = el4("div", { id: IDS4.bar }, [vertretungenButton]);
-      bar.dataset.werkiaVertretungenOwner = sourcePath;
-      anchor.parentElement.insertBefore(bar, anchor);
-    }
-    runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS4.dialog)) return;
-      event.stopPropagation();
-      closeDialog();
-    }, true);
-    if (typeof GM_registerMenuCommand === "function") {
-      try {
-        GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());
-      } catch {
-      }
-    }
-    let scheduled = false;
-    const schedule = () => {
-      if (scheduled) return;
-      scheduled = true;
-      runtime.setTimeout(() => {
-        scheduled = false;
-        placeButton();
-      }, 200);
-    };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
-    runtime.addCleanup?.(() => {
-      owned(IDS4.button)?.remove();
-      owned(IDS4.bar)?.remove();
-      closeDialog();
-    });
-    schedule();
-  }
-
   // src/features/vertretungen.js
   var CEM_VERTRETUNGEN_ROUTES = [ROUTES.cemMyCandidates, ROUTES.cemMyMatches];
   function executeVertretungen2(runtime) {
@@ -11984,15 +12770,15 @@
   }
 
   // ../../shared/js/cem-vta-sperre/core.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/cem-vta-sperre/fb2a848c-9946-4216-9da8-5ec69e3a752f";
-  var REQUEST_TIMEOUT_MS3 = 15e3;
-  var OFFLINE_MESSAGE3 = "Der Server für die VTA-Sperrliste ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/cem-vta-sperre/fb2a848c-9946-4216-9da8-5ec69e3a752f";
+  var REQUEST_TIMEOUT_MS4 = 15e3;
+  var OFFLINE_MESSAGE4 = "Der Server für die VTA-Sperrliste ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var LABEL_TEXT = "Keine CEM-VTA";
-  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaCemVtaSperreMe {
+  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaCemVtaSperreMe {
   me: currentEmployee { id __typename }
 }`;
-  var UUID_RE2 = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-  function parseResponse3(status2, text) {
+  var UUID_RE3 = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  function parseResponse4(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -12003,7 +12789,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Sperrliste: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createSperreClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createSperreClient({ request, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -12013,24 +12799,24 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse3(response.status, response.responseText));
+            resolve(parseResponse4(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
       });
     });
   }
   function normalizeName(value) {
     return String(value || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
   }
-  function employerIdFromHref2(href) {
+  function employerIdFromHref3(href) {
     const match = String(href || "").match(/#\/Employer\/([0-9a-f-]{36})/i);
-    return match && UUID_RE2.test(match[1]) ? match[1].toLowerCase() : "";
+    return match && UUID_RE3.test(match[1]) ? match[1].toLowerCase() : "";
   }
-  function createLookup(entries = []) {
+  function createLookup2(entries = []) {
     const byId2 = /* @__PURE__ */ new Map();
     const byName = /* @__PURE__ */ new Map();
     for (const entry of entries) {
@@ -12048,7 +12834,7 @@
     if (!row2) return { id: "", name: "", link: null, cell: null };
     const cell = row2.querySelector("td.column-jobPositionId");
     const link = cell?.querySelector('a[href*="#/Employer/"]') || row2.querySelector('a[href*="#/Employer/"]');
-    const id = employerIdFromHref2(link?.getAttribute("href") || link?.href || "");
+    const id = employerIdFromHref3(link?.getAttribute("href") || link?.href || "");
     let name = link?.textContent?.trim() || "";
     if (!name) {
       const text = cell?.innerText || cell?.textContent || "";
@@ -12067,7 +12853,7 @@
 
   // ../../shared/js/cem-vta-sperre/index.js
   var POTENTIAL_MATCHES_ROUTE6 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
-  var IDS5 = {
+  var IDS6 = {
     button: "werkia-cem-vta-sperre-button",
     dialog: "werkia-cem-vta-sperre-dialog",
     style: "werkia-cem-vta-sperre-style"
@@ -12075,10 +12861,10 @@
   var ROW_CLASS2 = "werkia-cem-vta-sperre-row";
   var LABEL_CLASS = "werkia-cem-vta-sperre-label";
   var VERTRETUNGEN_BUTTON_ID = "werkia-vertretungen-button";
-  var CACHE_MS6 = 10 * 60 * 1e3;
-  var RETRY_MS3 = 60 * 1e3;
-  var CONFIRM_MS2 = 4e3;
-  var T2 = {
+  var CACHE_MS7 = 10 * 60 * 1e3;
+  var RETRY_MS4 = 60 * 1e3;
+  var CONFIRM_MS3 = 4e3;
+  var T3 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -12125,49 +12911,49 @@
     const isPotentialMatches = () => POTENTIAL_MATCHES_ROUTE6.test(location.hash || "");
     const isButtonPage = () => buttonRoutes.some((route) => route.test(location.hash || ""));
     function ensureStyle4() {
-      if (document.getElementById(IDS5.style)) return;
+      if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
-      style.id = IDS5.style;
-      const d = `#${IDS5.dialog}`;
+      style.id = IDS6.style;
+      const d = `#${IDS6.dialog}`;
       style.textContent = `
-      .${ROW_CLASS2} { outline:2px solid ${T2.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T2.bad} !important; }
-      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T2.badSoft} !important; }
-      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T2.badHover} !important; }
-      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T2.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
-      .${LABEL_CLASS}:hover { background:${T2.badInk}; }
+      .${ROW_CLASS2} { outline:2px solid ${T3.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T3.bad} !important; }
+      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T3.badSoft} !important; }
+      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T3.badHover} !important; }
+      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T3.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
+      .${LABEL_CLASS}:hover { background:${T3.badInk}; }
       .${LABEL_CLASS} svg { width:14px; height:14px; fill:currentColor; }
-      #${IDS5.button}.wcs-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS5.button}.wcs-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS5.button}.wcs-native svg { flex:none; fill:currentColor; }
-      #${IDS5.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T2.line}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS6.button}.wcs-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS6.button}.wcs-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS6.button}.wcs-native svg { flex:none; fill:currentColor; }
+      #${IDS6.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T3.line}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
       ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T2.line}; border-radius:12px; background:${T2.surface}; color:${T2.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T2.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
-      ${d} .wcs-close:hover { background:${T2.sunken}; }
+      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T3.line}; border-radius:12px; background:${T3.surface}; color:${T3.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T3.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wcs-close:hover { background:${T3.sunken}; }
       ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
-      ${d} h3 { margin:18px 0 8px; color:${T2.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
-      ${d} p { margin:0 0 10px; color:${T2.ink2}; font-size:12px; }
-      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T2.line}; }
-      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
+      ${d} h3 { margin:18px 0 8px; color:${T3.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T3.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T3.line}; }
+      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T3.line}; }
       ${d} .wcs-who { flex:1; min-width:0; }
       ${d} .wcs-name { font-weight:600; }
       ${d} .wcs-name a { color:inherit; text-decoration:none; }
       ${d} .wcs-name a:hover { text-decoration:underline; }
-      ${d} .wcs-meta { color:${T2.muted}; font-size:11px; }
-      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T2.badSoft}; color:${T2.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wcs-meta { color:${T3.muted}; font-size:11px; }
+      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T3.badSoft}; color:${T3.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
       ${d} .wcs-row { display:flex; gap:8px; align-items:center; }
       ${d} .wcs-reason { margin:10px 0 8px; }
-      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T2.lineStrong}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
-      ${d} input:focus { outline:2px solid ${T2.accent}; outline-offset:-1px; }
-      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T2.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T3.lineStrong}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} input:focus { outline:2px solid ${T3.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T3.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
       ${d} button:disabled { cursor:default; opacity:.6; }
-      ${d} button.wcs-secondary { border:1px solid ${T2.line}; background:${T2.surface}; color:${T2.ink}; }
-      ${d} button.wcs-secondary:hover { background:${T2.sunken}; }
-      ${d} button.wcs-danger { background:${T2.badSoft}; color:${T2.badInk}; }
-      ${d} button.wcs-danger:hover { background:${T2.badHover}; }
+      ${d} button.wcs-secondary { border:1px solid ${T3.line}; background:${T3.surface}; color:${T3.ink}; }
+      ${d} button.wcs-secondary:hover { background:${T3.sunken}; }
+      ${d} button.wcs-danger { background:${T3.badSoft}; color:${T3.badInk}; }
+      ${d} button.wcs-danger:hover { background:${T3.badHover}; }
       ${d} .wcs-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T2.ink2}; font-size:12px; }
-      ${d} .wcs-status.wcs-error { color:${T2.badInk}; }
+      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T3.ink2}; font-size:12px; }
+      ${d} .wcs-status.wcs-error { color:${T3.badInk}; }
     `;
       document.head.appendChild(style);
     }
@@ -12203,7 +12989,7 @@
           timer = runtime.setTimeout(() => {
             armed = false;
             element5.textContent = label2;
-          }, CONFIRM_MS2);
+          }, CONFIRM_MS3);
           return;
         }
         if (timer !== null) runtime.clearTimeout?.(timer);
@@ -12213,7 +12999,7 @@
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY4, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -12222,7 +13008,7 @@
       return post({ ...payload, employeeId: await loadMyId() });
     }
     function remember(entries) {
-      cache = { at: Date.now(), entries, lookup: createLookup(entries) };
+      cache = { at: Date.now(), entries, lookup: createLookup2(entries) };
       failedAt = 0;
       return cache;
     }
@@ -12241,8 +13027,8 @@
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS6) return Promise.resolve(cache);
-      if (failedAt && Date.now() - failedAt < RETRY_MS3) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS7) return Promise.resolve(cache);
+      if (failedAt && Date.now() - failedAt < RETRY_MS4) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[CEM-VTA-Sperre] Liste nicht geladen:", error?.message || error);
         return cache;
@@ -12294,18 +13080,18 @@
       markRows(list.lookup);
     }
     function setStatus(text, isError = false) {
-      const status2 = owned(IDS5.dialog)?.querySelector(".wcs-status");
+      const status2 = owned(IDS6.dialog)?.querySelector(".wcs-status");
       if (!status2) return;
       status2.textContent = text;
       status2.classList.toggle("wcs-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS5.dialog)?.querySelectorAll(".wcs-body button, .wcs-body input").forEach((element5) => {
+      owned(IDS6.dialog)?.querySelectorAll(".wcs-body button, .wcs-body input").forEach((element5) => {
         element5.disabled = busy;
       });
     }
     function closeDialog() {
-      owned(IDS5.dialog)?.remove();
+      owned(IDS6.dialog)?.remove();
     }
     async function refresh(message = "") {
       const list = await fetchList();
@@ -12394,7 +13180,7 @@
       return parts;
     }
     function render() {
-      const target = owned(IDS5.dialog)?.querySelector(".wcs-body");
+      const target = owned(IDS6.dialog)?.querySelector(".wcs-body");
       if (!target) return;
       target.textContent = "";
       const list = el4("ul");
@@ -12416,7 +13202,7 @@
       closeDialog();
       ensureStyle4();
       dialogState = { entries: cache?.entries || [], hits: null, query: "", canEdit };
-      const overlay = el4("div", { id: IDS5.dialog });
+      const overlay = el4("div", { id: IDS6.dialog });
       overlay.dataset.werkiaCemVtaSperreOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -12439,12 +13225,12 @@
     }
     function placeButton() {
       if (!isButtonPage()) {
-        owned(IDS5.button)?.remove();
+        owned(IDS6.button)?.remove();
         return;
       }
       const vertretungen = document.getElementById(VERTRETUNGEN_BUTTON_ID);
       const slot = vertretungen?.parentElement ? { parent: vertretungen.parentElement, before: vertretungen, sample: vertretungen } : findSlot(document);
-      const existing = owned(IDS5.button);
+      const existing = owned(IDS6.button);
       if (!slot) {
         existing?.remove();
         return;
@@ -12453,7 +13239,7 @@
       existing?.remove();
       ensureStyle4();
       const sperreButton = button2("VTA-Sperrliste", openDialog);
-      sperreButton.id = IDS5.button;
+      sperreButton.id = IDS6.button;
       sperreButton.title = "Arbeitgeber, bei denen CEM keine VTAs stellt";
       sperreButton.dataset.werkiaCemVtaSperreOwner = sourcePath;
       const look = slot.sample ? nativeLookFrom(slot.sample) : null;
@@ -12469,7 +13255,7 @@
       slot.parent.insertBefore(sperreButton, slot.before);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS5.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS6.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -12504,7 +13290,7 @@
     runtime.addWindowListener("hashchange", onChange);
     runtime.addCleanup?.(() => {
       clearMarks();
-      owned(IDS5.button)?.remove();
+      owned(IDS6.button)?.remove();
       closeDialog();
     });
     onChange();
@@ -12597,7 +13383,7 @@
   // src/features/cem-ampel/index.js
   var SOURCE_PATH2 = "cem/toolbox/src/features/cem-ampel/index.js";
   var ROUTE_RE = /^#\/CEM\/MyCandidates(?:[/?]|$)/i;
-  var IDS6 = { style: "werkia-cem-ampel-style", menu: "werkia-cem-ampel-menu", info: "werkia-cem-ampel-info" };
+  var IDS7 = { style: "werkia-cem-ampel-style", menu: "werkia-cem-ampel-menu", info: "werkia-cem-ampel-info" };
   var DOT_CLASS = "werkia-cem-ampel-dot";
   var NEW_CLASS = "werkia-cem-ampel-new";
   var OWNER_ATTR = "data-werkia-cem-ampel";
@@ -12627,7 +13413,7 @@
     const isTargetPage3 = () => ROUTE_RE.test(location.hash || "");
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getCemGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      const data = await getCemGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -12636,7 +13422,7 @@
     function loadFarben(scope) {
       const key = scopeKey(scope);
       const cached = lists.get(key);
-      if (cached && Date.now() - cached.at < CACHE_MS5) return cached.promise;
+      if (cached && Date.now() - cached.at < CACHE_MS6) return cached.promise;
       const promise = call({ action: "liste", ...scope }).then((data) => {
         listError = "";
         return data.farben;
@@ -12656,7 +13442,7 @@
     });
     const fresh = (id) => {
       const hit = known.get(id);
-      return hit && Date.now() - hit.at < CACHE_MS5 ? hit : null;
+      return hit && Date.now() - hit.at < CACHE_MS6 ? hit : null;
     };
     async function loadStatus(ids) {
       loading = (async () => {
@@ -12681,11 +13467,11 @@
       }
     }
     function ensureStyle4() {
-      if (document.getElementById(IDS6.style)) return;
+      if (document.getElementById(IDS7.style)) return;
       const style = document.createElement("style");
-      style.id = IDS6.style;
+      style.id = IDS7.style;
       const font = '"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
-      const m = `#${IDS6.menu}`;
+      const m = `#${IDS7.menu}`;
       style.textContent = `
       .${DOT_CLASS} { display:inline-block; box-sizing:border-box; width:20px; height:20px; min-width:20px; margin:0 8px 0 0; padding:0; border:2px solid; border-radius:50%; cursor:pointer; vertical-align:middle; box-shadow:0 1px 3px rgba(9,9,11,.35), inset 0 2px 3px rgba(255,255,255,.45); transition:transform .1s ease; }
       .${DOT_CLASS}:hover { transform:scale(1.15); }
@@ -12694,7 +13480,7 @@
       ${FARB_IDS.map((farbe) => `.${DOT_CLASS}[data-farbe="${farbe}"] { background:${FARBEN[farbe].fill}; border-color:${FARBEN[farbe].ring}; }`).join("\n      ")}
       .${DOT_CLASS}[data-kam-warnung="true"] { border:3px solid ${FARBEN.rot.fill}; box-shadow:0 0 0 2px ${FARBEN.rot.fill}, 0 1px 3px rgba(9,9,11,.35); }
       .${NEW_CLASS} { display:inline-block; margin:0 0 0 8px; padding:2px 7px; border-radius:5px; background:${THEME.accent}; color:#fff; font:800 12px/1.25 ${font}; letter-spacing:.06em; vertical-align:middle; box-shadow:0 1px 2px rgba(9,9,11,.3); cursor:default; }
-      #${IDS6.info} { margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
+      #${IDS7.info} { margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
       ${m} { position:absolute; z-index:2147483000; width:280px; box-sizing:border-box; padding:12px; border:1px solid ${THEME.line}; border-radius:12px; background:${THEME.surface}; color:${THEME.ink}; box-shadow:${THEME.shadowRaised}; font:400 13px/1.4 ${font}; }
       ${m} h3 { display:flex; align-items:center; gap:6px; margin:0 0 6px; color:${THEME.inkSecondary}; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
       ${m} p { margin:0 0 8px; }
@@ -12718,7 +13504,7 @@
       return element5;
     }
     function closeMenu() {
-      document.getElementById(IDS6.menu)?.remove();
+      document.getElementById(IDS7.menu)?.remove();
     }
     function openMenu(dot, id) {
       closeMenu();
@@ -12761,7 +13547,7 @@
       };
       const tip = cemHelp.tip("cem-ampel");
       const auto = entry.automatisch;
-      const menu = el4("div", { id: IDS6.menu }, [
+      const menu = el4("div", { id: IDS7.menu }, [
         el4("h3", {}, [document.createTextNode(`Ampel ${FARBEN[entry.farbe]?.label || ""}`), tip]),
         el4("p", { textContent: entry.grund }),
         entry.manuell && auto ? el4("p", { className: "wca-meta", textContent: `Automatisch wäre: ${FARBEN[auto.farbe]?.label} (${auto.grund})` }) : null,
@@ -12796,7 +13582,7 @@
       dot.addEventListener("mousedown", (event) => event.stopPropagation());
       dot.addEventListener("click", (event) => {
         swallow(event);
-        if (document.getElementById(IDS6.menu)?.dataset.candidateId === id) {
+        if (document.getElementById(IDS7.menu)?.dataset.candidateId === id) {
           closeMenu();
           return;
         }
@@ -12829,7 +13615,7 @@
       } else if (!entry.neu && badge) badge.remove();
     }
     function setInfo(rows) {
-      let info = document.getElementById(IDS6.info);
+      let info = document.getElementById(IDS7.info);
       const marked = /werkiaAmpel/.test(decodeURIComponent(location.hash || ""));
       const text = marked && listError ? `Ampel-Filter: ${listError} Die Liste bleibt leer, bis der Server wieder antwortet.` : "";
       if (!text) {
@@ -12839,14 +13625,14 @@
       const table = rows[0]?.row.closest("table") || document.querySelector("table");
       if (!table?.parentElement) return;
       if (!info) {
-        info = el4("div", { id: IDS6.info });
+        info = el4("div", { id: IDS7.info });
         table.parentElement.insertBefore(info, table);
       }
       if (info.textContent !== text) info.textContent = text;
     }
     function clear() {
       document.querySelectorAll(`.${DOT_CLASS}, .${NEW_CLASS}`).forEach((element5) => element5.remove());
-      document.getElementById(IDS6.info)?.remove();
+      document.getElementById(IDS7.info)?.remove();
       closeMenu();
     }
     function render() {
@@ -12859,7 +13645,7 @@
       setInfo(rows);
       rows.forEach(paint);
       const missing = [...new Set(rows.map((entry) => entry.id).filter((id) => !fresh(id)))];
-      if (missing.length && !loading && !(failedAt && Date.now() - failedAt < RETRY_MS2)) loadStatus(missing);
+      if (missing.length && !loading && !(failedAt && Date.now() - failedAt < RETRY_MS3)) loadStatus(missing);
     }
     let scheduled = false;
     function scheduleRender() {
@@ -12871,11 +13657,11 @@
       }, 200);
     }
     runtime.addWindowListener("click", (event) => {
-      const menu = document.getElementById(IDS6.menu);
+      const menu = document.getElementById(IDS7.menu);
       if (menu && !menu.contains(event.target) && !event.target?.closest?.(`.${DOT_CLASS}`)) closeMenu();
     }, true);
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key === "Escape" && document.getElementById(IDS6.menu)) {
+      if (event.key === "Escape" && document.getElementById(IDS7.menu)) {
         event.stopPropagation();
         closeMenu();
       }
@@ -12889,7 +13675,7 @@
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
-  var RETRY_MS4 = 60 * 1e3;
+  var RETRY_MS5 = 60 * 1e3;
   var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
   function tiptapOf3(element5) {
     try {
@@ -12920,12 +13706,12 @@
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
-      if (fresh || Date.now() - failedAt < RETRY_MS4) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS5) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
             if (!myId) {
-              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
+              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
               myId = String(data2?.me?.id || "");
             }
             if (!myId) throw new Error("Eigene Mitarbeiter-ID fehlt.");
@@ -13294,7 +14080,7 @@
 
   // ../../shared/js/no-go-check/index.js
   var POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var LEVEL_STYLES2 = {
     direct: { badge: "border:2px solid #450a0a;background:#7f1d1d;color:#fff;", accent: "#7f1d1d", tint: "#f7dcdc" },
     group: { badge: "border:2px solid #7f1d1d;background:#b91c1c;color:#fff;", accent: "#b91c1c", tint: "#fae3e3" },
@@ -13397,7 +14183,7 @@
         loadCandidateNoGos(candidateId);
         return;
       }
-      const rows = [...document.querySelectorAll(ROW_SELECTOR4)];
+      const rows = [...document.querySelectorAll(ROW_SELECTOR5)];
       if (!noGos.length) {
         rows.forEach(clearRow);
         return;
@@ -13580,6 +14366,16 @@
     });
   }
 
+  // src/features/vta-notizen.js
+  function executeVtaNotizen2(runtime) {
+    executeVtaNotizen(runtime, {
+      getGraphqlAdapter: getCemGraphqlAdapter,
+      toolboxName: "CEM-Toolbox",
+      helpTip: () => cemHelp.tip("vta-notizen"),
+      sourcePath: "cem/toolbox/src/features/vta-notizen.js"
+    });
+  }
+
   // src/features/wa-templates/employee-gender.js
   var EMPLOYEE_GENDER = {
     // CEM (Stand 2026-10-09, Angaben Eno)
@@ -13653,7 +14449,7 @@
     }).formatToParts(new Date(date));
     return Object.fromEntries(parts.map((part) => [part.type, part.value]));
   }
-  function formatDay2(date) {
+  function formatDay3(date) {
     const p = berlinParts(date);
     return `${p.weekday.replace(/\.?$/, ".")}, ${p.day}.${p.month}.`;
   }
@@ -13672,7 +14468,7 @@
     const key = berlinDayKey(date);
     if (key === berlinDayKey(now)) return "heute";
     if (key === berlinDayKey(new Date(new Date(now).getTime() + 24 * 60 * 60 * 1e3))) return "morgen";
-    return `am ${formatDay2(date)}`;
+    return `am ${formatDay3(date)}`;
   }
   var newestFirst = (a, b) => String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
   function pickInterview(interviews, purpose) {
@@ -13780,7 +14576,7 @@
         `🛜 ${slot("Link zur Stelle", ctx.jobLink)}`,
         "",
         `📆 *${several ? "Terminvorschläge" : "Terminvorschlag"}*:`,
-        ...dates.length ? dates.map((date) => `# ${formatDay2(date)} um ${formatTime(date)}`) : [`# ${slot("Terminvorschlag", "")}`],
+        ...dates.length ? dates.map((date) => `# ${formatDay3(date)} um ${formatTime(date)}`) : [`# ${slot("Terminvorschlag", "")}`],
         "",
         `Kannst und möchtest Du ${appointmentPhrase(ctx.mode, several)} wahrnehmen?`
       ];
@@ -13802,7 +14598,7 @@
         `🛠️ ${slot("Jobtitel", ctx.jobTitle)}`,
         `🛜 ${slot("Link zur Stelle", ctx.jobLink)}`,
         "",
-        `📆 *${date ? `${formatDay2(date)} um ${formatTime(date)}` : slot("Termin", "")}*`,
+        `📆 *${date ? `${formatDay3(date)} um ${formatTime(date)}` : slot("Termin", "")}*`,
         "",
         closing
       ];
@@ -14041,9 +14837,9 @@
     { key: "Raum", scope: "match", value: (ctx) => ctx.region },
     { key: "Adresse", scope: "match", value: (ctx) => ctx.address },
     { key: "Gesprächsart", scope: "match", value: (ctx) => MODE_ADJECTIVE[ctx.mode] },
-    { key: "Termin", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? `${formatDay2(ctx.interview.dates[0])} um ${formatTime(ctx.interview.dates[0])}` : "" },
+    { key: "Termin", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? `${formatDay3(ctx.interview.dates[0])} um ${formatTime(ctx.interview.dates[0])}` : "" },
     { key: "Termin Tag", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? relativeDay(ctx.interview.dates[0], ctx.now) : "" },
-    { key: "Terminvorschläge", scope: "match", value: (ctx) => [...ctx.suggestion?.dates || []].sort().map((date) => `# ${formatDay2(date)} um ${formatTime(date)}`).join("\n") },
+    { key: "Terminvorschläge", scope: "match", value: (ctx) => [...ctx.suggestion?.dates || []].sort().map((date) => `# ${formatDay3(date)} um ${formatTime(date)}`).join("\n") },
     { key: "Ansprechpartner", scope: "match", value: (ctx) => contactName2(ctx.contact) },
     { key: "Telefon Ansprechpartner", scope: "match", value: (ctx) => ctx.contact?.phoneNumbers?.[0] }
   ];
@@ -14172,83 +14968,83 @@
   // src/features/wa-templates/index.js
   var SOURCE_PATH3 = "cem/toolbox/src/features/wa-templates/index.js";
   var ROUTE_RE2 = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
   var CANDIDATE_ID_RE = /#\/Candidate\/([0-9a-f-]{36})/i;
   var BUTTON_CLASS = "werkia-wa-button";
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
-  var IDS7 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
-  var CACHE_MS7 = 2 * 60 * 1e3;
+  var IDS8 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
+  var CACHE_MS8 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
   .${CELL_CLASS} .${BUTTON_CLASS} { margin:0; }
   .${CELL_CLASS} { width:1%; white-space:nowrap; padding-left:4px !important; padding-right:4px !important; text-align:center; }
   th.${CELL_CLASS} { font-weight:500; }
   .${BUTTON_CLASS}:hover { background:#1f9a6b; color:#fff; }
-  #${IDS7.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS7.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
-  #${IDS7.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS7.menu} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS7.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS7.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS7.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
-  #${IDS7.dialog} .wa-head button { cursor:pointer; }
-  #${IDS7.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
-  #${IDS7.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
-  #${IDS7.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
-  #${IDS7.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
-  #${IDS7.dialog} select, #${IDS7.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS7.dialog} select:focus, #${IDS7.dialog} textarea:focus { outline:2px solid #b6a4ff; }
-  #${IDS7.dialog} textarea { min-height:440px; resize:vertical; }
-  #${IDS7.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-  #${IDS7.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
-  #${IDS7.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
-  #${IDS7.dialog} .wa-loading { color:#6b6775; }
-  #${IDS7.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
-  #${IDS7.dialog} .wa-foot button, #${IDS7.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS7.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
-  #${IDS7.dialog} .wa-primary:hover { background:#5535d6; }
-  #${IDS7.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
-  #${IDS7.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS7.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
-  #${IDS7.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
-  #${IDS7.menu} button.wa-action { color:#6d4aff; font-weight:600; }
-  #${IDS7.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
-  #${IDS7.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
-  #${IDS7.menu} .wa-group-items { padding-left:8px; }
-  #${IDS7.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS7.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-  #${IDS7.context} button:hover { background:#f1edff; color:#6d4aff; }
-  #${IDS7.context} button.wa-delete { color:#c23f3f; }
-  #${IDS7.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
-  #${IDS7.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
-  #${IDS7.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
-  #${IDS7.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
-  #${IDS7.confirm} p { margin:0; padding:16px 18px; }
-  #${IDS7.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
-  #${IDS7.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS7.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
-  #${IDS7.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
-  #${IDS7.confirm} .wa-delete-solid:hover { background:#a83232; }
-  #${IDS7.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
-  #${IDS7.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
-  #${IDS7.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
-  #${IDS7.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
-  #${IDS7.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
-  #${IDS7.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
-  #${IDS7.dialog} .wa-note { color:#6b6775; font-size:12px; }
-  #${IDS7.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
-  #${IDS7.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
-  #${IDS7.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
-  #${IDS7.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
-  #${IDS7.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
-  #${IDS7.dialog} .wa-move { padding:4px 9px !important; }
-  #${IDS7.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
-  #${IDS7.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
-  #${IDS7.dialog} .wa-spacer { flex:1; }
-  #${IDS7.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-  #${IDS7.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
+  #${IDS8.menu} { position:fixed; z-index:2147483640; min-width:320px; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:8px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.18); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS8.menu} .wa-group { padding:8px 12px 3px; color:#6b6775; font-size:11px; font-weight:650; letter-spacing:.02em; }
+  #${IDS8.menu} button { display:block; width:100%; padding:10px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS8.menu} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483641; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.55); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS8.dialog} .wa-card { width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; border-radius:20px; background:#f6f5f8; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS8.dialog} .wa-head { display:flex; align-items:center; gap:8px; padding:12px 16px; background:#3a3548; color:#fff; cursor:move; user-select:none; touch-action:none; }
+  #${IDS8.dialog} .wa-head button { cursor:pointer; }
+  #${IDS8.dialog} .wa-head h2 { flex:1; margin:0; font-size:18px; font-weight:650; }
+  #${IDS8.dialog} .wa-head .wa-sub { color:#cfcad9; font-size:13px; font-weight:500; }
+  #${IDS8.dialog} .wa-body { display:flex; flex-direction:column; gap:10px; padding:16px; overflow:auto; }
+  #${IDS8.dialog} label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:#6b6775; }
+  #${IDS8.dialog} select, #${IDS8.dialog} textarea { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS8.dialog} select:focus, #${IDS8.dialog} textarea:focus { outline:2px solid #b6a4ff; }
+  #${IDS8.dialog} textarea { min-height:440px; resize:vertical; }
+  #${IDS8.dialog} .wa-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  #${IDS8.dialog} .wa-gaps { padding:8px 10px; border-radius:10px; background:#fbf1de; color:#b17a12; font-size:13px; }
+  #${IDS8.dialog} .wa-error { padding:8px 10px; border-radius:10px; background:#fbe6e6; color:#c23f3f; font-size:12px; }
+  #${IDS8.dialog} .wa-loading { color:#6b6775; }
+  #${IDS8.dialog} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e2e0e8; background:#fff; }
+  #${IDS8.dialog} .wa-foot button, #${IDS8.dialog} .wa-close { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS8.dialog} .wa-primary { border:0; background:#6d4aff; color:#fff; }
+  #${IDS8.dialog} .wa-primary:hover { background:#5535d6; }
+  #${IDS8.dialog} .wa-primary:disabled { opacity:.6; cursor:wait; }
+  #${IDS8.dialog} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS8.dialog} .wa-close { padding:2px 10px; border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff; }
+  #${IDS8.menu} .wa-hint { padding:4px 12px 6px; color:#6b6775; font-size:12px; }
+  #${IDS8.menu} button.wa-action { color:#6d4aff; font-weight:600; }
+  #${IDS8.menu} button.wa-group-toggle { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; color:#3a3548; font-weight:650; }
+  #${IDS8.menu} button.wa-group-toggle .wa-arrow { color:#6b6775; font-size:12px; }
+  #${IDS8.menu} .wa-group-items { padding-left:8px; }
+  #${IDS8.context} { position:fixed; z-index:2147483643; min-width:180px; padding:6px; border:1px solid #e2e0e8; border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(28,26,34,.22); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS8.context} button { display:block; width:100%; padding:8px 12px; border:0; border-radius:10px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
+  #${IDS8.context} button:hover { background:#f1edff; color:#6d4aff; }
+  #${IDS8.context} button.wa-delete { color:#c23f3f; }
+  #${IDS8.context} button.wa-delete:hover { background:#fbe6e6; color:#c23f3f; }
+  #${IDS8.confirm} { position:fixed; inset:0; z-index:2147483644; display:flex; align-items:center; justify-content:center; background:rgba(28,26,34,.45); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:#1c1a22; }
+  #${IDS8.confirm} .wa-card { width:min(440px,calc(100vw - 32px)); border-radius:20px; background:#fff; box-shadow:0 24px 64px rgba(28,26,34,.3); overflow:hidden; }
+  #${IDS8.confirm} h2 { margin:0; padding:14px 18px; background:#3a3548; color:#fff; font-size:16px; font-weight:650; }
+  #${IDS8.confirm} p { margin:0; padding:16px 18px; }
+  #${IDS8.confirm} .wa-foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #e2e0e8; }
+  #${IDS8.confirm} button { padding:9px 18px; border-radius:16px; font:600 14px system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS8.confirm} .wa-neutral { border:1px solid #e2e0e8; background:transparent; color:#6b6775; }
+  #${IDS8.confirm} .wa-delete-solid { border:0; background:#c23f3f; color:#fff; }
+  #${IDS8.confirm} .wa-delete-solid:hover { background:#a83232; }
+  #${IDS8.menu} .wa-sep { height:1px; margin:6px 4px; background:#e2e0e8; }
+  #${IDS8.dialog} input[type=text] { border:1px solid #e2e0e8; border-radius:10px; background:#fff; color:#1c1a22; font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:8px 10px; }
+  #${IDS8.dialog} input[type=text]:focus { outline:2px solid #b6a4ff; }
+  #${IDS8.dialog} .wa-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  #${IDS8.dialog} .wa-chip { padding:4px 10px; border:1px solid #cbbcff; border-radius:999px; background:#f1edff; color:#5535d6; font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
+  #${IDS8.dialog} .wa-chip:hover { background:#6d4aff; color:#fff; }
+  #${IDS8.dialog} .wa-note { color:#6b6775; font-size:12px; }
+  #${IDS8.dialog} .wa-list { display:flex; flex-direction:column; gap:8px; }
+  #${IDS8.dialog} .wa-list-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e2e0e8; border-radius:12px; background:#fff; }
+  #${IDS8.dialog} .wa-list-row .wa-name { flex:1; font-weight:600; }
+  #${IDS8.dialog} .wa-tag { padding:2px 8px; border-radius:999px; background:#f1eef7; color:#6b6775; font-size:11px; font-weight:600; }
+  #${IDS8.dialog} .wa-small { padding:5px 12px !important; font-size:12px !important; }
+  #${IDS8.dialog} .wa-move { padding:4px 9px !important; }
+  #${IDS8.dialog} .wa-move:disabled { opacity:.35; cursor:default; }
+  #${IDS8.dialog} .wa-danger { border:1px solid #c23f3f; background:transparent; color:#c23f3f; }
+  #${IDS8.dialog} .wa-spacer { flex:1; }
+  #${IDS8.toast} { position:fixed; left:50%; bottom:24px; z-index:2147483642; transform:translateX(-50%); max-width:min(480px,calc(100vw - 32px)); padding:10px 14px; border-radius:16px; background:#3a3548; color:#fff; box-shadow:0 12px 32px rgba(28,26,34,.3); font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  #${IDS8.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
 `;
   function executeWaTemplates(runtime) {
     runtime.registerSource(SOURCE_PATH3);
@@ -14256,9 +15052,9 @@
     let syncTimer = null;
     let toastTimer = null;
     function ensureStyle4() {
-      if (document.getElementById(IDS7.style)) return;
+      if (document.getElementById(IDS8.style)) return;
       const style = document.createElement("style");
-      style.id = IDS7.style;
+      style.id = IDS8.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
@@ -14266,7 +15062,7 @@
       const entry = cache.get(key);
       if (entry && entry.expiresAt > Date.now()) return entry.promise;
       const promise = load2();
-      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS7 });
+      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS8 });
       promise.catch(() => cache.delete(key));
       return promise;
     }
@@ -14356,7 +15152,7 @@
         return;
       }
       ensureStyle4();
-      document.querySelectorAll(ROW_SELECTOR5).forEach(addButton);
+      document.querySelectorAll(ROW_SELECTOR6).forEach(addButton);
       widenExpandedPanels();
     }
     function scheduleSync() {
@@ -14369,14 +15165,14 @@
     let activeMenu = null;
     let followFrame = 0;
     function closeMenu() {
-      document.getElementById(IDS7.menu)?.remove();
+      document.getElementById(IDS8.menu)?.remove();
       activeMenu = null;
       closeContextMenu();
     }
     function openMenu(button2, target) {
       closeMenu();
       const menu = document.createElement("div");
-      menu.id = IDS7.menu;
+      menu.id = IDS8.menu;
       const place = () => {
         const rect = button2.getBoundingClientRect();
         const height = menu.offsetHeight;
@@ -14439,11 +15235,11 @@
       activeMenu = { button: button2, place };
     }
     function closeContextMenu() {
-      document.getElementById(IDS7.context)?.remove();
+      document.getElementById(IDS8.context)?.remove();
     }
     function openContextMenu(event, template) {
       closeContextMenu();
-      const context = element5("div", { id: IDS7.context });
+      const context = element5("div", { id: IDS8.context });
       const editButton = element5("button", { type: "button", textContent: "Bearbeiten" });
       editButton.addEventListener("click", () => {
         closeMenu();
@@ -14461,9 +15257,9 @@
       Object.assign(context.style, { left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` });
     }
     function confirmDelete(template, onDeleted) {
-      document.getElementById(IDS7.confirm)?.remove();
+      document.getElementById(IDS8.confirm)?.remove();
       const close = () => {
-        document.getElementById(IDS7.confirm)?.remove();
+        document.getElementById(IDS8.confirm)?.remove();
         window.removeEventListener("keydown", onKey, true);
       };
       const onKey = (keyEvent) => {
@@ -14473,7 +15269,7 @@
       };
       const cancelButton = element5("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const deleteButton = element5("button", { type: "button", className: "wa-delete-solid", textContent: "Löschen" });
-      const overlay = element5("div", { id: IDS7.confirm }, [element5("div", { className: "wa-card" }, [
+      const overlay = element5("div", { id: IDS8.confirm }, [element5("div", { className: "wa-card" }, [
         element5("h2", { textContent: "Vorlage löschen?" }),
         element5("p", { textContent: `Möchtest du die Vorlage „${template.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.` }),
         element5("div", { className: "wa-foot" }, [cancelButton, deleteButton])
@@ -14492,14 +15288,14 @@
       cancelButton.focus();
     }
     function onDocumentClick(event) {
-      const context = document.getElementById(IDS7.context);
+      const context = document.getElementById(IDS8.context);
       if (context?.contains(event.target)) return;
       closeContextMenu();
-      const menu = document.getElementById(IDS7.menu);
+      const menu = document.getElementById(IDS8.menu);
       if (menu && !menu.contains(event.target)) closeMenu();
     }
     function onDocumentScroll(event) {
-      const menu = document.getElementById(IDS7.menu);
+      const menu = document.getElementById(IDS8.menu);
       if (!menu || event.target instanceof Node && menu.contains(event.target)) return;
       closeContextMenu();
       if (followFrame) return;
@@ -14522,7 +15318,7 @@
       return node;
     }
     function closeDialog() {
-      document.getElementById(IDS7.dialog)?.remove();
+      document.getElementById(IDS8.dialog)?.remove();
       document.removeEventListener("keydown", onDialogKey, true);
     }
     function onDialogKey(event) {
@@ -14557,7 +15353,7 @@
       const cancelButton = element5("button", { type: "button", className: "wa-neutral", textContent: "Abbrechen" });
       const card = element5("div", { className: "wa-card" }, [head, body, element5("div", { className: "wa-foot" }, [cancelButton, copyButton])]);
       makeDraggable(card, head);
-      const overlay = element5("div", { id: IDS7.dialog }, [card]);
+      const overlay = element5("div", { id: IDS8.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -14693,7 +15489,7 @@ Trotzdem kopieren?`)) return;
       const foot = element5("div", { className: "wa-foot" });
       const card = element5("div", { className: "wa-card" }, [head, body, foot]);
       makeDraggable(card, head);
-      const overlay = element5("div", { id: IDS7.dialog }, [card]);
+      const overlay = element5("div", { id: IDS8.dialog }, [card]);
       overlay.addEventListener("mousedown", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -14876,9 +15672,9 @@ Trotzdem speichern?`)) return void 0;
       }
     }
     function showNotice(message) {
-      document.getElementById(IDS7.toast)?.remove();
+      document.getElementById(IDS8.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
-      const toast = element5("div", { id: IDS7.toast, textContent: message });
+      const toast = element5("div", { id: IDS8.toast, textContent: message });
       document.body.appendChild(toast);
       toastTimer = runtime.setTimeout(() => {
         toastTimer = null;
@@ -14886,10 +15682,10 @@ Trotzdem speichern?`)) return void 0;
       }, 4e3);
     }
     function showToast(template, context, text) {
-      document.getElementById(IDS7.toast)?.remove();
+      document.getElementById(IDS8.toast)?.remove();
       if (toastTimer !== null) runtime.clearTimeout(toastTimer);
       const preview = text.split("\n").filter((line) => line.trim()).slice(0, 2).join("\n");
-      const toast = element5("div", { id: IDS7.toast }, [
+      const toast = element5("div", { id: IDS8.toast }, [
         element5("div", { textContent: `✓ Kopiert: ${template.label}${context.candidateFirstName ? ` für ${context.candidateFirstName}` : ""}` }),
         element5("div", { className: "wa-preview", textContent: preview })
       ]);
@@ -14912,9 +15708,9 @@ Trotzdem speichern?`)) return void 0;
       if (followFrame) window.cancelAnimationFrame(followFrame);
       removeAll();
       closeDialog();
-      document.getElementById(IDS7.confirm)?.remove();
-      document.getElementById(IDS7.toast)?.remove();
-      document.getElementById(IDS7.style)?.remove();
+      document.getElementById(IDS8.confirm)?.remove();
+      document.getElementById(IDS8.toast)?.remove();
+      document.getElementById(IDS8.style)?.remove();
     });
     scheduleSync();
   }
@@ -15026,7 +15822,7 @@ Trotzdem speichern?`)) return void 0;
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
-  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var COMMENTS_BUTTON_SELECTOR3 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
@@ -15044,7 +15840,7 @@ Trotzdem speichern?`)) return void 0;
     { kind: RESPONSES.angefragt, tone: "plain" },
     { kind: RESPONSES.erledigt, tone: "link", label: "Abhaken" }
   ];
-  function matchIdFromHref4(href) {
+  function matchIdFromHref5(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function executeCemTodo(runtime) {
@@ -15074,7 +15870,7 @@ Trotzdem speichern?`)) return void 0;
     `;
       document.head.appendChild(style);
     }
-    const rowMatchId = (row2) => matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
+    const rowMatchId = (row2) => matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
     function commentsButtonCount(button2) {
       const text = button2?.querySelector('.MuiBadge-badge, [class*="MuiBadge-badge"]')?.textContent || "";
       return text.replace(/\D/g, "");
@@ -15288,7 +16084,7 @@ Trotzdem speichern?`)) return void 0;
       if (!isTargetPage3()) return;
       ensureStyle4();
       const wanted = [];
-      document.querySelectorAll(ROW_SELECTOR6).forEach((row2) => syncRow(row2, wanted));
+      document.querySelectorAll(ROW_SELECTOR7).forEach((row2) => syncRow(row2, wanted));
       wanted.push(...syncDialog());
       if (wanted.length && !loading) load2(wanted);
     }
@@ -15303,7 +16099,7 @@ Trotzdem speichern?`)) return void 0;
     };
     runtime.addDocumentListener("click", (event) => {
       const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR3);
-      const row2 = button2?.closest(ROW_SELECTOR6);
+      const row2 = button2?.closest(ROW_SELECTOR7);
       const matchId = row2 ? rowMatchId(row2) : "";
       if (!matchId) return;
       dialogMatchId = matchId;
@@ -15316,22 +16112,40 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS4 = 2e4;
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS5 = 2e4;
   var MAX_COMMENT = 1500;
-  var OFFLINE_MESSAGE4 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE5 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
   var DIRECTIONS = {
     AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
     AN_KAM: { id: "AN_KAM", label: "An KAM", role: "KAM", title: "Match an die KAM-Person des Arbeitgebers schicken (Slack-DM)" }
   };
-  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref5(href) {
-    const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE3.test(id) ? id : "";
+  var OWN_TEAM_SENDERS = {
+    AN_KAM: [
+      { slackId: "U0ASG5XV1LM", name: "Niklas (KAM-Lead)" }
+    ],
+    AN_CEM: [
+      { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
+    ]
+  };
+  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaSlackDmMe {
+  me: currentEmployee { id slackId __typename }
+}`;
+  var TEAMS = ["KAM", "CEM"];
+  function canSendToOwnTeam(direction, me, senders = OWN_TEAM_SENDERS) {
+    const slackId = String(me?.slackId || "").trim();
+    if (!slackId) return false;
+    return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  function buildPayload({ action, direction, matchId, comment = "", auth, testChannel = "" }) {
+  var UUID_RE4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref6(href) {
+    const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+    return UUID_RE4.test(id) ? id : "";
+  }
+  function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
+    if (team && !TEAMS.includes(team)) throw new Error(`Unbekanntes Team: ${team}`);
     const bearer = String(auth?.bearer || "").trim();
     if (!bearer) throw new Error(NO_AUTH_MESSAGE);
     const payload = {
@@ -15342,10 +16156,11 @@ Trotzdem speichern?`)) return void 0;
       bearer,
       fingerprint: String(auth?.fingerprint || "").trim()
     };
+    if (team) payload.team = team;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse4(status2, text) {
+  function parseResponse5(status2, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -15357,11 +16172,11 @@ Trotzdem speichern?`)) return void 0;
     if (status2 === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createSlackDmClient({ request, getAuth, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
+  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
-        payload = buildPayload({ action, direction, matchId, comment, auth: getAuth(), testChannel });
+        payload = buildPayload({ action, direction, matchId, comment, auth: getAuth(), team, testChannel });
       } catch (error) {
         reject(error);
         return;
@@ -15374,13 +16189,13 @@ Trotzdem speichern?`)) return void 0;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse4(response.status, response.responseText));
+            resolve(parseResponse5(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
       });
     });
   }
@@ -15403,68 +16218,74 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
-  var IDS8 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var IDS9 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT6 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT7 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
-  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT6}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT7}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT6}; color:#09090b; -webkit-font-smoothing:antialiased; }
-  #${IDS8.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS8.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
-  #${IDS8.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS8.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT6}; }
-  #${IDS8.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS8.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
-  #${IDS8.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS8.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
-  #${IDS8.dialog} dd a { color:#b85400; text-decoration:none; }
-  #${IDS8.dialog} dd a:hover { text-decoration:underline; }
-  #${IDS8.dialog} .sd-muted { color:#8b8b94; }
-  #${IDS8.dialog} .sd-warn { color:#8a6700; }
-  #${IDS8.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS8.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT6}; resize:vertical; }
-  #${IDS8.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
-  #${IDS8.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
-  #${IDS8.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
-  #${IDS8.dialog} .sd-status.sd-error { color:#b52f2f; }
-  #${IDS8.dialog} .sd-status.sd-ok { color:#0a7c0a; }
-  #${IDS8.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS8.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT6}; }
-  #${IDS8.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
-  #${IDS8.dialog} .sd-secondary:hover { background:#f4f4f5; }
-  #${IDS8.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
-  #${IDS8.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
-  #${IDS8.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT7}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS9.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS9.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS9.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS9.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT7}; }
+  #${IDS9.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS9.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS9.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS9.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS9.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS9.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS9.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS9.dialog} .sd-warn { color:#8a6700; }
+  #${IDS9.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS9.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT7}; resize:vertical; }
+  #${IDS9.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS9.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS9.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS9.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS9.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS9.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS9.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT7}; }
+  #${IDS9.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS9.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS9.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS9.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS9.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
 `;
   function executeSlackDm(runtime, {
     routes = [],
     direction,
+    team = "",
+    ownTeamDirection = "",
+    graphqlRequest = null,
     getAuth,
     sourcePath,
     helpTip,
     request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
   } = {}) {
     runtime.registerSource(sourcePath);
-    const config = DIRECTIONS[direction];
-    if (!config) throw new Error(`Slack-DM: unbekannte Richtung ${direction}`);
+    if (!DIRECTIONS[direction]) throw new Error(`Slack-DM: unbekannte Richtung ${direction}`);
+    if (ownTeamDirection && !DIRECTIONS[ownTeamDirection]) throw new Error(`Slack-DM: unbekannte Richtung ${ownTeamDirection}`);
+    const directions = [direction];
     const send = createSlackDmClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
       }),
-      getAuth: () => getAuth ? getAuth() : {}
+      getAuth: () => getAuth ? getAuth() : {},
+      team
     });
     let syncTimer = null;
     let closeTimer = null;
+    let stopped = false;
     const isTargetPage3 = () => routes.some((route) => route.test(location.hash));
     function ensureStyle4() {
-      if (document.getElementById(IDS8.style)) return;
+      if (document.getElementById(IDS9.style)) return;
       const style = document.createElement("style");
-      style.id = IDS8.style;
+      style.id = IDS9.style;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
@@ -15482,24 +16303,29 @@ Trotzdem speichern?`)) return void 0;
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
       const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
-      const matchId = matchIdFromHref5(link?.getAttribute("href"));
+      const matchId = matchIdFromHref6(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
-    function addButton(row2) {
+    function addButtons(row2) {
       const target = matchCellOf(row2);
       if (!target?.cell) return;
-      const existing = target.cell.querySelector(`.${BUTTON_CLASS2}`);
-      if (existing?.dataset.matchId === target.matchId) return;
-      existing?.remove();
-      const button2 = el4("button", { type: "button", className: BUTTON_CLASS2, title: config.title, text: config.label });
-      button2.dataset.matchId = target.matchId;
-      button2.dataset.werkiaSlackDmOwner = sourcePath;
-      button2.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openDialog(target.matchId);
-      });
-      target.cell.appendChild(button2);
+      const existing = [...target.cell.querySelectorAll(`.${BUTTON_CLASS2}`)];
+      const current = existing.map((button2) => `${button2.dataset.matchId}:${button2.dataset.direction}`).join(",");
+      if (current === directions.map((id) => `${target.matchId}:${id}`).join(",")) return;
+      existing.forEach((button2) => button2.remove());
+      for (const id of directions) {
+        const config = DIRECTIONS[id];
+        const button2 = el4("button", { type: "button", className: BUTTON_CLASS2, title: config.title, text: config.label });
+        button2.dataset.matchId = target.matchId;
+        button2.dataset.direction = id;
+        button2.dataset.werkiaSlackDmOwner = sourcePath;
+        button2.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openDialog(target.matchId, id);
+        });
+        target.cell.appendChild(button2);
+      }
     }
     function removeButtons() {
       document.querySelectorAll(`.${BUTTON_CLASS2}`).forEach((button2) => {
@@ -15511,7 +16337,7 @@ Trotzdem speichern?`)) return void 0;
         runtime.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      document.getElementById(IDS8.dialog)?.remove();
+      document.getElementById(IDS9.dialog)?.remove();
       document.removeEventListener("keydown", onKeydown, true);
     }
     function onKeydown(event) {
@@ -15543,10 +16369,11 @@ Trotzdem speichern?`)) return void 0;
       row2("An", list);
       return reachable.length > 0;
     }
-    async function openDialog(matchId) {
+    async function openDialog(matchId, dialogDirection = direction) {
+      const config = DIRECTIONS[dialogDirection];
       closeDialog();
       ensureStyle4();
-      const comment = el4("textarea", { id: `${IDS8.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      const comment = el4("textarea", { id: `${IDS9.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el4("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
@@ -15558,7 +16385,7 @@ Trotzdem speichern?`)) return void 0;
         el4("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
         el4("div", { className: "sd-head" }, [el4("h2", { text: `${config.label} schicken` }), tip]),
         el4("dl", {}, [el4("dt", { text: "Match" }), el4("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el4("label", { for: `${IDS8.dialog}-comment`, text: "Kommentar" }),
+        el4("label", { for: `${IDS9.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
         el4("div", { className: "sd-status" }),
@@ -15567,7 +16394,7 @@ Trotzdem speichern?`)) return void 0;
           sendButton
         ])
       ]);
-      const dialog = el4("div", { id: IDS8.dialog }, card);
+      const dialog = el4("div", { id: IDS9.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -15578,7 +16405,7 @@ Trotzdem speichern?`)) return void 0;
         sendButton.disabled = true;
         setStatus(dialog, "Wird gesendet …");
         try {
-          const response = await send({ action: "senden", direction, matchId, comment: comment.value });
+          const response = await send({ action: "senden", direction: dialogDirection, matchId, comment: comment.value });
           if (!dialog.isConnected) return;
           setStatus(dialog, sentMessage(response), "ok");
           closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
@@ -15589,7 +16416,7 @@ Trotzdem speichern?`)) return void 0;
         }
       });
       try {
-        const preview = await send({ action: "vorschau", direction, matchId });
+        const preview = await send({ action: "vorschau", direction: dialogDirection, matchId });
         if (!dialog.isConnected) return;
         sendButton.disabled = !renderPreview(dialog, preview);
         if (sendButton.disabled) setStatus(dialog, "Niemand der Empfänger ist in Slack erreichbar.", "error");
@@ -15605,7 +16432,17 @@ Trotzdem speichern?`)) return void 0;
         return;
       }
       ensureStyle4();
-      document.querySelectorAll(ROW_SELECTOR7).forEach(addButton);
+      document.querySelectorAll(ROW_SELECTOR8).forEach(addButtons);
+    }
+    async function unlockOwnTeam() {
+      if (!ownTeamDirection || !graphqlRequest) return;
+      try {
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY5, {});
+        if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
+        if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
+        scheduleSync();
+      } catch {
+      }
     }
     function scheduleSync() {
       if (syncTimer !== null) return;
@@ -15620,12 +16457,14 @@ Trotzdem speichern?`)) return void 0;
       scheduleSync();
     });
     runtime.addCleanup?.(() => {
+      stopped = true;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       closeDialog();
       removeButtons();
-      document.getElementById(IDS8.style)?.remove();
+      document.getElementById(IDS9.style)?.remove();
     });
     scheduleSync();
+    unlockOwnTeam();
   }
 
   // src/features/slack-dm.js
@@ -15634,6 +16473,11 @@ Trotzdem speichern?`)) return void 0;
       routes: [ROUTES.cemMyMatches, ROUTES.cemMyCandidates],
       direction: "AN_KAM",
       getAuth: getCemGraphqlAuth,
+      team: "CEM",
+      // Knopf "An CEM" fuers eigene Team, nur fuer Personen aus
+      // OWN_TEAM_SENDERS (shared/js/slack-dm/core.js).
+      ownTeamDirection: "AN_CEM",
+      graphqlRequest: (query, variables) => getCemGraphqlAdapter().request(query, variables),
       helpTip: () => cemHelp.tip("slack-dm"),
       sourcePath: "cem/toolbox/src/features/slack-dm.js",
       ...options
@@ -15976,6 +16820,7 @@ Trotzdem speichern?`)) return void 0;
     // overpainted by a less severe highlight.
     { id: "no-go-check", execute: executeNoGoCheck2 },
     { id: "appointment-prio", execute: executeAppointmentPrio2 },
+    { id: "vta-notizen", execute: executeVtaNotizen2 },
     { id: "wa-templates", execute: executeWaTemplates },
     { id: "cem-todo", execute: executeCemTodo },
     { id: "slack-dm", execute: executeSlackDm2 },

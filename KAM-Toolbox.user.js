@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.15.259
+// @version      1.16.269
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -4059,9 +4059,9 @@
   var TOOLBAR_SELECTOR = '[role="toolbar"], .MuiToolbar-root';
   var OWN_SELECTOR = '[class*="werkia-"]';
   var RETRY_MS = 60 * 1e3;
-  function tiptapOf2(element5) {
+  function tiptapOf2(element6) {
     try {
-      return element5?.wrappedJSObject?.editor || element5?.editor || null;
+      return element6?.wrappedJSObject?.editor || element6?.editor || null;
     } catch {
       return null;
     }
@@ -4089,8 +4089,8 @@
     return node;
   }
   var keepFocus = (event) => event.preventDefault();
-  function isDark(element5) {
-    let node = element5;
+  function isDark(element6) {
+    let node = element6;
     while (node && node.nodeType === 1) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
       if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
@@ -4470,6 +4470,1689 @@
     scheduleSync();
   }
 
+  // ../../shared/js/list-filter-presets/core.js
+  var STORAGE_KEY = "werkia_list_filter_presets_v1";
+  var STORE_VERSION = 1;
+  function parseJsonObject(value, fallback) {
+    if (!value) return fallback;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function safeCall(callback) {
+    if (typeof callback !== "function") return "";
+    try {
+      return callback();
+    } catch {
+      return "";
+    }
+  }
+  function routeFromHash(hash = "") {
+    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
+  }
+  function parseListState(hash = "") {
+    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
+    const perPage = Number.parseInt(params.get("perPage") || "", 10);
+    return {
+      route: routeFromHash(hash),
+      filter: parseJsonObject(params.get("filter"), {}),
+      sort: params.get("sort") || "",
+      order: params.get("order") || "",
+      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
+    };
+  }
+  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
+    const params = new URLSearchParams({
+      displayedFilters: JSON.stringify({}),
+      filter: JSON.stringify(filter || {})
+    });
+    if (order) params.set("order", order);
+    params.set("page", "1");
+    if (perPage) params.set("perPage", String(perPage));
+    if (sort) params.set("sort", sort);
+    return `#/${route}?${params}`;
+  }
+  function isTargetRoute(hash, routes = []) {
+    const route = routeFromHash(hash).toLowerCase();
+    return routes.some((candidate) => String(candidate).toLowerCase() === route);
+  }
+  function isEmptyFilterValue(value) {
+    if (value === null || value === void 0 || value === "") return true;
+    return Array.isArray(value) && value.length === 0;
+  }
+  function filterKey(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return JSON.stringify(
+      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
+    );
+  }
+  function filterFields(filter) {
+    const source = filter && typeof filter === "object" ? filter : {};
+    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
+  }
+  function describePreset(preset) {
+    const fields = filterFields(preset?.filter);
+    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
+  }
+  function createPresetId(now = Date.now(), entropy = Math.random()) {
+    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
+  }
+  function presetFromState(name, state) {
+    return {
+      id: createPresetId(),
+      name: String(name || "").trim(),
+      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
+      sort: state?.sort || "",
+      order: state?.order || "",
+      perPage: state?.perPage || 0
+    };
+  }
+  function applyPresetToState(preset, currentState) {
+    return {
+      route: currentState?.route || "",
+      filter: preset?.filter || {},
+      sort: preset?.sort || currentState?.sort || "",
+      order: preset?.order || currentState?.order || "",
+      perPage: preset?.perPage || currentState?.perPage || 0
+    };
+  }
+  function findActivePresetId(presets, state) {
+    const key = filterKey(state?.filter);
+    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
+  }
+  function emptyStore() {
+    return { version: STORE_VERSION, routes: {} };
+  }
+  function parseStore(raw) {
+    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
+    if (!parsed || typeof parsed !== "object") return emptyStore();
+    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
+    const clean6 = {};
+    Object.keys(routes).forEach((route) => {
+      clean6[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+        id: String(preset.id || createPresetId()),
+        name: String(preset.name),
+        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
+        sort: preset.sort || "",
+        order: preset.order || "",
+        perPage: Number.parseInt(preset.perPage, 10) || 0
+      }));
+    });
+    return { version: STORE_VERSION, routes: clean6 };
+  }
+  function presetsForRoute(store, route) {
+    return store?.routes?.[route] ? [...store.routes[route]] : [];
+  }
+  function upsertPreset(store, route, preset) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
+    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+    if (sameName >= 0) kept.splice(sameName, 1, preset);
+    else kept.push(preset);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function removePreset(store, route, id) {
+    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
+    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
+  }
+  function mergeStores(base, incoming) {
+    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
+    const routes = incoming?.routes || {};
+    Object.keys(routes).forEach((route) => {
+      routes[route].forEach((preset) => {
+        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
+        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
+      });
+    });
+    return result;
+  }
+  function createPresetStorage({ read, write, backupRead, backupWrite }) {
+    return {
+      load() {
+        const primary = parseStore(safeCall(read));
+        if (Object.keys(primary.routes).length) return primary;
+        const backup = parseStore(safeCall(backupRead));
+        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
+        return backup;
+      },
+      save(store) {
+        const serialized = JSON.stringify(store);
+        safeCall(() => write(serialized));
+        safeCall(() => backupWrite(serialized));
+      }
+    };
+  }
+
+  // ../../shared/js/list-filter-presets/index.js
+  var IDS = {
+    bar: "werkia-filter-presets-bar",
+    select: "werkia-filter-presets-select",
+    style: "werkia-filter-presets-style",
+    dialog: "werkia-filter-presets-dialog"
+  };
+  var LIST_ANCHOR_SELECTORS = [
+    ".RaList-content",
+    ".RaList-main",
+    "table.RaDataTable-table",
+    "main table"
+  ];
+  function findListAnchor(root = document) {
+    for (const selector of LIST_ANCHOR_SELECTORS) {
+      const element6 = root.querySelector(selector);
+      if (element6) return element6;
+    }
+    return null;
+  }
+  function executeListFilterPresets(runtime, {
+    routes = [],
+    sourcePath,
+    label = "Filtervorlagen",
+    builtInPresets = [],
+    storage,
+    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
+    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
+    helpTip
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const presetStorage = storage || createPresetStorage({
+      read: () => localStorage.getItem(STORAGE_KEY),
+      write: (value) => localStorage.setItem(STORAGE_KEY, value),
+      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
+      backupWrite: (value) => {
+        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
+      }
+    });
+    const owner = sourcePath || routes.join(",");
+    const ownElement = (id) => {
+      const element6 = document.getElementById(id);
+      return element6?.dataset.werkiaPresetsOwner === owner ? element6 : null;
+    };
+    const isTargetPage8 = () => isTargetRoute(location.hash, routes);
+    const currentRoute = () => routeFromHash(location.hash);
+    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
+    function ensureStyle7() {
+      if (document.getElementById(IDS.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS.style;
+      style.textContent = `
+      #${IDS.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      #${IDS.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS.bar} button:hover { background:#3643c7; }
+      #${IDS.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
+      #${IDS.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS.dialog} h2 { margin:0 0 12px; font-size:15px; }
+      #${IDS.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
+      #${IDS.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
+      #${IDS.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
+      #${IDS.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
+      #${IDS.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function applyPreset(preset) {
+      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
+    }
+    function saveCurrentFilter() {
+      const state = parseListState(location.hash);
+      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
+      const name = window.prompt("Name der Vorlage:", "");
+      if (!name || !name.trim()) return;
+      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
+      render();
+    }
+    function closeDialog() {
+      ownElement(IDS.dialog)?.remove();
+    }
+    function renderManager() {
+      closeDialog();
+      const route = currentRoute();
+      const overlay = document.createElement("div");
+      overlay.id = IDS.dialog;
+      overlay.dataset.werkiaPresetsOwner = owner;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const card = document.createElement("div");
+      card.className = "werkia-filter-presets-card";
+      const heading = document.createElement("h2");
+      heading.textContent = `Filtervorlagen verwalten – ${route}`;
+      card.appendChild(heading);
+      const list = document.createElement("ul");
+      const presets = ownPresets();
+      if (!presets.length) {
+        const empty = document.createElement("li");
+        empty.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
+        list.appendChild(empty);
+      }
+      presets.forEach((preset) => {
+        const row2 = document.createElement("li");
+        const name = document.createElement("span");
+        name.className = "werkia-filter-presets-name";
+        name.textContent = preset.name;
+        const fields = document.createElement("span");
+        fields.className = "werkia-filter-presets-fields";
+        fields.textContent = describePreset(preset);
+        const rename = document.createElement("button");
+        rename.type = "button";
+        rename.className = "werkia-filter-presets-secondary";
+        rename.textContent = "Umbenennen";
+        rename.addEventListener("click", () => {
+          const next = window.prompt("Neuer Name:", preset.name);
+          if (!next || !next.trim()) return;
+          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
+          renderManager();
+          render();
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "werkia-filter-presets-danger";
+        remove.textContent = "Loeschen";
+        remove.addEventListener("click", () => {
+          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
+          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
+          renderManager();
+          render();
+        });
+        row2.append(name, fields, rename, remove);
+        list.appendChild(row2);
+      });
+      card.appendChild(list);
+      const hint = document.createElement("p");
+      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
+      card.appendChild(hint);
+      const transfer = document.createElement("textarea");
+      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
+      transfer.spellcheck = false;
+      card.appendChild(transfer);
+      const importButton = document.createElement("button");
+      importButton.type = "button";
+      importButton.textContent = "Aus Textfeld importieren";
+      importButton.addEventListener("click", () => {
+        const incoming = parseStore(transfer.value);
+        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
+        presetStorage.save(mergeStores(presetStorage.load(), incoming));
+        renderManager();
+        render();
+      });
+      const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "werkia-filter-presets-secondary";
+      closeButton.textContent = "Schliessen";
+      closeButton.addEventListener("click", closeDialog);
+      card.append(importButton, closeButton);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.id = IDS.bar;
+      bar.dataset.werkiaPresetsOwner = owner;
+      const title = document.createElement("strong");
+      title.textContent = label;
+      const select = document.createElement("select");
+      select.id = IDS.select;
+      select.addEventListener("change", () => {
+        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
+        if (preset) applyPreset(preset);
+      });
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.textContent = "Aktuellen Filter speichern";
+      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
+      saveButton.addEventListener("click", saveCurrentFilter);
+      const manageButton = document.createElement("button");
+      manageButton.type = "button";
+      manageButton.className = "werkia-filter-presets-secondary";
+      manageButton.textContent = "Verwalten";
+      manageButton.addEventListener("click", renderManager);
+      const resetButton = document.createElement("button");
+      resetButton.type = "button";
+      resetButton.className = "werkia-filter-presets-secondary";
+      resetButton.textContent = "Filter zuruecksetzen";
+      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
+      const tip = helpTip?.();
+      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
+      return bar;
+    }
+    const optionSignatures = /* @__PURE__ */ new WeakMap();
+    function fillSelect(select) {
+      if (!select) return;
+      const own = ownPresets();
+      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
+      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
+      if (optionSignatures.get(select) === signature) {
+        if (select.value !== active) select.value = active;
+        return;
+      }
+      optionSignatures.set(select, signature);
+      select.textContent = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
+      select.appendChild(placeholder);
+      const addGroup = (groupLabel, groupPresets) => {
+        if (!groupPresets.length) return;
+        const group = document.createElement("optgroup");
+        group.label = groupLabel;
+        groupPresets.forEach((preset) => {
+          const option = document.createElement("option");
+          option.value = preset.id;
+          option.textContent = preset.name;
+          option.title = describePreset(preset);
+          group.appendChild(option);
+        });
+        select.appendChild(group);
+      };
+      addGroup("Team-Vorlagen", builtInPresets);
+      addGroup("Eigene Vorlagen", own);
+      select.value = active;
+    }
+    function render() {
+      if (!isTargetPage8()) {
+        ownElement(IDS.bar)?.remove();
+        closeDialog();
+        return;
+      }
+      ensureStyle7();
+      let bar = document.getElementById(IDS.bar);
+      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
+      if (!bar) {
+        const anchor = findListAnchor(document);
+        if (!anchor?.parentElement) return;
+        bar = buildBar();
+        anchor.parentElement.insertBefore(bar, anchor);
+      }
+      fillSelect(bar.querySelector(`#${IDS.select}`));
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // ../../shared/js/vertretungen/core.js
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS = 15e3;
+  var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
+  me: currentEmployee { id __typename }
+}`;
+  function berlinDay(date = /* @__PURE__ */ new Date()) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  }
+  function formatDay(day, withYear = false) {
+    const [year, month, date] = String(day || "").split("-");
+    if (!year || !month || !date) return String(day || "");
+    return withYear ? `${date}.${month}.${year}` : `${date}.${month}.`;
+  }
+  function formatRange(von, bis) {
+    if (von === bis) return formatDay(von, true);
+    const sameYear = String(von).slice(0, 4) === String(bis).slice(0, 4);
+    return `${formatDay(von, !sameYear)} – ${formatDay(bis, true)}`;
+  }
+  function canEditDraft(me, draft) {
+    if (!me) return false;
+    if (me.darfAlles) return true;
+    return draft.abwesendId === me.id || draft.vertretungId === me.id;
+  }
+  function validateDraft(me, draft, today = berlinDay()) {
+    if (!draft.abwesendId) return "Bitte auswählen, wer abwesend ist.";
+    if (!draft.vertretungId) return "Bitte die Vertretung auswählen.";
+    if (draft.abwesendId === draft.vertretungId) return "Niemand kann sich selbst vertreten.";
+    if (!draft.von || !draft.bis) return "Bitte „Von“ und „Bis“ ausfüllen.";
+    if (draft.von > draft.bis) return "„Von“ liegt nach „Bis“.";
+    if (draft.bis < today) return "„Bis“ liegt in der Vergangenheit.";
+    if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
+    return "";
+  }
+  function parseResponse(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+      });
+    });
+  }
+  function plannedSubstituteMentions(mentions, aktiv, handled = /* @__PURE__ */ new Set()) {
+    const present = new Set(mentions.map((mention) => mention.id));
+    const planned = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const mention of mentions) {
+      for (const entry of aktiv || []) {
+        if (entry.abwesendId !== mention.id || !entry.vertretungId || entry.vertretungId === mention.id) continue;
+        const key = `${entry.abwesendId}|${entry.vertretungId}`;
+        if (present.has(entry.vertretungId) || handled.has(key) || seen.has(entry.vertretungId)) continue;
+        seen.add(entry.vertretungId);
+        planned.push({ key, pos: mention.end, vertretungId: entry.vertretungId, vertretungName: entry.vertretungName || "Vertretung" });
+      }
+    }
+    return planned.sort((a, b) => b.pos - a.pos);
+  }
+
+  // ../../shared/js/vertretungen/index.js
+  var IDS2 = {
+    button: "werkia-vertretungen-button",
+    bar: "werkia-vertretungen-bar",
+    dialog: "werkia-vertretungen-dialog",
+    style: "werkia-vertretungen-style"
+  };
+  var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
+  var CONFIRM_MS = 4e3;
+  var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
+  var COPIED_STYLES = [
+    "color",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "letterSpacing",
+    "textTransform",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderRadius",
+    "minWidth",
+    "minHeight"
+  ];
+  function nativeLookFrom(sample, view = sample?.ownerDocument?.defaultView) {
+    if (!sample || !view) return null;
+    const computed = view.getComputedStyle(sample);
+    const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
+    const icon2 = sample.querySelector("svg");
+    const iconStyle = icon2 ? view.getComputedStyle(icon2) : null;
+    const iconBox = icon2?.parentElement && icon2.parentElement !== sample ? view.getComputedStyle(icon2.parentElement) : null;
+    return {
+      style,
+      iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
+      iconGap: iconBox?.marginRight && iconBox.marginRight !== "0px" ? iconBox.marginRight : "8px"
+    };
+  }
+  function findToolbar(root = document) {
+    for (const selector of TOOLBAR_SELECTORS) {
+      const element6 = root.querySelector(selector);
+      if (element6) return element6;
+    }
+    return null;
+  }
+  function findSlot(root = document) {
+    const filterButton = [...root.querySelectorAll("button, a")].find((element6) => element6.id !== IDS2.button && /^filter hinzuf/i.test(element6.textContent.trim()));
+    if (filterButton) {
+      let before = filterButton;
+      while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
+      return { parent: before.parentElement, before, sample: filterButton };
+    }
+    const toolbar = findToolbar(root);
+    if (!toolbar) return null;
+    const sample = [...toolbar.querySelectorAll("button, a")].find((element6) => element6.id !== IDS2.button && element6.textContent.trim());
+    return { parent: toolbar, before: toolbar.firstElementChild, sample };
+  }
+  function executeVertretungen(runtime, {
+    routes = [],
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createVertretungenClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let state = null;
+    let editing = null;
+    let adminsOpen = false;
+    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
+    const owned = (id) => {
+      const element6 = document.getElementById(id);
+      return element6?.dataset.werkiaVertretungenOwner === sourcePath ? element6 : null;
+    };
+    function ensureStyle7() {
+      if (document.getElementById(IDS2.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS2.style;
+      style.textContent = `
+      #${IDS2.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+      #${IDS2.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS2.button}.wv-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS2.button}.wv-native svg { flex:none; fill:currentColor; }
+      #${IDS2.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.button}.wv-own:hover { background:#d7dbf0; }
+      #${IDS2.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
+      #${IDS2.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
+      #${IDS2.dialog} .wv-close:hover { background:#eceef6; }
+      #${IDS2.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
+      #${IDS2.dialog} h2 { margin:0 0 6px; font-size:15px; }
+      #${IDS2.dialog} h3 { margin:16px 0 8px; font-size:13px; }
+      #${IDS2.dialog} .wv-admins { margin-top:16px; }
+      #${IDS2.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
+      #${IDS2.dialog} .wv-admins[open] summary { margin-bottom:8px; }
+      #${IDS2.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
+      #${IDS2.dialog} ul { margin:0; padding:0; list-style:none; }
+      #${IDS2.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
+      #${IDS2.dialog} .wv-who { flex:1; font-weight:700; }
+      #${IDS2.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
+      #${IDS2.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
+      #${IDS2.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
+      #${IDS2.dialog} select, #${IDS2.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
+      #${IDS2.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
+      #${IDS2.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
+      #${IDS2.dialog} button:disabled { cursor:wait; opacity:.7; }
+      #${IDS2.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
+      #${IDS2.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
+      #${IDS2.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
+      #${IDS2.dialog} .wv-status.wv-error { color:#a02334; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el7(tag, props = {}, children = []) {
+      const element6 = document.createElement(tag);
+      Object.assign(element6, props);
+      element6.append(...children.filter((child) => child !== null && child !== void 0));
+      return element6;
+    }
+    function button3(text, onClick, className = "") {
+      return el7("button", { type: "button", textContent: text, className, onclick: onClick });
+    }
+    function confirmButton(label, question, onConfirm) {
+      let armed = false;
+      let timer = null;
+      const element6 = button3(label, () => {
+        if (!armed) {
+          armed = true;
+          element6.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element6.textContent = label;
+          }, CONFIRM_MS);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, "wv-danger");
+      return element6;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function closeDialog() {
+      owned(IDS2.dialog)?.remove();
+      editing = null;
+    }
+    function setStatus(text, isError = false) {
+      const status = owned(IDS2.dialog)?.querySelector(".wv-status");
+      if (!status) return;
+      status.textContent = text;
+      status.classList.toggle("wv-error", isError);
+    }
+    function setBusy(busy) {
+      owned(IDS2.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element6) => {
+        element6.disabled = busy;
+      });
+    }
+    async function refresh(message = "") {
+      state = await call({ action: "liste" });
+      render();
+      if (message) setStatus(message);
+    }
+    async function run(action, success) {
+      setBusy(true);
+      setStatus("Speichert …");
+      try {
+        await call(action);
+        editing = null;
+        await refresh(success);
+      } catch (error) {
+        setBusy(false);
+        setStatus(error.message || String(error), true);
+      }
+    }
+    function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
+      const select = el7("select");
+      select.append(el7("option", { value: "", textContent: "Bitte wählen …" }));
+      for (const person of people) {
+        select.append(el7("option", { value: person.id, textContent: person.name }));
+      }
+      select.value = value || "";
+      if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
+      return select;
+    }
+    function entryRow(entry) {
+      const who = el7("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
+      const when = el7("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
+      const badge = entry.aktiv ? el7("span", { className: "wv-badge", textContent: "läuft" }) : null;
+      const actions = entry.darfBearbeiten ? [
+        button3("Bearbeiten", () => {
+          editing = entry;
+          render();
+        }, "wv-secondary"),
+        confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
+      ] : [];
+      const row2 = el7("li", {}, [who, when, badge, ...actions]);
+      if (entry.geaendertVon) row2.title = `Zuletzt geändert von ${entry.geaendertVon}`;
+      return row2;
+    }
+    function form() {
+      const today = berlinDay();
+      const { ich } = state;
+      const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
+      const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
+      const von = el7("input", { type: "date", value: editing ? editing.von : today });
+      const bis = el7("input", { type: "date", value: editing ? editing.bis : today, min: today });
+      const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
+        const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
+        const problem = validateDraft(ich, draft, today);
+        if (problem) {
+          setStatus(problem, true);
+          return;
+        }
+        run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
+      });
+      const cancel = editing ? button3("Abbrechen", () => {
+        editing = null;
+        render();
+      }, "wv-secondary") : null;
+      return [
+        el7("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
+        el7("div", { className: "wv-form" }, [
+          el7("label", { textContent: "Abwesend" }),
+          abwesend,
+          el7("label", { textContent: "Vertretung" }),
+          vertretung,
+          el7("label", { textContent: "Von" }),
+          von,
+          el7("label", { textContent: "Bis (einschließlich)" }),
+          bis
+        ]),
+        el7("div", { className: "wv-actions" }, [save, cancel])
+      ];
+    }
+    function adminSection() {
+      const { ich } = state;
+      const admins = state.admins || [];
+      const list = el7("ul");
+      admins.forEach((admin) => {
+        const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
+        list.append(el7("li", {}, [el7("span", { className: "wv-who", textContent: admin.name }), remove]));
+      });
+      const parts = [
+        el7("summary", { textContent: `Admins (${admins.length})` }),
+        el7("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
+        list
+      ];
+      if (ich.darfAlles) {
+        const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
+        const add = button3("Als Admin eintragen", () => {
+          if (!candidate.value) {
+            setStatus("Bitte auswählen, wer Admin werden soll.", true);
+            return;
+          }
+          run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
+        }, "wv-secondary");
+        parts.push(el7("div", { className: "wv-actions" }, [candidate, add]));
+      }
+      const details = el7("details", { className: "wv-admins" }, parts);
+      details.open = adminsOpen;
+      details.addEventListener("toggle", () => {
+        adminsOpen = details.open;
+      });
+      return details;
+    }
+    function card() {
+      return owned(IDS2.dialog)?.querySelector(".wv-body");
+    }
+    function render() {
+      const target = card();
+      if (!target) return;
+      target.textContent = "";
+      const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
+      const list = el7("ul");
+      if (!state.eintraege.length) list.append(el7("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
+      state.eintraege.forEach((entry) => list.append(entryRow(entry)));
+      const tip = helpTip?.();
+      target.append(
+        el7("h2", {}, [document.createTextNode("Vertretungen "), tip]),
+        el7("p", { textContent: intro }),
+        list,
+        ...form(),
+        adminSection(),
+        el7("div", { className: "wv-status" }),
+        el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
+      );
+    }
+    async function openDialog() {
+      closeDialog();
+      ensureStyle7();
+      const overlay = el7("div", { id: IDS2.dialog });
+      overlay.dataset.werkiaVertretungenOwner = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const close = button3("×", closeDialog, "wv-close");
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el7("div", { className: "wv-body" }, [
+        el7("h2", { textContent: "Vertretungen" }),
+        el7("div", { className: "wv-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(el7("div", { className: "wv-card" }, [close, target]));
+      document.body.appendChild(overlay);
+      try {
+        await refresh();
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        target.append(el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
+      }
+    }
+    function placeButton() {
+      if (!isTargetPage8()) {
+        owned(IDS2.button)?.remove();
+        owned(IDS2.bar)?.remove();
+        return;
+      }
+      ensureStyle7();
+      const slot = findSlot(document);
+      const existing = owned(IDS2.button);
+      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS2.bar)) return;
+      existing?.remove();
+      const vertretungenButton = button3("Vertretungen", openDialog);
+      vertretungenButton.id = IDS2.button;
+      vertretungenButton.title = "Vertretungen eintragen und ansehen";
+      vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
+      if (slot) {
+        owned(IDS2.bar)?.remove();
+        const look = nativeLookFrom(slot.sample);
+        if (look) {
+          vertretungenButton.className = "wv-native";
+          Object.assign(vertretungenButton.style, look.style);
+          const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon2.setAttribute("viewBox", "0 0 24 24");
+          icon2.setAttribute("aria-hidden", "true");
+          icon2.style.width = look.iconSize;
+          icon2.style.height = look.iconSize;
+          icon2.style.marginRight = look.iconGap;
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", PEOPLE_ICON_PATH);
+          icon2.append(path);
+          vertretungenButton.prepend(icon2);
+        } else {
+          vertretungenButton.className = "wv-own";
+        }
+        slot.parent.insertBefore(vertretungenButton, slot.before);
+        return;
+      }
+      vertretungenButton.className = "wv-own";
+      owned(IDS2.bar)?.remove();
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return;
+      const bar = el7("div", { id: IDS2.bar }, [vertretungenButton]);
+      bar.dataset.werkiaVertretungenOwner = sourcePath;
+      anchor.parentElement.insertBefore(bar, anchor);
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS2.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());
+      } catch {
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        placeButton();
+      }, 200);
+    };
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.addCleanup?.(() => {
+      owned(IDS2.button)?.remove();
+      owned(IDS2.bar)?.remove();
+      closeDialog();
+    });
+    schedule();
+  }
+
+  // ../../shared/js/vta-notizen/core.js
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
+  var REQUEST_TIMEOUT_MS2 = 15e3;
+  var OFFLINE_MESSAGE2 = "Der Server für die VTA-Notizen ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var MAX_NOTE = 1e3;
+  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVtaNotizenMe {
+  me: currentEmployee { id __typename }
+}`;
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function parseResponse2(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`VTA-Notizen: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createNotizenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse2(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+      });
+    });
+  }
+  function employerIdFromHref2(href) {
+    const id = String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function matchIdFromHref3(href) {
+    const id = String(href || "").match(/#\/Match\/([^/?]+)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function createLookup(entries = []) {
+    const byId2 = /* @__PURE__ */ new Map();
+    for (const entry of entries) if (entry?.employerId) byId2.set(String(entry.employerId).toLowerCase(), entry);
+    return (employerId) => byId2.get(String(employerId || "").toLowerCase()) || null;
+  }
+  var squash = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  function hasNote(notes, notiz) {
+    const needle = squash(notiz);
+    return Boolean(needle) && squash(notes).includes(needle);
+  }
+  function withNote(notes, notiz) {
+    const text = String(notes || "");
+    const add = String(notiz || "").trim();
+    if (!add || hasNote(text, add)) return text;
+    return text.trim() ? `${text.replace(/\s+$/, "")}
+
+${add}` : add;
+  }
+  function formatDay2(iso) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  }
+  function entryMeta(entry) {
+    if (!entry) return "";
+    const day = formatDay2(entry.geaendertAm);
+    return [entry.geaendertVon ? `von ${entry.geaendertVon}` : "", day ? `am ${day}` : ""].filter(Boolean).join(" ");
+  }
+
+  // ../../shared/js/vta-notizen/index.js
+  var IDS3 = {
+    button: "werkia-vta-notiz-button",
+    dialog: "werkia-vta-notiz-dialog",
+    style: "werkia-vta-notiz-style"
+  };
+  var BOX_CLASS = "werkia-vta-notiz-box";
+  var OWNER_KEY = "werkiaVtaNotizOwner";
+  var CACHE_MS5 = 5 * 60 * 1e3;
+  var RETRY_MS2 = 60 * 1e3;
+  var CLICK_MAX_AGE_MS = 10 * 60 * 1e3;
+  var CONFIRM_MS2 = 4e3;
+  var APPOINTMENT_INPUT_SELECTOR = ".RaArrayInput-root input.MuiPickersInputBase-input";
+  var ROW_SELECTOR = "tr, .MuiTableRow-root";
+  var T = {
+    surface: "#ffffff",
+    sunken: "#f4f4f5",
+    ink: "#09090b",
+    ink2: "#52525b",
+    muted: "#8b8b94",
+    line: "#e4e4e7",
+    lineStrong: "#d4d4d8",
+    accent: "#ef6c00",
+    accentInk: "#b85400",
+    accentSoft: "#fff3e8",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec",
+    badHover: "#f9dcdc"
+  };
+  var FONT6 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  var NOTE_ICON_PATH = "M19 3H4.99C3.89 3 3 3.9 3 5l.01 14c0 1.1.89 2 1.99 2h10l6-6V5c0-1.1-.9-2-2-2zM7 8h10v2H7V8zm5 6H7v-2h5v2zm2 5.5V14h5.5L14 19.5z";
+  function findAppointmentDialog(root = document) {
+    return [...root.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => dialog.querySelector(APPOINTMENT_INPUT_SELECTOR) && dialog.querySelector('textarea[name="notes"]')).at(-1) || null;
+  }
+  function isExistingAppointment(dialog) {
+    if (!dialog) return false;
+    const buttons = [...dialog.querySelectorAll("button")].map((button3) => (button3.textContent || "").trim());
+    if (buttons.some((text) => /^(weiterleiten|löschen)$/i.test(text))) return true;
+    const titles = [...dialog.querySelectorAll("h1, h2, h3, h4, h5, h6, .MuiDialogTitle-root")].map((title) => title.textContent || "");
+    return titles.some((text) => /bearbeit/i.test(text));
+  }
+  function targetFromRow(row2) {
+    if (!row2?.querySelector) return { matchId: "", employerId: "" };
+    const employerLink = row2.querySelector('a[href*="#/Employer/"]');
+    const matchLink = row2.querySelector('a[href*="#/Match/"]');
+    return {
+      employerId: employerIdFromHref2(employerLink?.getAttribute("href")),
+      matchId: matchIdFromHref3(matchLink?.getAttribute("href"))
+    };
+  }
+  function vtaNotizenTopic({ page, routes }) {
+    return {
+      id: "vta-notizen",
+      title: "VTA-Notizen je Arbeitgeber",
+      page,
+      routes,
+      kind: "external",
+      summary: "Pro Arbeitgeber eine feste Notiz für Terminvorschläge, z. B. ein Buchungslink oder „Termine nur Di/Do“. Beim Anlegen eines Terminvorschlags hängt die Toolbox sie ans Notizfeld an.",
+      steps: [
+        "Am Arbeitgeber auf „VTA-Notiz“ in der Leiste klicken, Text eintragen und „Speichern“.",
+        "Alternativ im Terminvorschlag-Dialog unter dem Notizfeld auf „Bearbeiten“ bzw. „VTA-Notiz anlegen“ klicken. Alle Notizen zeigt der Tampermonkey-Menüeintrag „VTA-Notizen“.",
+        "Beim nächsten neuen Terminvorschlag für diesen Arbeitgeber steht die Notiz schon im Notizfeld. Was dort vorher stand, bleibt davor stehen."
+      ],
+      notes: [
+        "Die Notiz bleibt im Notizfeld sichtbar und lässt sich vor dem Speichern ändern oder löschen. Gespeichert wird erst mit dem Speichern-Knopf des Dialogs.",
+        "In einem bestehenden Termin fügt die Toolbox nichts von selbst ein; dort hilft „Ins Notizfeld übernehmen“.",
+        "Erkannt wird der Arbeitgeber über die Zeile, in der du den Dialog geöffnet hast, sonst über die Seite (Match oder Arbeitgeber). Steht „Arbeitgeber nicht erkannt“ da, den Dialog aus der Zeile des Matches öffnen.",
+        "Ändern darf jeder. Im Editor steht, wer zuletzt geändert hat und wann. Eine leer gespeicherte Notiz wird gelöscht.",
+        "Jeder Standort ist im Adminpanel ein eigener Arbeitgeber und hat seine eigene Notiz.",
+        "Die Toolbox lädt die Notizen höchstens alle 5 Minuten neu. Eigene Änderungen sind sofort zu sehen."
+      ]
+    };
+  }
+  function executeVtaNotizen(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    toolboxName = "Toolbox",
+    helpTip = () => null,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createNotizenClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let cache = null;
+    let failedAt = 0;
+    let loading = null;
+    let clicked = { matchId: "", employerId: "", at: 0 };
+    let box = null;
+    let dialogState = { entries: [], hits: null, query: "", selected: null };
+    const owned = (id) => {
+      const element6 = document.getElementById(id);
+      return element6?.dataset[OWNER_KEY] === sourcePath ? element6 : null;
+    };
+    const currentEmployerId = () => employerIdFromHref2(location.hash || "");
+    function ensureStyle7() {
+      if (document.getElementById(IDS3.style)) return;
+      const style = document.createElement("style");
+      style.id = IDS3.style;
+      const d = `#${IDS3.dialog}`;
+      const b = `.${BOX_CLASS}`;
+      style.textContent = `
+      #${IDS3.button}.wvn-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS3.button}.wvn-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS3.button}.wvn-native svg { flex:none; fill:currentColor; }
+      #${IDS3.button}.wvn-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T.line}; border-radius:8px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 ${FONT6}; }
+      ${b} { box-sizing:border-box; width:100%; margin:6px 0 10px; padding:9px 11px; border:1px solid ${T.line}; border-radius:8px; background:#fafafa; color:${T.ink}; font:400 13px/1.45 ${FONT6}; }
+      ${b}[data-state="none"], ${b}[data-state="loading"], ${b}[data-state="error"] { padding:5px 11px; background:transparent; border-style:dashed; color:${T.muted}; font-size:12px; }
+      ${b} .wvn-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+      ${b} .wvn-title { font-weight:650; font-size:12px; color:${T.ink2}; }
+      ${b} .wvn-meta { color:${T.muted}; font-size:11px; }
+      ${b} .wvn-text { margin-top:4px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${b} .wvn-spacer { flex:1; }
+      ${b} .wvn-done { color:#1f9a6b; font-size:12px; font-weight:600; }
+      ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+      ${d} .wvn-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T.line}; border-radius:12px; background:${T.surface}; color:${T.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 ${FONT6}; }
+      ${d} .wvn-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T.ink2}; font:400 22px/30px ${FONT6}; }
+      ${d} .wvn-close:hover { background:${T.sunken}; }
+      ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
+      ${d} h3 { margin:18px 0 8px; color:${T.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T.line}; }
+      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${d} .wvn-who { flex:1; min-width:0; }
+      ${d} .wvn-name { font-weight:600; }
+      ${d} .wvn-name a { color:inherit; text-decoration:none; }
+      ${d} .wvn-name a:hover { text-decoration:underline; }
+      ${d} .wvn-meta { color:${T.muted}; font-size:11px; }
+      ${d} .wvn-text { white-space:pre-wrap; overflow-wrap:anywhere; color:${T.ink2}; font-size:12px; }
+      ${d} .wvn-chip { padding:2px 8px; border-radius:999px; background:${T.accentSoft}; color:${T.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wvn-row { display:flex; gap:8px; align-items:center; }
+      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T.lineStrong}; border-radius:8px; background:${T.surface}; color:${T.ink}; font-family:inherit; font-size:13px; }
+      ${d} .wvn-status { min-height:18px; margin-top:10px; color:${T.ink2}; font-size:12px; }
+      ${d} .wvn-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+      .wvn-editor { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+      .wvn-editor textarea { width:100%; min-height:84px; box-sizing:border-box; padding:7px 10px; border:1px solid ${T.lineStrong}; border-radius:8px; background:${T.surface}; color:${T.ink}; font:400 13px/1.45 ${FONT6}; resize:vertical; }
+      .wvn-editor textarea:focus, ${d} input:focus { outline:2px solid ${T.accent}; outline-offset:-1px; }
+      .wvn-editor .wvn-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      .wvn-status.wvn-error, .wvn-editor .wvn-status.wvn-error { color:${T.badInk}; }
+      .wvn-editor .wvn-status { min-height:16px; color:${T.ink2}; font-size:12px; }
+      .wvn-btn { min-height:28px; padding:4px 11px; border:0; border-radius:8px; background:${T.accent}; color:#fff; cursor:pointer; font:600 12px/1 ${FONT6}; white-space:nowrap; }
+      .wvn-btn:disabled { cursor:default; opacity:.6; }
+      .wvn-btn.wvn-secondary { border:1px solid ${T.line}; background:${T.surface}; color:${T.ink}; }
+      .wvn-btn.wvn-secondary:hover { background:${T.sunken}; }
+      .wvn-btn.wvn-danger { background:${T.badSoft}; color:${T.badInk}; }
+      .wvn-btn.wvn-danger:hover { background:${T.badHover}; }
+      .wvn-btn.wvn-link { min-height:0; padding:2px 4px; background:transparent; color:${T.accentInk}; }
+      .wvn-btn.wvn-link:hover { text-decoration:underline; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el7(tag, props = {}, children = []) {
+      const element6 = document.createElement(tag);
+      Object.assign(element6, props);
+      element6.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element6;
+    }
+    function button3(text, onClick2, variant = "") {
+      return el7("button", {
+        type: "button",
+        textContent: text,
+        className: `wvn-btn${variant ? ` wvn-${variant}` : ""}`,
+        onclick: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClick2(event);
+        }
+      });
+    }
+    function noteIcon(size) {
+      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon2.setAttribute("viewBox", "0 0 24 24");
+      icon2.setAttribute("aria-hidden", "true");
+      if (size) {
+        icon2.style.width = size;
+        icon2.style.height = size;
+      }
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", NOTE_ICON_PATH);
+      icon2.append(path);
+      return icon2;
+    }
+    function confirmButton(label, question, onConfirm) {
+      let armed = false;
+      let timer = null;
+      const element6 = button3(label, () => {
+        if (!armed) {
+          armed = true;
+          element6.textContent = question;
+          timer = runtime.setTimeout(() => {
+            armed = false;
+            element6.textContent = label;
+          }, CONFIRM_MS2);
+          return;
+        }
+        if (timer !== null) runtime.clearTimeout?.(timer);
+        onConfirm();
+      }, "danger");
+      return element6;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function call(payload) {
+      return post({ ...payload, employeeId: await loadMyId() });
+    }
+    function fetchList() {
+      if (!loading) {
+        loading = call({ action: "liste" }).then((data) => {
+          const entries = data.eintraege || [];
+          cache = { at: now(), entries, lookup: createLookup(entries) };
+          failedAt = 0;
+          return cache;
+        }).catch((error) => {
+          failedAt = now();
+          throw error;
+        }).finally(() => {
+          loading = null;
+        });
+      }
+      return loading;
+    }
+    function loadList() {
+      if (cache && now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
+      if (failedAt && now() - failedAt < RETRY_MS2) return Promise.resolve(cache);
+      return fetchList().catch((error) => {
+        console.warn("[VTA-Notizen] Liste nicht geladen:", error?.message || error);
+        return cache;
+      });
+    }
+    async function save(employerId, notiz) {
+      await call({ action: "speichern", employerId, notiz });
+      await fetchList();
+      afterChange();
+    }
+    function afterChange() {
+      if (box) renderBox(box);
+      scheduleButton();
+    }
+    async function employerName(employerId) {
+      const entry = cache?.lookup(employerId);
+      if (entry?.employerName) return entry.employerName;
+      try {
+        const data = await call({ action: "suche", suche: employerId });
+        return (data.treffer || []).find((hit) => String(hit.id).toLowerCase() === employerId)?.name || "";
+      } catch {
+        return "";
+      }
+    }
+    function editorForm({ employerId, entry, onDone, autofocus = true }) {
+      const textarea = el7("textarea", { value: entry?.notiz || "", maxLength: MAX_NOTE, placeholder: "z. B. Buchungslink oder „Termine nur Di/Do“" });
+      const status = el7("div", { className: "wvn-status" });
+      const setStatus = (text, isError = false) => {
+        status.textContent = text;
+        status.classList.toggle("wvn-error", isError);
+      };
+      const controls = [];
+      const setBusy = (busy) => {
+        textarea.disabled = busy;
+        controls.forEach((control) => {
+          control.disabled = busy;
+        });
+      };
+      const run = async (notiz, success) => {
+        setBusy(true);
+        setStatus("Speichert …");
+        try {
+          await save(employerId, notiz);
+          onDone?.(success);
+        } catch (error) {
+          setBusy(false);
+          setStatus(error.message || String(error), true);
+        }
+      };
+      controls.push(button3("Speichern", () => run(textarea.value, textarea.value.trim() ? "VTA-Notiz gespeichert." : "VTA-Notiz gelöscht.")));
+      if (entry) controls.push(confirmButton("Notiz löschen", "Wirklich löschen?", () => run("", "VTA-Notiz gelöscht.")));
+      if (onDone) controls.push(button3("Abbrechen", () => onDone(""), "secondary"));
+      const meta = entry ? el7("span", { className: "wvn-meta", textContent: `Zuletzt geändert ${entryMeta(entry)}` }) : null;
+      const form = el7("div", { className: "wvn-editor" }, [textarea, el7("div", { className: "wvn-row" }, [...controls, meta]), status]);
+      textarea.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") event.stopPropagation();
+      });
+      if (autofocus) runtime.setTimeout(() => textarea.focus(), 0);
+      return form;
+    }
+    function notesField(dialog) {
+      return dialog.querySelector('textarea[name="notes"]');
+    }
+    function setNotes(textarea, value) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      if (setter) setter.call(textarea, value);
+      else textarea.value = value;
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function insertInto(current, entry) {
+      const textarea = notesField(current.dialog);
+      if (!textarea || !entry) return false;
+      const next = withNote(textarea.value, entry.notiz);
+      if (next !== textarea.value) setNotes(textarea, next);
+      return true;
+    }
+    function placeBox(current) {
+      const textarea = notesField(current.dialog);
+      if (!textarea) return;
+      const anchor = textarea.closest(".MuiFormControl-root, .MuiTextField-root") || textarea;
+      if (anchor.nextElementSibling !== current.element) anchor.insertAdjacentElement("afterend", current.element);
+    }
+    function renderBox(current) {
+      if (box !== current) return;
+      const { element: element6 } = current;
+      element6.textContent = "";
+      if (current.editing) element6.dataset.state = "edit";
+      else element6.dataset.state = current.state;
+      const tip = helpTip?.();
+      if (current.state === "loading") {
+        element6.append(el7("span", { textContent: "VTA-Notiz: Arbeitgeber wird ermittelt …" }));
+        return;
+      }
+      if (current.state === "error") {
+        element6.append(el7("span", { textContent: current.message || "VTA-Notiz: Arbeitgeber nicht erkannt." }));
+        if (tip) element6.append(tip);
+        return;
+      }
+      const entry = cache?.lookup(current.employerId) || null;
+      const head = el7("div", { className: "wvn-head" });
+      element6.append(head);
+      if (current.editing) {
+        head.append(el7("span", { className: "wvn-title", textContent: `VTA-Notiz für ${current.employerName || "diesen Arbeitgeber"}` }));
+        if (tip) head.append(tip);
+        element6.append(editorForm({
+          employerId: current.employerId,
+          entry,
+          // Neu angelegt oder geändert: bei einem neuen Termin gleich ins
+          // Notizfeld (die alte Fassung bleibt stehen, falls schon drin).
+          onDone: (message) => {
+            current.editing = false;
+            const saved = message ? cache?.lookup(current.employerId) : null;
+            if (saved && !isExistingAppointment(current.dialog)) insertInto(current, saved);
+            renderBox(current);
+          }
+        }));
+        return;
+      }
+      if (!entry) {
+        element6.dataset.state = "none";
+        head.append(
+          el7("span", { textContent: "Keine VTA-Notiz für diesen Arbeitgeber." }),
+          button3("VTA-Notiz anlegen", () => {
+            current.editing = true;
+            renderBox(current);
+          }, "link")
+        );
+        if (tip) head.append(tip);
+        return;
+      }
+      element6.dataset.state = "note";
+      const inserted = hasNote(notesField(current.dialog)?.value, entry.notiz);
+      head.append(el7("span", { className: "wvn-title", textContent: `VTA-Notiz ${entry.employerName ? `· ${entry.employerName}` : ""}` }));
+      if (tip) head.append(tip);
+      head.append(el7("span", { className: "wvn-spacer" }));
+      head.append(inserted ? el7("span", { className: "wvn-done", textContent: "Steht im Notizfeld" }) : button3("Ins Notizfeld übernehmen", () => {
+        insertInto(current, entry);
+        renderBox(current);
+      }));
+      head.append(button3("Bearbeiten", () => {
+        current.editing = true;
+        renderBox(current);
+      }, "secondary"));
+      element6.append(el7("div", { className: "wvn-text", textContent: entry.notiz }));
+      element6.dataset.inserted = String(inserted);
+    }
+    function currentTarget() {
+      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS && (clicked.matchId || clicked.employerId)) return clicked;
+      const hash = location.hash || "";
+      return { matchId: matchIdFromHref3(hash), employerId: employerIdFromHref2(hash) };
+    }
+    async function resolveEmployer(target) {
+      if (target.employerId) return target.employerId;
+      if (!target.matchId) return "";
+      const provider = employerNotesProviderFor(getGraphqlAdapter());
+      return String(await provider.employerIdForMatch(target.matchId) || "").toLowerCase();
+    }
+    async function startBox(current) {
+      try {
+        const employerId = await resolveEmployer(current.target);
+        if (box !== current) return;
+        if (!employerId) {
+          current.state = "error";
+          current.message = "VTA-Notiz: Arbeitgeber nicht erkannt. Den Dialog aus der Zeile des Matches öffnen.";
+          renderBox(current);
+          return;
+        }
+        current.employerId = employerId;
+        const list = await loadList();
+        if (box !== current) return;
+        if (!list) {
+          current.state = "error";
+          current.message = "VTA-Notiz: Server nicht erreichbar.";
+          renderBox(current);
+          return;
+        }
+        const entry = list.lookup(employerId);
+        current.employerName = entry?.employerName || "";
+        current.state = "ready";
+        if (entry && !current.autoDone && !isExistingAppointment(current.dialog)) insertInto(current, entry);
+        current.autoDone = true;
+        renderBox(current);
+        if (!entry) employerName(employerId).then((name) => {
+          if (box === current && name) current.employerName = name;
+        });
+      } catch (error) {
+        console.warn("[VTA-Notizen]", error);
+        if (box !== current) return;
+        current.state = "error";
+        current.message = "VTA-Notiz: Arbeitgeber konnte nicht ermittelt werden.";
+        renderBox(current);
+      }
+    }
+    function teardownBox() {
+      if (!box) return;
+      box.element.remove();
+      if (box.dialog.dataset[OWNER_KEY] === sourcePath) delete box.dialog.dataset[OWNER_KEY];
+      box = null;
+    }
+    function syncBox2() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (box) {
+          teardownBox();
+          clicked = { matchId: "", employerId: "", at: 0 };
+        }
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY];
+      if (claimedBy && claimedBy !== sourcePath) return;
+      if (box && box.dialog !== dialog) teardownBox();
+      if (!box) {
+        ensureStyle7();
+        dialog.dataset[OWNER_KEY] = sourcePath;
+        const element6 = el7("div", { className: BOX_CLASS });
+        element6.dataset[OWNER_KEY] = sourcePath;
+        box = { dialog, element: element6, target: currentTarget(), employerId: "", employerName: "", state: "loading", editing: false, autoDone: false };
+        placeBox(box);
+        renderBox(box);
+        startBox(box);
+        return;
+      }
+      placeBox(box);
+      if (box.state === "ready" && !box.editing) {
+        const entry = cache?.lookup(box.employerId);
+        if (entry && String(hasNote(notesField(dialog)?.value, entry.notiz)) !== box.element.dataset.inserted) renderBox(box);
+      }
+    }
+    function setDialogStatus(text, isError = false) {
+      const status = owned(IDS3.dialog)?.querySelector(".wvn-card > .wvn-body > .wvn-status");
+      if (!status) return;
+      status.textContent = text;
+      status.classList.toggle("wvn-error", isError);
+    }
+    function closeDialog() {
+      owned(IDS3.dialog)?.remove();
+    }
+    function employerLink(id, name) {
+      return el7("a", { href: `#/Employer/${id}/show`, textContent: name || id, target: "_blank", rel: "noopener" });
+    }
+    function select(id, name) {
+      dialogState.selected = { id, name };
+      renderDialog();
+    }
+    function entryRow(entry) {
+      return el7("li", {}, [
+        el7("div", { className: "wvn-who" }, [
+          el7("div", { className: "wvn-name" }, [employerLink(entry.employerId, entry.employerName)]),
+          el7("div", { className: "wvn-text", textContent: entry.notiz }),
+          el7("div", { className: "wvn-meta", textContent: entryMeta(entry) })
+        ]),
+        button3("Bearbeiten", () => select(entry.employerId, entry.employerName), "secondary")
+      ]);
+    }
+    function hitRow(hit) {
+      const meta = [hit.status, `${hit.stellen} ${hit.stellen === 1 ? "Stelle" : "Stellen"}`].filter(Boolean).join(" · ");
+      return el7("li", {}, [
+        el7("div", { className: "wvn-who" }, [
+          el7("div", { className: "wvn-name" }, [employerLink(hit.id, hit.name)]),
+          el7("div", { className: "wvn-meta", textContent: meta })
+        ]),
+        hit.hatNotiz ? el7("span", { className: "wvn-chip", textContent: "hat Notiz" }) : null,
+        button3(hit.hatNotiz ? "Bearbeiten" : "Auswählen", () => select(String(hit.id).toLowerCase(), hit.name), hit.hatNotiz ? "secondary" : "")
+      ]);
+    }
+    function searchSection() {
+      const input = el7("input", { type: "search", value: dialogState.query, placeholder: "Name, Employer-ID oder Link zum Arbeitgeber" });
+      const search = async () => {
+        dialogState.query = input.value.trim();
+        setDialogStatus("Sucht …");
+        try {
+          const data = await call({ action: "suche", suche: dialogState.query });
+          dialogState.hits = data.treffer || [];
+          renderDialog();
+          if (!dialogState.hits.length) setDialogStatus("Kein Arbeitgeber gefunden.");
+        } catch (error) {
+          setDialogStatus(error.message || String(error), true);
+        }
+      };
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          search();
+        }
+      });
+      const parts = [
+        el7("h3", { textContent: "Arbeitgeber suchen" }),
+        el7("div", { className: "wvn-row" }, [input, button3("Suchen", search)])
+      ];
+      if (dialogState.hits?.length) {
+        const list = el7("ul");
+        dialogState.hits.forEach((hit) => list.append(hitRow(hit)));
+        parts.push(list);
+      }
+      return parts;
+    }
+    function renderDialog() {
+      const target = owned(IDS3.dialog)?.querySelector(".wvn-body");
+      if (!target) return;
+      target.textContent = "";
+      const tip = helpTip?.();
+      const { selected } = dialogState;
+      if (selected) {
+        const entry = cache?.lookup(selected.id) || null;
+        target.append(
+          el7("h2", {}, [document.createTextNode("VTA-Notiz "), tip]),
+          el7("p", {}, [document.createTextNode("Für "), employerLink(selected.id, selected.name || entry?.employerName), document.createTextNode(". Kommt bei jedem neuen Terminvorschlag für diesen Arbeitgeber ans Ende des Notizfelds.")]),
+          editorForm({
+            employerId: selected.id,
+            entry,
+            // Gespeichert: aus der Übersicht zurück zur Liste, vom Arbeitgeber
+            // aus bleibt der Editor mit dem neuen Stand offen. Abbrechen:
+            // zurück zur Liste bzw. Dialog zu.
+            onDone: (message) => {
+              if (!message && !dialogState.fromOverview) {
+                closeDialog();
+                return;
+              }
+              if (dialogState.fromOverview) dialogState.selected = null;
+              dialogState.entries = cache?.entries || [];
+              renderDialog();
+              if (message) setDialogStatus(message);
+            }
+          }),
+          el7("div", { className: "wvn-status" }),
+          el7("div", { className: "wvn-actions" }, [button3("Schließen", closeDialog, "secondary")])
+        );
+        return;
+      }
+      const list = el7("ul");
+      if (!dialogState.entries.length) list.append(el7("li", { textContent: "Noch keine VTA-Notiz hinterlegt." }));
+      dialogState.entries.forEach((entry) => list.append(entryRow(entry)));
+      target.append(
+        el7("h2", {}, [document.createTextNode("VTA-Notizen "), tip]),
+        el7("p", { textContent: "Feste Notizen je Arbeitgeber, z. B. Buchungslink oder „Termine nur Di/Do“. Bei einem neuen Terminvorschlag hängt die Toolbox sie ans Notizfeld an." }),
+        el7("h3", { textContent: `Hinterlegt (${dialogState.entries.length})` }),
+        list,
+        ...searchSection(),
+        el7("div", { className: "wvn-status" }),
+        el7("div", { className: "wvn-actions" }, [button3("Schließen", closeDialog, "secondary")])
+      );
+    }
+    async function openDialog({ employerId = "" } = {}) {
+      closeDialog();
+      ensureStyle7();
+      dialogState = { entries: cache?.entries || [], hits: null, query: "", selected: null, fromOverview: !employerId };
+      const overlay = el7("div", { id: IDS3.dialog });
+      overlay.dataset[OWNER_KEY] = sourcePath;
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDialog();
+      });
+      const close = button3("×", closeDialog);
+      close.className = "wvn-close wvn-btn wvn-secondary";
+      close.title = "Schließen (Esc)";
+      close.setAttribute("aria-label", "Schließen");
+      const target = el7("div", { className: "wvn-body" }, [
+        el7("h2", { textContent: "VTA-Notizen" }),
+        el7("div", { className: "wvn-status", textContent: "Lädt …" })
+      ]);
+      overlay.append(el7("div", { className: "wvn-card" }, [close, target]));
+      document.body.appendChild(overlay);
+      try {
+        const list = await fetchList();
+        dialogState.entries = list.entries;
+        if (employerId) {
+          const name = list.lookup(employerId)?.employerName || await employerName(employerId);
+          dialogState.selected = { id: employerId, name };
+        }
+        renderDialog();
+      } catch (error) {
+        setDialogStatus(error.message || String(error), true);
+        target.append(el7("div", { className: "wvn-actions" }, [button3("Schließen", closeDialog, "secondary")]));
+      }
+    }
+    function placeButton() {
+      const employerId = currentEmployerId();
+      const existing = document.getElementById(IDS3.button);
+      if (existing && existing.dataset[OWNER_KEY] !== sourcePath) return;
+      if (!employerId) {
+        existing?.remove();
+        return;
+      }
+      const has2 = Boolean(cache?.lookup(employerId));
+      const text = has2 ? "VTA-Notiz ✓" : "VTA-Notiz";
+      const slot = findSlot(document);
+      if (existing && slot && existing.parentElement === slot.parent && existing.dataset.employerId === employerId && existing.dataset.label === text) {
+        if (slot.before === existing) return;
+        let next = existing.nextElementSibling;
+        while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
+        if (next === slot.before) return;
+      }
+      if (existing && !slot) return;
+      existing?.remove();
+      const target = findSlot(document);
+      if (!target) return;
+      ensureStyle7();
+      const noteButton = el7("button", { type: "button", textContent: text, onclick: () => openDialog({ employerId: currentEmployerId() }) });
+      noteButton.id = IDS3.button;
+      noteButton.title = has2 ? "VTA-Notiz dieses Arbeitgebers ansehen oder ändern" : "Feste Notiz für Terminvorschläge bei diesem Arbeitgeber anlegen";
+      noteButton.dataset[OWNER_KEY] = sourcePath;
+      noteButton.dataset.employerId = employerId;
+      noteButton.dataset.label = text;
+      const look = nativeLookFrom(target.sample);
+      if (look) {
+        noteButton.className = "wvn-native";
+        Object.assign(noteButton.style, look.style);
+        const svg = noteIcon(look.iconSize);
+        svg.style.marginRight = look.iconGap;
+        noteButton.prepend(svg);
+      } else {
+        noteButton.className = "wvn-own";
+      }
+      let before = target.before;
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id)) before = before.previousElementSibling;
+      target.parent.insertBefore(noteButton, before);
+    }
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key !== "Escape" || !owned(IDS3.dialog)) return;
+      event.stopPropagation();
+      closeDialog();
+    }, true);
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand(`${toolboxName}: VTA-Notizen`, () => openDialog({ employerId: currentEmployerId() }));
+      } catch {
+      }
+    }
+    const onClick = (event) => {
+      const row2 = event.target?.closest?.(ROW_SELECTOR);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const target = targetFromRow(row2);
+      if (target.matchId || target.employerId) clicked = { ...target, at: now() };
+    };
+    runtime.addDocumentListener("click", onClick, true);
+    let buttonScheduled = false;
+    function scheduleButton() {
+      if (buttonScheduled) return;
+      buttonScheduled = true;
+      runtime.setTimeout(() => {
+        buttonScheduled = false;
+        placeButton();
+      }, 250);
+    }
+    let boxScheduled = false;
+    function scheduleBox() {
+      if (boxScheduled) return;
+      boxScheduled = true;
+      runtime.setTimeout(() => {
+        boxScheduled = false;
+        syncBox2();
+      }, 150);
+    }
+    function onChange() {
+      scheduleBox();
+      scheduleButton();
+    }
+    function onHashChange() {
+      onChange();
+      if (currentEmployerId()) loadList().then(() => scheduleButton());
+    }
+    runtime.createMutationObserver(onChange).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", onHashChange);
+    runtime.addWindowListener("input", scheduleBox);
+    runtime.addCleanup?.(() => {
+      teardownBox();
+      owned(IDS3.button)?.remove();
+      closeDialog();
+    });
+    onHashChange();
+  }
+
   // src/help.js
   var MY_MATCHES = "KAM › Meine Matches";
   var QUESTIONNAIRE = "OM-Fragebogen (Meine Matches)";
@@ -4510,6 +6193,7 @@
       ]
     },
     appointmentPrioTopic({ team: "KAM", page: "Terminvorschlag-Dialog", routes: onMyMatches }),
+    vtaNotizenTopic({ page: "Terminvorschlag-Dialog und Arbeitgeber", routes: [...onMyMatches, ROUTES.employer] }),
     {
       id: "match-slack-actions",
       title: "Dringend und Push an Slack",
@@ -4547,6 +6231,29 @@
     },
     matchMentionTopic({ kind: "cem", page: "Matchkommentar-Dialog", routes: onMyMatches }),
     {
+      id: "match-mail",
+      title: "Mail an AP und offene Bewerber für die Sammelmail",
+      page: `${MY_MATCHES} › Matchkommentar-Dialog, „Email senden“ und Arbeitgeber`,
+      routes: onMyMatches,
+      kind: "form",
+      summary: "„Mail an AP“ oben im Matchkommentar-Dialog öffnet den Mail-Dialog des Adminpanels für denselben Match, wie der Briefumschlag in der Spalte „Email“. Im Mail-Dialog steht über dem Text, wie viele Bewerber beim Arbeitgeber noch offen sind (KAM-Status weder Hired noch Out), mit „Namen einfügen“ und „Kopieren“. „Offene Bewerber“ (im Matchkommentar-Dialog und unten rechts auf der Arbeitgeberseite) zeigt dieselbe Liste mit Vakanz und legt sie in die Zwischenablage.",
+      steps: [
+        "Im Matchkommentar-Dialog auf „Mail an AP“ klicken. Der Kommentar-Dialog bleibt offen.",
+        "Im Mail-Dialog wie gewohnt die Vorlage wählen.",
+        "Für eine Sammelmail den Cursor an die Stelle im Text setzen und „Namen einfügen“ klicken. Eine Zeile je Bewerber, bei mehreren Vakanzen mit Vakanztitel.",
+        "Text prüfen und mit „Senden“ des Adminpanels abschicken.",
+        "Nur die Liste, etwa für eine größere Sammelanfrage: „Offene Bewerber“ klicken. Die Liste steht im Fenster und ist schon kopiert. Auch über das Tampermonkey-Menü."
+      ],
+      notes: [
+        "Gesendet wird nur mit „Senden“ des Adminpanels, die Toolbox schickt keine Mail.",
+        "Erst die Vorlage wählen, dann einfügen: Eine andere Vorlage ersetzt den ganzen Text.",
+        "Steht in einer Vorlage {{{offeneBewerber}}}, kommen die Namen genau dorthin.",
+        "Gezählt werden alle Matches des Arbeitgebers, die auch in Meine Matches erscheinen würden, ohne Begrenzung auf eine Seite.",
+        "Die Mail hängt im Adminpanel an dem Match, aus dem du den Dialog geöffnet hast.",
+        "„Mail an AP“ braucht die Zeile des Matches in der Liste. Aus einer anderen Seite geöffnet, steht dort ein Hinweis."
+      ]
+    },
+    {
       id: "slack-dm",
       title: "An CEM: Match per Slack-DM schicken",
       page: MY_MATCHES,
@@ -4561,7 +6268,9 @@
       notes: [
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die CEM-Person, die beim Kandidaten eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
         "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
-        "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht."
+        "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht.",
+        "Der Link in der Nachricht öffnet bei der CEM-Person die Kandidatenansicht, bei der KAM-Person das Match in KAM › Meine Matches.",
+        "Einzelne Personen (derzeit die KAM-Leitung) sehen zusätzlich „An KAM“. Damit geht die DM an die KAM-Person, die beim Arbeitgeber eingetragen ist, und deren Vertretung. Bist du das selbst, meldet der Dialog das. Freischalten lässt sich das nur im Code der Toolbox."
       ]
     },
     {
@@ -5006,8 +6715,8 @@
     }
     const statusFor = (dialog) => (text, tone = "") => setStatus(text, tone, dialog);
     function setRunningControls(dialog, isRunning) {
-      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element5) => {
-        element5.disabled = isRunning;
+      dialog.querySelectorAll('select, input, [data-action="apply"]').forEach((element6) => {
+        element6.disabled = isRunning;
       });
       const stopButton = dialog.querySelector('[data-action="close"]');
       if (stopButton) {
@@ -5348,7 +7057,7 @@
   }
 
   // ../../shared/js/bulk-match-actions/index.js
-  var ROW_SELECTOR = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
@@ -5361,7 +7070,7 @@
       team,
       isTargetPage: isTargetPage8,
       getRequest,
-      ids: IDS10,
+      ids: IDS11,
       fields,
       columns,
       statusOptions,
@@ -5386,34 +7095,34 @@
       }
       return null;
     }
-    function clickLikeUser(element5) {
+    function clickLikeUser(element6) {
       const eventOptions = { bubbles: true, cancelable: true, composed: true, button: 0, buttons: 1 };
       if (typeof PointerEvent === "function") {
-        element5.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element6.dispatchEvent(new PointerEvent("pointerdown", { ...eventOptions, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element5.dispatchEvent(new MouseEvent("mousedown", eventOptions));
+      element6.dispatchEvent(new MouseEvent("mousedown", eventOptions));
       if (typeof PointerEvent === "function") {
-        element5.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        element6.dispatchEvent(new PointerEvent("pointerup", { ...eventOptions, buttons: 0, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }
-      element5.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
-      element5.click();
+      element6.dispatchEvent(new MouseEvent("mouseup", { ...eventOptions, buttons: 0 }));
+      element6.click();
     }
-    function visibleOverlay(element5) {
-      if (!element5) return false;
-      const style = getComputedStyle(element5);
-      const rect = element5.getBoundingClientRect();
+    function visibleOverlay(element6) {
+      if (!element6) return false;
+      const style = getComputedStyle(element6);
+      const rect = element6.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR3) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
+      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(MATCH_LINK_SELECTOR3) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE));
     }
-    function shownOnPage(element5) {
-      if (!element5.isConnected || element5.closest("[hidden]")) return false;
-      const style = getComputedStyle(element5);
+    function shownOnPage(element6) {
+      if (!element6.isConnected || element6.closest("[hidden]")) return false;
+      const style = getComputedStyle(element6);
       return style.display !== "none" && style.visibility !== "hidden";
     }
     function listIsLoading() {
-      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element5) => !element5.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element5));
+      return [...document.querySelectorAll(LOADING_SELECTOR)].some((element6) => !element6.closest('dialog, [role="dialog"], [id^="werkia"]') && shownOnPage(element6));
     }
     function employerFromRow(row2) {
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR2);
@@ -5441,13 +7150,13 @@
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
-      ids: IDS10,
-      buttonIds: [IDS10.button, IDS10.statusButton, IDS10.forwardButton, IDS10.declinePastButton],
+      ids: IDS11,
+      buttonIds: [IDS11.button, IDS11.statusButton, IDS11.forwardButton, IDS11.declinePastButton],
       stopNoun: "Zeile",
       reloadMissingText: 'Änderung geprüft. Der interne Adminpanel-Button "Neu laden" wurde nicht gefunden.',
       extraCss: `
-      #${IDS10.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
-      #${IDS10.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
+      #${IDS11.feedbackShortcuts} { display: grid; gap: 5px; margin: 12px 0; font: 700 14px/1.4 Arial,sans-serif; }
+      #${IDS11.feedbackShortcuts} select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #bbb; border-radius: 5px; font: inherit; background: #fff; }`
     });
     function visibleMatches() {
       const seen = /* @__PURE__ */ new Set();
@@ -5587,13 +7296,13 @@
       customInput.dispatchEvent(new Event("blur", { bubbles: true }));
     }
     function installNativeOutFeedbackDropdown(dialog) {
-      if (dialog.querySelector(`#${IDS10.feedbackShortcuts}`)) return;
+      if (dialog.querySelector(`#${IDS11.feedbackShortcuts}`)) return;
       const customInput = dialog.querySelector('input[name="customFeedback"], textarea[name="customFeedback"]');
       const othersRadio = dialog.querySelector('input[name="feedback"][value="others"]');
       const anchor = customInput?.closest(".MuiFormControl-root") || customInput?.parentElement || othersRadio?.closest("label") || othersRadio?.parentElement;
       if (!anchor) return;
       const shortcuts = document.createElement("label");
-      shortcuts.id = IDS10.feedbackShortcuts;
+      shortcuts.id = IDS11.feedbackShortcuts;
       shortcuts.innerHTML = `<span style="display:inline-flex;align-items:center;">${team}-Feedback${tip("outFeedback")}</span>
       <select name="werkia${team[0]}${team.slice(1).toLowerCase()}OutFeedback">
         <option value="">Bitte auswählen</option>
@@ -5893,10 +7602,10 @@
     function installHeaderButtons() {
       if (!isTargetPage8()) return;
       kit.injectStyle();
-      installButton(columns.followUp, IDS10.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
-      installButton(columns.status, IDS10.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
-      installButton(columns.interview, IDS10.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
-      installButton(columns.interview, IDS10.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
+      installButton(columns.followUp, IDS11.button, "Alle ändern", `${team}-WVL-Datum für angehakte sichtbare Matches ändern`, renderWvlDialog);
+      installButton(columns.status, IDS11.statusButton, "Alle ändern", `${team} Status für angehakte sichtbare Matches ändern`, renderStatusDialog);
+      installButton(columns.interview, IDS11.forwardButton, "Alle weiterleiten", "Terminvorschläge mit Status „Vorschlag“ für angehakte sichtbare Matches weiterleiten", () => renderInterviewDialog(INTERVIEW_ACTIONS.forward));
+      installButton(columns.interview, IDS11.declinePastButton, "Vergangene ablehnen", "Terminvorschläge, deren Termine alle in der Vergangenheit liegen, für angehakte sichtbare Matches ablehnen", () => renderInterviewDialog(INTERVIEW_ACTIONS.declinePast));
     }
     let scheduled = false;
     const scheduleInstall = () => {
@@ -5918,7 +7627,7 @@
   }
 
   // src/features/kam-suite/bulk-match-actions.js
-  var IDS = {
+  var IDS4 = {
     button: "werkia-kam-wvl-bulk-button",
     statusButton: "werkia-kam-status-bulk-button",
     forwardButton: "werkia-kam-interview-forward-bulk-button",
@@ -5979,7 +7688,7 @@
       team: "KAM",
       isTargetPage,
       getRequest: () => getKamGraphqlAdapter().request,
-      ids: IDS,
+      ids: IDS4,
       fields: { status: "kamStatus", feedback: "kamFeedback", followUp: "kamFollowUpDate" },
       columns: { status: "kamStatus", followUp: "kamFollowUpDate", interview: "interview" },
       statusOptions: KAM_STATUS_OPTIONS,
@@ -6060,7 +7769,7 @@
   }
 
   // src/features/kam-suite/contact-badges.js
-  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
   var STYLE_ID6 = "werkia-kam-contact-style";
@@ -6095,7 +7804,7 @@
     const contactIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
     }
     function employerFromRow(row2) {
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR3);
@@ -6122,7 +7831,7 @@
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle6() {
+    function ensureStyle7() {
       if (document.getElementById(STYLE_ID6)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID6;
@@ -6284,7 +7993,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle6();
+        ensureStyle7();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
       }, 150);
@@ -6298,9 +8007,9 @@
   }
 
   // src/features/kam-suite/employer-notes.js
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR4 = 'a[href*="#/Employer/"]';
-  var BOX_CLASS = "werkia-kam-employer-notes";
+  var BOX_CLASS2 = "werkia-kam-employer-notes";
   var ROW_TAGS = ["AP", "Prozess"];
   function getKamEmployerNotesProvider() {
     return employerNotesProviderFor(getKamGraphqlAdapter());
@@ -6315,7 +8024,7 @@
     function syncRow(row2, provider) {
       const employerId = employerIdFromRow(row2);
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR4);
-      let box = row2.querySelector(`.${BOX_CLASS}`);
+      let box = row2.querySelector(`.${BOX_CLASS2}`);
       if (!employerId || !link) {
         box?.remove();
         return;
@@ -6326,7 +8035,7 @@
       }
       if (!box) {
         box = document.createElement("span");
-        box.className = BOX_CLASS;
+        box.className = BOX_CLASS2;
         box.dataset.employerId = employerId;
         for (const tag of ROW_TAGS) box.appendChild(createEmployerNoteBadge({ provider, employerId, tag, document }));
       }
@@ -6341,7 +8050,7 @@
       } catch {
         return;
       }
-      document.querySelectorAll(ROW_SELECTOR3).forEach((row2) => syncRow(row2, provider));
+      document.querySelectorAll(ROW_SELECTOR4).forEach((row2) => syncRow(row2, provider));
     }
     let scheduled = false;
     const schedule = () => {
@@ -6399,7 +8108,7 @@
   }
 
   // src/features/kam-suite/vacancy-city-badges.js
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
   var STYLE_ID7 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
@@ -6415,7 +8124,7 @@
     const cityIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR));
     }
     function jobPositionFromRow(row2) {
       const link = row2.querySelector(JOB_TITLE_LINK_SELECTOR);
@@ -6431,7 +8140,7 @@
       });
       return [...ids];
     }
-    function ensureStyle6() {
+    function ensureStyle7() {
       if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID7;
@@ -6502,7 +8211,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage3()) return;
-        ensureStyle6();
+        ensureStyle7();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -6592,7 +8301,7 @@
   }
 
   // src/features/kam-suite/cem-status-line.js
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
@@ -6619,12 +8328,12 @@
     const failedMatchIds = /* @__PURE__ */ new Set();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
     function matchIdFromRow2(row2) {
       return getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
     }
-    function ensureStyle6() {
+    function ensureStyle7() {
       if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID8;
@@ -6762,7 +8471,7 @@
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle6();
+        ensureStyle7();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
@@ -6793,424 +8502,6 @@
     scheduleLines();
   }
 
-  // ../../shared/js/list-filter-presets/core.js
-  var STORAGE_KEY = "werkia_list_filter_presets_v1";
-  var STORE_VERSION = 1;
-  function parseJsonObject(value, fallback) {
-    if (!value) return fallback;
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
-    } catch {
-      return fallback;
-    }
-  }
-  function safeCall(callback) {
-    if (typeof callback !== "function") return "";
-    try {
-      return callback();
-    } catch {
-      return "";
-    }
-  }
-  function routeFromHash(hash = "") {
-    return String(hash).replace(/^#\/?/, "").split("?")[0].replace(/\/+$/, "");
-  }
-  function parseListState(hash = "") {
-    const params = new URLSearchParams(String(hash).split("?").slice(1).join("?"));
-    const perPage = Number.parseInt(params.get("perPage") || "", 10);
-    return {
-      route: routeFromHash(hash),
-      filter: parseJsonObject(params.get("filter"), {}),
-      sort: params.get("sort") || "",
-      order: params.get("order") || "",
-      perPage: Number.isFinite(perPage) && perPage > 0 ? perPage : 0
-    };
-  }
-  function buildListHash({ route, filter = {}, sort = "", order = "", perPage = 0 }) {
-    const params = new URLSearchParams({
-      displayedFilters: JSON.stringify({}),
-      filter: JSON.stringify(filter || {})
-    });
-    if (order) params.set("order", order);
-    params.set("page", "1");
-    if (perPage) params.set("perPage", String(perPage));
-    if (sort) params.set("sort", sort);
-    return `#/${route}?${params}`;
-  }
-  function isTargetRoute(hash, routes = []) {
-    const route = routeFromHash(hash).toLowerCase();
-    return routes.some((candidate) => String(candidate).toLowerCase() === route);
-  }
-  function isEmptyFilterValue(value) {
-    if (value === null || value === void 0 || value === "") return true;
-    return Array.isArray(value) && value.length === 0;
-  }
-  function filterKey(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return JSON.stringify(
-      Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort().map((key) => [key, source[key]])
-    );
-  }
-  function filterFields(filter) {
-    const source = filter && typeof filter === "object" ? filter : {};
-    return Object.keys(source).filter((key) => !isEmptyFilterValue(source[key])).sort();
-  }
-  function describePreset(preset) {
-    const fields = filterFields(preset?.filter);
-    return fields.length ? fields.join(", ") : "ohne Filter (zeigt alles)";
-  }
-  function createPresetId(now = Date.now(), entropy = Math.random()) {
-    return `p${now.toString(36)}${entropy.toString(36).slice(2, 7)}`;
-  }
-  function presetFromState(name, state) {
-    return {
-      id: createPresetId(),
-      name: String(name || "").trim(),
-      filter: state?.filter && typeof state.filter === "object" ? state.filter : {},
-      sort: state?.sort || "",
-      order: state?.order || "",
-      perPage: state?.perPage || 0
-    };
-  }
-  function applyPresetToState(preset, currentState) {
-    return {
-      route: currentState?.route || "",
-      filter: preset?.filter || {},
-      sort: preset?.sort || currentState?.sort || "",
-      order: preset?.order || currentState?.order || "",
-      perPage: preset?.perPage || currentState?.perPage || 0
-    };
-  }
-  function findActivePresetId(presets, state) {
-    const key = filterKey(state?.filter);
-    return (presets || []).find((preset) => filterKey(preset.filter) === key)?.id || "";
-  }
-  function emptyStore() {
-    return { version: STORE_VERSION, routes: {} };
-  }
-  function parseStore(raw) {
-    const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
-    if (!parsed || typeof parsed !== "object") return emptyStore();
-    const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean5 = {};
-    Object.keys(routes).forEach((route) => {
-      clean5[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
-        id: String(preset.id || createPresetId()),
-        name: String(preset.name),
-        filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
-        sort: preset.sort || "",
-        order: preset.order || "",
-        perPage: Number.parseInt(preset.perPage, 10) || 0
-      }));
-    });
-    return { version: STORE_VERSION, routes: clean5 };
-  }
-  function presetsForRoute(store, route) {
-    return store?.routes?.[route] ? [...store.routes[route]] : [];
-  }
-  function upsertPreset(store, route, preset) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== preset.id);
-    const sameName = kept.findIndex((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-    if (sameName >= 0) kept.splice(sameName, 1, preset);
-    else kept.push(preset);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function removePreset(store, route, id) {
-    const kept = presetsForRoute(store, route).filter((entry) => entry.id !== id);
-    return { version: STORE_VERSION, routes: { ...store?.routes, [route]: kept } };
-  }
-  function mergeStores(base, incoming) {
-    let result = { version: STORE_VERSION, routes: { ...base?.routes } };
-    const routes = incoming?.routes || {};
-    Object.keys(routes).forEach((route) => {
-      routes[route].forEach((preset) => {
-        const existing = presetsForRoute(result, route).find((entry) => entry.name.toLowerCase() === preset.name.toLowerCase());
-        result = upsertPreset(result, route, { ...preset, id: existing?.id || preset.id });
-      });
-    });
-    return result;
-  }
-  function createPresetStorage({ read, write, backupRead, backupWrite }) {
-    return {
-      load() {
-        const primary = parseStore(safeCall(read));
-        if (Object.keys(primary.routes).length) return primary;
-        const backup = parseStore(safeCall(backupRead));
-        if (Object.keys(backup.routes).length) safeCall(() => write(JSON.stringify(backup)));
-        return backup;
-      },
-      save(store) {
-        const serialized = JSON.stringify(store);
-        safeCall(() => write(serialized));
-        safeCall(() => backupWrite(serialized));
-      }
-    };
-  }
-
-  // ../../shared/js/list-filter-presets/index.js
-  var IDS2 = {
-    bar: "werkia-filter-presets-bar",
-    select: "werkia-filter-presets-select",
-    style: "werkia-filter-presets-style",
-    dialog: "werkia-filter-presets-dialog"
-  };
-  var LIST_ANCHOR_SELECTORS = [
-    ".RaList-content",
-    ".RaList-main",
-    "table.RaDataTable-table",
-    "main table"
-  ];
-  function findListAnchor(root = document) {
-    for (const selector of LIST_ANCHOR_SELECTORS) {
-      const element5 = root.querySelector(selector);
-      if (element5) return element5;
-    }
-    return null;
-  }
-  function executeListFilterPresets(runtime, {
-    routes = [],
-    sourcePath,
-    label = "Filtervorlagen",
-    builtInPresets = [],
-    storage,
-    // Optional: liefert den ?-Knopf der jeweiligen Toolbox-Hilfe
-    // (shared/js/toolbox-help/). Ohne ihn bleibt die Leiste wie bisher.
-    helpTip
-  } = {}) {
-    runtime.registerSource(sourcePath);
-    const presetStorage = storage || createPresetStorage({
-      read: () => localStorage.getItem(STORAGE_KEY),
-      write: (value) => localStorage.setItem(STORAGE_KEY, value),
-      backupRead: () => typeof GM_getValue === "function" ? GM_getValue(STORAGE_KEY, "") : "",
-      backupWrite: (value) => {
-        if (typeof GM_setValue === "function") GM_setValue(STORAGE_KEY, value);
-      }
-    });
-    const owner = sourcePath || routes.join(",");
-    const ownElement = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaPresetsOwner === owner ? element5 : null;
-    };
-    const isTargetPage8 = () => isTargetRoute(location.hash, routes);
-    const currentRoute = () => routeFromHash(location.hash);
-    const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle6() {
-      if (document.getElementById(IDS2.style)) return;
-      const style = document.createElement("style");
-      style.id = IDS2.style;
-      style.textContent = `
-      #${IDS2.bar} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS2.bar} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
-      #${IDS2.select} { min-width:230px; height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS2.bar} button { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS2.bar} button:hover { background:#3643c7; }
-      #${IDS2.bar} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS2.bar} button.werkia-filter-presets-secondary:hover { background:#d7dbf0; }
-      #${IDS2.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS2.dialog} .werkia-filter-presets-card { width:min(600px,92vw); max-height:82vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS2.dialog} h2 { margin:0 0 12px; font-size:15px; }
-      #${IDS2.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS2.dialog} ul { margin:0 0 14px; padding:0; list-style:none; }
-      #${IDS2.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS2.dialog} .werkia-filter-presets-name { flex:1; font-weight:700; }
-      #${IDS2.dialog} .werkia-filter-presets-fields { flex:1; color:#6b7280; font-size:11px; }
-      #${IDS2.dialog} textarea { width:100%; min-height:120px; margin-bottom:10px; padding:8px; border:1px solid #c8ccdd; border-radius:6px; font:400 12px/1.4 monospace; }
-      #${IDS2.dialog} button { min-height:28px; padding:5px 10px; margin-right:6px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS2.dialog} button.werkia-filter-presets-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS2.dialog} button.werkia-filter-presets-danger { background:#f8d7da; color:#a02334; }
-    `;
-      document.head.appendChild(style);
-    }
-    function applyPreset(preset) {
-      location.hash = buildListHash(applyPresetToState(preset, parseListState(location.hash)));
-    }
-    function saveCurrentFilter() {
-      const state = parseListState(location.hash);
-      if (!filterFields(state.filter).length && !window.confirm("Im aktuellen Filter ist nichts gesetzt. Trotzdem als Vorlage speichern?")) return;
-      const name = window.prompt("Name der Vorlage:", "");
-      if (!name || !name.trim()) return;
-      presetStorage.save(upsertPreset(presetStorage.load(), currentRoute(), presetFromState(name, state)));
-      render();
-    }
-    function closeDialog() {
-      ownElement(IDS2.dialog)?.remove();
-    }
-    function renderManager() {
-      closeDialog();
-      const route = currentRoute();
-      const overlay = document.createElement("div");
-      overlay.id = IDS2.dialog;
-      overlay.dataset.werkiaPresetsOwner = owner;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDialog();
-      });
-      const card = document.createElement("div");
-      card.className = "werkia-filter-presets-card";
-      const heading = document.createElement("h2");
-      heading.textContent = `Filtervorlagen verwalten – ${route}`;
-      card.appendChild(heading);
-      const list = document.createElement("ul");
-      const presets = ownPresets();
-      if (!presets.length) {
-        const empty = document.createElement("li");
-        empty.textContent = 'Noch keine eigenen Vorlagen. Filter oben normal setzen und "Aktuellen Filter speichern" druecken.';
-        list.appendChild(empty);
-      }
-      presets.forEach((preset) => {
-        const row2 = document.createElement("li");
-        const name = document.createElement("span");
-        name.className = "werkia-filter-presets-name";
-        name.textContent = preset.name;
-        const fields = document.createElement("span");
-        fields.className = "werkia-filter-presets-fields";
-        fields.textContent = describePreset(preset);
-        const rename = document.createElement("button");
-        rename.type = "button";
-        rename.className = "werkia-filter-presets-secondary";
-        rename.textContent = "Umbenennen";
-        rename.addEventListener("click", () => {
-          const next = window.prompt("Neuer Name:", preset.name);
-          if (!next || !next.trim()) return;
-          presetStorage.save(upsertPreset(presetStorage.load(), route, { ...preset, name: next.trim() }));
-          renderManager();
-          render();
-        });
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "werkia-filter-presets-danger";
-        remove.textContent = "Loeschen";
-        remove.addEventListener("click", () => {
-          if (!window.confirm(`Vorlage "${preset.name}" loeschen?`)) return;
-          presetStorage.save(removePreset(presetStorage.load(), route, preset.id));
-          renderManager();
-          render();
-        });
-        row2.append(name, fields, rename, remove);
-        list.appendChild(row2);
-      });
-      card.appendChild(list);
-      const hint = document.createElement("p");
-      hint.textContent = "Sichern/Uebertragen: Text kopieren und in einem anderen Browser hier einfuegen. Import ergaenzt, er ueberschreibt nichts.";
-      card.appendChild(hint);
-      const transfer = document.createElement("textarea");
-      transfer.value = JSON.stringify(presetStorage.load(), null, 2);
-      transfer.spellcheck = false;
-      card.appendChild(transfer);
-      const importButton = document.createElement("button");
-      importButton.type = "button";
-      importButton.textContent = "Aus Textfeld importieren";
-      importButton.addEventListener("click", () => {
-        const incoming = parseStore(transfer.value);
-        if (!Object.keys(incoming.routes).length) return window.alert("Kein gueltiger Vorlagen-Export im Textfeld.");
-        presetStorage.save(mergeStores(presetStorage.load(), incoming));
-        renderManager();
-        render();
-      });
-      const closeButton = document.createElement("button");
-      closeButton.type = "button";
-      closeButton.className = "werkia-filter-presets-secondary";
-      closeButton.textContent = "Schliessen";
-      closeButton.addEventListener("click", closeDialog);
-      card.append(importButton, closeButton);
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-    }
-    function buildBar() {
-      const bar = document.createElement("div");
-      bar.id = IDS2.bar;
-      bar.dataset.werkiaPresetsOwner = owner;
-      const title = document.createElement("strong");
-      title.textContent = label;
-      const select = document.createElement("select");
-      select.id = IDS2.select;
-      select.addEventListener("change", () => {
-        const preset = [...builtInPresets, ...ownPresets()].find((entry) => entry.id === select.value);
-        if (preset) applyPreset(preset);
-      });
-      const saveButton = document.createElement("button");
-      saveButton.type = "button";
-      saveButton.textContent = "Aktuellen Filter speichern";
-      saveButton.title = "Filter, Sortierung und Seitengroesse der aktuellen Ansicht als Vorlage sichern";
-      saveButton.addEventListener("click", saveCurrentFilter);
-      const manageButton = document.createElement("button");
-      manageButton.type = "button";
-      manageButton.className = "werkia-filter-presets-secondary";
-      manageButton.textContent = "Verwalten";
-      manageButton.addEventListener("click", renderManager);
-      const resetButton = document.createElement("button");
-      resetButton.type = "button";
-      resetButton.className = "werkia-filter-presets-secondary";
-      resetButton.textContent = "Filter zuruecksetzen";
-      resetButton.addEventListener("click", () => applyPreset({ filter: {} }));
-      const tip = helpTip?.();
-      bar.append(...[title, tip, select, saveButton, manageButton, resetButton].filter(Boolean));
-      return bar;
-    }
-    const optionSignatures = /* @__PURE__ */ new WeakMap();
-    function fillSelect(select) {
-      if (!select) return;
-      const own = ownPresets();
-      const active = findActivePresetId([...builtInPresets, ...own], parseListState(location.hash));
-      const signature = JSON.stringify([builtInPresets, own].map((list) => list.map((preset) => [preset.id, preset.name, describePreset(preset)])));
-      if (optionSignatures.get(select) === signature) {
-        if (select.value !== active) select.value = active;
-        return;
-      }
-      optionSignatures.set(select, signature);
-      select.textContent = "";
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = own.length || builtInPresets.length ? "Vorlage waehlen …" : "Noch keine Vorlage gespeichert";
-      select.appendChild(placeholder);
-      const addGroup = (groupLabel, groupPresets) => {
-        if (!groupPresets.length) return;
-        const group = document.createElement("optgroup");
-        group.label = groupLabel;
-        groupPresets.forEach((preset) => {
-          const option = document.createElement("option");
-          option.value = preset.id;
-          option.textContent = preset.name;
-          option.title = describePreset(preset);
-          group.appendChild(option);
-        });
-        select.appendChild(group);
-      };
-      addGroup("Team-Vorlagen", builtInPresets);
-      addGroup("Eigene Vorlagen", own);
-      select.value = active;
-    }
-    function render() {
-      if (!isTargetPage8()) {
-        ownElement(IDS2.bar)?.remove();
-        closeDialog();
-        return;
-      }
-      ensureStyle6();
-      let bar = document.getElementById(IDS2.bar);
-      if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
-      if (!bar) {
-        const anchor = findListAnchor(document);
-        if (!anchor?.parentElement) return;
-        bar = buildBar();
-        anchor.parentElement.insertBefore(bar, anchor);
-      }
-      fillSelect(bar.querySelector(`#${IDS2.select}`));
-    }
-    let scheduled = false;
-    const scheduleRender = () => {
-      if (scheduled) return;
-      scheduled = true;
-      runtime.setTimeout(() => {
-        scheduled = false;
-        render();
-      }, 150);
-    };
-    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", scheduleRender);
-    scheduleRender();
-  }
-
   // ../../shared/js/match-status-filter/core.js
   function optionsFromLabels(labels) {
     return Object.entries(labels || {}).map(([value, label]) => ({ value, label }));
@@ -7227,8 +8518,8 @@
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean5 = [...new Set(statuses)].filter(Boolean);
-    if (clean5.length) next[field] = clean5;
+    const clean6 = [...new Set(statuses)].filter(Boolean);
+    if (clean6.length) next[field] = clean6;
     else delete next[field];
     return next;
   }
@@ -7258,7 +8549,7 @@
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage8 = () => route.test(location.hash);
-    function ensureStyle6() {
+    function ensureStyle7() {
       if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID9;
@@ -7319,7 +8610,7 @@
         bar?.remove();
         return;
       }
-      ensureStyle6();
+      ensureStyle7();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -8781,7 +10072,7 @@
     const isQuestionnaireDialog2 = (dialog) => {
       const text = dialog?.innerText || dialog?.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
-      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
+      const labels = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element6) => (element6.innerText || "").trim()));
       return labels.has("Kandidat") && labels.has("Job") && QUESTIONNAIRE_LABELS3.filter((label) => labels.has(label)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog2(dialog)) || null;
@@ -8940,7 +10231,7 @@
   }
 
   // src/features/kam-suite/candidate-file-popup.js
-  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
@@ -8953,12 +10244,12 @@
     let pendingCandidateId = "";
     let pendingCandidateAt = 0;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR2));
     }
-    function visibleOverlay(element5) {
-      if (!element5) return false;
-      const style = getComputedStyle(element5);
-      const rect = element5.getBoundingClientRect();
+    function visibleOverlay(element6) {
+      if (!element6) return false;
+      const style = getComputedStyle(element6);
+      const rect = element6.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function candidateFilesDialog() {
@@ -8995,7 +10286,7 @@
       else dialog.prepend(button3);
     }
     function installCandidateFileHooks() {
-      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element5) => element5.remove());
+      document.querySelectorAll(`${CANDIDATE_ACTIONS_CELL_SELECTOR} .werkia-kam-candidate-open`).forEach((element6) => element6.remove());
       getRows().forEach((row2) => {
         const actionsCell = row2.querySelector(CANDIDATE_ACTIONS_CELL_SELECTOR);
         if (!actionsCell) return;
@@ -9486,7 +10777,7 @@
 
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
-  var ROW_SELECTOR7 = "tr.RaDataTable-row";
+  var ROW_SELECTOR8 = "tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row2) {
@@ -9517,7 +10808,7 @@
       if (!isTargetPage()) return;
       const link = event.target.closest(CHAT_LINK_SELECTOR);
       if (!link) return;
-      const row2 = link.closest(ROW_SELECTOR7);
+      const row2 = link.closest(ROW_SELECTOR8);
       const matchId = getMatchIdFromChatRow(row2);
       if (!matchId) return;
       event.preventDefault();
@@ -9652,7 +10943,7 @@
   // src/features/kam-suite/appointment-copy-paste.js
   var TERM_KEY = "werkia_termine_copy_v4";
   var TERM_BAR_ID = "werkia-termine-buttons";
-  var APPOINTMENT_INPUT_SELECTOR = ".RaArrayInput-root input.MuiPickersInputBase-input";
+  var APPOINTMENT_INPUT_SELECTOR2 = ".RaArrayInput-root input.MuiPickersInputBase-input";
   var APPOINTMENT_PICKER_SELECTOR = ".MuiPickersInputBase-root";
   var TERM_SELECT_FIELDS = {
     status: { names: ["status", "appointmentStatus"], label: "Status", fallbackIndex: 0 },
@@ -9660,10 +10951,10 @@
     location: { names: ["location", "locationId", "appointmentLocation"], label: "Standort", fallbackIndex: 2 }
   };
   function getAppointments(root = document) {
-    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR)].map((el7) => el7.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
+    return [...root.querySelectorAll(APPOINTMENT_INPUT_SELECTOR2)].map((el7) => el7.value?.trim()).filter((v) => /^\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}$/.test(v));
   }
   function hasAppointmentFields(dialog) {
-    return Boolean(dialog?.querySelector?.(APPOINTMENT_INPUT_SELECTOR));
+    return Boolean(dialog?.querySelector?.(APPOINTMENT_INPUT_SELECTOR2));
   }
   function appointmentCountChange(currentCount, targetCount) {
     const current = Math.max(0, Number(currentCount) || 0);
@@ -9694,17 +10985,17 @@
   }
   function executeAppointmentCopyPaste(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/appointment-copy-paste.js");
-    function isVisible3(element5) {
-      if (!element5) return false;
-      const rect = element5.getBoundingClientRect();
-      const style = window.getComputedStyle(element5);
+    function isVisible3(element6) {
+      if (!element6) return false;
+      const rect = element6.getBoundingClientRect();
+      const style = window.getComputedStyle(element6);
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function appointmentDialog() {
       return [...document.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => isVisible3(dialog) && hasAppointmentFields(dialog)).at(-1) || null;
     }
     function appointmentArrayRoot(dialog) {
-      return [...dialog.querySelectorAll(".RaArrayInput-root")].find((root) => root.querySelector(APPOINTMENT_INPUT_SELECTOR)) || null;
+      return [...dialog.querySelectorAll(".RaArrayInput-root")].find((root) => root.querySelector(APPOINTMENT_INPUT_SELECTOR2)) || null;
     }
     function appointmentPickerRoots(dialog) {
       return [...appointmentArrayRoot(dialog)?.querySelectorAll(APPOINTMENT_PICKER_SELECTOR) || []];
@@ -9777,7 +11068,7 @@
         if (select) return select;
       }
       const selects = [...dialog.querySelectorAll(".MuiSelect-select")];
-      const fieldLabel = [...dialog.querySelectorAll("label")].find((element5) => element5.textContent?.trim().replace(/\*/g, "").trim() === label);
+      const fieldLabel = [...dialog.querySelectorAll("label")].find((element6) => element6.textContent?.trim().replace(/\*/g, "").trim() === label);
       if (fieldLabel) {
         const labelledSelect = selects.find((select) => select.getAttribute("aria-labelledby")?.split(/\s+/).includes(fieldLabel.id));
         if (labelledSelect) return labelledSelect;
@@ -10014,6 +11305,16 @@
     });
   }
 
+  // src/features/vta-notizen.js
+  function executeVtaNotizen2(runtime) {
+    executeVtaNotizen(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      toolboxName: "KAM-Toolbox",
+      helpTip: () => kamHelp.tip("vta-notizen"),
+      sourcePath: "kam/toolbox/src/features/vta-notizen.js"
+    });
+  }
+
   // ../../shared/js/werkia-graphql/job-position-urgency-provider.js
   var URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
   var JOB_POSITION_URGENCY_QUERY = `query allJobPositions($filter: JobPositionFilter) {
@@ -10040,7 +11341,7 @@
 
   // src/features/kam-suite/match-slack-actions.js
   var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
@@ -10057,7 +11358,7 @@
   function jobPositionIdFromHref(href) {
     return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
   }
-  function matchIdFromHref3(href) {
+  function matchIdFromHref4(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function formatAt(iso) {
@@ -10138,18 +11439,18 @@
       saveStore(store);
     }
     function rows() {
-      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR9)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR2));
     }
     function rowIds(row2) {
       return {
         jobPositionId: jobPositionIdFromHref(row2.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref3(row2.querySelector(MATCH_LINK_SELECTOR6)?.href)
+        matchId: matchIdFromHref4(row2.querySelector(MATCH_LINK_SELECTOR6)?.href)
       };
     }
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle6() {
+    function ensureStyle7() {
       if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
       style.id = STYLE_ID10;
@@ -10312,14 +11613,14 @@
       }, PENDING_POLL_MS);
     }
     function removeBars() {
-      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element5) => element5.remove());
+      document.querySelectorAll(`.${BAR_CLASS2}, .${FALLBACK_BLOCK_CLASS}`).forEach((element6) => element6.remove());
     }
     function sync() {
       if (!isTargetPage7()) {
         removeBars();
         return;
       }
-      ensureStyle6();
+      ensureStyle7();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -10346,22 +11647,40 @@
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS = 2e4;
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS3 = 2e4;
   var MAX_COMMENT = 1500;
-  var OFFLINE_MESSAGE = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE3 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
   var DIRECTIONS = {
     AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
     AN_KAM: { id: "AN_KAM", label: "An KAM", role: "KAM", title: "Match an die KAM-Person des Arbeitgebers schicken (Slack-DM)" }
   };
-  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref4(href) {
-    const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE.test(id) ? id : "";
+  var OWN_TEAM_SENDERS = {
+    AN_KAM: [
+      { slackId: "U0ASG5XV1LM", name: "Niklas (KAM-Lead)" }
+    ],
+    AN_CEM: [
+      { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
+    ]
+  };
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaSlackDmMe {
+  me: currentEmployee { id slackId __typename }
+}`;
+  var TEAMS = ["KAM", "CEM"];
+  function canSendToOwnTeam(direction, me, senders = OWN_TEAM_SENDERS) {
+    const slackId = String(me?.slackId || "").trim();
+    if (!slackId) return false;
+    return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  function buildPayload({ action, direction, matchId, comment = "", auth, testChannel = "" }) {
+  var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref5(href) {
+    const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+    return UUID_RE2.test(id) ? id : "";
+  }
+  function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
+    if (team && !TEAMS.includes(team)) throw new Error(`Unbekanntes Team: ${team}`);
     const bearer = String(auth?.bearer || "").trim();
     if (!bearer) throw new Error(NO_AUTH_MESSAGE);
     const payload = {
@@ -10372,10 +11691,11 @@
       bearer,
       fingerprint: String(auth?.fingerprint || "").trim()
     };
+    if (team) payload.team = team;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse(status, text) {
+  function parseResponse3(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -10387,11 +11707,11 @@
     if (status === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createSlackDmClient({ request, getAuth, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
-        payload = buildPayload({ action, direction, matchId, comment, auth: getAuth(), testChannel });
+        payload = buildPayload({ action, direction, matchId, comment, auth: getAuth(), team, testChannel });
       } catch (error) {
         reject(error);
         return;
@@ -10404,13 +11724,13 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse(response.status, response.responseText));
+            resolve(parseResponse3(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
       });
     });
   }
@@ -10433,103 +11753,114 @@
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS = "werkia-slack-dm-button";
-  var IDS3 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
+  var IDS5 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT6 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT7 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS = `
-  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT6}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT7}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS3.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT6}; color:#09090b; -webkit-font-smoothing:antialiased; }
-  #${IDS3.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS3.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
-  #${IDS3.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS3.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT6}; }
-  #${IDS3.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
-  #${IDS3.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
-  #${IDS3.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
-  #${IDS3.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
-  #${IDS3.dialog} dd a { color:#b85400; text-decoration:none; }
-  #${IDS3.dialog} dd a:hover { text-decoration:underline; }
-  #${IDS3.dialog} .sd-muted { color:#8b8b94; }
-  #${IDS3.dialog} .sd-warn { color:#8a6700; }
-  #${IDS3.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS3.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT6}; resize:vertical; }
-  #${IDS3.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
-  #${IDS3.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
-  #${IDS3.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
-  #${IDS3.dialog} .sd-status.sd-error { color:#b52f2f; }
-  #${IDS3.dialog} .sd-status.sd-ok { color:#0a7c0a; }
-  #${IDS3.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS3.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT6}; }
-  #${IDS3.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
-  #${IDS3.dialog} .sd-secondary:hover { background:#f4f4f5; }
-  #${IDS3.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
-  #${IDS3.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
-  #${IDS3.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
+  #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT7}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS5.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS5.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
+  #${IDS5.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  #${IDS5.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT7}; }
+  #${IDS5.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
+  #${IDS5.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
+  #${IDS5.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
+  #${IDS5.dialog} dd { margin:0; color:#09090b; line-height:20px; overflow-wrap:anywhere; }
+  #${IDS5.dialog} dd a { color:#b85400; text-decoration:none; }
+  #${IDS5.dialog} dd a:hover { text-decoration:underline; }
+  #${IDS5.dialog} .sd-muted { color:#8b8b94; }
+  #${IDS5.dialog} .sd-warn { color:#8a6700; }
+  #${IDS5.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
+  #${IDS5.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT7}; resize:vertical; }
+  #${IDS5.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
+  #${IDS5.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+  #${IDS5.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
+  #${IDS5.dialog} .sd-status.sd-error { color:#b52f2f; }
+  #${IDS5.dialog} .sd-status.sd-ok { color:#0a7c0a; }
+  #${IDS5.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  #${IDS5.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT7}; }
+  #${IDS5.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
+  #${IDS5.dialog} .sd-secondary:hover { background:#f4f4f5; }
+  #${IDS5.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
+  #${IDS5.dialog} .sd-primary:hover:not(:disabled) { background:#b85400; border-color:#b85400; }
+  #${IDS5.dialog} .sd-foot button:disabled { cursor:default; opacity:.55; }
 `;
   function executeSlackDm(runtime, {
     routes = [],
     direction,
+    team = "",
+    ownTeamDirection = "",
+    graphqlRequest = null,
     getAuth,
     sourcePath,
     helpTip,
     request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
   } = {}) {
     runtime.registerSource(sourcePath);
-    const config = DIRECTIONS[direction];
-    if (!config) throw new Error(`Slack-DM: unbekannte Richtung ${direction}`);
+    if (!DIRECTIONS[direction]) throw new Error(`Slack-DM: unbekannte Richtung ${direction}`);
+    if (ownTeamDirection && !DIRECTIONS[ownTeamDirection]) throw new Error(`Slack-DM: unbekannte Richtung ${ownTeamDirection}`);
+    const directions = [direction];
     const send = createSlackDmClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
       }),
-      getAuth: () => getAuth ? getAuth() : {}
+      getAuth: () => getAuth ? getAuth() : {},
+      team
     });
     let syncTimer = null;
     let closeTimer = null;
+    let stopped = false;
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle6() {
-      if (document.getElementById(IDS3.style)) return;
+    function ensureStyle7() {
+      if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
-      style.id = IDS3.style;
+      style.id = IDS5.style;
       style.textContent = CSS;
       document.head.appendChild(style);
     }
     function el7(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+      const element6 = document.createElement(tag);
       for (const [key, value] of Object.entries(props)) {
-        if (key === "className") element5.className = value;
-        else if (key === "text") element5.textContent = value;
-        else if (key.startsWith("on")) element5.addEventListener(key.slice(2), value);
-        else element5.setAttribute(key, value);
+        if (key === "className") element6.className = value;
+        else if (key === "text") element6.textContent = value;
+        else if (key.startsWith("on")) element6.addEventListener(key.slice(2), value);
+        else element6.setAttribute(key, value);
       }
-      for (const child of [].concat(children)) if (child) element5.append(child);
-      return element5;
+      for (const child of [].concat(children)) if (child) element6.append(child);
+      return element6;
     }
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
       const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR7)).find(Boolean);
-      const matchId = matchIdFromHref4(link?.getAttribute("href"));
+      const matchId = matchIdFromHref5(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
-    function addButton(row2) {
+    function addButtons(row2) {
       const target = matchCellOf(row2);
       if (!target?.cell) return;
-      const existing = target.cell.querySelector(`.${BUTTON_CLASS}`);
-      if (existing?.dataset.matchId === target.matchId) return;
-      existing?.remove();
-      const button3 = el7("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
-      button3.dataset.matchId = target.matchId;
-      button3.dataset.werkiaSlackDmOwner = sourcePath;
-      button3.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openDialog(target.matchId);
-      });
-      target.cell.appendChild(button3);
+      const existing = [...target.cell.querySelectorAll(`.${BUTTON_CLASS}`)];
+      const current = existing.map((button3) => `${button3.dataset.matchId}:${button3.dataset.direction}`).join(",");
+      if (current === directions.map((id) => `${target.matchId}:${id}`).join(",")) return;
+      existing.forEach((button3) => button3.remove());
+      for (const id of directions) {
+        const config = DIRECTIONS[id];
+        const button3 = el7("button", { type: "button", className: BUTTON_CLASS, title: config.title, text: config.label });
+        button3.dataset.matchId = target.matchId;
+        button3.dataset.direction = id;
+        button3.dataset.werkiaSlackDmOwner = sourcePath;
+        button3.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openDialog(target.matchId, id);
+        });
+        target.cell.appendChild(button3);
+      }
     }
     function removeButtons() {
       document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button3) => {
@@ -10541,7 +11872,7 @@
         runtime.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      document.getElementById(IDS3.dialog)?.remove();
+      document.getElementById(IDS5.dialog)?.remove();
       document.removeEventListener("keydown", onKeydown, true);
     }
     function onKeydown(event) {
@@ -10573,10 +11904,11 @@
       row2("An", list);
       return reachable.length > 0;
     }
-    async function openDialog(matchId) {
+    async function openDialog(matchId, dialogDirection = direction) {
+      const config = DIRECTIONS[dialogDirection];
       closeDialog();
-      ensureStyle6();
-      const comment = el7("textarea", { id: `${IDS3.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
+      ensureStyle7();
+      const comment = el7("textarea", { id: `${IDS5.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el7("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
         count.textContent = `${comment.value.length} / ${MAX_COMMENT}`;
@@ -10588,7 +11920,7 @@
         el7("button", { type: "button", className: "sd-close", "aria-label": "Schließen", text: "×", onclick: closeDialog }),
         el7("div", { className: "sd-head" }, [el7("h2", { text: `${config.label} schicken` }), tip]),
         el7("dl", {}, [el7("dt", { text: "Match" }), el7("dd", { className: "sd-muted", text: "Wird geladen …" })]),
-        el7("label", { for: `${IDS3.dialog}-comment`, text: "Kommentar" }),
+        el7("label", { for: `${IDS5.dialog}-comment`, text: "Kommentar" }),
         comment,
         count,
         el7("div", { className: "sd-status" }),
@@ -10597,7 +11929,7 @@
           sendButton
         ])
       ]);
-      const dialog = el7("div", { id: IDS3.dialog }, card);
+      const dialog = el7("div", { id: IDS5.dialog }, card);
       dialog.addEventListener("click", (event) => {
         if (event.target === dialog) closeDialog();
       });
@@ -10608,7 +11940,7 @@
         sendButton.disabled = true;
         setStatus(dialog, "Wird gesendet …");
         try {
-          const response = await send({ action: "senden", direction, matchId, comment: comment.value });
+          const response = await send({ action: "senden", direction: dialogDirection, matchId, comment: comment.value });
           if (!dialog.isConnected) return;
           setStatus(dialog, sentMessage(response), "ok");
           closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
@@ -10619,7 +11951,7 @@
         }
       });
       try {
-        const preview = await send({ action: "vorschau", direction, matchId });
+        const preview = await send({ action: "vorschau", direction: dialogDirection, matchId });
         if (!dialog.isConnected) return;
         sendButton.disabled = !renderPreview(dialog, preview);
         if (sendButton.disabled) setStatus(dialog, "Niemand der Empfänger ist in Slack erreichbar.", "error");
@@ -10634,8 +11966,18 @@
         removeButtons();
         return;
       }
-      ensureStyle6();
-      document.querySelectorAll(ROW_SELECTOR9).forEach(addButton);
+      ensureStyle7();
+      document.querySelectorAll(ROW_SELECTOR10).forEach(addButtons);
+    }
+    async function unlockOwnTeam() {
+      if (!ownTeamDirection || !graphqlRequest) return;
+      try {
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY3, {});
+        if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
+        if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
+        scheduleSync();
+      } catch {
+      }
     }
     function scheduleSync() {
       if (syncTimer !== null) return;
@@ -10650,12 +11992,14 @@
       scheduleSync();
     });
     runtime.addCleanup?.(() => {
+      stopped = true;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       closeDialog();
       removeButtons();
-      document.getElementById(IDS3.style)?.remove();
+      document.getElementById(IDS5.style)?.remove();
     });
     scheduleSync();
+    unlockOwnTeam();
   }
 
   // src/features/kam-suite/slack-dm.js
@@ -10664,6 +12008,11 @@
       routes: [ROUTES.kamMyMatches],
       direction: "AN_CEM",
       getAuth: getKamGraphqlAuth,
+      team: "KAM",
+      // Knopf "An KAM" fuers eigene Team, nur fuer Personen aus
+      // OWN_TEAM_SENDERS (shared/js/slack-dm/core.js).
+      ownTeamDirection: "AN_KAM",
+      graphqlRequest: (query, variables) => getKamGraphqlAdapter().request(query, variables),
       helpTip: () => kamHelp.tip("slack-dm"),
       sourcePath: "kam/toolbox/src/features/kam-suite/slack-dm.js",
       ...options
@@ -11070,8 +12419,8 @@
     'div[aria-label="Message body"]',
     'div[role="document"]'
   ];
-  function isVisible(element5) {
-    return element5.getClientRects().length > 0;
+  function isVisible(element6) {
+    return element6.getClientRects().length > 0;
   }
   var OUTSIDE_READING_PANE_SELECTOR = '[role="listbox"], [role="grid"], [role="tree"], [role="navigation"]';
   function readingPaneRoot() {
@@ -11081,7 +12430,7 @@
     while (node.parentElement && node.parentElement !== document.body && node.parentElement !== document.documentElement) {
       if (node.matches?.('[role="main"]')) break;
       const parent = node.parentElement;
-      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element5) => !node.contains(element5))) break;
+      if ([...parent.querySelectorAll(OUTSIDE_READING_PANE_SELECTOR)].some((element6) => !node.contains(element6))) break;
       node = parent;
     }
     return node;
@@ -11093,7 +12442,7 @@
     return readingPaneRoot()?.innerText || text;
   }
   function readSubjectsFromReadingPane() {
-    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element5) => (element5.getAttribute("title") || element5.textContent || "").trim()).filter(Boolean);
+    const subjects = [...document.querySelectorAll('[id$="_SUBJECT"]')].filter(isVisible).map((element6) => (element6.getAttribute("title") || element6.textContent || "").trim()).filter(Boolean);
     return [...new Set(subjects)];
   }
   function readOutMailCommentDraft() {
@@ -11107,7 +12456,7 @@
   function readMailContext() {
     return { subjects: readSubjectsFromReadingPane(), bodyText: readMailBodyText() };
   }
-  var IDS4 = {
+  var IDS6 = {
     launcher: "werkia-outen-launcher",
     popover: "werkia-outen-popover",
     dialog: "werkia-outen-dialog",
@@ -11161,11 +12510,11 @@
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS6 = 35e3;
+    const REQUEST_TIMEOUT_MS7 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS6);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS7);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -11423,10 +12772,10 @@
       });
     }
     function ensureLauncher() {
-      let launcher = document.getElementById(IDS4.launcher);
+      let launcher = document.getElementById(IDS6.launcher);
       if (!launcher) {
         launcher = document.createElement("button");
-        launcher.id = IDS4.launcher;
+        launcher.id = IDS6.launcher;
         launcher.type = "button";
         launcher.textContent = "KAM";
         launcher.title = "KAM-Toolbox: Bewerbungsmail erkannt";
@@ -11454,22 +12803,22 @@
       return launcher;
     }
     function closePopover2() {
-      document.getElementById(IDS4.popover)?.remove();
-      document.getElementById(IDS4.launcher)?.setAttribute("aria-expanded", "false");
+      document.getElementById(IDS6.popover)?.remove();
+      document.getElementById(IDS6.launcher)?.setAttribute("aria-expanded", "false");
     }
     function removeLauncher() {
       closePopover2();
-      document.getElementById(IDS4.launcher)?.remove();
+      document.getElementById(IDS6.launcher)?.remove();
     }
     function togglePopover() {
-      if (document.getElementById(IDS4.popover)) closePopover2();
+      if (document.getElementById(IDS6.popover)) closePopover2();
       else renderPopover();
     }
     function renderPopover() {
-      let popover = document.getElementById(IDS4.popover);
+      let popover = document.getElementById(IDS6.popover);
       if (!popover) {
         popover = document.createElement("div");
-        popover.id = IDS4.popover;
+        popover.id = IDS6.popover;
         popover.setAttribute("role", "dialog");
         popover.setAttribute("aria-label", "KAM-Toolbox");
         styled2(popover, {
@@ -11487,7 +12836,7 @@
         });
         document.body.appendChild(popover);
       }
-      document.getElementById(IDS4.launcher)?.setAttribute("aria-expanded", "true");
+      document.getElementById(IDS6.launcher)?.setAttribute("aria-expanded", "true");
       const summary = applicationSummary(readMailContext());
       popover.dataset.summary = JSON.stringify(summary);
       const line = (label, value) => {
@@ -11881,7 +13230,7 @@
       }
     }
     function oversizedAttachments() {
-      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element5) => element5.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
+      return [...document.querySelectorAll('[id$="_ATTACHMENTS"]')].map((element6) => element6.innerText || "").filter((text) => (parseAttachmentSize(text) || 0) > CBRE_MAX_ATTACHMENT_BYTES);
     }
     async function renderCbreStep(dialog, state, match) {
       if (isDialogClosed(dialog)) return;
@@ -11906,21 +13255,21 @@
         return label;
       };
       const input = (value) => {
-        const element5 = document.createElement("input");
-        element5.type = "text";
-        element5.value = value || "";
-        return styled2(element5, fieldStyle);
+        const element6 = document.createElement("input");
+        element6.type = "text";
+        element6.value = value || "";
+        return styled2(element6, fieldStyle);
       };
       const select = (options, value) => {
-        const element5 = document.createElement("select");
+        const element6 = document.createElement("select");
         options.forEach(([optionValue, text]) => {
           const option = document.createElement("option");
           option.value = optionValue;
           option.textContent = text;
-          element5.appendChild(option);
+          element6.appendChild(option);
         });
-        element5.value = value;
-        return styled2(element5, fieldStyle);
+        element6.value = value;
+        return styled2(element6, fieldStyle);
       };
       const fields = {
         firstName: input(candidate.firstName || match.candidate?.firstName),
@@ -11950,7 +13299,7 @@
       );
       const preview = document.createElement("pre");
       styled2(preview, { margin: "0", padding: "8px 10px", background: "#f6f6f6", border: "1px solid #ddd", borderRadius: "5px", whiteSpace: "pre-wrap", font: "12px/1.45 Consolas,monospace" });
-      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element5]) => [key, element5.value]));
+      const values = () => Object.fromEntries(Object.entries(fields).map(([key, element6]) => [key, element6.value]));
       const updatePreview = () => {
         const current = values();
         preview.textContent = `An: ${CBRE_RECIPIENT}
@@ -11958,9 +13307,9 @@ Betreff: ${cbreSubject(current.positionId)}
 
 ${buildCbreBody(current)}`;
       };
-      Object.values(fields).forEach((element5) => {
-        element5.addEventListener("input", updatePreview);
-        element5.addEventListener("change", updatePreview);
+      Object.values(fields).forEach((element6) => {
+        element6.addEventListener("input", updatePreview);
+        element6.addEventListener("change", updatePreview);
       });
       updatePreview();
       const notes = [hasRefrigerationCertificate(candidate.certificates) ? "Laut Adminpanel hat der Kandidat einen Kälteschein. Ob groß oder klein, steht dort nicht – bitte auswählen." : "Laut Adminpanel ist kein Kälteschein hinterlegt. Für die Stelle ist der große Pflicht, der kleine geht unter Umständen."];
@@ -12014,9 +13363,9 @@ ${buildCbreBody(current)}`;
     async function openBccField() {
       const existing = visibleElement(COMPOSE_SELECTORS.bcc);
       if (existing) return existing;
-      const button3 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element5) => {
-        const label = `${element5.getAttribute("aria-label") || ""} ${element5.getAttribute("title") || ""}`;
-        return (element5.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
+      const button3 = [...document.querySelectorAll('button, [role="button"]')].filter(isVisible).find((element6) => {
+        const label = `${element6.getAttribute("aria-label") || ""} ${element6.getAttribute("title") || ""}`;
+        return (element6.textContent || "").trim() === "Bcc" || /\bBcc\b/.test(label);
       });
       if (!button3) return null;
       button3.click();
@@ -12028,8 +13377,8 @@ ${buildCbreBody(current)}`;
     async function waitForElement(selector, timeoutMs = 8e3) {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        const element5 = visibleElement(selector);
-        if (element5) return element5;
+        const element6 = visibleElement(selector);
+        if (element6) return element6;
         await sleep2(150);
       }
       return null;
@@ -12041,10 +13390,10 @@ ${buildCbreBody(current)}`;
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    function placeCaretAtEnd(element5) {
-      element5.focus();
+    function placeCaretAtEnd(element6) {
+      element6.focus();
       const range = document.createRange();
-      range.selectNodeContents(element5);
+      range.selectNodeContents(element6);
       range.collapse(false);
       const selection = window.getSelection();
       selection.removeAllRanges();
@@ -12066,16 +13415,16 @@ ${buildCbreBody(current)}`;
     function editorText2(editor) {
       return (editor.innerText || "").replace(/ /g, " ").replace(/\n{2,}/g, "\n").trim();
     }
-    function editableIn(element5) {
-      if (!element5) return null;
-      if (element5.isContentEditable) return element5;
-      return element5.querySelector('[contenteditable="true"]') || element5;
+    function editableIn(element6) {
+      if (!element6) return null;
+      if (element6.isContentEditable) return element6;
+      return element6.querySelector('[contenteditable="true"]') || element6;
     }
     function recipientPresent(toField, address) {
       let node = toField;
       for (let depth = 0; node && depth < 4; depth += 1, node = node.parentElement) {
         if (recipientLabelMatches(node.innerText, address)) return true;
-        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element5) => recipientLabelMatches(`${element5.getAttribute("title") || ""} ${element5.getAttribute("aria-label") || ""}`, address));
+        const labelled = [...node.querySelectorAll("[title], [aria-label]")].some((element6) => recipientLabelMatches(`${element6.getAttribute("title") || ""} ${element6.getAttribute("aria-label") || ""}`, address));
         if (labelled) return true;
       }
       return false;
@@ -12086,13 +13435,13 @@ ${buildCbreBody(current)}`;
       target.dispatchEvent(new KeyboardEvent("keypress", init));
       target.dispatchEvent(new KeyboardEvent("keyup", init));
     }
-    async function waitForStableText(element5, { quietMs = 700, timeoutMs = 5e3 } = {}) {
+    async function waitForStableText(element6, { quietMs = 700, timeoutMs = 5e3 } = {}) {
       const deadline = Date.now() + timeoutMs;
-      let last = element5.innerText;
+      let last = element6.innerText;
       let stableSince = Date.now();
       while (Date.now() < deadline) {
         await sleep2(150);
-        const current = element5.innerText;
+        const current = element6.innerText;
         if (current !== last) {
           last = current;
           stableSince = Date.now();
@@ -12166,9 +13515,9 @@ ${buildCbreBody(current)}`;
       }
     }
     function showCbreToast({ text, tone }) {
-      document.getElementById(IDS4.toast)?.remove();
+      document.getElementById(IDS6.toast)?.remove();
       const toast = document.createElement("div");
-      toast.id = IDS4.toast;
+      toast.id = IDS6.toast;
       toast.setAttribute("role", "status");
       toast.title = "Klicken zum Schließen";
       toast.textContent = text;
@@ -12264,9 +13613,9 @@ ${buildCbreBody(current)}`;
       }).catch((error) => renderCaughtError(dialog, error));
     }
     function openWizard(context, { mode = "outen" } = {}) {
-      document.getElementById(IDS4.dialog)?.remove();
+      document.getElementById(IDS6.dialog)?.remove();
       const dialog = document.createElement("dialog");
-      dialog.id = IDS4.dialog;
+      dialog.id = IDS6.dialog;
       styleDialogFrame(dialog);
       document.body.appendChild(dialog);
       const resolved = resolveApplicationSubject(context);
@@ -12288,7 +13637,7 @@ ${buildCbreBody(current)}`;
     let settleUntil = 0;
     let lastMatched = false;
     function mailKey() {
-      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element5) => element5.id).join("|");
+      const ids = [...document.querySelectorAll('[id$="_SUBJECT"]')].map((element6) => element6.id).join("|");
       return `${location.href}#${ids}`;
     }
     function evaluateMail() {
@@ -12315,22 +13664,22 @@ ${buildCbreBody(current)}`;
           return;
         }
         ensureLauncher();
-        const popover = document.getElementById(IDS4.popover);
+        const popover = document.getElementById(IDS6.popover);
         if (popover && popover.dataset.summary !== JSON.stringify(applicationSummary(readMailContext()))) renderPopover();
       }, 400);
     }
     runtime.createMutationObserver(scheduleCheck).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addCleanup(() => {
       removeLauncher();
-      document.getElementById(IDS4.dialog)?.remove();
+      document.getElementById(IDS6.dialog)?.remove();
     });
     scheduleCheck();
   }
 
   // src/features/outlook-assistent/core.js
-  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
-  var REQUEST_TIMEOUT_MS2 = 2e4;
-  var OFFLINE_MESSAGE2 = "Der Toolbox-Server ist gerade nicht erreichbar.";
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var REQUEST_TIMEOUT_MS4 = 2e4;
+  var OFFLINE_MESSAGE4 = "Der Toolbox-Server ist gerade nicht erreichbar.";
   var PRESELECT_FROM = 0.8;
   var MAILART_LABELS = {
     absage: "Absage",
@@ -12381,7 +13730,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Mail-Assistent: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
     const post = (payload) => new Promise((resolve, reject) => {
       const auth = getAuth() || {};
       if (!auth.bearer) {
@@ -12401,8 +13750,8 @@ ${buildCbreBody(current)}`;
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE2)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE2))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
       });
     });
     return {
@@ -12568,70 +13917,70 @@ ${buildCbreBody(current)}`;
   // src/features/outlook-assistent/index.js
   var SOURCE = "kam/toolbox/src/features/outlook-assistent/index.js";
   var HOSTS = ["outlook.office.com", "outlook.cloud.microsoft"];
-  var IDS5 = { pill: "werkia-mail-assistent-pill", panel: "werkia-mail-assistent-panel", style: "werkia-mail-assistent-style" };
+  var IDS7 = { pill: "werkia-mail-assistent-pill", panel: "werkia-mail-assistent-panel", style: "werkia-mail-assistent-style" };
   var MAIL_BODY_SELECTORS2 = ['div[aria-label="Nachrichtentext"]', 'div[aria-label="Message body"]', 'div[role="document"]'];
   var STATUS_CHOICES = ["interview_request", "interview_conducted", "interview_feedback", "hot_case", "hot_hot_case", "out"];
   var adminBase = (umgebung) => umgebung === "staging" ? "https://staging-admin.werkia.de/#" : "https://admin.werkia.de/#";
   var CSS2 = `
-#${IDS5.panel}{--ink:#09090b;--ink2:#52525b;--muted:#8b8b94;--line:#e4e4e7;--line2:#d4d4d8;--sunken:#f4f4f5;--accent:#ef6c00;--navy:#284e75;--good:#0a7c0a;--goodSoft:#ecf7ec;--warn:#8a6700;--warnSoft:#fdf6e0;--bad:#b52f2f;--badSoft:#fbecec;
+#${IDS7.panel}{--ink:#09090b;--ink2:#52525b;--muted:#8b8b94;--line:#e4e4e7;--line2:#d4d4d8;--sunken:#f4f4f5;--accent:#ef6c00;--navy:#284e75;--good:#0a7c0a;--goodSoft:#ecf7ec;--warn:#8a6700;--warnSoft:#fdf6e0;--bad:#b52f2f;--badSoft:#fbecec;
   position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100vw;z-index:2147483001;display:flex;flex-direction:column;background:#fff;color:var(--ink);
   border-left:1px solid var(--line);box-shadow:-12px 0 32px -18px rgba(9,9,11,.35);font:14px/1.45 "Segoe UI",Inter,system-ui,Arial,sans-serif;box-sizing:border-box}
-#${IDS5.panel} *{box-sizing:border-box;font-family:inherit}
-#${IDS5.panel} .wma-hd{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
-#${IDS5.panel} .wma-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-#${IDS5.panel} .wma-brand i{width:8px;height:8px;border-radius:2px;background:var(--accent)}
-#${IDS5.panel} .wma-sp{flex:1}
-#${IDS5.panel} .wma-env{font-size:10.5px;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--warnSoft);color:var(--warn);text-transform:none}
-#${IDS5.panel} .wma-x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 2px}
-#${IDS5.panel} .wma-chip{display:inline-block;margin-top:10px;font-weight:600;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--sunken);color:var(--ink2)}
-#${IDS5.panel} .wma-chip.absage{background:var(--badSoft);color:var(--bad)}
-#${IDS5.panel} .wma-chip.interesse,#${IDS5.panel} .wma-chip.termin_zusage,#${IDS5.panel} .wma-chip.vertrag{background:var(--goodSoft);color:var(--good)}
-#${IDS5.panel} .wma-sum{margin-top:8px;font-weight:600;font-size:15px;line-height:1.35}
-#${IDS5.panel} .wma-sub{margin-top:6px;color:var(--ink2);font-size:12.5px}
-#${IDS5.panel} a{color:var(--navy);font-weight:600;text-decoration:none}
-#${IDS5.panel} a:hover{text-decoration:underline}
-#${IDS5.panel} .wma-bd{flex:1;overflow:auto;padding:12px 16px;display:grid;gap:10px;align-content:start}
-#${IDS5.panel} .wma-lbl{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 -2px}
-#${IDS5.panel} .wma-who{font-weight:600;font-size:13px;margin-top:4px}
-#${IDS5.panel} .wma-who span{font-weight:400;color:var(--ink2)}
-#${IDS5.panel} .wma-act{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px;background:#fff}
-#${IDS5.panel} .wma-act.off{background:var(--sunken)}
-#${IDS5.panel} .wma-act.off .wma-ttl{color:var(--muted)}
-#${IDS5.panel} .wma-row{display:flex;align-items:center;gap:10px}
-#${IDS5.panel} .wma-ttl{flex:1;font-weight:600;min-width:0}
-#${IDS5.panel} .wma-ttl small{display:block;font-weight:400;color:var(--ink2);font-size:12.5px;margin-top:1px;overflow-wrap:anywhere}
-#${IDS5.panel} .wma-sw{position:relative;width:34px;height:20px;border-radius:999px;background:var(--line2);flex:none;cursor:pointer;border:0;padding:0;transition:background .15s}
-#${IDS5.panel} .wma-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-#${IDS5.panel} .wma-sw[aria-checked="true"]{background:var(--accent)}
-#${IDS5.panel} .wma-sw[aria-checked="true"]::after{left:16px}
-#${IDS5.panel} .wma-sw:disabled{opacity:.4;cursor:default}
-#${IDS5.panel} .wma-edit{border:0;background:none;color:var(--navy);font-weight:600;font-size:12px;cursor:pointer;padding:0}
-#${IDS5.panel} .wma-line{display:flex;gap:6px;flex-wrap:wrap}
-#${IDS5.panel} select,#${IDS5.panel} textarea,#${IDS5.panel} input[type=date]{font-size:13px;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;background:#fff;color:var(--ink)}
-#${IDS5.panel} select{flex:1;min-width:0}
-#${IDS5.panel} textarea{width:100%;min-height:54px;resize:vertical}
-#${IDS5.panel} .wma-tags{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px}
-#${IDS5.panel} .wma-unsure{font-size:12px;color:var(--warn);background:var(--warnSoft);border-radius:6px;padding:6px 8px}
-#${IDS5.panel} .wma-note{font-size:12.5px;color:var(--ink2)}
-#${IDS5.panel} .wma-draft{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--sunken);font-size:13px;display:grid;gap:6px}
-#${IDS5.panel} .wma-draft p{margin:0;white-space:pre-wrap}
-#${IDS5.panel} .wma-ghost{justify-self:start;font-weight:600;font-size:12px;border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--ink)}
-#${IDS5.panel} .wma-ft{border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:8px}
-#${IDS5.panel} .wma-btns{display:flex;gap:8px}
-#${IDS5.panel} .wma-primary{flex:1;font-weight:600;font-size:14px;border:0;border-radius:7px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer}
-#${IDS5.panel} .wma-primary:disabled{background:var(--line2);cursor:default}
-#${IDS5.panel} .wma-secondary{font-weight:600;font-size:14px;border:1px solid var(--line2);border-radius:7px;padding:10px 14px;background:#fff;color:var(--ink2);cursor:pointer}
-#${IDS5.panel} .wma-hint{font-size:11.5px;color:var(--muted);text-align:center}
-#${IDS5.panel} .wma-kbd{font-size:10.5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px}
-#${IDS5.panel} .wma-done{display:grid;gap:6px}
-#${IDS5.panel} .wma-ok{color:var(--good);font-weight:700}
-#${IDS5.panel} .wma-fail{color:var(--bad);font-weight:700}
-#${IDS5.pill}{position:fixed;right:88px;bottom:27px;z-index:2147483000;height:40px;padding:0 16px;border-radius:20px;border:0;cursor:pointer;
+#${IDS7.panel} *{box-sizing:border-box;font-family:inherit}
+#${IDS7.panel} .wma-hd{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+#${IDS7.panel} .wma-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#${IDS7.panel} .wma-brand i{width:8px;height:8px;border-radius:2px;background:var(--accent)}
+#${IDS7.panel} .wma-sp{flex:1}
+#${IDS7.panel} .wma-env{font-size:10.5px;letter-spacing:.04em;padding:2px 7px;border-radius:999px;background:var(--warnSoft);color:var(--warn);text-transform:none}
+#${IDS7.panel} .wma-x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 2px}
+#${IDS7.panel} .wma-chip{display:inline-block;margin-top:10px;font-weight:600;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--sunken);color:var(--ink2)}
+#${IDS7.panel} .wma-chip.absage{background:var(--badSoft);color:var(--bad)}
+#${IDS7.panel} .wma-chip.interesse,#${IDS7.panel} .wma-chip.termin_zusage,#${IDS7.panel} .wma-chip.vertrag{background:var(--goodSoft);color:var(--good)}
+#${IDS7.panel} .wma-sum{margin-top:8px;font-weight:600;font-size:15px;line-height:1.35}
+#${IDS7.panel} .wma-sub{margin-top:6px;color:var(--ink2);font-size:12.5px}
+#${IDS7.panel} a{color:var(--navy);font-weight:600;text-decoration:none}
+#${IDS7.panel} a:hover{text-decoration:underline}
+#${IDS7.panel} .wma-bd{flex:1;overflow:auto;padding:12px 16px;display:grid;gap:10px;align-content:start}
+#${IDS7.panel} .wma-lbl{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 -2px}
+#${IDS7.panel} .wma-who{font-weight:600;font-size:13px;margin-top:4px}
+#${IDS7.panel} .wma-who span{font-weight:400;color:var(--ink2)}
+#${IDS7.panel} .wma-act{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px;background:#fff}
+#${IDS7.panel} .wma-act.off{background:var(--sunken)}
+#${IDS7.panel} .wma-act.off .wma-ttl{color:var(--muted)}
+#${IDS7.panel} .wma-row{display:flex;align-items:center;gap:10px}
+#${IDS7.panel} .wma-ttl{flex:1;font-weight:600;min-width:0}
+#${IDS7.panel} .wma-ttl small{display:block;font-weight:400;color:var(--ink2);font-size:12.5px;margin-top:1px;overflow-wrap:anywhere}
+#${IDS7.panel} .wma-sw{position:relative;width:34px;height:20px;border-radius:999px;background:var(--line2);flex:none;cursor:pointer;border:0;padding:0;transition:background .15s}
+#${IDS7.panel} .wma-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+#${IDS7.panel} .wma-sw[aria-checked="true"]{background:var(--accent)}
+#${IDS7.panel} .wma-sw[aria-checked="true"]::after{left:16px}
+#${IDS7.panel} .wma-sw:disabled{opacity:.4;cursor:default}
+#${IDS7.panel} .wma-edit{border:0;background:none;color:var(--navy);font-weight:600;font-size:12px;cursor:pointer;padding:0}
+#${IDS7.panel} .wma-line{display:flex;gap:6px;flex-wrap:wrap}
+#${IDS7.panel} select,#${IDS7.panel} textarea,#${IDS7.panel} input[type=date]{font-size:13px;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;background:#fff;color:var(--ink)}
+#${IDS7.panel} select{flex:1;min-width:0}
+#${IDS7.panel} textarea{width:100%;min-height:54px;resize:vertical}
+#${IDS7.panel} .wma-tags{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px}
+#${IDS7.panel} .wma-unsure{font-size:12px;color:var(--warn);background:var(--warnSoft);border-radius:6px;padding:6px 8px}
+#${IDS7.panel} .wma-note{font-size:12.5px;color:var(--ink2)}
+#${IDS7.panel} .wma-draft{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--sunken);font-size:13px;display:grid;gap:6px}
+#${IDS7.panel} .wma-draft p{margin:0;white-space:pre-wrap}
+#${IDS7.panel} .wma-ghost{justify-self:start;font-weight:600;font-size:12px;border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;color:var(--ink)}
+#${IDS7.panel} .wma-ft{border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:8px}
+#${IDS7.panel} .wma-btns{display:flex;gap:8px}
+#${IDS7.panel} .wma-primary{flex:1;font-weight:600;font-size:14px;border:0;border-radius:7px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer}
+#${IDS7.panel} .wma-primary:disabled{background:var(--line2);cursor:default}
+#${IDS7.panel} .wma-secondary{font-weight:600;font-size:14px;border:1px solid var(--line2);border-radius:7px;padding:10px 14px;background:#fff;color:var(--ink2);cursor:pointer}
+#${IDS7.panel} .wma-hint{font-size:11.5px;color:var(--muted);text-align:center}
+#${IDS7.panel} .wma-kbd{font-size:10.5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+#${IDS7.panel} .wma-done{display:grid;gap:6px}
+#${IDS7.panel} .wma-ok{color:var(--good);font-weight:700}
+#${IDS7.panel} .wma-fail{color:var(--bad);font-weight:700}
+#${IDS7.pill}{position:fixed;right:88px;bottom:27px;z-index:2147483000;height:40px;padding:0 16px;border-radius:20px;border:0;cursor:pointer;
   font:600 13px "Segoe UI",Inter,system-ui,Arial,sans-serif;color:#fff;background:#ef6c00;box-shadow:0 4px 16px rgba(0,0,0,.25)}
-#${IDS5.pill}.done{background:#71717a}
-#${IDS5.pill}.error{background:#a1a1aa}
+#${IDS7.pill}.done{background:#71717a}
+#${IDS7.pill}.error{background:#a1a1aa}
 `;
-  var isVisible2 = (element5) => element5.getClientRects().length > 0;
+  var isVisible2 = (element6) => element6.getClientRects().length > 0;
   function el4(tag, className = "", text = "") {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -12639,9 +13988,9 @@ ${buildCbreBody(current)}`;
     return node;
   }
   function ensureStyle3() {
-    if (document.getElementById(IDS5.style)) return;
+    if (document.getElementById(IDS7.style)) return;
     const style = el4("style");
-    style.id = IDS5.style;
+    style.id = IDS7.style;
     style.textContent = CSS2;
     document.head.appendChild(style);
   }
@@ -12670,7 +14019,7 @@ ${buildCbreBody(current)}`;
     let disabled = false;
     const closedKeys = /* @__PURE__ */ new Set();
     function removePill() {
-      document.getElementById(IDS5.pill)?.remove();
+      document.getElementById(IDS7.pill)?.remove();
     }
     function pillLabel(result) {
       if (result?.fehler && !result.vorschlag) return "Mail-Assistent: Fehler";
@@ -12684,15 +14033,15 @@ ${buildCbreBody(current)}`;
         return;
       }
       ensureStyle3();
-      let pill2 = document.getElementById(IDS5.pill);
+      let pill2 = document.getElementById(IDS7.pill);
       if (!pill2) {
         pill2 = el4("button");
-        pill2.id = IDS5.pill;
+        pill2.id = IDS7.pill;
         pill2.type = "button";
         pill2.addEventListener("click", () => {
           const result2 = current.result;
           if (result2?.fehler && !result2.vorschlag) window.alert(`Mail-Assistent: ${result2.fehler}`);
-          else if (document.getElementById(IDS5.panel)) closePanel();
+          else if (document.getElementById(IDS7.panel)) closePanel();
           else openPanel(result2);
         });
         document.body.appendChild(pill2);
@@ -12702,7 +14051,7 @@ ${buildCbreBody(current)}`;
       pill2.className = isError ? "error" : result.status === "erledigt" ? "done" : "";
     }
     function closePanel() {
-      document.getElementById(IDS5.panel)?.remove();
+      document.getElementById(IDS7.panel)?.remove();
     }
     function switchButton(on, disabled2, onToggle) {
       const node = el4("button", "wma-sw");
@@ -12855,7 +14204,7 @@ ${buildCbreBody(current)}`;
       });
       const state = { open: /* @__PURE__ */ new Set(), done: null, busy: false };
       const panel = el4("aside");
-      panel.id = IDS5.panel;
+      panel.id = IDS7.panel;
       panel.dataset.key = current.key;
       panel.setAttribute("aria-label", "Mail-Assistent");
       const staging = result.umgebung === "staging";
@@ -13030,7 +14379,7 @@ ${buildCbreBody(current)}`;
       document.body.appendChild(panel);
     }
     function autoOpen(result, key) {
-      const open = document.getElementById(IDS5.panel);
+      const open = document.getElementById(IDS7.panel);
       if (open && open.dataset.key !== key) closePanel();
       if (!result?.gefunden || !result.vorschlag || result.status !== "offen" || closedKeys.has(key)) {
         if (!result?.vorschlag) closePanel();
@@ -13574,7 +14923,7 @@ ${buildCbreBody(current)}`;
     employerCache = null
   }) {
     runtime.registerSource(sourcePath);
-    const IDS10 = makeIds(idPrefix);
+    const IDS11 = makeIds(idPrefix);
     const { defaultScope: defaultScope2, leaveHash: leaveHash2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, pickScope: pickScope2 } = core;
     const isTargetPage8 = () => core.isRoute(parseListState(location.hash).route);
     const allModes = () => [...BUILT_IN_MODES2, ...storage.load()];
@@ -13596,43 +14945,43 @@ ${buildCbreBody(current)}`;
       employers.patch(event?.detail?.employerId, event?.detail?.directContact);
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
-    function ensureStyle6() {
-      if (document.getElementById(IDS10.style)) return;
+    function ensureStyle7() {
+      if (document.getElementById(IDS11.style)) return;
       const style = document.createElement("style");
-      style.id = IDS10.style;
+      style.id = IDS11.style;
       style.textContent = `
-      #${IDS10.group}, #${IDS10.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS10.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
-      #${IDS10.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
-      #${IDS10.group} + #${IDS10.side} { margin:0 0 0 8px; }
-      #${IDS10.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS10.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS10.side}.is-active > strong { color:#b85400; }
-      #${IDS10.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.side} button:hover { background:#f4f4f5; }
-      #${IDS10.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
-      #${IDS10.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
-      #${IDS10.group}.is-active, #${IDS10.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
-      #${IDS10.group} > strong, #${IDS10.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
-      #${IDS10.group}.is-active > strong, #${IDS10.bar}.is-active > strong { color:#b85400; }
-      #${IDS10.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
-      #${IDS10.group} button, #${IDS10.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.group} button:hover, #${IDS10.bar} button:hover { background:#f4f4f5; }
-      #${IDS10.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
-      #${IDS10.leave}:hover { background:#b85400 !important; }
-      #${IDS10.group} [hidden], #${IDS10.bar} [hidden] { display:none !important; }
+      #${IDS11.group}, #${IDS11.bar} { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS11.bar} { display:inline-flex; margin:0 0 10px; padding:8px 10px; background:#fafafa; }
+      #${IDS11.side} { display:inline-flex; align-items:center; gap:6px; margin:0 0 10px 8px; padding:3px 6px 3px 10px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; vertical-align:top; }
+      #${IDS11.group} + #${IDS11.side} { margin:0 0 0 8px; }
+      #${IDS11.side}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS11.side} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS11.side}.is-active > strong { color:#b85400; }
+      #${IDS11.side} button { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.side} button:hover { background:#f4f4f5; }
+      #${IDS11.side} button[aria-pressed="true"] { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS11.side} button i { width:12px; height:12px; border-radius:50%; border:2px solid; box-sizing:border-box; }
+      #${IDS11.group}.is-active, #${IDS11.bar}.is-active { border-color:#ef6c00; background:#fff3e8; }
+      #${IDS11.group} > strong, #${IDS11.bar} > strong { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#52525b; }
+      #${IDS11.group}.is-active > strong, #${IDS11.bar}.is-active > strong { color:#b85400; }
+      #${IDS11.select} { min-width:190px; height:30px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; font:inherit; }
+      #${IDS11.group} button, #${IDS11.bar} button { min-height:30px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.group} button:hover, #${IDS11.bar} button:hover { background:#f4f4f5; }
+      #${IDS11.leave} { border-color:#ef6c00 !important; background:#ef6c00 !important; color:#fff !important; }
+      #${IDS11.leave}:hover { background:#b85400 !important; }
+      #${IDS11.group} [hidden], #${IDS11.bar} [hidden] { display:none !important; }
       .${HIGHLIGHT_CLASS} { background:#fff3e8 !important; box-shadow:inset 3px 0 0 #ef6c00; }
       .${HEAD_CLASS} { color:#b85400 !important; font-weight:650 !important; }
-      #${IDS10.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
-      #${IDS10.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-      #${IDS10.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
-      #${IDS10.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
-      #${IDS10.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
-      #${IDS10.dialog} input[type=text], #${IDS10.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
-      #${IDS10.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
-      #${IDS10.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-      #${IDS10.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
-      #${IDS10.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
+      #${IDS11.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:#09090b; }
+      #${IDS11.dialog} .werkia-focus-card { width:min(440px,92vw); padding:16px 18px 14px; border:1px solid #e4e4e7; border-radius:10px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+      #${IDS11.dialog} h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+      #${IDS11.dialog} p { margin:0 0 12px; color:#52525b; font-size:12px; }
+      #${IDS11.dialog} label { display:block; margin:0 0 10px; color:#52525b; font-size:12px; font-weight:550; }
+      #${IDS11.dialog} input[type=text], #${IDS11.dialog} select { display:block; width:100%; box-sizing:border-box; height:32px; margin-top:4px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px; font:inherit; color:#09090b; }
+      #${IDS11.dialog} label.werkia-focus-check { display:flex; align-items:center; gap:8px; color:#09090b; font-weight:400; }
+      #${IDS11.dialog} .werkia-focus-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+      #${IDS11.dialog} button { min-height:30px; padding:5px 12px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; line-height:1; }
+      #${IDS11.dialog} button.werkia-focus-primary { border-color:#ef6c00; background:#ef6c00; color:#fff; }
     `;
       document.head.appendChild(style);
     }
@@ -13669,13 +15018,13 @@ ${buildCbreBody(current)}`;
       leave();
     }
     function closeDialog() {
-      document.getElementById(IDS10.dialog)?.remove();
+      document.getElementById(IDS11.dialog)?.remove();
     }
     function openSaveDialog() {
       closeDialog();
       const state = parseListState(location.hash);
       const overlay = document.createElement("div");
-      overlay.id = IDS10.dialog;
+      overlay.id = IDS11.dialog;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -13752,7 +15101,7 @@ ${buildCbreBody(current)}`;
       const title = document.createElement("strong");
       title.textContent = "Focus-Mode";
       const select = document.createElement("select");
-      select.id = IDS10.select;
+      select.id = IDS11.select;
       select.setAttribute("aria-label", "Focus-Mode wählen");
       const warm = () => {
         if (hasContactMode()) employers.prefetch();
@@ -13766,19 +15115,19 @@ ${buildCbreBody(current)}`;
       });
       const leaveButton = document.createElement("button");
       leaveButton.type = "button";
-      leaveButton.id = IDS10.leave;
+      leaveButton.id = IDS11.leave;
       leaveButton.textContent = "Verlassen";
       leaveButton.title = "Zurück zur Ansicht von vor dem Focus-Mode";
       leaveButton.addEventListener("click", leave);
       const saveButton = document.createElement("button");
       saveButton.type = "button";
-      saveButton.id = IDS10.save;
+      saveButton.id = IDS11.save;
       saveButton.textContent = "Als Focus-Mode speichern";
       saveButton.title = "Aktuellen Filter mit einer hervorgehobenen Spalte als eigenen Focus-Mode sichern";
       saveButton.addEventListener("click", openSaveDialog);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
-      removeButton.id = IDS10.remove;
+      removeButton.id = IDS11.remove;
       removeButton.textContent = "Löschen";
       removeButton.title = "Diesen eigenen Focus-Mode löschen";
       removeButton.addEventListener("click", () => {
@@ -13790,14 +15139,14 @@ ${buildCbreBody(current)}`;
     }
     function ensureControls() {
       const presetsBar = document.getElementById(PRESETS_BAR_ID);
-      let group = document.getElementById(IDS10.group);
-      let ownBar = document.getElementById(IDS10.bar);
+      let group = document.getElementById(IDS11.group);
+      let ownBar = document.getElementById(IDS11.bar);
       if (presetsBar) {
         ownBar?.remove();
         if (group && group.parentElement === presetsBar) return group;
         group?.remove();
         group = document.createElement("span");
-        group.id = IDS10.group;
+        group.id = IDS11.group;
         buildControls(group);
         presetsBar.appendChild(group);
         return group;
@@ -13807,13 +15156,13 @@ ${buildCbreBody(current)}`;
       const anchor = findListAnchor(document);
       if (!anchor?.parentElement) return null;
       ownBar = document.createElement("div");
-      ownBar.id = IDS10.bar;
+      ownBar.id = IDS11.bar;
       buildControls(ownBar);
       anchor.parentElement.insertBefore(ownBar, anchor);
       return ownBar;
     }
     function ensureSide(container) {
-      let side = document.getElementById(IDS10.side);
+      let side = document.getElementById(IDS11.side);
       if (!SIDE_MODES.length) {
         side?.remove();
         return null;
@@ -13821,7 +15170,7 @@ ${buildCbreBody(current)}`;
       if (side && side.previousElementSibling === container) return side;
       side?.remove();
       side = document.createElement("span");
-      side.id = IDS10.side;
+      side.id = IDS11.side;
       const title = document.createElement("strong");
       title.textContent = SIDE_MODES[0].side.box || "Filter";
       side.appendChild(title);
@@ -13870,8 +15219,8 @@ ${buildCbreBody(current)}`;
       }
       if (select.value !== activeId) select.value = activeId;
     }
-    function setHidden(element5, hidden) {
-      if (element5 && element5.hidden !== hidden) element5.hidden = hidden;
+    function setHidden(element6, hidden) {
+      if (element6 && element6.hidden !== hidden) element6.hidden = hidden;
     }
     let onPage = false;
     function render() {
@@ -13879,15 +15228,15 @@ ${buildCbreBody(current)}`;
         if (onPage) {
           onPage = false;
           clearColumnFocus(document);
-          document.getElementById(IDS10.group)?.remove();
-          document.getElementById(IDS10.bar)?.remove();
-          document.getElementById(IDS10.side)?.remove();
+          document.getElementById(IDS11.group)?.remove();
+          document.getElementById(IDS11.bar)?.remove();
+          document.getElementById(IDS11.side)?.remove();
           closeDialog();
         }
         return;
       }
       onPage = true;
-      ensureStyle6();
+      ensureStyle7();
       const own = storage.load();
       const state = parseListState(location.hash);
       if (hasStaleEmployerIds(state.filter)) {
@@ -13918,8 +15267,8 @@ ${buildCbreBody(current)}`;
       const sideActive = Boolean(mode?.side);
       const isActive = Boolean(mode) && !sideActive;
       if (container.classList.contains("is-active") !== isActive) container.classList.toggle("is-active", isActive);
-      fillSelect(container.querySelector(`#${IDS10.select}`), own, isActive ? mode.id : "");
-      setHidden(container.querySelector(`#${IDS10.leave}`), !isActive);
+      fillSelect(container.querySelector(`#${IDS11.select}`), own, isActive ? mode.id : "");
+      setHidden(container.querySelector(`#${IDS11.leave}`), !isActive);
       const side = ensureSide(container);
       if (side) {
         if (side.classList.contains("is-active") !== sideActive) side.classList.toggle("is-active", sideActive);
@@ -13928,7 +15277,7 @@ ${buildCbreBody(current)}`;
           if (button3.getAttribute("aria-pressed") !== pressed) button3.setAttribute("aria-pressed", pressed);
         });
       }
-      setHidden(container.querySelector(`#${IDS10.remove}`), !isActive || Boolean(mode?.builtIn));
+      setHidden(container.querySelector(`#${IDS11.remove}`), !isActive || Boolean(mode?.builtIn));
     }
     let scheduled = false;
     const scheduleRender = () => {
@@ -14052,488 +15401,6 @@ ${buildCbreBody(current)}`;
     });
   }
 
-  // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS3 = 15e3;
-  var OFFLINE_MESSAGE3 = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
-  me: currentEmployee { id __typename }
-}`;
-  function berlinDay(date = /* @__PURE__ */ new Date()) {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
-  }
-  function formatDay(day, withYear = false) {
-    const [year, month, date] = String(day || "").split("-");
-    if (!year || !month || !date) return String(day || "");
-    return withYear ? `${date}.${month}.${year}` : `${date}.${month}.`;
-  }
-  function formatRange(von, bis) {
-    if (von === bis) return formatDay(von, true);
-    const sameYear = String(von).slice(0, 4) === String(bis).slice(0, 4);
-    return `${formatDay(von, !sameYear)} – ${formatDay(bis, true)}`;
-  }
-  function canEditDraft(me, draft) {
-    if (!me) return false;
-    if (me.darfAlles) return true;
-    return draft.abwesendId === me.id || draft.vertretungId === me.id;
-  }
-  function validateDraft(me, draft, today = berlinDay()) {
-    if (!draft.abwesendId) return "Bitte auswählen, wer abwesend ist.";
-    if (!draft.vertretungId) return "Bitte die Vertretung auswählen.";
-    if (draft.abwesendId === draft.vertretungId) return "Niemand kann sich selbst vertreten.";
-    if (!draft.von || !draft.bis) return "Bitte „Von“ und „Bis“ ausfüllen.";
-    if (draft.von > draft.bis) return "„Von“ liegt nach „Bis“.";
-    if (draft.bis < today) return "„Bis“ liegt in der Vergangenheit.";
-    if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
-    return "";
-  }
-  function parseResponse2(status, text) {
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-    if (data && data.ok === true) return data;
-    if (data && data.fehler) throw new Error(data.fehler);
-    throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
-  }
-  function createVertretungenClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
-    return (payload) => new Promise((resolve, reject) => {
-      request({
-        method: "POST",
-        url,
-        headers: { "Content-Type": "application/json" },
-        data: JSON.stringify(payload),
-        timeout: timeoutMs,
-        onload(response) {
-          try {
-            resolve(parseResponse2(response.status, response.responseText));
-          } catch (error) {
-            reject(error);
-          }
-        },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
-      });
-    });
-  }
-  function plannedSubstituteMentions(mentions, aktiv, handled = /* @__PURE__ */ new Set()) {
-    const present = new Set(mentions.map((mention) => mention.id));
-    const planned = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const mention of mentions) {
-      for (const entry of aktiv || []) {
-        if (entry.abwesendId !== mention.id || !entry.vertretungId || entry.vertretungId === mention.id) continue;
-        const key = `${entry.abwesendId}|${entry.vertretungId}`;
-        if (present.has(entry.vertretungId) || handled.has(key) || seen.has(entry.vertretungId)) continue;
-        seen.add(entry.vertretungId);
-        planned.push({ key, pos: mention.end, vertretungId: entry.vertretungId, vertretungName: entry.vertretungName || "Vertretung" });
-      }
-    }
-    return planned.sort((a, b) => b.pos - a.pos);
-  }
-
-  // ../../shared/js/vertretungen/index.js
-  var IDS6 = {
-    button: "werkia-vertretungen-button",
-    bar: "werkia-vertretungen-bar",
-    dialog: "werkia-vertretungen-dialog",
-    style: "werkia-vertretungen-style"
-  };
-  var TOOLBAR_SELECTORS = [".RaList-actions .RaTopToolbar-root", ".RaTopToolbar-root", ".RaList-actions"];
-  var CONFIRM_MS = 4e3;
-  var PEOPLE_ICON_PATH = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
-  var COPIED_STYLES = [
-    "color",
-    "fontFamily",
-    "fontSize",
-    "fontWeight",
-    "lineHeight",
-    "letterSpacing",
-    "textTransform",
-    "paddingTop",
-    "paddingRight",
-    "paddingBottom",
-    "paddingLeft",
-    "borderRadius",
-    "minWidth",
-    "minHeight"
-  ];
-  function nativeLookFrom(sample, view = sample?.ownerDocument?.defaultView) {
-    if (!sample || !view) return null;
-    const computed = view.getComputedStyle(sample);
-    const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
-    const icon2 = sample.querySelector("svg");
-    const iconStyle = icon2 ? view.getComputedStyle(icon2) : null;
-    const iconBox = icon2?.parentElement && icon2.parentElement !== sample ? view.getComputedStyle(icon2.parentElement) : null;
-    return {
-      style,
-      iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
-      iconGap: iconBox?.marginRight && iconBox.marginRight !== "0px" ? iconBox.marginRight : "8px"
-    };
-  }
-  function findToolbar(root = document) {
-    for (const selector of TOOLBAR_SELECTORS) {
-      const element5 = root.querySelector(selector);
-      if (element5) return element5;
-    }
-    return null;
-  }
-  function findSlot(root = document) {
-    const filterButton = [...root.querySelectorAll("button, a")].find((element5) => element5.id !== IDS6.button && /^filter hinzuf/i.test(element5.textContent.trim()));
-    if (filterButton) {
-      let before = filterButton;
-      while (before.parentElement && before.parentElement.childElementCount === 1 && before.parentElement !== root.body) before = before.parentElement;
-      return { parent: before.parentElement, before, sample: filterButton };
-    }
-    const toolbar = findToolbar(root);
-    if (!toolbar) return null;
-    const sample = [...toolbar.querySelectorAll("button, a")].find((element5) => element5.id !== IDS6.button && element5.textContent.trim());
-    return { parent: toolbar, before: toolbar.firstElementChild, sample };
-  }
-  function executeVertretungen(runtime, {
-    routes = [],
-    getGraphqlAdapter,
-    sourcePath,
-    toolboxName = "Toolbox",
-    helpTip,
-    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
-  } = {}) {
-    runtime.registerSource(sourcePath);
-    const post = createVertretungenClient({
-      request: request || (() => {
-        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
-    });
-    let myId = "";
-    let state = null;
-    let editing = null;
-    let adminsOpen = false;
-    const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
-    const owned = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaVertretungenOwner === sourcePath ? element5 : null;
-    };
-    function ensureStyle6() {
-      if (document.getElementById(IDS6.style)) return;
-      const style = document.createElement("style");
-      style.id = IDS6.style;
-      style.textContent = `
-      #${IDS6.bar} { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-      #${IDS6.button}.wv-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS6.button}.wv-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS6.button}.wv-native svg { flex:none; fill:currentColor; }
-      #${IDS6.button}.wv-own { min-height:30px; padding:5px 10px; border:0; border-radius:6px; background:#e7e9f6; color:#3643c7; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS6.button}.wv-own:hover { background:#d7dbf0; }
-      #${IDS6.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); }
-      #${IDS6.dialog} .wv-close { position:absolute; top:10px; right:10px; min-height:0; width:30px; height:30px; padding:0; border-radius:50%; background:transparent; color:#5a6178; font:400 22px/30px Arial,sans-serif; }
-      #${IDS6.dialog} .wv-close:hover { background:#eceef6; }
-      #${IDS6.dialog} .wv-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:#fff; color:#1f2933; font:400 13px/1.4 Arial,sans-serif; }
-      #${IDS6.dialog} h2 { margin:0 0 6px; font-size:15px; }
-      #${IDS6.dialog} h3 { margin:16px 0 8px; font-size:13px; }
-      #${IDS6.dialog} .wv-admins { margin-top:16px; }
-      #${IDS6.dialog} .wv-admins summary { cursor:pointer; color:#5a6178; font-size:12px; font-weight:700; }
-      #${IDS6.dialog} .wv-admins[open] summary { margin-bottom:8px; }
-      #${IDS6.dialog} p { margin:0 0 10px; color:#6b7280; font-size:12px; }
-      #${IDS6.dialog} ul { margin:0; padding:0; list-style:none; }
-      #${IDS6.dialog} li { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #eceef6; }
-      #${IDS6.dialog} .wv-who { flex:1; font-weight:700; }
-      #${IDS6.dialog} .wv-when { color:#5a6178; font-size:12px; white-space:nowrap; }
-      #${IDS6.dialog} .wv-badge { padding:2px 6px; border-radius:4px; background:#e6f7f0; color:#1f9a6b; font-size:11px; font-weight:700; }
-      #${IDS6.dialog} .wv-form { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
-      #${IDS6.dialog} select, #${IDS6.dialog} input { height:30px; padding:4px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.3 Arial,sans-serif; }
-      #${IDS6.dialog} .wv-actions { display:flex; gap:6px; margin-top:12px; }
-      #${IDS6.dialog} button { min-height:28px; padding:5px 10px; border:0; border-radius:6px; background:#4956df; color:#fff; cursor:pointer; font:700 12px/1 Arial,sans-serif; }
-      #${IDS6.dialog} button:disabled { cursor:wait; opacity:.7; }
-      #${IDS6.dialog} button.wv-secondary { background:#e7e9f6; color:#3643c7; }
-      #${IDS6.dialog} button.wv-danger { background:#f8d7da; color:#a02334; }
-      #${IDS6.dialog} .wv-status { min-height:18px; margin-top:10px; font-size:12px; }
-      #${IDS6.dialog} .wv-status.wv-error { color:#a02334; }
-    `;
-      document.head.appendChild(style);
-    }
-    function el7(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
-      Object.assign(element5, props);
-      element5.append(...children.filter((child) => child !== null && child !== void 0));
-      return element5;
-    }
-    function button3(text, onClick, className = "") {
-      return el7("button", { type: "button", textContent: text, className, onclick: onClick });
-    }
-    function confirmButton(label, question, onConfirm) {
-      let armed = false;
-      let timer = null;
-      const element5 = button3(label, () => {
-        if (!armed) {
-          armed = true;
-          element5.textContent = question;
-          timer = runtime.setTimeout(() => {
-            armed = false;
-            element5.textContent = label;
-          }, CONFIRM_MS);
-          return;
-        }
-        if (timer !== null) runtime.clearTimeout?.(timer);
-        onConfirm();
-      }, "wv-danger");
-      return element5;
-    }
-    async function loadMyId() {
-      if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
-      myId = String(data?.me?.id || "");
-      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
-      return myId;
-    }
-    async function call(payload) {
-      return post({ ...payload, employeeId: await loadMyId() });
-    }
-    function closeDialog() {
-      owned(IDS6.dialog)?.remove();
-      editing = null;
-    }
-    function setStatus(text, isError = false) {
-      const status = owned(IDS6.dialog)?.querySelector(".wv-status");
-      if (!status) return;
-      status.textContent = text;
-      status.classList.toggle("wv-error", isError);
-    }
-    function setBusy(busy) {
-      owned(IDS6.dialog)?.querySelectorAll(".wv-body button, .wv-body select, .wv-body input").forEach((element5) => {
-        element5.disabled = busy;
-      });
-    }
-    async function refresh(message = "") {
-      state = await call({ action: "liste" });
-      render();
-      if (message) setStatus(message);
-    }
-    async function run(action, success) {
-      setBusy(true);
-      setStatus("Speichert …");
-      try {
-        await call(action);
-        editing = null;
-        await refresh(success);
-      } catch (error) {
-        setBusy(false);
-        setStatus(error.message || String(error), true);
-      }
-    }
-    function personSelect(value, { onlyMe = false, people = state.mitarbeiter } = {}) {
-      const select = el7("select");
-      select.append(el7("option", { value: "", textContent: "Bitte wählen …" }));
-      for (const person of people) {
-        select.append(el7("option", { value: person.id, textContent: person.name }));
-      }
-      select.value = value || "";
-      if (onlyMe) select.title = "Ohne Admin-Rechte musst du selbst abwesend oder Vertretung sein.";
-      return select;
-    }
-    function entryRow(entry) {
-      const who = el7("span", { className: "wv-who", textContent: `${entry.abwesendName} → ${entry.vertretungName}` });
-      const when = el7("span", { className: "wv-when", textContent: formatRange(entry.von, entry.bis) });
-      const badge = entry.aktiv ? el7("span", { className: "wv-badge", textContent: "läuft" }) : null;
-      const actions = entry.darfBearbeiten ? [
-        button3("Bearbeiten", () => {
-          editing = entry;
-          render();
-        }, "wv-secondary"),
-        confirmButton("Löschen", "Wirklich löschen?", () => run({ action: "loeschen", id: entry.id }, "Gelöscht."))
-      ] : [];
-      const row2 = el7("li", {}, [who, when, badge, ...actions]);
-      if (entry.geaendertVon) row2.title = `Zuletzt geändert von ${entry.geaendertVon}`;
-      return row2;
-    }
-    function form() {
-      const today = berlinDay();
-      const { ich } = state;
-      const abwesend = personSelect(editing ? editing.abwesendId : ich.id, { onlyMe: !ich.darfAlles });
-      const vertretung = personSelect(editing ? editing.vertretungId : "", { onlyMe: !ich.darfAlles });
-      const von = el7("input", { type: "date", value: editing ? editing.von : today });
-      const bis = el7("input", { type: "date", value: editing ? editing.bis : today, min: today });
-      const save = button3(editing ? "Änderung speichern" : "Vertretung eintragen", () => {
-        const draft = { abwesendId: abwesend.value, vertretungId: vertretung.value, von: von.value, bis: bis.value };
-        const problem = validateDraft(ich, draft, today);
-        if (problem) {
-          setStatus(problem, true);
-          return;
-        }
-        run({ action: "speichern", eintrag: editing ? { ...draft, id: editing.id } : draft }, editing ? "Geändert." : "Eingetragen.");
-      });
-      const cancel = editing ? button3("Abbrechen", () => {
-        editing = null;
-        render();
-      }, "wv-secondary") : null;
-      return [
-        el7("h3", { textContent: editing ? "Vertretung ändern" : "Neue Vertretung" }),
-        el7("div", { className: "wv-form" }, [
-          el7("label", { textContent: "Abwesend" }),
-          abwesend,
-          el7("label", { textContent: "Vertretung" }),
-          vertretung,
-          el7("label", { textContent: "Von" }),
-          von,
-          el7("label", { textContent: "Bis (einschließlich)" }),
-          bis
-        ]),
-        el7("div", { className: "wv-actions" }, [save, cancel])
-      ];
-    }
-    function adminSection() {
-      const { ich } = state;
-      const admins = state.admins || [];
-      const list = el7("ul");
-      admins.forEach((admin) => {
-        const remove = ich.darfAlles && admin.id ? confirmButton("Entfernen", "Wirklich entfernen?", () => run({ action: "admin_entfernen", id: admin.id }, "Admin entfernt.")) : null;
-        list.append(el7("li", {}, [el7("span", { className: "wv-who", textContent: admin.name }), remove]));
-      });
-      const parts = [
-        el7("summary", { textContent: `Admins (${admins.length})` }),
-        el7("p", { textContent: "Admins dürfen alle Vertretungen ändern und weitere Admins eintragen." }),
-        list
-      ];
-      if (ich.darfAlles) {
-        const candidate = personSelect("", { people: state.adminKandidaten || state.mitarbeiter });
-        const add = button3("Als Admin eintragen", () => {
-          if (!candidate.value) {
-            setStatus("Bitte auswählen, wer Admin werden soll.", true);
-            return;
-          }
-          run({ action: "admin_hinzufuegen", adminId: candidate.value }, "Admin eingetragen.");
-        }, "wv-secondary");
-        parts.push(el7("div", { className: "wv-actions" }, [candidate, add]));
-      }
-      const details = el7("details", { className: "wv-admins" }, parts);
-      details.open = adminsOpen;
-      details.addEventListener("toggle", () => {
-        adminsOpen = details.open;
-      });
-      return details;
-    }
-    function card() {
-      return owned(IDS6.dialog)?.querySelector(".wv-body");
-    }
-    function render() {
-      const target = card();
-      if (!target) return;
-      target.textContent = "";
-      const intro = state.ich.darfAlles ? "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Du darfst alle Einträge ändern." : "Solange eine Vertretung läuft, taggen VT Automatik, VT Bot und VT-Status-Hinweis sie zusätzlich zur abwesenden Person. Ändern kannst du Einträge, in denen du selbst abwesend oder Vertretung bist.";
-      const list = el7("ul");
-      if (!state.eintraege.length) list.append(el7("li", { textContent: "Gerade ist keine Vertretung eingetragen." }));
-      state.eintraege.forEach((entry) => list.append(entryRow(entry)));
-      const tip = helpTip?.();
-      target.append(
-        el7("h2", {}, [document.createTextNode("Vertretungen "), tip]),
-        el7("p", { textContent: intro }),
-        list,
-        ...form(),
-        adminSection(),
-        el7("div", { className: "wv-status" }),
-        el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")])
-      );
-    }
-    async function openDialog() {
-      closeDialog();
-      ensureStyle6();
-      const overlay = el7("div", { id: IDS6.dialog });
-      overlay.dataset.werkiaVertretungenOwner = sourcePath;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDialog();
-      });
-      const close = button3("×", closeDialog, "wv-close");
-      close.title = "Schließen (Esc)";
-      close.setAttribute("aria-label", "Schließen");
-      const target = el7("div", { className: "wv-body" }, [
-        el7("h2", { textContent: "Vertretungen" }),
-        el7("div", { className: "wv-status", textContent: "Lädt …" })
-      ]);
-      overlay.append(el7("div", { className: "wv-card" }, [close, target]));
-      document.body.appendChild(overlay);
-      try {
-        await refresh();
-      } catch (error) {
-        setStatus(error.message || String(error), true);
-        target.append(el7("div", { className: "wv-actions" }, [button3("Schließen", closeDialog, "wv-secondary")]));
-      }
-    }
-    function placeButton() {
-      if (!isTargetPage8()) {
-        owned(IDS6.button)?.remove();
-        owned(IDS6.bar)?.remove();
-        return;
-      }
-      ensureStyle6();
-      const slot = findSlot(document);
-      const existing = owned(IDS6.button);
-      if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS6.bar)) return;
-      existing?.remove();
-      const vertretungenButton = button3("Vertretungen", openDialog);
-      vertretungenButton.id = IDS6.button;
-      vertretungenButton.title = "Vertretungen eintragen und ansehen";
-      vertretungenButton.dataset.werkiaVertretungenOwner = sourcePath;
-      if (slot) {
-        owned(IDS6.bar)?.remove();
-        const look = nativeLookFrom(slot.sample);
-        if (look) {
-          vertretungenButton.className = "wv-native";
-          Object.assign(vertretungenButton.style, look.style);
-          const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          icon2.setAttribute("viewBox", "0 0 24 24");
-          icon2.setAttribute("aria-hidden", "true");
-          icon2.style.width = look.iconSize;
-          icon2.style.height = look.iconSize;
-          icon2.style.marginRight = look.iconGap;
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", PEOPLE_ICON_PATH);
-          icon2.append(path);
-          vertretungenButton.prepend(icon2);
-        } else {
-          vertretungenButton.className = "wv-own";
-        }
-        slot.parent.insertBefore(vertretungenButton, slot.before);
-        return;
-      }
-      vertretungenButton.className = "wv-own";
-      owned(IDS6.bar)?.remove();
-      const anchor = findListAnchor(document);
-      if (!anchor?.parentElement) return;
-      const bar = el7("div", { id: IDS6.bar }, [vertretungenButton]);
-      bar.dataset.werkiaVertretungenOwner = sourcePath;
-      anchor.parentElement.insertBefore(bar, anchor);
-    }
-    runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS6.dialog)) return;
-      event.stopPropagation();
-      closeDialog();
-    }, true);
-    if (typeof GM_registerMenuCommand === "function") {
-      try {
-        GM_registerMenuCommand(`${toolboxName}: Vertretungen`, () => openDialog());
-      } catch {
-      }
-    }
-    let scheduled = false;
-    const schedule = () => {
-      if (scheduled) return;
-      scheduled = true;
-      runtime.setTimeout(() => {
-        scheduled = false;
-        placeButton();
-      }, 200);
-    };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
-    runtime.addCleanup?.(() => {
-      owned(IDS6.button)?.remove();
-      owned(IDS6.bar)?.remove();
-      closeDialog();
-    });
-    schedule();
-  }
-
   // src/features/kam-suite/vertretungen.js
   function executeVertretungen2(runtime, options = {}) {
     executeVertretungen(runtime, {
@@ -14549,11 +15416,11 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS = 10 * 60 * 1e3;
-  var RETRY_MS2 = 60 * 1e3;
+  var RETRY_MS3 = 60 * 1e3;
   var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
-  function tiptapOf3(element5) {
+  function tiptapOf3(element6) {
     try {
-      return element5.wrappedJSObject?.editor || element5.editor || null;
+      return element6.wrappedJSObject?.editor || element6.editor || null;
     } catch {
       return null;
     }
@@ -14580,7 +15447,7 @@ ${buildCbreBody(current)}`;
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS;
-      if (fresh || Date.now() - failedAt < RETRY_MS2) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS3) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
@@ -14602,10 +15469,10 @@ ${buildCbreBody(current)}`;
       await loading;
       return cache.aktiv;
     }
-    function attach(element5) {
-      const editor = tiptapOf3(element5);
+    function attach(element6) {
+      const editor = tiptapOf3(element6);
       if (!editor?.on || !editor.state?.schema?.nodes?.mention) return;
-      attached.add(element5);
+      attached.add(element6);
       const handled = /* @__PURE__ */ new Set();
       let pending = false;
       async function apply() {
@@ -14642,8 +15509,8 @@ ${buildCbreBody(current)}`;
       });
     }
     runtime.setInterval(() => {
-      for (const element5 of document.querySelectorAll(EDITOR_SELECTOR4)) {
-        if (!attached.has(element5)) attach(element5);
+      for (const element6 of document.querySelectorAll(EDITOR_SELECTOR4)) {
+        if (!attached.has(element6)) attach(element6);
       }
     }, SCAN_MS);
   }
@@ -14657,10 +15524,10 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
-  var REQUEST_TIMEOUT_MS4 = 15e3;
-  var OFFLINE_MESSAGE4 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaToolboxDatenMe {
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS5 = 15e3;
+  var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay2(date = /* @__PURE__ */ new Date()) {
@@ -14673,7 +15540,7 @@ ${buildCbreBody(current)}`;
     while ([0, 6].includes(date.getUTCDay()));
     return date.toISOString().slice(0, 10);
   }
-  function parseResponse3(status, text) {
+  function parseResponse4(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -14684,7 +15551,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -14694,13 +15561,13 @@ ${buildCbreBody(current)}`;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse3(response.status, response.responseText));
+            resolve(parseResponse4(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
       });
     });
   }
@@ -14708,7 +15575,7 @@ ${buildCbreBody(current)}`;
     let pending = null;
     return () => {
       if (!pending) {
-        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY2, {}).then((data) => {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY4, {}).then((data) => {
           const id = String(data?.me?.id || "");
           if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
           return id;
@@ -14720,7 +15587,7 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL4 }) {
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL5 }) {
     const post = createToolboxDatenRequest({ request, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
@@ -14761,7 +15628,7 @@ ${buildCbreBody(current)}`;
   function berlinTime(date = /* @__PURE__ */ new Date()) {
     return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
   }
-  function formatDay2(day) {
+  function formatDay3(day) {
     const [, month, date] = String(day || "").split("-");
     return month && date ? `${date}.${month}.` : String(day || "");
   }
@@ -14828,7 +15695,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/prio-liste/index.js
-  var IDS7 = {
+  var IDS8 = {
     button: "werkia-prio-button",
     bar: "werkia-prio-bar",
     panel: "werkia-prio-panel",
@@ -14841,13 +15708,13 @@ ${buildCbreBody(current)}`;
     prioFirst: "werkia-prio-zuerst",
     reviewDay: "werkia-prio-popup-tag"
   };
-  var ROW_SELECTOR10 = "tr.RaDataTable-row";
+  var ROW_SELECTOR11 = "tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
   var STAR_CLASS = "werkia-prio-star";
   var REFRESH_MS2 = 5 * 60 * 1e3;
   var REVIEW_CHECK_MS = 60 * 1e3;
   var STAR_PATH = "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
-  var T = {
+  var T2 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -14868,7 +15735,7 @@ ${buildCbreBody(current)}`;
   function rowGroups(tbody) {
     const groups = [];
     for (const child of [...tbody.children]) {
-      if (child.matches(ROW_SELECTOR10)) groups.push([child]);
+      if (child.matches(ROW_SELECTOR11)) groups.push([child]);
       else if (groups.length) groups[groups.length - 1].push(child);
     }
     return groups;
@@ -14940,89 +15807,89 @@ ${buildCbreBody(current)}`;
     let lastPageKey = "";
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaPrioOwner === sourcePath ? element5 : null;
+      const element6 = document.getElementById(id);
+      return element6?.dataset.werkiaPrioOwner === sourcePath ? element6 : null;
     };
     const today = () => berlinDay2(now());
     const collapsed = () => store.get(STORAGE_KEYS.collapsed) === "1";
     const prioFirst = () => store.get(STORAGE_KEYS.prioFirst) === "1";
     function el7(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
-      Object.assign(element5, props);
-      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
-      return element5;
+      const element6 = document.createElement(tag);
+      Object.assign(element6, props);
+      element6.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element6;
     }
     const button3 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
-    function ensureStyle6() {
-      if (document.getElementById(IDS7.style)) return;
-      const style = el7("style", { id: IDS7.style });
-      const P = `#${IDS7.panel}`;
-      const R = `#${IDS7.review}`;
+    function ensureStyle7() {
+      if (document.getElementById(IDS8.style)) return;
+      const style = el7("style", { id: IDS8.style });
+      const P = `#${IDS8.panel}`;
+      const R = `#${IDS8.review}`;
       style.textContent = `
-      #${IDS7.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
-      #${IDS7.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS7.button}.wp-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS7.button}.wp-native svg { flex:none; fill:currentColor; }
-      #${IDS7.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T.line}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS7.button}[data-active="1"] { color:${T.accentInk} !important; }
-      ${P}, ${R} .wp-card { box-sizing:border-box; color:${T.ink}; background:${T.surface}; border:1px solid ${T.line}; border-radius:10px; box-shadow:${T.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
-      #${IDS7.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T.line}; border-radius:999px; background:${T.surface}; color:${T.accentInk}; box-shadow:${T.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS7.tab}:hover { border-color:${T.accent}; }
-      #${IDS7.tab} svg { width:14px; height:14px; fill:currentColor; }
+      #${IDS8.bar} { display:flex; justify-content:flex-end; margin:0 0 8px; }
+      #${IDS8.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS8.button}.wp-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS8.button}.wp-native svg { flex:none; fill:currentColor; }
+      #${IDS8.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T2.line}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.button}[data-active="1"] { color:${T2.accentInk} !important; }
+      ${P}, ${R} .wp-card { box-sizing:border-box; color:${T2.ink}; background:${T2.surface}; border:1px solid ${T2.line}; border-radius:10px; box-shadow:${T2.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
+      #${IDS8.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T2.line}; border-radius:999px; background:${T2.surface}; color:${T2.accentInk}; box-shadow:${T2.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.tab}:hover { border-color:${T2.accent}; }
+      #${IDS8.tab} svg { width:14px; height:14px; fill:currentColor; }
       ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
-      ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T.line}; }
+      ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T2.line}; }
       ${P} .wp-title { font-weight:650; font-size:13px; }
       ${P} .wp-head select { flex:1; min-width:0; }
       ${P} .wp-body { overflow:auto; padding:6px 12px 10px; }
-      ${P} .wp-switch { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid ${T.line}; color:${T.ink2}; font-size:12px; cursor:pointer; }
-      ${P} .wp-switch input { accent-color:${T.accent}; margin:0; }
+      ${P} .wp-switch { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid ${T2.line}; color:${T2.ink2}; font-size:12px; cursor:pointer; }
+      ${P} .wp-switch input { accent-color:${T2.accent}; margin:0; }
       ${P} ul { margin:0; padding:0; list-style:none; }
-      ${P} li { display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:start; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${P} li { display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:start; padding:8px 0; border-bottom:1px solid ${T2.line}; }
       ${P} li:last-child { border-bottom:0; }
-      ${P} li input[type=checkbox] { margin:2px 0 0; accent-color:${T.accent}; }
-      ${P} li .wp-name { color:${T.ink}; font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
-      ${P} li .wp-name:hover { color:${T.accentInk}; text-decoration:underline; }
-      ${P} li.wp-done .wp-name { color:${T.muted}; text-decoration:line-through; }
+      ${P} li input[type=checkbox] { margin:2px 0 0; accent-color:${T2.accent}; }
+      ${P} li .wp-name { color:${T2.ink}; font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
+      ${P} li .wp-name:hover { color:${T2.accentInk}; text-decoration:underline; }
+      ${P} li.wp-done .wp-name { color:${T2.muted}; text-decoration:line-through; }
       ${P} li .wp-notiz, ${P} li .wp-extra, ${P} li .wp-edit { grid-column:2 / 4; }
-      ${P} li .wp-notiz { color:${T.ink2}; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${P} li .wp-notiz { color:${T2.ink2}; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
       ${P} li .wp-edit { display:flex; gap:4px; }
       ${P} li .wp-edit input { flex:1; min-width:0; }
-      ${P} .wp-tag { margin-left:6px; padding:1px 6px; border-radius:999px; background:${T.accentSoft}; color:${T.accentInk}; font-size:11px; font-weight:600; white-space:nowrap; }
+      ${P} .wp-tag { margin-left:6px; padding:1px 6px; border-radius:999px; background:${T2.accentSoft}; color:${T2.accentInk}; font-size:11px; font-weight:600; white-space:nowrap; }
       ${P} .wp-actions { display:flex; gap:2px; }
-      ${P} .wp-icon { min-width:24px; height:24px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:${T.muted}; cursor:pointer; font:400 14px/24px system-ui,Arial,sans-serif; }
-      ${P} .wp-icon:hover { background:${T.sunken}; color:${T.ink}; }
+      ${P} .wp-icon { min-width:24px; height:24px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:${T2.muted}; cursor:pointer; font:400 14px/24px system-ui,Arial,sans-serif; }
+      ${P} .wp-icon:hover { background:${T2.sunken}; color:${T2.ink}; }
       ${P} .wp-add { display:flex; gap:6px; margin-top:10px; }
       ${P} .wp-add select { flex:1; min-width:0; }
-      ${P} select, ${P} input[type=text], ${R} select { height:28px; box-sizing:border-box; padding:3px 6px; border:1px solid ${T.lineStrong}; border-radius:6px; background:${T.surface}; color:${T.ink}; font:400 12px/1.2 system-ui,Arial,sans-serif; }
-      ${P} .wp-btn, ${R} .wp-btn { height:28px; padding:0 10px; border:1px solid ${T.lineStrong}; border-radius:6px; background:${T.surface}; color:${T.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      ${P} .wp-btn:hover, ${R} .wp-btn:hover { background:${T.sunken}; }
-      ${P} .wp-primary, ${R} .wp-primary { border-color:${T.accent}; background:${T.accent}; color:#fff; }
-      ${P} .wp-primary:hover, ${R} .wp-primary:hover { background:${T.accentInk}; }
+      ${P} select, ${P} input[type=text], ${R} select { height:28px; box-sizing:border-box; padding:3px 6px; border:1px solid ${T2.lineStrong}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; font:400 12px/1.2 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn, ${R} .wp-btn { height:28px; padding:0 10px; border:1px solid ${T2.lineStrong}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn:hover, ${R} .wp-btn:hover { background:${T2.sunken}; }
+      ${P} .wp-primary, ${R} .wp-primary { border-color:${T2.accent}; background:${T2.accent}; color:#fff; }
+      ${P} .wp-primary:hover, ${R} .wp-primary:hover { background:${T2.accentInk}; }
       ${P} button:disabled, ${R} button:disabled { cursor:wait; opacity:.6; }
-      ${P} .wp-hint { margin:8px 0 0; color:${T.muted}; font-size:12px; }
-      ${P} .wp-link { border:0; padding:0; background:none; color:${T.accentInk}; cursor:pointer; font:inherit; font-size:12px; text-decoration:underline; }
-      ${P} .wp-status, ${R} .wp-status { min-height:0; font-size:12px; color:${T.ink2}; }
+      ${P} .wp-hint { margin:8px 0 0; color:${T2.muted}; font-size:12px; }
+      ${P} .wp-link { border:0; padding:0; background:none; color:${T2.accentInk}; cursor:pointer; font:inherit; font-size:12px; text-decoration:underline; }
+      ${P} .wp-status, ${R} .wp-status { min-height:0; font-size:12px; color:${T2.ink2}; }
       ${P} .wp-status:not(:empty) { margin-top:8px; }
-      ${P} .wp-status.wp-error, ${R} .wp-status.wp-error { color:${T.bad}; }
+      ${P} .wp-status.wp-error, ${R} .wp-status.wp-error { color:${T2.bad}; }
       ${R} { position:fixed; inset:0; z-index:2147482000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.4); }
       ${R} .wp-card { width:min(560px,94vw); max-height:86vh; overflow:auto; padding:18px 20px; }
       ${R} h2 { margin:0 0 4px; font-size:15px; font-weight:650; }
-      ${R} p { margin:0 0 12px; color:${T.ink2}; font-size:12px; }
+      ${R} p { margin:0 0 12px; color:${T2.ink2}; font-size:12px; }
       ${R} ul { margin:0 0 12px; padding:0; list-style:none; }
-      ${R} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T.line}; }
+      ${R} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
       ${R} .wp-who { flex:1; min-width:0; }
       ${R} .wp-who b { display:block; font-weight:600; }
-      ${R} .wp-who span { color:${T.ink2}; font-size:12px; }
-      ${R} .wp-seg { display:inline-flex; border:1px solid ${T.lineStrong}; border-radius:6px; overflow:hidden; }
-      ${R} .wp-seg button { height:26px; padding:0 10px; border:0; background:${T.surface}; color:${T.ink2}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      ${R} .wp-seg button + button { border-left:1px solid ${T.lineStrong}; }
-      ${R} .wp-seg button[aria-pressed="true"] { background:${T.accentSoft}; color:${T.accentInk}; }
+      ${R} .wp-who span { color:${T2.ink2}; font-size:12px; }
+      ${R} .wp-seg { display:inline-flex; border:1px solid ${T2.lineStrong}; border-radius:6px; overflow:hidden; }
+      ${R} .wp-seg button { height:26px; padding:0 10px; border:0; background:${T2.surface}; color:${T2.ink2}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${R} .wp-seg button + button { border-left:1px solid ${T2.lineStrong}; }
+      ${R} .wp-seg button[aria-pressed="true"] { background:${T2.accentSoft}; color:${T2.accentInk}; }
       ${R} .wp-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-      .${STAR_CLASS} { display:inline-flex; vertical-align:-3px; width:18px; height:18px; margin-right:3px; padding:0; border:0; background:transparent; cursor:pointer; color:${T.lineStrong}; }
-      .${STAR_CLASS}:hover { color:${T.accent}; }
-      .${STAR_CLASS}[data-on="1"] { color:${T.accent}; }
+      .${STAR_CLASS} { display:inline-flex; vertical-align:-3px; width:18px; height:18px; margin-right:3px; padding:0; border:0; background:transparent; cursor:pointer; color:${T2.lineStrong}; }
+      .${STAR_CLASS}:hover { color:${T2.accent}; }
+      .${STAR_CLASS}[data-on="1"] { color:${T2.accent}; }
       .${STAR_CLASS} svg { width:18px; height:18px; fill:currentColor; }
-      tr[data-werkia-prio="1"] > td:first-child { box-shadow:inset 3px 0 0 ${T.accent}; }
+      tr[data-werkia-prio="1"] > td:first-child { box-shadow:inset 3px 0 0 ${T2.accent}; }
     `;
       document.head.appendChild(style);
     }
@@ -15125,7 +15992,7 @@ ${buildCbreBody(current)}`;
     }
     function slotBefore(slot) {
       let before = slot.before;
-      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS7.button) {
+      while (before?.previousElementSibling && /^werkia-/.test(before.previousElementSibling.id) && before.previousElementSibling.id !== IDS8.button) {
         before = before.previousElementSibling;
       }
       return before;
@@ -15136,7 +16003,7 @@ ${buildCbreBody(current)}`;
     }
     function placeButton() {
       const slot = findSlot(document);
-      let existing = owned(IDS7.button);
+      let existing = owned(IDS8.button);
       if (existing && slot) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -15144,17 +16011,17 @@ ${buildCbreBody(current)}`;
           existing.remove();
           existing = null;
         }
-      } else if (existing && !slot && existing.parentElement?.id !== IDS7.bar) {
+      } else if (existing && !slot && existing.parentElement?.id !== IDS8.bar) {
         existing.remove();
         existing = null;
       }
       if (!existing) {
         const prioButton = button3("", togglePanel, "", "Prio-Liste ein- oder ausklappen");
-        prioButton.id = IDS7.button;
+        prioButton.id = IDS8.button;
         prioButton.dataset.werkiaPrioOwner = sourcePath;
         prioButton.append(el7("span", { className: "wp-label" }));
         if (slot) {
-          owned(IDS7.bar)?.remove();
+          owned(IDS8.bar)?.remove();
           const look = nativeLookFrom(slot.sample);
           if (look) {
             prioButton.className = "wp-native";
@@ -15168,8 +16035,8 @@ ${buildCbreBody(current)}`;
           const anchor = findListAnchor(document);
           if (!anchor?.parentElement) return;
           prioButton.className = "wp-own";
-          owned(IDS7.bar)?.remove();
-          const bar = el7("div", { id: IDS7.bar }, [prioButton]);
+          owned(IDS8.bar)?.remove();
+          const bar = el7("div", { id: IDS8.bar }, [prioButton]);
           bar.dataset.werkiaPrioOwner = sourcePath;
           anchor.parentElement.insertBefore(bar, anchor);
         }
@@ -15198,14 +16065,14 @@ ${buildCbreBody(current)}`;
       tick();
     }
     function placeTab() {
-      let tab = owned(IDS7.tab);
+      let tab = owned(IDS8.tab);
       if (!collapsed()) {
         tab?.remove();
         return;
       }
       if (!tab) {
         tab = button3("", togglePanel, "", "Prio-Liste öffnen");
-        tab.id = IDS7.tab;
+        tab.id = IDS8.tab;
         tab.dataset.werkiaPrioOwner = sourcePath;
         tab.append(starIcon("14px"), el7("span", { className: "wp-label" }));
         document.body.appendChild(tab);
@@ -15215,14 +16082,14 @@ ${buildCbreBody(current)}`;
       if (label.textContent !== text) label.textContent = text;
     }
     function placePanel2() {
-      let panel = owned(IDS7.panel);
+      let panel = owned(IDS8.panel);
       placeTab();
       if (collapsed()) {
         panel?.remove();
         return;
       }
       if (!panel) {
-        panel = el7("div", { id: IDS7.panel });
+        panel = el7("div", { id: IDS8.panel });
         panel.dataset.werkiaPrioOwner = sourcePath;
         panel.setAttribute("role", "region");
         panel.setAttribute("aria-label", "Prio-Liste");
@@ -15233,22 +16100,22 @@ ${buildCbreBody(current)}`;
     function extrasFor(employerId) {
       if (!renderEmployerExtras || !employerId) return null;
       if (!extrasCache.has(employerId)) {
-        let element6 = null;
+        let element7 = null;
         try {
-          element6 = renderEmployerExtras(employerId) || null;
+          element7 = renderEmployerExtras(employerId) || null;
         } catch (failure) {
           console.warn("[Prio-Liste] Zusatz am Arbeitgeber:", failure);
         }
-        extrasCache.set(employerId, element6);
+        extrasCache.set(employerId, element7);
       }
-      const element5 = extrasCache.get(employerId);
-      return element5 ? el7("div", { className: "wp-extra" }, [element5]) : null;
+      const element6 = extrasCache.get(employerId);
+      return element6 ? el7("div", { className: "wp-extra" }, [element6]) : null;
     }
     function entryItem(entry, readOnly) {
       const check = el7("input", { type: "checkbox", checked: entry.erledigt, disabled: readOnly || busy, title: entry.erledigt ? "Wieder öffnen" : "Abhaken" });
       check.addEventListener("change", () => saveEntry(entry, { erledigt: check.checked }));
       const name = el7("a", { className: "wp-name", href: `#/Employer/${encodeURIComponent(entry.employerId)}/show`, textContent: entry.employerName });
-      const tag = entry.uebertragen ? el7("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay2(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
+      const tag = entry.uebertragen ? el7("span", { className: "wp-tag", textContent: `übertragen vom ${formatDay3(entry.tag)}`, title: "Gestern nicht erledigt, deshalb heute wieder dabei." }) : null;
       const actions = readOnly ? el7("span") : el7("span", { className: "wp-actions" }, [
         button3("✎", () => {
           editingId = entry.id;
@@ -15286,7 +16153,7 @@ ${buildCbreBody(current)}`;
     function pageEmployers() {
       const onList = prioEmployerIds(entries, today());
       const found = /* @__PURE__ */ new Map();
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
         const employer = employerOfRow(row2);
         if (employer && !onList.has(employer.id) && !found.has(employer.id)) found.set(employer.id, employer.name || "Unbekannter Arbeitgeber");
       }
@@ -15318,7 +16185,7 @@ ${buildCbreBody(current)}`;
       return select;
     }
     function renderPanel() {
-      const panel = owned(IDS7.panel);
+      const panel = owned(IDS8.panel);
       if (!panel) return;
       const day = today();
       const tip = helpTip?.() || null;
@@ -15360,7 +16227,7 @@ ${buildCbreBody(current)}`;
         const later = laterEntries(entries, day);
         const open = openEntries(entries, day);
         const footer = [];
-        if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay2(later[0].tag)}). `));
+        if (later.length) footer.push(document.createTextNode(`${later.length} für später geplant (ab ${formatDay3(later[0].tag)}). `));
         if (open.length) footer.push(button3("Tag abschließen …", () => openReview(), "wp-link"));
         if (footer.length) body.append(el7("p", { className: "wp-hint" }, footer));
         body.append(status);
@@ -15372,7 +16239,7 @@ ${buildCbreBody(current)}`;
       const day = today();
       const ids = prioEmployerIds(entries, day);
       const ready = loaded || Boolean(error);
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
         const employer = employerOfRow(row2);
         if (!employer) continue;
         const flag = ids.has(employer.id) ? "1" : "";
@@ -15418,7 +16285,7 @@ ${buildCbreBody(current)}`;
     function applyOrder(ids) {
       const on = prioFirst();
       if (!on && !wasSorted) return;
-      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR10)].map((row2) => row2.parentElement))) {
+      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR11)].map((row2) => row2.parentElement))) {
         const groups = rowGroups(tbody);
         if (groups.some((group) => !natural.has(group[0]))) {
           epoch += 1;
@@ -15435,14 +16302,14 @@ ${buildCbreBody(current)}`;
       wasSorted = on;
     }
     function closeReview() {
-      owned(IDS7.review)?.remove();
+      owned(IDS8.review)?.remove();
     }
     function openReview() {
       closeReview();
       const day = today();
       const open = openEntries(entries, day);
       if (!open.length) return;
-      ensureStyle6();
+      ensureStyle7();
       const decisions2 = new Map(open.map((entry) => [entry.id, "morgen"]));
       const status = el7("div", { className: "wp-status" });
       const items = open.map((entry) => {
@@ -15456,7 +16323,7 @@ ${buildCbreBody(current)}`;
           return choice;
         });
         seg.append(...choices);
-        const sub = [entry.uebertragen ? `übertragen vom ${formatDay2(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
+        const sub = [entry.uebertragen ? `übertragen vom ${formatDay3(entry.tag)}` : "", entry.notiz].filter(Boolean).join(" · ");
         return el7("li", {}, [el7("div", { className: "wp-who" }, [el7("b", { textContent: entry.employerName }), sub ? el7("span", { textContent: sub }) : null]), seg]);
       });
       const save = button3("Übernehmen", async () => {
@@ -15488,12 +16355,12 @@ ${buildCbreBody(current)}`;
       card.setAttribute("aria-label", "Prio-Liste: Tag abschließen");
       card.append(
         el7("h2", { textContent: "Prio-Liste: Tag abschließen" }),
-        el7("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay2(nextWorkday(day))}.` }),
+        el7("p", { textContent: `Was ist erledigt? Der Rest wandert auf den ${formatDay3(nextWorkday(day))}.` }),
         el7("ul", {}, items),
         status,
         el7("div", { className: "wp-foot" }, [later, save])
       );
-      const overlay = el7("div", { id: IDS7.review }, [card]);
+      const overlay = el7("div", { id: IDS8.review }, [card]);
       overlay.dataset.werkiaPrioOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeReview();
@@ -15507,24 +16374,24 @@ ${buildCbreBody(current)}`;
       if (!reviewDue({ now: date, lastShownDay, openCount: 1 })) return;
       await load2();
       if (!loaded) return;
-      if (owned(IDS7.review)) return;
+      if (owned(IDS8.review)) return;
       store.set(STORAGE_KEYS.reviewDay, day);
       if (reviewDue({ now: date, lastShownDay, openCount: openEntries(entries, day).length })) openReview();
     }
     function tick() {
       if (!isTargetPage8()) {
-        owned(IDS7.button)?.remove();
-        owned(IDS7.bar)?.remove();
-        owned(IDS7.panel)?.remove();
-        owned(IDS7.tab)?.remove();
+        owned(IDS8.button)?.remove();
+        owned(IDS8.bar)?.remove();
+        owned(IDS8.panel)?.remove();
+        owned(IDS8.tab)?.remove();
         return;
       }
-      ensureStyle6();
+      ensureStyle7();
       placeButton();
       placePanel2();
       renderRows();
       const pageKey = pageEmployers().map(([id]) => id).join(",");
-      const panel = owned(IDS7.panel);
+      const panel = owned(IDS8.panel);
       if (panel && pageKey !== lastPageKey && !panel.contains(document.activeElement)) {
         lastPageKey = pageKey;
         renderPanel();
@@ -15543,7 +16410,7 @@ ${buildCbreBody(current)}`;
       }, 200);
     };
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS7.review)) return;
+      if (event.key !== "Escape" || !owned(IDS8.review)) return;
       event.stopPropagation();
       closeReview();
     }, true);
@@ -15556,10 +16423,10 @@ ${buildCbreBody(current)}`;
       checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
     }, REVIEW_CHECK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS7.button)?.remove();
-      owned(IDS7.bar)?.remove();
-      owned(IDS7.panel)?.remove();
-      owned(IDS7.tab)?.remove();
+      owned(IDS8.button)?.remove();
+      owned(IDS8.bar)?.remove();
+      owned(IDS8.panel)?.remove();
+      owned(IDS8.tab)?.remove();
       closeReview();
       document.querySelectorAll(`.${STAR_CLASS}`).forEach((star) => {
         if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
@@ -15667,7 +16534,7 @@ ${buildCbreBody(current)}`;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
     const placement = inMatchList ? "match-list" : "vacancy-list";
     runtime.registerSource?.(sourcePath);
-    const IDS10 = {
+    const IDS11 = {
       style: `werkia-${namespace}-vacancy-status-style`,
       bulkButton: `werkia-${namespace}-vacancy-status-bulk-button`,
       dialog: `werkia-${namespace}-vacancy-status-dialog`,
@@ -15679,9 +16546,9 @@ ${buildCbreBody(current)}`;
     const failed = /* @__PURE__ */ new Set();
     const written = /* @__PURE__ */ new Map();
     function injectStyle() {
-      if (document.getElementById(IDS10.style)) return;
+      if (document.getElementById(IDS11.style)) return;
       const style = document.createElement("style");
-      style.id = IDS10.style;
+      style.id = IDS11.style;
       style.textContent = `
       td[${CELL_ATTR}] { font-size: 0 !important; }
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
@@ -15852,8 +16719,8 @@ ${buildCbreBody(current)}`;
       if (!inMatchList) document.querySelectorAll(`td[${CELL_ATTR}]`).forEach((cell) => cell.removeAttribute(CELL_ATTR));
     }
     const kit = bulk ? createBulkDialogKit({
-      ids: { dialog: IDS10.dialog, style: IDS10.dialogStyle, status: IDS10.dialogStatus },
-      buttonIds: [IDS10.bulkButton],
+      ids: { dialog: IDS11.dialog, style: IDS11.dialogStyle, status: IDS11.dialogStatus },
+      buttonIds: [IDS11.bulkButton],
       stopNoun: "Vakanz",
       reloadMissingText: 'Status geändert. Der Adminpanel-Button "Neu laden" wurde nicht gefunden, bitte die Seite neu laden.'
     }) : null;
@@ -15928,7 +16795,7 @@ ${buildCbreBody(current)}`;
     }
     function installBulkButton() {
       if (!kit) return;
-      kit.installButton(document.querySelector("th.column-status"), IDS10.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
+      kit.installButton(document.querySelector("th.column-status"), IDS11.bulkButton, "Alle ändern", "Status für angehakte sichtbare Vakanzen ändern", () => {
         if (!visibleRows().length) return window.alert("Keine sichtbaren Vakanzzeilen gefunden.");
         renderBulkDialog();
       });
@@ -15950,8 +16817,8 @@ ${buildCbreBody(current)}`;
       removeInline();
       if (inMatchList) loaded.clear();
       failed.clear();
-      document.getElementById(IDS10.bulkButton)?.remove();
-      if (!kit?.state.running) document.getElementById(IDS10.dialog)?.remove();
+      document.getElementById(IDS11.bulkButton)?.remove();
+      if (!kit?.state.running) document.getElementById(IDS11.dialog)?.remove();
     }
     let scheduled = false;
     function scheduleInstall() {
@@ -15966,8 +16833,8 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(IDS10.style)?.remove();
-      document.getElementById(IDS10.dialogStyle)?.remove();
+      document.getElementById(IDS11.style)?.remove();
+      document.getElementById(IDS11.dialogStyle)?.remove();
     });
     scheduleInstall();
   }
@@ -16197,11 +17064,11 @@ ${buildCbreBody(current)}`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
-  function inScope(element5) {
-    if (!element5?.closest) return false;
-    if (element5.closest(`#${EXPLAIN_ID}`)) return false;
-    if (element5.closest(NOTES_SELECTOR)) return true;
-    const scope = element5.closest(SCOPE_SELECTOR);
+  function inScope(element6) {
+    if (!element6?.closest) return false;
+    if (element6.closest(`#${EXPLAIN_ID}`)) return false;
+    if (element6.closest(NOTES_SELECTOR)) return true;
+    const scope = element6.closest(SCOPE_SELECTOR);
     return Boolean(scope && /Matchkommentare/i.test(scope.textContent || ""));
   }
   function textPointAt(doc, x, y) {
@@ -16313,9 +17180,9 @@ ${buildCbreBody(current)}`;
   var GROUP_STORAGE_KEY = `${PREFIX2}-group`;
   var TEMPLATES_TAB = "vorlagen";
   var GROUPS2 = buttonGroups();
-  function tiptapOf4(element5) {
+  function tiptapOf4(element6) {
     try {
-      return element5?.wrappedJSObject?.editor || element5?.editor || null;
+      return element6?.wrappedJSObject?.editor || element6?.editor || null;
     } catch {
       return null;
     }
@@ -16348,8 +17215,8 @@ ${buildCbreBody(current)}`;
     } catch {
     }
   }
-  function isDark2(element5) {
-    let node = element5;
+  function isDark2(element6) {
+    let node = element6;
     while (node && node.nodeType === 1) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(node).backgroundColor || "");
       if (match && (match[4] === void 0 || Number(match[4]) > 0.5)) {
@@ -17045,7 +17912,7 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/tagesplan/index.js
-  var IDS8 = {
+  var IDS9 = {
     style: "werkia-tagesplan-style",
     button: "werkia-tagesplan-button",
     panel: "werkia-tagesplan-panel",
@@ -17054,7 +17921,7 @@ ${buildCbreBody(current)}`;
   };
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
   var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
-  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR12 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
   var CLOCK_MS = 1e3;
@@ -17077,14 +17944,14 @@ ${buildCbreBody(current)}`;
     return svg;
   }
   function el6(tag, props = {}, children = []) {
-    const element5 = document.createElement(tag);
+    const element6 = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
-      if (key === "style") element5.style.cssText = value;
-      else if (key === "role" || key.startsWith("aria-")) element5.setAttribute(key, value);
-      else element5[key] = value;
+      if (key === "style") element6.style.cssText = value;
+      else if (key === "role" || key.startsWith("aria-")) element6.setAttribute(key, value);
+      else element6[key] = value;
     }
-    element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
-    return element5;
+    element6.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+    return element6;
   }
   function button2(text, onClick, className = "wtp-secondary") {
     return el6("button", { type: "button", textContent: text, className, onclick: onClick });
@@ -17114,42 +17981,42 @@ ${buildCbreBody(current)}`;
   .wtp .wtp-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .wtp .wtp-grid { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; }
   .wtp ul { list-style:none; margin:0; padding:0; }
-  #${IDS8.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
-  #${IDS8.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
-  #${IDS8.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
-  #${IDS8.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
-  #${IDS8.panel} .wtp-title { font-weight:600; }
-  #${IDS8.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
-  #${IDS8.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
-  #${IDS8.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
-  #${IDS8.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
-  #${IDS8.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
-  #${IDS8.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
-  #${IDS8.panel} .wtp-late { color:var(--bad); font-weight:600; }
-  #${IDS8.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
-  #${IDS8.panel} details summary { cursor:pointer; color:var(--ink-2); }
-  #${IDS8.panel} details li { padding:3px 0; }
-  #${IDS8.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
-  #${IDS8.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
-  #${IDS8.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
-  #${IDS8.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
-  #${IDS8.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.popup} .wtp-item:last-of-type { border-bottom:0; }
-  #${IDS8.popup} .wtp-title { font-weight:600; }
-  #${IDS8.popup} .wtp-row { margin-top:6px; }
-  #${IDS8.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-  #${IDS8.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
-  #${IDS8.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
-  #${IDS8.dialog} li span { flex:1; }
+  #${IDS9.panel} { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(400px,96vw); display:flex; flex-direction:column; background:var(--plane); border-left:1px solid var(--line); box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
+  #${IDS9.panel} .wtp-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 10px; background:var(--surface); border-bottom:1px solid var(--line); }
+  #${IDS9.panel} .wtp-body { flex:1; overflow:auto; padding:4px 16px 16px; }
+  #${IDS9.panel} .wtp-entry { display:grid; grid-template-columns:48px 1fr; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.panel} .wtp-time { font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-2); }
+  #${IDS9.panel} .wtp-title { font-weight:600; }
+  #${IDS9.panel} .wtp-done .wtp-title { text-decoration:line-through; color:var(--muted); }
+  #${IDS9.panel} .wtp-tag { display:inline-block; padding:0 6px; border-radius:4px; font-size:11px; font-weight:600; margin-right:6px; }
+  #${IDS9.panel} .wtp-tag-termin { background:#e8f0f8; color:var(--navy); }
+  #${IDS9.panel} .wtp-tag-reminder { background:var(--accent-soft); color:var(--accent-ink); }
+  #${IDS9.panel} .wtp-tag-team { background:#e9f5ec; color:var(--good); }
+  #${IDS9.panel} .wtp-tag-wvl { background:var(--sunken); color:var(--ink-2); }
+  #${IDS9.panel} .wtp-late { color:var(--bad); font-weight:600; }
+  #${IDS9.panel} .wtp-actions { grid-column:2; display:flex; gap:6px; margin-top:4px; }
+  #${IDS9.panel} details summary { cursor:pointer; color:var(--ink-2); }
+  #${IDS9.panel} details li { padding:3px 0; }
+  #${IDS9.panel} .wtp-form { margin-top:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+  #${IDS9.panel} .wtp-people { max-height:140px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; background:var(--surface); }
+  #${IDS9.panel} .wtp-people label { display:flex; gap:6px; align-items:center; padding:2px 0; }
+  #${IDS9.popup} { position:fixed; right:16px; bottom:16px; z-index:2147482500; width:min(360px,94vw); max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:10px; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); padding:12px 14px; }
+  #${IDS9.popup} .wtp-item { padding:8px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.popup} .wtp-item:last-of-type { border-bottom:0; }
+  #${IDS9.popup} .wtp-title { font-weight:600; }
+  #${IDS9.popup} .wtp-row { margin-top:6px; }
+  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
+  #${IDS9.dialog} .wtp-card { position:relative; width:min(460px,94vw); max-height:86vh; overflow:auto; padding:18px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
+  #${IDS9.dialog} li { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  #${IDS9.dialog} li span { flex:1; }
   .${ROW_BUTTON_CLASS} { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin-left:4px; padding:0; border:0; border-radius:50%; background:transparent; color:#8b8b94; cursor:pointer; vertical-align:middle; }
   .${ROW_BUTTON_CLASS}:hover { background:#f4f4f5; color:#52525b; }
   .${ROW_BUTTON_CLASS} svg { fill:currentColor; }
   .${ROW_BUTTON_CLASS}.wtp-has { color:#ef6c00; }
-  #${IDS8.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-  #${IDS8.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
-  #${IDS8.button}.wtp-native svg { flex:none; fill:currentColor; }
-  #${IDS8.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
+  #${IDS9.button}.wtp-native { display:inline-flex; flex:none; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+  #${IDS9.button}.wtp-native:hover { background:rgba(0,0,0,.04); }
+  #${IDS9.button}.wtp-native svg { flex:none; fill:currentColor; }
+  #${IDS9.button}.wtp-own { min-height:30px; margin-left:8px; padding:5px 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:600 12px/1 Arial,sans-serif; }
 `;
   function executeTagesplan(runtime, {
     routes = [],
@@ -17175,17 +18042,17 @@ ${buildCbreBody(current)}`;
     const reported = /* @__PURE__ */ new Set();
     const isTargetPage8 = () => routes.some((route) => route.test(location.hash));
     const owned = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset.werkiaTagesplanOwner === sourcePath ? element5 : null;
+      const element6 = document.getElementById(id);
+      return element6?.dataset.werkiaTagesplanOwner === sourcePath ? element6 : null;
     };
-    const own = (element5) => {
-      element5.dataset.werkiaTagesplanOwner = sourcePath;
-      element5.classList.add("wtp");
-      return element5;
+    const own = (element6) => {
+      element6.dataset.werkiaTagesplanOwner = sourcePath;
+      element6.classList.add("wtp");
+      return element6;
     };
-    function ensureStyle6() {
-      if (document.getElementById(IDS8.style)) return;
-      document.head.appendChild(el6("style", { id: IDS8.style, textContent: CSS3 }));
+    function ensureStyle7() {
+      if (document.getElementById(IDS9.style)) return;
+      document.head.appendChild(el6("style", { id: IDS9.style, textContent: CSS3 }));
     }
     function readGesehen() {
       try {
@@ -17281,10 +18148,10 @@ ${buildCbreBody(current)}`;
       daten.reminder = [...daten.reminder.filter((entry) => entry.id !== previousId), ...saved ? [saved] : []];
       refreshViews();
     }
-    async function reminderAction(item, action, element5) {
+    async function reminderAction(item, action, element6) {
       const entry = item.reminder;
-      const status = element5.closest(".wtp-item")?.querySelector(".wtp-status");
-      element5.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+      const status = element6.closest(".wtp-item")?.querySelector(".wtp-status");
+      element6.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
         control.disabled = true;
       });
       try {
@@ -17298,7 +18165,7 @@ ${buildCbreBody(current)}`;
           replaceReminder(await client().speichern("reminder", { id: entry.id, daten: entry.daten, faelligUm, erledigt: false }) || { ...entry, faelligUm, angezeigtAm: "" });
         }
       } catch (error) {
-        element5.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
+        element6.closest(".wtp-item")?.querySelectorAll("button, select").forEach((control) => {
           control.disabled = false;
         });
         if (status) {
@@ -17331,21 +18198,21 @@ ${buildCbreBody(current)}`;
       const close = button2("×", () => markGesehen(item.key), "wtp-icon");
       close.title = "Ausblenden";
       close.style.float = "right";
-      const element5 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
-      element5.dataset.key = item.key;
-      return element5;
+      const element6 = el6("div", { className: "wtp-item" }, [close, ...parts, actions, el6("div", { className: "wtp-status" })]);
+      element6.dataset.key = item.key;
+      return element6;
     }
     function renderPopup() {
       const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
-      const existing = owned(IDS8.popup);
+      const existing = owned(IDS9.popup);
       if (!items.length) {
         existing?.remove();
         return;
       }
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
-      ensureStyle6();
-      const popup = existing || own(el6("div", { id: IDS8.popup, role: "alert" }));
+      ensureStyle7();
+      const popup = existing || own(el6("div", { id: IDS9.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
       popup.append(
@@ -17375,12 +18242,12 @@ ${buildCbreBody(current)}`;
       return `${new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" }).format(date)} ${time}`;
     }
     function closeDialog() {
-      owned(IDS8.dialog)?.remove();
+      owned(IDS9.dialog)?.remove();
     }
     function openReminderDialog(matchId) {
       closeDialog();
-      ensureStyle6();
-      const overlay = own(el6("div", { id: IDS8.dialog }));
+      ensureStyle7();
+      const overlay = own(el6("div", { id: IDS9.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -17459,7 +18326,7 @@ ${buildCbreBody(current)}`;
     }
     function decorateRows() {
       if (!isTargetPage8()) return;
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR12)) {
         const link = row2.querySelector(MATCH_LINK_SELECTOR8);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
@@ -17467,7 +18334,7 @@ ${buildCbreBody(current)}`;
         if (!cell) continue;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
-          ensureStyle6();
+          ensureStyle7();
           rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
@@ -17488,13 +18355,13 @@ ${buildCbreBody(current)}`;
       }
     }
     function closePanel() {
-      owned(IDS8.panel)?.remove();
+      owned(IDS9.panel)?.remove();
       teamEditing = null;
     }
     async function openPanel() {
-      ensureStyle6();
-      if (!owned(IDS8.panel)) {
-        const panel = own(el6("aside", { id: IDS8.panel, "aria-label": "Tages-Timeline" }));
+      ensureStyle7();
+      if (!owned(IDS9.panel)) {
+        const panel = own(el6("aside", { id: IDS9.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
       }
       renderPanel("Lädt …");
@@ -17561,10 +18428,10 @@ ${buildCbreBody(current)}`;
         ])));
         main.append(el6("details", {}, [el6("summary", { textContent: "Matches anzeigen" }), list]));
       }
-      const element5 = el6("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
-      if (actions.childElementCount) element5.append(actions);
-      element5.dataset.art = entry.art;
-      return element5;
+      const element6 = el6("div", { className: `wtp-entry${entry.erledigt ? " wtp-done" : ""}` }, [time, main]);
+      if (actions.childElementCount) element6.append(actions);
+      element6.dataset.art = entry.art;
+      return element6;
     }
     async function panelReminderAction(item, action, control) {
       control.disabled = true;
@@ -17645,13 +18512,13 @@ ${buildCbreBody(current)}`;
       ]);
     }
     function renderStatus(text, isError = false) {
-      const status = owned(IDS8.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
+      const status = owned(IDS9.panel)?.querySelector(".wtp-head + .wtp-body > .wtp-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wtp-error", isError);
     }
     function renderPanel(message = "", isError = false) {
-      const panel = owned(IDS8.panel);
+      const panel = owned(IDS9.panel);
       if (!panel) return;
       const day = berlinDay2(now());
       const close = button2("×", closePanel, "wtp-icon");
@@ -17688,11 +18555,11 @@ ${buildCbreBody(current)}`;
     }
     function placeButton() {
       if (!isTargetPage8()) {
-        owned(IDS8.button)?.remove();
+        owned(IDS9.button)?.remove();
         return;
       }
       const slot = findSlot(document);
-      const existing = owned(IDS8.button);
+      const existing = owned(IDS9.button);
       if (existing && slot && existing.parentElement === slot.parent) {
         let next = existing.nextElementSibling;
         while (next && next !== slot.before && /^werkia-/.test(next.id)) next = next.nextElementSibling;
@@ -17701,9 +18568,9 @@ ${buildCbreBody(current)}`;
       if (existing && !slot) return;
       existing?.remove();
       if (!slot) return;
-      ensureStyle6();
-      const heute = button2("Heute", () => owned(IDS8.panel) ? closePanel() : openPanel(), "");
-      heute.id = IDS8.button;
+      ensureStyle7();
+      const heute = button2("Heute", () => owned(IDS9.panel) ? closePanel() : openPanel(), "");
+      heute.id = IDS9.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
       heute.dataset.werkiaTagesplanOwner = sourcePath;
       const look = nativeLookFrom(slot.sample);
@@ -17723,7 +18590,7 @@ ${buildCbreBody(current)}`;
     function refreshViews() {
       renderPopup();
       decorateRows();
-      if (owned(IDS8.panel) && !teamEditing) renderPanel();
+      if (owned(IDS9.panel) && !teamEditing) renderPanel();
     }
     async function tick() {
       const time = now().getTime();
@@ -17738,12 +18605,12 @@ ${buildCbreBody(current)}`;
     }
     runtime.addWindowListener("keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (owned(IDS8.dialog)) {
+      if (owned(IDS9.dialog)) {
         event.stopPropagation();
         closeDialog();
         return;
       }
-      if (owned(IDS8.panel)) {
+      if (owned(IDS9.panel)) {
         event.stopPropagation();
         closePanel();
       }
@@ -17778,12 +18645,12 @@ ${buildCbreBody(current)}`;
       });
     }, CLOCK_MS);
     runtime.addCleanup?.(() => {
-      owned(IDS8.button)?.remove();
-      owned(IDS8.popup)?.remove();
+      owned(IDS9.button)?.remove();
+      owned(IDS9.popup)?.remove();
       closeDialog();
       closePanel();
-      document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element5) => {
-        if (element5.dataset.werkiaTagesplanOwner === sourcePath) element5.remove();
+      document.querySelectorAll(`.${ROW_BUTTON_CLASS}`).forEach((element6) => {
+        if (element6.dataset.werkiaTagesplanOwner === sourcePath) element6.remove();
       });
     });
     schedule();
@@ -17805,16 +18672,16 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS5 = 15e3;
+  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS6 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
-  var OFFLINE_MESSAGE5 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE6 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
-  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaArbeitgeberPauseMe {
+  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaArbeitgeberPauseMe {
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse4(status, text) {
+  function parseResponse5(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -17825,23 +18692,23 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL5 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL6 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS5,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS6,
         onload(response) {
           try {
-            resolve(parseResponse4(response.status, response.responseText));
+            resolve(parseResponse5(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE6)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE6))
       });
     });
   }
@@ -17854,7 +18721,7 @@ ${buildCbreBody(current)}`;
     date.setUTCDate(date.getUTCDate() + days);
     return date.toISOString().slice(0, 10);
   }
-  function formatDay3(day) {
+  function formatDay4(day) {
     const [year, month, date] = String(day || "").split("-");
     return year && month && date ? `${date}.${month}.${year}` : String(day || "");
   }
@@ -17866,9 +18733,9 @@ ${buildCbreBody(current)}`;
   function stellenText(count) {
     return `${count} ${count === 1 ? "Stelle" : "Stellen"}`;
   }
-  function entryMeta(entry) {
+  function entryMeta2(entry) {
     return [
-      `wieder aktiv ab ${formatDay3(entry.wiederAktivAb)}`,
+      `wieder aktiv ab ${formatDay4(entry.wiederAktivAb)}`,
       `${stellenText(entry.stellen)} pausiert`,
       entry.grund,
       entry.pausiertVon ? `von ${entry.pausiertVon}` : ""
@@ -17880,15 +18747,15 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/arbeitgeber-pause/index.js
-  var IDS9 = {
+  var IDS10 = {
     button: "werkia-arbeitgeber-pause-button",
     dialog: "werkia-arbeitgeber-pause-dialog",
     style: "werkia-arbeitgeber-pause-style"
   };
-  var OWNER_KEY = "werkiaArbeitgeberPauseOwner";
-  var CACHE_MS5 = 5 * 60 * 1e3;
-  var CONFIRM_MS2 = 4e3;
-  var T2 = {
+  var OWNER_KEY2 = "werkiaArbeitgeberPauseOwner";
+  var CACHE_MS6 = 5 * 60 * 1e3;
+  var CONFIRM_MS3 = 4e3;
+  var T3 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -17922,61 +18789,61 @@ ${buildCbreBody(current)}`;
     let loading = null;
     let state = { entries: [], heute: "", hits: null, query: "", selected: null, editing: "" };
     const owned = (id) => {
-      const element5 = document.getElementById(id);
-      return element5?.dataset[OWNER_KEY] === sourcePath ? element5 : null;
+      const element6 = document.getElementById(id);
+      return element6?.dataset[OWNER_KEY2] === sourcePath ? element6 : null;
     };
     const currentEmployerId = () => employerIdFromHash(location.hash || "");
     const isButtonPage = () => ROUTES.kamMyMatches.test(location.hash || "") || Boolean(currentEmployerId());
-    function ensureStyle6() {
-      if (document.getElementById(IDS9.style)) return;
+    function ensureStyle7() {
+      if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
-      style.id = IDS9.style;
-      const d = `#${IDS9.dialog}`;
+      style.id = IDS10.style;
+      const d = `#${IDS10.dialog}`;
       style.textContent = `
-      #${IDS9.button}.wap-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
-      #${IDS9.button}.wap-native:hover { background:rgba(0,0,0,.04); }
-      #${IDS9.button}.wap-native svg { flex:none; fill:currentColor; }
-      #${IDS9.button}.wap-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T2.line}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS9.button}.wap-paused { color:${T2.accentInk} !important; background:${T2.accentSoft} !important; }
+      #${IDS10.button}.wap-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
+      #${IDS10.button}.wap-native:hover { background:rgba(0,0,0,.04); }
+      #${IDS10.button}.wap-native svg { flex:none; fill:currentColor; }
+      #${IDS10.button}.wap-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T3.line}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS10.button}.wap-paused { color:${T3.accentInk} !important; background:${T3.accentSoft} !important; }
       ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-      ${d} .wap-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T2.line}; border-radius:12px; background:${T2.surface}; color:${T2.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      ${d} .wap-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T2.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
-      ${d} .wap-close:hover { background:${T2.sunken}; }
+      ${d} .wap-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T3.line}; border-radius:12px; background:${T3.surface}; color:${T3.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wap-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T3.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wap-close:hover { background:${T3.sunken}; }
       ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
-      ${d} h3 { margin:18px 0 8px; color:${T2.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
-      ${d} p { margin:0 0 10px; color:${T2.ink2}; font-size:12px; }
-      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T2.line}; }
-      ${d} li { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
+      ${d} h3 { margin:18px 0 8px; color:${T3.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T3.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T3.line}; }
+      ${d} li { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:8px 0; border-bottom:1px solid ${T3.line}; }
       ${d} .wap-who { flex:1; min-width:200px; }
       ${d} .wap-name { font-weight:600; }
       ${d} .wap-name a { color:inherit; text-decoration:none; }
       ${d} .wap-name a:hover { text-decoration:underline; }
-      ${d} .wap-meta { color:${T2.muted}; font-size:11px; }
-      ${d} .wap-chip { padding:2px 8px; border-radius:999px; background:${T2.accentSoft}; color:${T2.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wap-meta { color:${T3.muted}; font-size:11px; }
+      ${d} .wap-chip { padding:2px 8px; border-radius:999px; background:${T3.accentSoft}; color:${T3.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
       ${d} .wap-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-      ${d} .wap-form { margin-top:10px; padding:12px; border:1px solid ${T2.line}; border-radius:10px; background:${T2.sunken}; }
-      ${d} .wap-form label { display:flex; flex-direction:column; gap:4px; color:${T2.ink2}; font-size:11px; font-weight:600; }
+      ${d} .wap-form { margin-top:10px; padding:12px; border:1px solid ${T3.line}; border-radius:10px; background:${T3.sunken}; }
+      ${d} .wap-form label { display:flex; flex-direction:column; gap:4px; color:${T3.ink2}; font-size:11px; font-weight:600; }
       ${d} .wap-form .wap-grow { flex:1; min-width:200px; }
-      ${d} input { min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T2.lineStrong}; border-radius:8px; background:${T2.surface}; color:${T2.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} input { min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T3.lineStrong}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
       ${d} .wap-row > input[type="search"] { flex:1; }
-      ${d} input:focus { outline:2px solid ${T2.accent}; outline-offset:-1px; }
-      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T2.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} input:focus { outline:2px solid ${T3.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T3.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
       ${d} button:disabled { cursor:default; opacity:.6; }
-      ${d} button.wap-secondary { border:1px solid ${T2.line}; background:${T2.surface}; color:${T2.ink}; }
-      ${d} button.wap-secondary:hover { background:${T2.sunken}; }
-      ${d} button.wap-danger { background:${T2.badSoft}; color:${T2.badInk}; }
-      ${d} button.wap-danger:hover { background:${T2.badHover}; }
+      ${d} button.wap-secondary { border:1px solid ${T3.line}; background:${T3.surface}; color:${T3.ink}; }
+      ${d} button.wap-secondary:hover { background:${T3.sunken}; }
+      ${d} button.wap-danger { background:${T3.badSoft}; color:${T3.badInk}; }
+      ${d} button.wap-danger:hover { background:${T3.badHover}; }
       ${d} .wap-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-      ${d} .wap-status { min-height:18px; margin-top:10px; color:${T2.ink2}; font-size:12px; }
-      ${d} .wap-status.wap-error { color:${T2.badInk}; }
+      ${d} .wap-status { min-height:18px; margin-top:10px; color:${T3.ink2}; font-size:12px; }
+      ${d} .wap-status.wap-error { color:${T3.badInk}; }
     `;
       document.head.appendChild(style);
     }
     function el7(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
-      Object.assign(element5, props);
-      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
-      return element5;
+      const element6 = document.createElement(tag);
+      Object.assign(element6, props);
+      element6.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element6;
     }
     function button3(text, onClick, className = "") {
       return el7("button", { type: "button", textContent: text, className, onclick: onClick });
@@ -17997,24 +18864,24 @@ ${buildCbreBody(current)}`;
     function confirmButton(label, question, onConfirm, className = "wap-danger") {
       let armed = false;
       let timer = null;
-      const element5 = button3(label, () => {
+      const element6 = button3(label, () => {
         if (!armed) {
           armed = true;
-          element5.textContent = question;
+          element6.textContent = question;
           timer = runtime.setTimeout(() => {
             armed = false;
-            element5.textContent = label;
-          }, CONFIRM_MS2);
+            element6.textContent = label;
+          }, CONFIRM_MS3);
           return;
         }
         if (timer !== null) runtime.clearTimeout?.(timer);
         onConfirm();
       }, className);
-      return element5;
+      return element6;
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY5, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -18034,25 +18901,25 @@ ${buildCbreBody(current)}`;
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS6) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[Arbeitgeber-Pause] Liste nicht geladen:", error?.message || error);
         return cache;
       });
     }
     function setStatus(text, isError = false) {
-      const status = owned(IDS9.dialog)?.querySelector(".wap-status");
+      const status = owned(IDS10.dialog)?.querySelector(".wap-status");
       if (!status) return;
       status.textContent = text;
       status.classList.toggle("wap-error", isError);
     }
     function setBusy(busy) {
-      owned(IDS9.dialog)?.querySelectorAll(".wap-body button, .wap-body input").forEach((element5) => {
-        element5.disabled = busy;
+      owned(IDS10.dialog)?.querySelectorAll(".wap-body button, .wap-body input").forEach((element6) => {
+        element6.disabled = busy;
       });
     }
     function closeDialog() {
-      owned(IDS9.dialog)?.remove();
+      owned(IDS10.dialog)?.remove();
     }
     async function refresh(message = "") {
       const list = await fetchList();
@@ -18086,7 +18953,7 @@ ${buildCbreBody(current)}`;
       const parts = [
         el7("div", { className: "wap-who" }, [
           el7("div", { className: "wap-name" }, [employerLink(entry.employerId, entry.employerName)]),
-          el7("div", { className: "wap-meta", textContent: entryMeta(entry) })
+          el7("div", { className: "wap-meta", textContent: entryMeta2(entry) })
         ])
       ];
       if (state.editing === entry.id) {
@@ -18199,7 +19066,7 @@ ${buildCbreBody(current)}`;
       return parts;
     }
     function render() {
-      const target = owned(IDS9.dialog)?.querySelector(".wap-body");
+      const target = owned(IDS10.dialog)?.querySelector(".wap-body");
       if (!target) return;
       target.textContent = "";
       const list = el7("ul");
@@ -18219,10 +19086,10 @@ ${buildCbreBody(current)}`;
     }
     async function openDialog({ employerId = "" } = {}) {
       closeDialog();
-      ensureStyle6();
+      ensureStyle7();
       state = { entries: cache?.entries || [], heute: cache?.heute || "", hits: null, query: "", selected: null, editing: "" };
-      const overlay = el7("div", { id: IDS9.dialog });
-      overlay.dataset[OWNER_KEY] = sourcePath;
+      const overlay = el7("div", { id: IDS10.dialog });
+      overlay.dataset[OWNER_KEY2] = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -18246,16 +19113,16 @@ ${buildCbreBody(current)}`;
     function buttonLabel(employerId) {
       if (!employerId) return { text: "AG-Pause", title: "Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
       const entry = findEntry(cache?.entries, employerId);
-      if (entry) return { text: `Pausiert bis ${lastPausedDay(entry.wiederAktivAb)}`, title: `Wieder aktiv ab ${formatDay3(entry.wiederAktivAb)}. Klicken zum Ändern oder Beenden.`, paused: true };
+      if (entry) return { text: `Pausiert bis ${lastPausedDay(entry.wiederAktivAb)}`, title: `Wieder aktiv ab ${formatDay4(entry.wiederAktivAb)}. Klicken zum Ändern oder Beenden.`, paused: true };
       return { text: "Pausieren", title: "Diesen Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
     }
     function placeButton() {
       if (!isButtonPage()) {
-        owned(IDS9.button)?.remove();
+        owned(IDS10.button)?.remove();
         return;
       }
       const slot = findSlot(document);
-      const existing = owned(IDS9.button);
+      const existing = owned(IDS10.button);
       const employerId = currentEmployerId();
       const label = buttonLabel(employerId);
       if (existing && slot && existing.parentElement === slot.parent && existing.dataset.employerId === employerId && existing.dataset.label === label.text) {
@@ -18268,11 +19135,11 @@ ${buildCbreBody(current)}`;
       existing?.remove();
       const target = findSlot(document);
       if (!target) return;
-      ensureStyle6();
+      ensureStyle7();
       const pauseButton = button3(label.text, () => openDialog({ employerId: currentEmployerId() }));
-      pauseButton.id = IDS9.button;
+      pauseButton.id = IDS10.button;
       pauseButton.title = label.title;
-      pauseButton.dataset[OWNER_KEY] = sourcePath;
+      pauseButton.dataset[OWNER_KEY2] = sourcePath;
       pauseButton.dataset.employerId = employerId;
       pauseButton.dataset.label = label.text;
       const look = nativeLookFrom(target.sample);
@@ -18291,7 +19158,7 @@ ${buildCbreBody(current)}`;
       target.parent.insertBefore(pauseButton, before);
     }
     runtime.addWindowListener("keydown", (event) => {
-      if (event.key !== "Escape" || !owned(IDS9.dialog)) return;
+      if (event.key !== "Escape" || !owned(IDS10.dialog)) return;
       event.stopPropagation();
       closeDialog();
     }, true);
@@ -18321,10 +19188,530 @@ ${buildCbreBody(current)}`;
     runtime.createMutationObserver(() => scheduleButton()).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", onChange);
     runtime.addCleanup?.(() => {
-      owned(IDS9.button)?.remove();
+      owned(IDS10.button)?.remove();
       closeDialog();
     });
     onChange();
+  }
+
+  // src/features/match-mail/core.js
+  var MY_MATCHES_ONLINE_MATCH_STATUSES = ["process", "unsolicited_send", "reverse_match_send", "kam_request", "portal_uploaded"];
+  var CLOSED_KAM_STATUSES = ["hired", "out"];
+  var PAGE_SIZE2 = 200;
+  var MAX_PAGES = 20;
+  var NAMES_CHUNK = 300;
+  var CACHE_MS7 = 2 * 60 * 1e3;
+  var APPLICANTS_PLACEHOLDER = "{{{offeneBewerber}}}";
+  var OPEN_MATCHES_QUERY = `query WerkiaKamOffeneMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
+  items: allMatches(filter: $filter, page: $page, perPage: $perPage, sortField: "id", sortOrder: "ASC") { id candidateId jobPositionId kamStatus }
+}`;
+  var CANDIDATE_NAMES_QUERY = `query WerkiaKamOffeneBewerberNamen($ids: [UUID!]) {
+  items: allCandidates(filter: { ids: $ids }, page: 0, perPage: 300) { id firstName lastName }
+}`;
+  var JOB_TITLES_QUERY = `query WerkiaKamOffeneBewerberVakanzen($ids: [UUID!]) {
+  items: allJobPositions(filter: { ids: $ids }, page: 0, perPage: 300) { id mainTitle }
+}`;
+  function openMatchesVariables(employerId, page = 0) {
+    return {
+      filter: { employerIds: [String(employerId)], matched: true, onlineMatchStatuses: MY_MATCHES_ONLINE_MATCH_STATUSES },
+      page,
+      perPage: PAGE_SIZE2
+    };
+  }
+  function isOpenKamStatus(status) {
+    return !CLOSED_KAM_STATUSES.includes(String(status || "").trim().toLowerCase());
+  }
+  function clean5(value) {
+    return String(value ?? "").replace(/\s+/g, " ").trim();
+  }
+  function openApplicants(matches = [], candidates = [], jobs = []) {
+    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean5([c.firstName, c.lastName].filter(Boolean).join(" "))]));
+    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean5(j.mainTitle)]));
+    const seen = /* @__PURE__ */ new Set();
+    const list = [];
+    for (const match of matches) {
+      if (!match || !isOpenKamStatus(match.kamStatus)) continue;
+      const candidateId = String(match.candidateId || "");
+      const name = candidateNames.get(candidateId) || "";
+      if (!name) continue;
+      const jobTitle = jobTitles.get(String(match.jobPositionId || "")) || "";
+      const key = `${candidateId}|${jobTitle}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({ matchId: String(match.id), candidateId, name, jobTitle });
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name, "de") || a.jobTitle.localeCompare(b.jobTitle, "de"));
+  }
+  function applicantsText(list = [], { titles = "auto" } = {}) {
+    const distinct = new Set(list.map((item) => item.jobTitle).filter(Boolean));
+    const withTitle = titles === "always" || distinct.size > 1;
+    return list.map((item) => `- ${item.name}${withTitle && item.jobTitle ? ` (${item.jobTitle})` : ""}`).join("\n");
+  }
+  function insertApplicants(value, text, start = null, end = null) {
+    const current = String(value ?? "");
+    const block = String(text ?? "");
+    const placeholderAt = current.indexOf(APPLICANTS_PLACEHOLDER);
+    if (placeholderAt >= 0) {
+      return {
+        value: current.slice(0, placeholderAt) + block + current.slice(placeholderAt + APPLICANTS_PLACEHOLDER.length),
+        caret: placeholderAt + block.length
+      };
+    }
+    const from = Number.isInteger(start) ? Math.max(0, Math.min(start, current.length)) : current.length;
+    const to = Number.isInteger(end) ? Math.max(from, Math.min(end, current.length)) : from;
+    const before = current.slice(0, from);
+    const after = current.slice(to);
+    const lead = before && !before.endsWith("\n") ? "\n" : "";
+    const tail = after && !after.startsWith("\n") ? "\n" : "";
+    return { value: `${before}${lead}${block}${tail}${after}`, caret: from + lead.length + block.length };
+  }
+  function chunk2(items, size) {
+    const out = [];
+    for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+    return out;
+  }
+  function createOpenApplicantsProvider({ request, now = () => Date.now() }) {
+    const cache = /* @__PURE__ */ new Map();
+    async function load2(employerId) {
+      const matches = [];
+      for (let page = 0; page < MAX_PAGES; page += 1) {
+        const data = await request(OPEN_MATCHES_QUERY, openMatchesVariables(employerId, page));
+        const items = data?.items || [];
+        matches.push(...items);
+        if (items.length < PAGE_SIZE2) break;
+      }
+      const open = matches.filter((match) => isOpenKamStatus(match?.kamStatus));
+      if (!open.length) return [];
+      const candidateIds = [...new Set(open.map((m) => String(m.candidateId || "")).filter(Boolean))];
+      const jobIds = [...new Set(open.map((m) => String(m.jobPositionId || "")).filter(Boolean))];
+      const byIds = async (query, ids) => {
+        const items = [];
+        for (const part of chunk2(ids, NAMES_CHUNK)) items.push(...(await request(query, { ids: part }))?.items || []);
+        return items;
+      };
+      if (!candidateIds.length) return [];
+      const candidates = await byIds(CANDIDATE_NAMES_QUERY, candidateIds);
+      const jobs = jobIds.length ? await byIds(JOB_TITLES_QUERY, jobIds) : [];
+      return openApplicants(open, candidates, jobs);
+    }
+    function get(employerId) {
+      const key = String(employerId || "");
+      if (!key) return Promise.reject(new Error("Kein Arbeitgeber."));
+      const hit = cache.get(key);
+      if (hit && now() - hit.at < CACHE_MS7) return hit.promise;
+      const promise = load2(key);
+      cache.set(key, { at: now(), promise });
+      promise.catch(() => {
+        if (cache.get(key)?.promise === promise) cache.delete(key);
+      });
+      return promise;
+    }
+    return { get };
+  }
+
+  // src/features/match-mail/index.js
+  var STYLE_ID13 = "werkia-kam-match-mail-style-v1";
+  var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
+  var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
+  var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
+  var EMPLOYER_BUTTON_ATTRIBUTE = "data-werkia-kam-applicants-employer";
+  var EMAIL_ICON_SELECTOR = 'svg[data-testid="EmailIcon"]';
+  var BODY_SELECTOR = 'textarea[name="bodyPreview"]';
+  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var STYLE5 = `
+.werkia-kmm-open { display: inline-flex; align-items: center; gap: 4px; height: 24px; margin-left: 10px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; vertical-align: middle; cursor: pointer; }
+.werkia-kmm-open:hover { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+.werkia-kmm-open svg { width: 14px; height: 14px; fill: currentColor; }
+.werkia-kmm-open-msg { margin-left: 8px; font: 400 12px/1.4 ${FONT8}; color: #b52f2f; vertical-align: middle; }
+.werkia-kmm-open-msg:empty { display: none; }
+.werkia-kmm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0; padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-bar b { font-weight: 650; }
+.werkia-kmm-bar small { color: #8b8b94; }
+.werkia-kmm-bar small[data-tone="error"] { color: #b52f2f; }
+.werkia-kmm-btn { height: 24px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; cursor: pointer; }
+.werkia-kmm-btn:hover:not(:disabled), .werkia-kmm-btn[data-done="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+.werkia-kmm-btn:disabled { opacity: .5; cursor: default; }
+.werkia-kmm-overlay { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center; background: rgba(9, 9, 11, .35); }
+.werkia-kmm-card { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 10px; background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-card-head { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 14px; }
+.werkia-kmm-card-head small { font-weight: 500; color: #8b8b94; font-size: 12px; }
+.werkia-kmm-card-head small[data-tone="error"] { color: #b52f2f; }
+.werkia-kmm-card textarea { flex: 1 1 auto; min-height: 240px; resize: vertical; padding: 8px; border: 1px solid #e4e4e7; border-radius: 8px; font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-card-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.werkia-kmm-employer { position: fixed; right: 16px; bottom: 16px; z-index: 1200; height: 30px; padding: 0 14px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); cursor: pointer; }
+.werkia-kmm-employer:hover { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
+`;
+  var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
+  function ensureStyle6(doc) {
+    if (doc.getElementById(STYLE_ID13)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID13;
+    style.textContent = STYLE5;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  function element5(doc, tag, className, text) {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text !== void 0) node.textContent = text;
+    return node;
+  }
+  function mailIcon(doc) {
+    const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", MAIL_ICON_PATH);
+    svg.appendChild(path);
+    return svg;
+  }
+  function findRowMailButton(row2) {
+    if (!row2) return null;
+    const byClass = row2.querySelector("td.column-email button");
+    if (byClass) return byClass;
+    const table = row2.closest("table");
+    const headers = table ? [...table.querySelectorAll("thead th")] : [];
+    const index = headers.findIndex((th) => th.textContent.trim() === "Email");
+    if (index >= 0) {
+      const cell = row2.children[index];
+      const button3 = cell?.querySelector("button");
+      if (button3) return button3;
+    }
+    const icons = [...row2.querySelectorAll(EMAIL_ICON_SELECTOR)];
+    return icons.at(-1)?.closest("button") || null;
+  }
+  function findMatchRow(doc, matchId) {
+    if (!matchId) return null;
+    return [...doc.querySelectorAll("tr")].find((row2) => matchIdFromRow(row2) === matchId) || null;
+  }
+  function findSendMailDialogs(doc = document) {
+    const papers = '.MuiDialog-paper, [role="dialog"]';
+    const found = /* @__PURE__ */ new Set();
+    for (const node of doc.querySelectorAll('[data-testid="send-mail-dialog"]')) {
+      found.add(node.matches(papers) ? node : node.querySelector(papers) || node.closest(papers) || node);
+    }
+    for (const dialog of doc.querySelectorAll(papers)) {
+      if (/Email senden/.test(dialog.textContent || "") && dialog.querySelector(`${BODY_SELECTOR}, [data-testid="email-body"]`)) found.add(dialog);
+    }
+    return [...found].filter((dialog) => ![...found].some((other) => other !== dialog && dialog.contains(other)));
+  }
+  function setReactValue(textarea, value) {
+    const view = textarea.ownerDocument.defaultView || window;
+    const setter = Object.getOwnPropertyDescriptor(view.HTMLTextAreaElement.prototype, "value")?.set;
+    if (setter) setter.call(textarea, value);
+    else textarea.value = value;
+    textarea.dispatchEvent(new view.Event("input", { bubbles: true }));
+    textarea.dispatchEvent(new view.Event("change", { bubbles: true }));
+  }
+  function employerIdFromEmployerHash(hash) {
+    return String(hash || "").match(/^#\/Employer\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?]|$)/i)?.[1]?.toLowerCase() || "";
+  }
+  function titleNode(dialog) {
+    const title = dialog.querySelector(".MuiDialogTitle-root");
+    if (title) return title;
+    return [...dialog.querySelectorAll("h1, h2, h3, h6")].find((node) => /Matchkommentare/.test(node.textContent || "")) || null;
+  }
+  function executeMatchMail(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    helpTip = () => null
+  } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    let commentsRow = null;
+    let commentsMatchId = "";
+    let mailContext = { matchId: "", employerId: "" };
+    let applicantsProvider = null;
+    const bars = /* @__PURE__ */ new WeakMap();
+    function adapter2() {
+      try {
+        return getGraphqlAdapter();
+      } catch {
+        return null;
+      }
+    }
+    function provider() {
+      if (applicantsProvider) return applicantsProvider;
+      const graphql = adapter2();
+      if (!graphql) return null;
+      applicantsProvider = createOpenApplicantsProvider({ request: graphql.request });
+      return applicantsProvider;
+    }
+    function closeListDialog() {
+      document.querySelector(`[${LIST_DIALOG_ATTRIBUTE}]`)?.remove();
+    }
+    function showApplicantsDialog(employerIdOrPromise, host = document.body) {
+      closeListDialog();
+      ensureStyle6(document);
+      const overlay = element5(document, "div", "werkia-kmm-overlay");
+      overlay.setAttribute(LIST_DIALOG_ATTRIBUTE, "");
+      const card = element5(document, "div", "werkia-kmm-card");
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-label", "Offene Bewerber des Arbeitgebers");
+      const head = element5(document, "div", "werkia-kmm-card-head");
+      const status = element5(document, "small", "", "Wird geladen …");
+      head.append(...[element5(document, "span", "", "Offene Bewerber des Arbeitgebers"), helpTip(), status].filter(Boolean));
+      const textarea = element5(document, "textarea");
+      textarea.readOnly = true;
+      const copy = element5(document, "button", "werkia-kmm-btn", "Kopieren");
+      copy.type = "button";
+      copy.disabled = true;
+      const close = element5(document, "button", "werkia-kmm-btn", "Schließen");
+      close.type = "button";
+      const actions = element5(document, "div", "werkia-kmm-card-actions");
+      actions.append(copy, close);
+      card.append(head, textarea, actions);
+      overlay.append(card);
+      for (const type of ["click", "mousedown", "keydown"]) card.addEventListener(type, (event) => event.stopPropagation());
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeListDialog();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeListDialog();
+      });
+      close.addEventListener("click", closeListDialog);
+      copy.addEventListener("click", async () => {
+        if (textarea.value && await copyToClipboard(textarea.value, document)) {
+          copy.dataset.done = "true";
+          copy.textContent = "Kopiert";
+        }
+      });
+      host.appendChild(overlay);
+      close.focus();
+      const applicants = provider();
+      if (!applicants) {
+        status.textContent = "Keine Anmeldung am Adminpanel erfasst.";
+        status.dataset.tone = "error";
+        return overlay;
+      }
+      Promise.resolve(employerIdOrPromise).then((employerId) => {
+        if (!employerId) throw new Error("Arbeitgeber nicht gefunden.");
+        return applicants.get(employerId);
+      }).then(async (list) => {
+        if (!overlay.isConnected) return;
+        textarea.value = applicantsText(list, { titles: "always" });
+        copy.disabled = !list.length;
+        const count = list.length === 1 ? "1 offene Bewerbung" : `${list.length} offene Bewerbungen`;
+        if (!list.length) {
+          status.textContent = "Keine offenen Bewerbungen.";
+          return;
+        }
+        const copied = await copyToClipboard(textarea.value, document);
+        status.textContent = copied ? `${count}, in der Zwischenablage` : `${count}, mit „Kopieren“ übernehmen`;
+        if (copied) copy.textContent = "Nochmal kopieren";
+      }, (error) => {
+        console.warn("[Offene Bewerber]", error);
+        status.textContent = String(error?.message || "Bewerber nicht lesbar.");
+        status.dataset.tone = "error";
+      });
+      return overlay;
+    }
+    function commentsEmployerId() {
+      const matchId = commentsMatchId || matchIdFromHref(location.hash);
+      const row2 = commentsRow?.isConnected ? commentsRow : findMatchRow(document, matchId);
+      return resolveEmployer({ matchId: matchIdFromRow(row2) || matchId, employerId: employerIdFromRow(row2) });
+    }
+    function renderEmployerButton() {
+      const employerId = employerIdFromEmployerHash(location.hash);
+      const existing = document.querySelector(`[${EMPLOYER_BUTTON_ATTRIBUTE}]`);
+      if (!employerId) {
+        existing?.remove();
+        return;
+      }
+      if (existing) {
+        existing.setAttribute(EMPLOYER_BUTTON_ATTRIBUTE, employerId);
+        return;
+      }
+      ensureStyle6(document);
+      const button3 = element5(document, "button", "werkia-kmm-employer", "Offene Bewerber");
+      button3.type = "button";
+      button3.title = "Alle offenen Bewerbungen dieses Arbeitgebers (KAM-Status weder Hired noch Out) als Liste, kopiert in die Zwischenablage";
+      button3.setAttribute(EMPLOYER_BUTTON_ATTRIBUTE, employerId);
+      button3.addEventListener("click", (event) => {
+        event.preventDefault();
+        showApplicantsDialog(button3.getAttribute(EMPLOYER_BUTTON_ATTRIBUTE));
+      });
+      document.body.appendChild(button3);
+    }
+    function openMail(dialog, message) {
+      message.textContent = "";
+      const matchId = commentsMatchId || matchIdFromHref(location.hash);
+      const row2 = commentsRow?.isConnected ? commentsRow : findMatchRow(document, matchId);
+      const button3 = findRowMailButton(row2);
+      if (!button3) {
+        message.textContent = "Mail-Knopf nicht gefunden. Den Dialog über KAM › Meine Matches öffnen.";
+        return;
+      }
+      mailContext = { matchId: matchIdFromRow(row2) || matchId, employerId: employerIdFromRow(row2) };
+      button3.click();
+      schedule();
+    }
+    function renderOpenButton() {
+      const dialog = findMatchCommentsDialog(document);
+      if (!dialog || dialog.querySelector(`[${OPEN_ATTRIBUTE}]`)) return;
+      ensureStyle6(document);
+      const wrap2 = element5(document, "span");
+      wrap2.setAttribute(OPEN_ATTRIBUTE, "");
+      const button3 = element5(document, "button", "werkia-kmm-open");
+      button3.type = "button";
+      button3.title = "Öffnet den Mail-Dialog des Adminpanels (Mail-Vorlagen an den Ansprechpartner) für diesen Match";
+      button3.append(mailIcon(document), document.createTextNode("Mail an AP"));
+      const message = element5(document, "span", "werkia-kmm-open-msg");
+      button3.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openMail(dialog, message);
+      });
+      const list = element5(document, "button", "werkia-kmm-open", "Offene Bewerber");
+      list.type = "button";
+      list.title = "Alle offenen Bewerbungen des Arbeitgebers als Liste, kopiert in die Zwischenablage";
+      list.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showApplicantsDialog(commentsEmployerId(), dialog);
+      });
+      wrap2.append(...[button3, list, helpTip(), message].filter(Boolean));
+      const title = titleNode(dialog);
+      if (title) title.appendChild(wrap2);
+      else dialog.prepend(wrap2);
+    }
+    function currentMailTarget() {
+      if (mailContext.matchId || mailContext.employerId) return mailContext;
+      return { matchId: matchIdFromHref(location.hash), employerId: "" };
+    }
+    async function resolveEmployer(target) {
+      if (target.employerId) return target.employerId;
+      const graphql = adapter2();
+      if (!graphql || !target.matchId) return "";
+      return employerNotesProviderFor(graphql).employerIdForMatch(target.matchId);
+    }
+    function createBar(dialog) {
+      const bar = element5(document, "div", "werkia-kmm-bar");
+      bar.setAttribute(BAR_ATTRIBUTE, "");
+      const label = element5(document, "b", "", "Offene Bewerber des Arbeitgebers");
+      const status = element5(document, "small", "", "Wird geladen …");
+      const insert = element5(document, "button", "werkia-kmm-btn", "Namen einfügen");
+      insert.type = "button";
+      insert.disabled = true;
+      insert.title = "Setzt die Namen an die Cursorstelle im Text, oder an die Stelle {{{offeneBewerber}}}, wenn die Vorlage sie hat. Erst die Vorlage wählen, dann einfügen.";
+      const copy = element5(document, "button", "werkia-kmm-btn", "Kopieren");
+      copy.type = "button";
+      copy.disabled = true;
+      bar.append(...[label, helpTip(), status, insert, copy].filter(Boolean));
+      const state = { bar, status, insert, copy, text: "" };
+      const flash = (button3) => {
+        button3.dataset.done = "true";
+        runtime.setTimeout(() => {
+          delete button3.dataset.done;
+        }, 1500);
+      };
+      insert.addEventListener("click", (event) => {
+        event.preventDefault();
+        const textarea = dialog.querySelector(BODY_SELECTOR);
+        if (!textarea || !state.text) return;
+        const result = insertApplicants(textarea.value, state.text, textarea.selectionStart, textarea.selectionEnd);
+        setReactValue(textarea, result.value);
+        try {
+          textarea.focus();
+          textarea.setSelectionRange(result.caret, result.caret);
+        } catch {
+        }
+        flash(insert);
+      });
+      copy.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (state.text && await copyToClipboard(state.text, document)) flash(copy);
+      });
+      const target = currentMailTarget();
+      const applicants = provider();
+      if (!applicants) {
+        status.textContent = "Keine Anmeldung am Adminpanel erfasst.";
+        status.dataset.tone = "error";
+        return state;
+      }
+      resolveEmployer(target).then((employerId) => {
+        if (!employerId) throw new Error("Arbeitgeber zu diesem Match nicht gefunden.");
+        return applicants.get(employerId);
+      }).then((list) => {
+        state.text = applicantsText(list);
+        status.textContent = list.length === 1 ? "1 offener Bewerber" : `${list.length} offene Bewerber`;
+        status.title = state.text;
+        insert.disabled = !list.length || !dialog.querySelector(BODY_SELECTOR);
+        copy.disabled = !list.length;
+        if (list.length && !dialog.querySelector(BODY_SELECTOR)) insert.title = "Kein einfaches Textfeld im Dialog. Mit „Kopieren“ übernehmen.";
+      }, (error) => {
+        console.warn("[Mail an AP]", error);
+        status.textContent = String(error?.message || "Bewerber nicht lesbar.");
+        status.dataset.tone = "error";
+      });
+      return state;
+    }
+    function placeBar(dialog, bar) {
+      const textarea = dialog.querySelector(BODY_SELECTOR);
+      const stack2 = textarea?.closest(".MuiStack-root");
+      const field = textarea?.closest(".MuiFormControl-root, .MuiTextField-root");
+      const anchor = stack2 && dialog.contains(stack2) && !stack2.querySelector('[name="subjectPreview"]') ? stack2 : field;
+      if (anchor) {
+        if (anchor.previousElementSibling !== bar) anchor.before(bar);
+        return;
+      }
+      const content = dialog.querySelector(".MuiDialogContent-root") || dialog.querySelector("form") || dialog;
+      if (content.firstElementChild !== bar) content.prepend(bar);
+    }
+    function renderBars() {
+      for (const dialog of findSendMailDialogs(document)) {
+        ensureStyle6(document);
+        if (!bars.has(dialog)) bars.set(dialog, createBar(dialog));
+        placeBar(dialog, bars.get(dialog).bar);
+      }
+    }
+    function render() {
+      renderOpenButton();
+      renderEmployerButton();
+      renderBars();
+      if (!findSendMailDialogs(document).length && !findMatchCommentsDialog(document)) {
+        commentsRow = null;
+        commentsMatchId = "";
+      }
+    }
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    };
+    runtime.addDocumentListener("click", (event) => {
+      const target = event.target;
+      const comments = target?.closest?.(COMMENTS_BUTTON_SELECTOR);
+      if (comments) {
+        commentsRow = comments.closest("tr");
+        commentsMatchId = matchIdFromRow(commentsRow);
+        schedule();
+        return;
+      }
+      const button3 = target?.closest?.("button");
+      const row2 = button3?.closest("tr");
+      const matchId = matchIdFromRow(row2);
+      if (matchId) {
+        mailContext = { matchId, employerId: employerIdFromRow(row2) };
+        schedule();
+      }
+    }, true);
+    runtime.addWindowListener?.("hashchange", schedule);
+    try {
+      if (typeof GM_registerMenuCommand === "function") {
+        GM_registerMenuCommand("KAM-Toolbox: Offene Bewerber des Arbeitgebers", () => {
+          const employerId = employerIdFromEmployerHash(location.hash);
+          if (employerId) showApplicantsDialog(employerId);
+          else if (findMatchCommentsDialog(document)) showApplicantsDialog(commentsEmployerId(), findMatchCommentsDialog(document));
+          else showApplicantsDialog(resolveEmployer(currentMailTarget()));
+        });
+      }
+    } catch {
+    }
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    schedule();
   }
 
   // ../../shared/js/om-notes-templates/index.js
@@ -18355,7 +19742,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID13 = "werkia-om-notes-template-style";
+  var STYLE_ID14 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -18424,11 +19811,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID13)) {
+    if (document.getElementById(STYLE_ID14)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID13;
+    style.id = STYLE_ID14;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -18662,7 +20049,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID13)?.remove();
+      document.getElementById(STYLE_ID14)?.remove();
     });
     renderToolbar();
   }
@@ -18682,7 +20069,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID14 = "werkia-urgent-vacancy-style";
+      const STYLE_ID15 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -18821,9 +20208,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID14)) return;
+        if (document.getElementById(STYLE_ID15)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID14;
+        style.id = STYLE_ID15;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -18934,6 +20321,7 @@ ${next}`;
     { id: "kam-suite-chat-icon-redirect", execute: executeChatIconRedirect },
     { id: "kam-suite-appointment-copy-paste", execute: executeAppointmentCopyPaste },
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
+    { id: "vta-notizen", execute: executeVtaNotizen2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },
@@ -18953,6 +20341,11 @@ ${next}`;
     { id: "vacancy-status", execute: executeVacancyStatus2 },
     { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
     { id: "match-mention", execute: executeKamMatchMention },
+    { id: "match-mail", execute: (runtime) => executeMatchMail(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      sourcePath: "kam/toolbox/src/features/match-mail/index.js",
+      helpTip: () => kamHelp.tip("match-mail")
+    }) },
     { id: "om-notes-templates", execute: (runtime) => executeOmNotesTemplates(runtime, { helpTip: () => kamHelp.tip("om-notes-templates", { tone: "dark" }) }) },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule }
   ], location.hostname));

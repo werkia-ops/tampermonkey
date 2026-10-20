@@ -44,6 +44,8 @@ Enthaltene Funktionen:
 - In Outlook Web: zur geöffneten Mail eines Arbeitgebers der Vorschlag aus dem n8n-Workflow KAM Mail Assistent (Status, Grund, Kommentar mit CEM-Erwähnung, WVL, AG-Notiz). Blauer Knopf unten rechts, jede Aktion einzeln abwählbar, „Übernehmen“ schreibt mit der eigenen Anmeldung.
 - Prio-Liste in Meine Matches: Knopf "Prio-Liste" oben rechts klappt ein Panel mit den heute markierten Arbeitgebern auf. Markieren per Stern vor dem Arbeitgeber oder im Panel, abhaken, Notiz bearbeiten. Um 17:30 ein Fenster zum Tagesabschluss, Offenes wandert auf den nächsten Arbeitstag. Schalter "Prio zuerst" sortiert die Zeilen der Seite. Gespeichert pro Person über Toolbox-Daten, lesbar für die heutige Vertretung.
 - Knopf „AG-Pause“ in Meine Matches und „Pausieren“ in der Leiste des Arbeitgebers: pausiert einen Arbeitgeber (Standort pausiert) samt veröffentlichter Stellen bis zu einem Datum. Am Morgen von „Wieder aktiv ab“ setzt der n8n-Workflow Arbeitgeber Pause beides zurück, pausierende Person und KAM bekommen eine Slack-DM. Verlängern und vorzeitig beenden im selben Dialog.
+- Feste VTA-Notiz je Arbeitgeber (z. B. Buchungslink): Box unter dem Notizfeld im Terminvorschlag-Dialog, bei neuen Terminen einmal ans Notizfeld angehängt. Pflege über Knopf „VTA-Notiz“ am Arbeitgeber, direkt in der Box oder im Tampermonkey-Menü. Gespeichert im n8n-Workflow VTA Notizen.
+- Knopf „Mail an AP“ im Matchkommentar-Dialog öffnet den AP-Dialog „Email senden“ desselben Matches. Leiste im Mail-Dialog fügt die Namen aller offenen Bewerbungen beim Arbeitgeber ein (ohne 20er-Grenze), „Offene Bewerber“ zeigt und kopiert die vollständige Liste.
 
 ## CEM Toolbox
 
@@ -83,6 +85,7 @@ Enthaltene Funktionen:
 - Ganz oben im Matchkommentar-Dialog der Hauptansprechpartner des Arbeitgebers mit Name, Telefonnummer und E-Mail, je mit Kopierknopf, dazu "Alles kopieren". Ohne markierten Haupt-AP steht der erste, mit Hinweis.
 - Unter dem Ansprechpartner oben im Matchkommentar-Dialog die Arbeitgeberkommentare, neueste zuerst, nur lesend. Die neuesten 5, der Rest aufklappbar.
 - Im Matchkommentar-Dialog an Stelle der Spalte "AG Fragebogen" der OM-Fragebogen des Matches, nur lesend: Anforderungen der Vakanz neben den Angaben des Kandidaten (Position, Berufserfahrung, Deutschkenntnisse, Führerschein, Auto, Reise-/Montagebereitschaft, Gehalt, Fachbereiche, Stellenumfang, Anerkennung, Entfernung) mit Bewertung passt/prüfen/passt nicht, darunter "Zusätzliche Information - OM". Der Haken "AG-Fragebogen anzeigen" blendet die native Spalte für diesen Dialog wieder ein.
+- Feste VTA-Notiz je Arbeitgeber (z. B. Buchungslink): Box unter dem Notizfeld im Terminvorschlag-Dialog, bei neuen Terminen einmal ans Notizfeld angehängt. Pflege direkt in der Box oder im Tampermonkey-Menü. Gespeichert im n8n-Workflow VTA Notizen.
 
 ## OBC Toolbox
 

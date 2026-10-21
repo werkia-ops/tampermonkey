@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.21.311
+// @version      1.22.313
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6722,7 +6722,7 @@ ${add}` : add;
       steps: [
         "Mit der Maus auf den Kreis zeigen, um den Grund zu sehen, z. B. „Hot Case“, „Bestätigter VT am 21.10.“ oder „7 Werktage ohne Kontakt“.",
         "Auf den Kreis klicken, um die Farbe selbst zu setzen (Grün, Gelb, Rot) oder zurück auf „Automatisch“ zu stellen. Eine selbst gesetzte Farbe hat einen gestrichelten Rand.",
-        "Im Focus-Mode „Ampel: nur Grün“ (bzw. Gelb, Rot) zeigt die Liste nur noch Kandidaten dieser Farbe, über alle Seiten. „Verlassen“ hebt das wieder auf."
+        "Neben dem Focus-Mode filtern Grün, Gelb, Rot und „Nur NEW“ die gesamte Liste. „Nur NEW“ zeigt Kandidaten ohne Kontakt seit der Zuteilung. Ein zweiter Klick hebt den Filter auf."
       ],
       notes: [
         "Grün: ein Match ist Hot Case (CEM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
@@ -6757,7 +6757,7 @@ ${add}` : add;
     matchContactPersonTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     employerCommentsReadTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     omQuestionnaireColumnTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
-    outGruendeTopic({ page: MY_MATCHES, routes: onMyMatches, statusName: "CEM Status" })
+    outGruendeTopic({ page: "CEM › Meine Matches, Meine Kandidaten und KAM › Meine Matches", routes: [...onBulkPages, ROUTES.kamMyMatches], statusName: "CEM Status", scopeNote: "In der KAM-Ansicht steht der KAM-Out-Grund unter dem KAM-Status. In den CEM-Ansichten stehen CEM- und KAM-Out-Gründe, der KAM-Grund wenn möglich direkt hinter „KAM Status: Out“." })
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -12832,7 +12832,7 @@ ${add}` : add;
   var NEW_TITLE = "Neu: Seit der Zuteilung hattest du noch keinen Kontakt (Matchkommentar oder Anruf).";
   function markerFarbe(value) {
     const list = Array.isArray(value) ? value : [value];
-    return list.map(String).find((farbe) => FARB_IDS.includes(farbe)) || "";
+    return list.map(String).find((farbe) => [...FARB_IDS, "neu"].includes(farbe)) || "";
   }
   function listScope(filter = {}) {
     const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE2.test(id)).map((id) => id.toLowerCase()) : [];
@@ -12856,6 +12856,20 @@ ${add}` : add;
     // (Owner, 2026-10-19), siehe shared/js/focus-modes/index.js.
     side: { box: "Ampel", label: FARBEN[farbe].label, fill: FARBEN[farbe].fill, ring: FARBEN[farbe].ring }
   }));
+  var NEW_MODE = {
+    id: "ampel-neu",
+    name: "Nur NEW",
+    description: "Nur Kandidaten ohne Kontakt des aktuellen CEM seit der Zuteilung, über alle Seiten",
+    filter: { [AMPEL_MARKER]: ["neu"] },
+    keepFilter: true,
+    sort: "",
+    order: "",
+    perPage: 0,
+    column: "",
+    front: false,
+    builtIn: true,
+    side: { box: "Ampel", label: "Nur NEW", fill: T2.accent, ring: T2.accent }
+  };
 
   // src/features/focus-modes.js
   var SOURCE_PATH = "cem/toolbox/src/features/focus-modes.js";
@@ -12866,7 +12880,7 @@ ${add}` : add;
   var SCOPE_KEYS = ["cemEmployeeIds", "interviewCreatorTeam"];
   var CEM_ROLE_NAME = "CEM";
   var BUILT_IN_MODES = [EMPLOYER_CONTACT_MODE, DIRECT_CONTACT_MODE];
-  var CANDIDATES_BUILT_IN_MODES = [...BUILT_IN_MODES, ...AMPEL_MODES];
+  var CANDIDATES_BUILT_IN_MODES = [...BUILT_IN_MODES, ...AMPEL_MODES, NEW_MODE];
   var COLUMN_LABELS = {
     matchInterview: "Termin",
     cemStatus: "CEM Status",
@@ -13959,6 +13973,7 @@ ${add}` : add;
       const cached = lists.get(key);
       if (cached && Date.now() - cached.at < CACHE_MS7) return cached.promise;
       const promise = call({ action: "liste", ...scope }).then((data) => {
+        if (!Array.isArray(data.farben?.neu)) throw new Error("Der NEW-Filter ist gerade nicht verfügbar. Bitte später noch einmal versuchen.");
         listError = "";
         return data.farben;
       });
@@ -17878,18 +17893,22 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/out-gruende.js
+  var CEM_OUT_VIEWS = [
+    { route: ROUTES.kamMyMatches, cellSelector: "td.column-kamStatus", sides: ["kam"], ownSide: "kam" },
+    ...[ROUTES.cemMyMatches, ROUTES.cemMyCandidates].map((route) => ({
+      route,
+      cellSelector: "td.column-cemStatus",
+      sides: ["cem", "kam"],
+      // KAM-Grund hinter "KAM Status: Out" in der Job-Spalte (Wunsch Bella).
+      inline: { side: "kam", cellSelector: "td.column-jobPositionId", pattern: /^KAM Status:/ }
+    }))
+  ];
   function executeCemOutGruende(runtime) {
     executeOutGruende(runtime, {
       namespace: "cem",
       sourcePath: "cem/toolbox/src/features/out-gruende.js",
       getGraphqlAdapter: getCemGraphqlAdapter,
-      views: [ROUTES.cemMyMatches, ROUTES.cemMyCandidates].map((route) => ({
-        route,
-        cellSelector: "td.column-cemStatus",
-        sides: ["cem", "kam"],
-        // KAM-Grund hinter "KAM Status: Out" in der Job-Spalte (Wunsch Bella).
-        inline: { side: "kam", cellSelector: "td.column-jobPositionId", pattern: /^KAM Status:/ }
-      }))
+      views: CEM_OUT_VIEWS
     });
   }
 

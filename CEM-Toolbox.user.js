@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.20.285
+// @version      1.20.298
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -14838,7 +14838,7 @@ ${add}` : add;
     });
   }
 
-  // src/features/wa-templates/employee-gender.js
+  // ../../shared/js/wa-templates/employee-gender.js
   var EMPLOYEE_GENDER = {
     // CEM (Stand 2026-10-09, Angaben Eno)
     "cb5406bc-2ede-4b38-acb4-127fb46c3d05": "f",
@@ -14878,7 +14878,7 @@ ${add}` : add;
     // Madeleine Marondel (ehemals OBC, noch an Kandidaten)
   };
 
-  // src/features/wa-templates/core.js
+  // ../../shared/js/wa-templates/core.js
   var TIME_ZONE = "Europe/Berlin";
   var MODES = [
     { value: "phone", label: "telefonisch" },
@@ -15175,7 +15175,7 @@ ${add}` : add;
     return (gaps || []).filter((label2) => String(text || "").includes(`[${label2}]`));
   }
 
-  // src/features/wa-templates/data.js
+  // ../../shared/js/wa-templates/data.js
   var WA_MATCH_QUERY = `query Match($id: UUID!) {
   data: Match(id: $id) {
     id
@@ -15212,6 +15212,16 @@ ${add}` : add;
     id name postalCode city __typename
   }
 }`;
+  var DEFAULT_OPS = {
+    match: WA_MATCH_QUERY,
+    candidate: WA_CANDIDATE_QUERY,
+    me: WA_ME_QUERY,
+    jobLocation: WA_JOB_LOCATION_QUERY,
+    employee: WA_EMPLOYEE_QUERY,
+    contacts: WA_CONTACTS_QUERY,
+    interviewLocations: WA_INTERVIEW_LOCATIONS_QUERY,
+    employerLocations: WA_EMPLOYER_LOCATIONS_QUERY
+  };
   function optional(unavailable2, label2, promise, fallback) {
     return promise.catch((error) => {
       console.warn(`[Werkia WA] ${label2} nicht ladbar:`, error?.message || error);
@@ -15219,17 +15229,17 @@ ${add}` : add;
       return fallback;
     });
   }
-  async function loadEmployee(request, id) {
+  async function loadEmployee(request, id, ops) {
     if (!id) return null;
-    const result = await request(WA_EMPLOYEE_QUERY, { ids: [id] });
+    const result = await request(ops.employee, { ids: [id] });
     return (result?.items || []).find((item) => item?.id === id) || null;
   }
-  var loadMe = (request) => request(WA_ME_QUERY, {}).then((result) => result?.me || null);
-  async function loadCandidateContext(request, candidateId) {
+  var loadMe = (request, ops) => request(ops.me, {}).then((result) => result?.me || null);
+  async function loadCandidateContext(request, candidateId, ops = DEFAULT_OPS) {
     const unavailable2 = [];
     const [result, cem] = await Promise.all([
-      request(WA_CANDIDATE_QUERY, { id: candidateId }),
-      optional(unavailable2, "eigener Name/E-Mail", loadMe(request), null)
+      request(ops.candidate, { id: candidateId }),
+      optional(unavailable2, "eigener Name/E-Mail", loadMe(request, ops), null)
     ]);
     const candidate = result?.data;
     if (!candidate?.id) throw new Error("Kandidat konnte nicht geladen werden.");
@@ -15237,15 +15247,15 @@ ${add}` : add;
       candidateId: candidate.id,
       candidateFirstName: candidate.firstName || "",
       cem,
-      obc: await optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, candidate.obcEmployeeId), null),
+      obc: await optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, candidate.obcEmployeeId, ops), null),
       unavailable: unavailable2
     };
   }
-  async function loadMatchContext(request, matchId) {
+  async function loadMatchContext(request, matchId, ops = DEFAULT_OPS) {
     const unavailable2 = [];
     const [result, cem] = await Promise.all([
-      request(WA_MATCH_QUERY, { id: matchId }),
-      optional(unavailable2, "eigener Name/E-Mail", loadMe(request), null)
+      request(ops.match, { id: matchId }),
+      optional(unavailable2, "eigener Name/E-Mail", loadMe(request, ops), null)
     ]);
     const match = result?.data;
     const jobPosition = match?.jobPosition;
@@ -15253,11 +15263,11 @@ ${add}` : add;
     if (!match?.id || !match.candidate?.id || !jobPosition?.id || !employer?.id) throw new Error("Matchdaten konnten nicht vollständig geladen werden.");
     const items = (query) => (result2) => result2?.[query] || [];
     const [obc, jobLocation, contacts, interviewLocations, employerLocations] = await Promise.all([
-      optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, match.candidate.obcEmployeeId), null),
-      optional(unavailable2, "Ort der Vakanz", request(WA_JOB_LOCATION_QUERY, { id: jobPosition.id }).then((result2) => result2?.data?.location || null), null),
-      optional(unavailable2, "Ansprechpartner", request(WA_CONTACTS_QUERY, { employerId: employer.id }).then(items("items")), []),
-      optional(unavailable2, "Terminadressen", request(WA_INTERVIEW_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), []),
-      optional(unavailable2, "Standorte", request(WA_EMPLOYER_LOCATIONS_QUERY, { employerId: employer.id }).then(items("items")), [])
+      optional(unavailable2, "OBC-Mitarbeiter", loadEmployee(request, match.candidate.obcEmployeeId, ops), null),
+      optional(unavailable2, "Ort der Vakanz", request(ops.jobLocation, { id: jobPosition.id }).then((result2) => result2?.data?.location || null), null),
+      optional(unavailable2, "Ansprechpartner", request(ops.contacts, { employerId: employer.id }).then(items("items")), []),
+      optional(unavailable2, "Terminadressen", request(ops.interviewLocations, { employerId: employer.id }).then(items("items")), []),
+      optional(unavailable2, "Standorte", request(ops.employerLocations, { employerId: employer.id }).then(items("items")), [])
     ]);
     return {
       matchId: match.id,
@@ -15281,7 +15291,7 @@ ${add}` : add;
     return pickAddress({ interview, interviewLocations: context.interviewLocations, employerLocations: context.employerLocations });
   }
 
-  // src/features/wa-templates/custom-templates.js
+  // ../../shared/js/wa-templates/custom-templates.js
   var STORAGE_KEY3 = "werkia_cem_wa_custom_templates_v1";
   var STORE_VERSION3 = 1;
   var SCOPES = [

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.20.300
+// @version      1.21.301
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6508,6 +6508,15 @@ ${add}` : add;
   var onBulkPages = [ROUTES.cemMyMatches, ROUTES.cemMyCandidates];
   var bulkPageNotes = ["In Meine Kandidaten sitzen die Knöpfe im Kopf der ersten aufgeklappten Match-Tabelle. Der Dialog listet die Matches aller aufgeklappten Kandidaten; der Kandidat-Status und die Kandidat-WVL bleiben dabei unverändert."];
   var CEM_HELP_TOPICS = [
+    {
+      id: "start-date",
+      title: "Startdatum prüfen",
+      page: "Kandidatenfragebogen und Kandidat bearbeiten",
+      routes: [...onBulkPages, ROUTES.potentialMatches],
+      kind: "view",
+      summary: "Das Startdatum ist umrandet. Fehlt es oder liegt es vor dem heutigen Berliner Datum, erscheint oben ein roter Hinweis.",
+      notes: ["Das heutige Datum ist gültig. Klein und grau am Feld steht die letzte Änderung des Startdatums aus der Kandidaten-Versionshistorie. Fehlt eine dokumentierte Änderung oder ist die Historie nicht erreichbar, steht das ausdrücklich dabei."]
+    },
     {
       id: "vacancy-candidate-info",
       title: "Kandidateninfos und Anruf-Empfehlung",
@@ -17878,6 +17887,169 @@ Trotzdem speichern?`)) return void 0;
     });
   }
 
+  // src/features/start-date-core.js
+  function berlinDay2(now = /* @__PURE__ */ new Date()) {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(now).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+  function startDateWarning(raw, today = berlinDay2()) {
+    const value = String(raw || "").trim();
+    if (!value) return "Startdatum fehlt. Bitte mit dem Kandidaten klären und eintragen.";
+    let day = value.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+    const german = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (german) day = `${german[3]}-${german[2]}-${german[1]}`;
+    if (!day || !Number.isFinite(Date.parse(`${day}T00:00:00Z`)) || (/* @__PURE__ */ new Date(`${day}T00:00:00Z`)).toISOString().slice(0, 10) !== day) {
+      return "Startdatum ist ungültig. Bitte prüfen.";
+    }
+    return day < today ? "Startdatum liegt in der Vergangenheit. Bitte mit dem Kandidaten klären und aktualisieren." : "";
+  }
+  var START_DATE_REVISIONS_QUERY = `query WerkiaCemStartDateHistory($filter: RevisionFilter!, $page: Int!) {
+  allRevisions(filter: $filter, sortField: "date", sortOrder: "DESC", page: $page, perPage: 100) {
+    date message
+  }
+}`;
+  async function loadStartDateChangedAt(request, candidateId) {
+    for (let page = 0; page < 50; page += 1) {
+      const data = await request(START_DATE_REVISIONS_QUERY, {
+        filter: { resource: "Candidate", recordId: candidateId },
+        page
+      });
+      if (!Array.isArray(data?.allRevisions)) throw new Error("Versionshistorie nicht verfügbar.");
+      const revisions = data.allRevisions;
+      const change = revisions.find((row2) => String(row2.message || "").split(",").some((key) => key.trim() === "startDate"));
+      if (change) {
+        if (!change.date || !Number.isFinite(Date.parse(change.date))) throw new Error("Änderungsdatum nicht verfügbar.");
+        return change.date;
+      }
+      if (revisions.length < 100) return null;
+    }
+    throw new Error("Versionshistorie zu umfangreich.");
+  }
+  function changedAtText(date) {
+    if (!date) return "Letzte Änderung nicht dokumentiert";
+    return `Zuletzt geändert: ${new Intl.DateTimeFormat("de-DE", {
+      timeZone: "Europe/Berlin",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(date))} Uhr`;
+  }
+
+  // src/features/start-date.js
+  var UUID = "[a-f0-9-]{36}";
+  var CANDIDATE_LINK = new RegExp(`/Candidate/(${UUID})(?:/|$)`, "i");
+  var SOURCE = "cem/toolbox/src/features/start-date.js";
+  var FIELD_CLASS = "werkia-cem-start-date";
+  var WARNING_CLASS = "werkia-cem-start-date-warning";
+  function executeStartDate(runtime) {
+    runtime.registerSource(SOURCE);
+    const history = /* @__PURE__ */ new Map();
+    let timer = null;
+    let stopped = false;
+    const style = document.createElement("style");
+    style.textContent = `
+    .${FIELD_CLASS} { outline:2px solid #ef6c00; outline-offset:3px; border-radius:4px; }
+    .${FIELD_CLASS}[data-start-date-warning="true"] { outline-color:#c62828; }
+    .${WARNING_CLASS} { padding:9px 12px; margin:8px 0 12px; border:1px solid #c62828; border-radius:6px; background:#fff4f4; color:#9f2020; font-size:13px; line-height:1.45; }
+    .werkia-cem-start-date-history { color:#71717a; font-size:11px; line-height:1.4; margin-top:5px; }
+  `;
+    document.head.appendChild(style);
+    function setText(node, value) {
+      if (node.textContent !== value) node.textContent = value;
+    }
+    function scan() {
+      if (stopped) return;
+      const fields = /* @__PURE__ */ new Set();
+      for (const label2 of document.querySelectorAll("label")) {
+        if (label2.textContent.replace(/\s*\*\s*$/, "").trim() !== "Startdatum") continue;
+        const field = label2.closest(".MuiFormControl-root");
+        if (!field) continue;
+        const input = field.querySelector('input[name="startDate"], input');
+        if (!input) continue;
+        const scope = field.closest('[role="dialog"], .MuiDialog-paper') || field.closest("form");
+        if (!scope) continue;
+        const candidateLink = [...scope.querySelectorAll('a[href*="/Candidate/"]')].map((link) => link.getAttribute("href").match(CANDIDATE_LINK)?.[1]).find(Boolean);
+        const candidateId = candidateLink || location.hash.match(/^#\/Candidate\/([a-f0-9-]{36})(?:\/|$)/i)?.[1];
+        if (!candidateId) continue;
+        fields.add(field);
+        field.classList.add(FIELD_CLASS);
+        const warning = startDateWarning(input.value);
+        const warnFlag = String(Boolean(warning));
+        if (field.dataset.startDateWarning !== warnFlag) field.dataset.startDateWarning = warnFlag;
+        let banner = scope.querySelector(`.${WARNING_CLASS}`);
+        if (warning) {
+          if (!banner) {
+            banner = document.createElement("div");
+            banner.className = WARNING_CLASS;
+            banner.setAttribute("role", "status");
+            const heading = [...scope.querySelectorAll("h2, h3, h4, h5, h6, p")].find((node) => /^Kandidat(?:en)? Fragebogen$/i.test(node.textContent.trim()));
+            if (heading) heading.after(banner);
+            else scope.prepend(banner);
+          }
+          setText(banner, warning);
+        } else banner?.remove();
+        let note = field.querySelector(".werkia-cem-start-date-history");
+        if (!note) {
+          note = document.createElement("div");
+          note.className = "werkia-cem-start-date-history";
+          field.appendChild(note);
+        }
+        const key = `${candidateId}|${input.value}`;
+        let entry = history.get(key);
+        if (!entry || entry.expires < Date.now()) {
+          entry = { text: "Letzte Änderung wird geladen…", expires: Date.now() + 6e4 };
+          history.set(key, entry);
+          loadStartDateChangedAt(getCemGraphqlAdapter().request, candidateId).then((date) => {
+            entry.text = changedAtText(date);
+          }).catch(() => {
+            entry.text = "Letzte Änderung derzeit nicht verfügbar";
+            entry.expires = Date.now() + 15e3;
+          }).finally(schedule);
+        }
+        setText(note, entry.text);
+      }
+      document.querySelectorAll(`.${FIELD_CLASS}`).forEach((field) => {
+        if (!fields.has(field)) {
+          field.classList.remove(FIELD_CLASS);
+          delete field.dataset.startDateWarning;
+          field.querySelector(".werkia-cem-start-date-history")?.remove();
+        }
+      });
+      document.querySelectorAll(`.${WARNING_CLASS}`).forEach((banner) => {
+        if (!banner.closest('[role="dialog"], .MuiDialog-paper, form')?.querySelector(`.${FIELD_CLASS}`)) banner.remove();
+      });
+    }
+    function schedule() {
+      if (stopped || timer !== null) return;
+      timer = runtime.setTimeout(() => {
+        timer = null;
+        scan();
+      }, 150);
+    }
+    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true });
+    runtime.addDocumentListener("input", schedule, true);
+    runtime.addDocumentListener("change", schedule, true);
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.setInterval(schedule, 15e3);
+    runtime.addCleanup(() => {
+      stopped = true;
+      style.remove();
+      document.querySelectorAll(`.${WARNING_CLASS}, .werkia-cem-start-date-history`).forEach((node) => node.remove());
+      document.querySelectorAll(`.${FIELD_CLASS}`).forEach((field) => {
+        field.classList.remove(FIELD_CLASS);
+        delete field.dataset.startDateWarning;
+      });
+    });
+    scan();
+  }
+
   // src/main.js
   initCemGraphqlAdapter();
   bootstrapToolbox({ label: "CEM", marker: "data-werkia-cem-toolbox-loaded" }, [
@@ -17922,6 +18094,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "match-contact-person", execute: executeCemMatchContactPerson },
     { id: "employer-comments", execute: executeCemEmployerComments },
     { id: "om-questionnaire-column", execute: executeCemOmQuestionnaireColumn },
-    { id: "out-gruende", execute: executeCemOutGruende }
+    { id: "out-gruende", execute: executeCemOutGruende },
+    { id: "start-date", execute: executeStartDate }
   ]);
 })();

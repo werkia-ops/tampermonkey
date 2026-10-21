@@ -56,6 +56,7 @@ Enthaltene Funktionen:
 
 Enthaltene Funktionen:
 
+- Umrandet das Startdatum im Kandidatenfragebogen. Bei leerem oder vergangenem Datum erscheint oben ein roter Hinweis. Direkt am Feld steht klein und grau, wann das Startdatum zuletzt geändert wurde, aus der Versionshistorie des Kandidaten.
 - Prueft alle 5 Minuten, ob eine neuere Version der Toolbox veroeffentlicht ist, und bietet dann in einem kleinen Hinweis unten rechts Aktualisieren und Neu laden an. "Spaeter" blendet den Hinweis fuer vier Stunden aus.
 - Kleine ?-Knoepfe an Dialogen, Leisten und Panels erklaeren die jeweilige Funktion. Der Hilfe-Knopf unten links und der Tampermonkey-Menueeintrag oeffnen eine Uebersicht aller Funktionen mit Kennzeichnung, ob sie nur anzeigen oder Daten aendern.
 - Setzt in CEM Meine Matches CEM WVL und CEM Status fuer die angehakten sichtbaren Matches gleichzeitig (Haken-Liste nach Arbeitgeber gruppiert, in Meine Kandidaten die Matches aller aufgeklappten Kandidaten). Bei Hired und Out wird die CEM WVL geleert, Out braucht einen Grund und lehnt offene Terminvorschlaege ab. "Alle weiterleiten" leitet alle Terminvorschlaege mit Status Vorschlag der angehakten Matches weiter. "Vergangene ablehnen" lehnt Terminvorschlaege mit Status Vorschlag ab, deren Termine alle in der Vergangenheit liegen.

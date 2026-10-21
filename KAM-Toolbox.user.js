@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.297
+// @version      1.19.300
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -6295,7 +6295,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID17 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID18 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -6303,9 +6303,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID17)) return;
+      if (document.getElementById(STYLE_ID18)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID17;
+      style.id = STYLE_ID18;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -12122,6 +12122,206 @@ ${add}` : add;
     });
   }
 
+  // ../../shared/js/interview-pills/index.js
+  var MARK = "data-werkia-cem-vta-pill";
+  var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
+  var TYPE_ATTRIBUTE = "data-werkia-interview-type";
+  var STYLE_ID12 = "werkia-interview-pill-style";
+  var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
+  var CACHE_MS6 = 60 * 1e3;
+  var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
+  var OWN_SELECTOR2 = `[${ORIGIN_ATTRIBUTE}], [${TYPE_ATTRIBUTE}]`;
+  var MATCH_INTERVIEWS_QUERY = `query allMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
+  items: allMatches(filter: $filter, page: $page, perPage: $perPage) {
+    id
+    interviews { id type status dates dateSuggestedBy }
+  }
+}`;
+  var TYPE_LABELS = {
+    interview: "VT",
+    trial_day: "HT",
+    second_interview: "Zweiter VT",
+    second_trial_day: "Zweiter HT",
+    avu: "AVU",
+    phone: "Telefon",
+    digital: "Digital",
+    fictional: "Fiktiv"
+  };
+  var DATE_FORMAT = new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  function normalize7(text) {
+    return String(text || "").replace(/[,\s]+/g, " ").trim();
+  }
+  function formatPillDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : normalize7(DATE_FORMAT.format(date));
+  }
+  function originLabel(interview) {
+    if (interview?.dateSuggestedBy === "employer") return "AG";
+    if (interview?.dateSuggestedBy === "candidate") return "Kand.";
+    return "";
+  }
+  function needsBorder(interview) {
+    return interview?.dateSuggestedBy === "employer" && OPEN_STATUSES.has(interview.status);
+  }
+  function typeLabel(interview) {
+    const type = String(interview?.type || "").replace(/^rescheduled_/, "");
+    return TYPE_LABELS[type] || "";
+  }
+  function hasTypePrefix(text) {
+    return /^[A-Za-zÄÖÜäöüß][^\d]{0,30}?\s-\s/.test(String(text || "").trim());
+  }
+  function assignInterviews(chipTexts, interviews) {
+    const result = chipTexts.map(() => null);
+    const free = new Set(interviews.map((_, index) => index));
+    chipTexts.forEach((text, chipIndex) => {
+      const normalized = normalize7(text);
+      for (const index of free) {
+        const dates = (interviews[index].dates || []).map(formatPillDate).filter(Boolean);
+        if (dates.some((date) => normalized.includes(date))) {
+          result[chipIndex] = interviews[index];
+          free.delete(index);
+          return;
+        }
+      }
+    });
+    const open = result.flatMap((value, index) => value ? [] : [index]);
+    if (open.length === 1 && free.size === 1) result[open[0]] = interviews[[...free][0]];
+    return result;
+  }
+  function executeInterviewPills(runtime, { sourcePath, isRoute, getAdapter, showOrigin = false, logLabel = "[Terminpills]" }) {
+    runtime.registerSource(sourcePath);
+    const cache = /* @__PURE__ */ new Map();
+    const pending = /* @__PURE__ */ new Set();
+    function ensureStyle7() {
+      if (document.getElementById(STYLE_ID12)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID12;
+      style.textContent = `.MuiChip-root[${MARK}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
+.werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
+.werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.werkia-cem-vta-origin { flex: 0 0 auto; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(0,0,0,.25); font-size: inherit; opacity: .75; white-space: nowrap; }
+.werkia-interview-type { white-space: nowrap; }`;
+      document.head.appendChild(style);
+    }
+    function chipText(chip) {
+      const clone = chip.cloneNode(true);
+      clone.querySelectorAll(OWN_SELECTOR2).forEach((node) => node.remove());
+      return [...clone.querySelectorAll("p, span")].map((node) => node.textContent).join(" ") || clone.textContent;
+    }
+    function decorateOrigin(chip, interview) {
+      const label = originLabel(interview);
+      const host = chip.querySelector(".MuiChip-label") || chip;
+      let tag = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
+      if (!label) {
+        tag?.remove();
+        host.classList.remove("werkia-cem-vta-host");
+      } else if (!tag || tag.textContent !== label) {
+        tag?.remove();
+        tag = document.createElement("span");
+        tag.className = "werkia-cem-vta-origin";
+        tag.setAttribute(ORIGIN_ATTRIBUTE, "");
+        tag.title = label === "AG" ? "Termine vom Arbeitgeber (KAM-VTA)" : "Termine vom Kandidaten (CEM-VTA)";
+        tag.textContent = label;
+        host.classList.add("werkia-cem-vta-host");
+        host.appendChild(tag);
+      }
+      if (needsBorder(interview)) chip.setAttribute(MARK, "");
+      else chip.removeAttribute(MARK);
+    }
+    function decorateType(chip, interview, text) {
+      const label = hasTypePrefix(text) ? "" : typeLabel(interview);
+      const wanted = label ? `${label} - ` : "";
+      let tag = chip.querySelector(`[${TYPE_ATTRIBUTE}]`);
+      if (!wanted) {
+        tag?.remove();
+        return;
+      }
+      if (tag?.textContent === wanted) return;
+      tag?.remove();
+      const host = chip.querySelector(".MuiChip-label") || chip;
+      const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => /\S/.test(node.nodeValue) && !node.parentElement?.closest(OWN_SELECTOR2) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+      });
+      const first = walker.nextNode();
+      tag = document.createElement("span");
+      tag.className = "werkia-interview-type";
+      tag.setAttribute(TYPE_ATTRIBUTE, "");
+      tag.textContent = wanted;
+      if (first) first.parentNode.insertBefore(tag, first);
+      else host.insertBefore(tag, host.firstChild);
+    }
+    async function load2(ids) {
+      ids.forEach((id) => pending.add(id));
+      try {
+        const data = await getAdapter().request(MATCH_INTERVIEWS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
+        const now = Date.now();
+        for (const match of data?.items || []) cache.set(match.id, { at: now, interviews: match.interviews || [] });
+      } catch (error) {
+        console.warn(logLabel, error);
+      } finally {
+        ids.forEach((id) => pending.delete(id));
+        schedule();
+      }
+    }
+    function render() {
+      if (!isRoute(location.hash)) return;
+      ensureStyle7();
+      const rows = /* @__PURE__ */ new Map();
+      document.querySelectorAll(CHIP_SELECTOR).forEach((chip) => {
+        const row2 = chip.closest("tr");
+        const matchId = matchIdFromRow(row2);
+        if (!matchId) return;
+        if (!rows.has(matchId)) rows.set(matchId, []);
+        rows.get(matchId).push(chip);
+      });
+      const missing = [];
+      const now = Date.now();
+      for (const [matchId, chips] of rows) {
+        const entry = cache.get(matchId);
+        if (!entry || now - entry.at > CACHE_MS6) {
+          if (!pending.has(matchId)) missing.push(matchId);
+          if (!entry) continue;
+        }
+        const texts = chips.map(chipText);
+        const assigned = assignInterviews(texts, entry.interviews);
+        chips.forEach((chip, index) => {
+          decorateType(chip, assigned[index], texts[index]);
+          if (showOrigin) decorateOrigin(chip, assigned[index]);
+        });
+      }
+      for (let i = 0; i < missing.length; i += 100) load2(missing.slice(i, i + 100));
+    }
+    let scheduled = false;
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    }
+    runtime.addWindowListener?.("hashchange", schedule);
+    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
+    schedule();
+  }
+
+  // src/features/termin-typ.js
+  function executeTerminTyp(runtime) {
+    executeInterviewPills(runtime, {
+      sourcePath: "kam/toolbox/src/features/termin-typ.js",
+      isRoute: (hash) => ROUTES.kamMyMatches.test(hash),
+      getAdapter: getKamGraphqlAdapter,
+      logLabel: "[KAM Termintyp]"
+    });
+  }
+
   // src/features/vta-notizen.js
   function executeVtaNotizen2(runtime) {
     executeVtaNotizen(runtime, {
@@ -12201,7 +12401,7 @@ ${add}` : add;
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID12 = "werkia-kam-match-actions-style";
+  var STYLE_ID13 = "werkia-kam-match-actions-style";
   var STORE_KEY2 = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
@@ -12270,9 +12470,9 @@ ${add}` : add;
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID12)) return;
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -12460,7 +12660,7 @@ ${add}` : add;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID12)?.remove();
+      document.getElementById(STYLE_ID13)?.remove();
     });
     scheduleSync();
   }
@@ -13027,9 +13227,24 @@ ${add}` : add;
     }
     return text.slice(0, end).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   }
+  var CLOSING_RE = /^[ \t]*(?:(?:mit[ \t]+)?(?:(?:freundliche|freundlichen|beste|besten|herzliche|herzlichen|liebe|lieben|schöne|schönen|viele|sonnige|sonnigen)[ \t]+)*(?:grüße|grüßen|gruß|grüsse|grüssen|gruss)|mfg|vg|lg|bg|(?:best|kind|warm)[ \t]+regards|regards|cheers)(?![\p{L}])([^\n:;?]{0,60})$/iu;
+  function cutAfterSignatureName(text) {
+    const lines = String(text || "").split("\n");
+    const index = lines.findIndex((line) => CLOSING_RE.test(line));
+    if (index < 0) return String(text || "");
+    const rest = CLOSING_RE.exec(lines[index])[1];
+    let end = index;
+    if (!new RegExp("^[ \\t]*(?:[,–-][ \\t]*)?\\p{Lu}", "u").test(rest)) {
+      let next = index + 1;
+      while (next < lines.length && !lines[next].trim()) next += 1;
+      if (next - index <= 2 && next < lines.length && lines[next].trim().length <= 60) end = next;
+    }
+    return lines.slice(0, end + 1).join("\n").trim();
+  }
   function outMailCommentDraft(bodyText) {
-    const reply = replyTextFromMailBody(bodyText);
-    if (!reply || hasApplicationProfile(parseProfileFromMailBody(reply))) return "";
+    const replyText = replyTextFromMailBody(bodyText);
+    if (!replyText || hasApplicationProfile(parseProfileFromMailBody(replyText))) return "";
+    const reply = cutAfterSignatureName(replyText);
     return reply.length > OUT_MAIL_COMMENT_MAX_CHARS ? `${reply.slice(0, OUT_MAIL_COMMENT_MAX_CHARS).trimEnd()} …` : reply;
   }
   function outMailCommentHtml({ reasonLabel = "", mailText = "" } = {}) {
@@ -17922,7 +18137,7 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID13 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID14 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -17958,9 +18173,9 @@ ${buildCbreBody(current)}`;
     }
   }
   function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID13)) return;
+    if (doc.getElementById(STYLE_ID14)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID13;
+    style.id = STYLE_ID14;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -18035,7 +18250,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/comment-shortcuts/index.js
   var PREFIX2 = "werkia-shortcuts";
-  var STYLE_ID14 = `${PREFIX2}-style`;
+  var STYLE_ID15 = `${PREFIX2}-style`;
   var BAR_CLASS3 = `${PREFIX2}-bar`;
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
@@ -18112,9 +18327,9 @@ ${buildCbreBody(current)}`;
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
   function ensureStyle5() {
-    if (document.getElementById(STYLE_ID14)) return;
+    if (document.getElementById(STYLE_ID15)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID14;
+    style.id = STYLE_ID15;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -19615,7 +19830,7 @@ ${buildCbreBody(current)}`;
     style: "werkia-arbeitgeber-pause-style"
   };
   var OWNER_KEY2 = "werkiaArbeitgeberPauseOwner";
-  var CACHE_MS6 = 5 * 60 * 1e3;
+  var CACHE_MS7 = 5 * 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
   var T3 = {
     surface: "#ffffff",
@@ -19763,7 +19978,7 @@ ${buildCbreBody(current)}`;
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS6) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS7) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[Arbeitgeber-Pause] Liste nicht geladen:", error?.message || error);
         return cache;
@@ -20062,7 +20277,7 @@ ${buildCbreBody(current)}`;
   var PAGE_SIZE2 = 200;
   var MAX_PAGES = 20;
   var NAMES_CHUNK = 300;
-  var CACHE_MS7 = 2 * 60 * 1e3;
+  var CACHE_MS8 = 2 * 60 * 1e3;
   var APPLICANTS_PLACEHOLDER = "{{{offeneBewerber}}}";
   var OPEN_MATCHES_QUERY = `query WerkiaKamOffeneMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
   items: allMatches(filter: $filter, page: $page, perPage: $perPage, sortField: "id", sortOrder: "ASC") { id candidateId jobPositionId kamStatus }
@@ -20160,7 +20375,7 @@ ${buildCbreBody(current)}`;
       const key = String(employerId || "");
       if (!key) return Promise.reject(new Error("Kein Arbeitgeber."));
       const hit = cache.get(key);
-      if (hit && now() - hit.at < CACHE_MS7) return hit.promise;
+      if (hit && now() - hit.at < CACHE_MS8) return hit.promise;
       const promise = load2(key);
       cache.set(key, { at: now(), promise });
       promise.catch(() => {
@@ -20172,7 +20387,7 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID15 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID16 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -20206,9 +20421,9 @@ ${buildCbreBody(current)}`;
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
   function ensureStyle6(doc) {
-    if (doc.getElementById(STYLE_ID15)) return;
+    if (doc.getElementById(STYLE_ID16)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID15;
+    style.id = STYLE_ID16;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -20609,7 +20824,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID16 = "werkia-om-notes-template-style";
+  var STYLE_ID17 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -20678,11 +20893,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID16)) {
+    if (document.getElementById(STYLE_ID17)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID16;
+    style.id = STYLE_ID17;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -20916,7 +21131,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID16)?.remove();
+      document.getElementById(STYLE_ID17)?.remove();
     });
     renderToolbar();
   }
@@ -20936,7 +21151,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID17 = "werkia-urgent-vacancy-style";
+      const STYLE_ID18 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -21075,9 +21290,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID17)) return;
+        if (document.getElementById(STYLE_ID18)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID17;
+        style.id = STYLE_ID18;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -21191,6 +21406,7 @@ ${next}`;
     { id: "kam-suite-chat-icon-redirect", execute: executeChatIconRedirect },
     { id: "kam-suite-appointment-copy-paste", execute: executeAppointmentCopyPaste },
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
+    { id: "termin-typ", execute: executeTerminTyp },
     { id: "vta-notizen", execute: executeVtaNotizen2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },

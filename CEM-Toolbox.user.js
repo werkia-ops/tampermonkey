@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.20.298
+// @version      1.20.300
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -9299,20 +9299,31 @@ ${add}` : add;
     });
   }
 
-  // src/features/cem-vta-pills.js
-  var SOURCE = "cem/toolbox/src/features/cem-vta-pills.js";
+  // ../../shared/js/interview-pills/index.js
   var MARK2 = "data-werkia-cem-vta-pill";
   var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
-  var STYLE_ID7 = "werkia-cem-vta-pill-style";
+  var TYPE_ATTRIBUTE = "data-werkia-interview-type";
+  var STYLE_ID7 = "werkia-interview-pill-style";
   var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
   var CACHE_MS6 = 60 * 1e3;
   var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
+  var OWN_SELECTOR2 = `[${ORIGIN_ATTRIBUTE}], [${TYPE_ATTRIBUTE}]`;
   var MATCH_INTERVIEWS_QUERY = `query allMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
   items: allMatches(filter: $filter, page: $page, perPage: $perPage) {
     id
-    interviews { id status dates dateSuggestedBy }
+    interviews { id type status dates dateSuggestedBy }
   }
 }`;
+  var TYPE_LABELS = {
+    interview: "VT",
+    trial_day: "HT",
+    second_interview: "Zweiter VT",
+    second_trial_day: "Zweiter HT",
+    avu: "AVU",
+    phone: "Telefon",
+    digital: "Digital",
+    fictional: "Fiktiv"
+  };
   var DATE_FORMAT = new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin",
     day: "numeric",
@@ -9328,9 +9339,6 @@ ${add}` : add;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "" : normalize3(DATE_FORMAT.format(date));
   }
-  function isCemRoute(hash) {
-    return ROUTES.cemMyMatches.test(hash) || ROUTES.cemMyCandidates.test(hash);
-  }
   function originLabel(interview) {
     if (interview?.dateSuggestedBy === "employer") return "AG";
     if (interview?.dateSuggestedBy === "candidate") return "Kand.";
@@ -9338,6 +9346,13 @@ ${add}` : add;
   }
   function needsBorder(interview) {
     return interview?.dateSuggestedBy === "employer" && OPEN_STATUSES.has(interview.status);
+  }
+  function typeLabel(interview) {
+    const type = String(interview?.type || "").replace(/^rescheduled_/, "");
+    return TYPE_LABELS[type] || "";
+  }
+  function hasTypePrefix(text) {
+    return /^[A-Za-zÄÖÜäöüß][^\d]{0,30}?\s-\s/.test(String(text || "").trim());
   }
   function assignInterviews(chipTexts, interviews) {
     const result = chipTexts.map(() => null);
@@ -9357,8 +9372,8 @@ ${add}` : add;
     if (open.length === 1 && free.size === 1) result[open[0]] = interviews[[...free][0]];
     return result;
   }
-  function executeCemVtaPills(runtime) {
-    runtime.registerSource(SOURCE);
+  function executeInterviewPills(runtime, { sourcePath, isRoute, getAdapter, showOrigin = false, logLabel = "[Terminpills]" }) {
+    runtime.registerSource(sourcePath);
     const cache = /* @__PURE__ */ new Map();
     const pending = /* @__PURE__ */ new Set();
     function ensureStyle4() {
@@ -9368,13 +9383,16 @@ ${add}` : add;
       style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
 .werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
 .werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.werkia-cem-vta-origin { flex: 0 0 auto; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(0,0,0,.25); font-size: inherit; opacity: .75; white-space: nowrap; }`;
+.werkia-cem-vta-origin { flex: 0 0 auto; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(0,0,0,.25); font-size: inherit; opacity: .75; white-space: nowrap; }
+.werkia-interview-type { white-space: nowrap; }`;
       document.head.appendChild(style);
     }
     function chipText(chip) {
-      return [...chip.querySelectorAll("p, span")].filter((node) => !node.hasAttribute(ORIGIN_ATTRIBUTE)).map((node) => node.textContent).join(" ") || chip.textContent;
+      const clone = chip.cloneNode(true);
+      clone.querySelectorAll(OWN_SELECTOR2).forEach((node) => node.remove());
+      return [...clone.querySelectorAll("p, span")].map((node) => node.textContent).join(" ") || clone.textContent;
     }
-    function decorate(chip, interview) {
+    function decorateOrigin(chip, interview) {
       const label2 = originLabel(interview);
       const host = chip.querySelector(".MuiChip-label") || chip;
       let tag = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
@@ -9394,21 +9412,43 @@ ${add}` : add;
       if (needsBorder(interview)) chip.setAttribute(MARK2, "");
       else chip.removeAttribute(MARK2);
     }
+    function decorateType(chip, interview, text) {
+      const label2 = hasTypePrefix(text) ? "" : typeLabel(interview);
+      const wanted = label2 ? `${label2} - ` : "";
+      let tag = chip.querySelector(`[${TYPE_ATTRIBUTE}]`);
+      if (!wanted) {
+        tag?.remove();
+        return;
+      }
+      if (tag?.textContent === wanted) return;
+      tag?.remove();
+      const host = chip.querySelector(".MuiChip-label") || chip;
+      const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => /\S/.test(node.nodeValue) && !node.parentElement?.closest(OWN_SELECTOR2) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+      });
+      const first = walker.nextNode();
+      tag = document.createElement("span");
+      tag.className = "werkia-interview-type";
+      tag.setAttribute(TYPE_ATTRIBUTE, "");
+      tag.textContent = wanted;
+      if (first) first.parentNode.insertBefore(tag, first);
+      else host.insertBefore(tag, host.firstChild);
+    }
     async function load2(ids) {
       ids.forEach((id) => pending.add(id));
       try {
-        const data = await getCemGraphqlAdapter().request(MATCH_INTERVIEWS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
+        const data = await getAdapter().request(MATCH_INTERVIEWS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
         const now = Date.now();
         for (const match of data?.items || []) cache.set(match.id, { at: now, interviews: match.interviews || [] });
       } catch (error) {
-        console.warn("[CEM VTA-Herkunft]", error);
+        console.warn(logLabel, error);
       } finally {
         ids.forEach((id) => pending.delete(id));
         schedule();
       }
     }
     function render() {
-      if (!isCemRoute(location.hash)) return;
+      if (!isRoute(location.hash)) return;
       ensureStyle4();
       const rows = /* @__PURE__ */ new Map();
       document.querySelectorAll(CHIP_SELECTOR).forEach((chip) => {
@@ -9426,8 +9466,12 @@ ${add}` : add;
           if (!pending.has(matchId)) missing.push(matchId);
           if (!entry) continue;
         }
-        const assigned = assignInterviews(chips.map(chipText), entry.interviews);
-        chips.forEach((chip, index) => decorate(chip, assigned[index]));
+        const texts = chips.map(chipText);
+        const assigned = assignInterviews(texts, entry.interviews);
+        chips.forEach((chip, index) => {
+          decorateType(chip, assigned[index], texts[index]);
+          if (showOrigin) decorateOrigin(chip, assigned[index]);
+        });
       }
       for (let i = 0; i < missing.length; i += 100) load2(missing.slice(i, i + 100));
     }
@@ -9443,6 +9487,20 @@ ${add}` : add;
     runtime.addWindowListener?.("hashchange", schedule);
     runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
     schedule();
+  }
+
+  // src/features/cem-vta-pills.js
+  function isCemRoute(hash) {
+    return ROUTES.cemMyMatches.test(hash) || ROUTES.cemMyCandidates.test(hash);
+  }
+  function executeCemVtaPills(runtime) {
+    executeInterviewPills(runtime, {
+      sourcePath: "cem/toolbox/src/features/cem-vta-pills.js",
+      isRoute: isCemRoute,
+      getAdapter: getCemGraphqlAdapter,
+      showOrigin: true,
+      logLabel: "[CEM VTA-Herkunft]"
+    });
   }
 
   // src/features/vacancy-candidate-info/candidate-table.js

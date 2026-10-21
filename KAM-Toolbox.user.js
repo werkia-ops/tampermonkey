@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.306
+// @version      1.19.311
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -7270,11 +7270,13 @@ ${add}` : add;
   }
 
   // ../../shared/js/bulk-match-actions/core.js
-  var OPEN_INTERVIEW_STATUSES = ["suggestion", "forwarded", "confirmed", "conducted", "not_reconfirmed"];
+  var OPEN_INTERVIEW_STATUSES = ["suggestion", "forwarded", "confirmed", "not_reconfirmed"];
+  var UNCONFIRMED_INTERVIEW_STATUSES = ["suggestion", "forwarded"];
   var ALL_INTERVIEWS_QUERY = `query allInterviews($filter: InterviewsFilter!, $sortField: String, $sortOrder: String, $page: Float, $perPage: Float) {
   items: allInterviews(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
     id
     status
+    dates
   }
   total: _allInterviewsMeta(filter: $filter, page: $page, perPage: $perPage) {
     count
@@ -7360,8 +7362,12 @@ ${add}` : add;
   function statusClearsWvl(statusValue) {
     return statusValue === "hired" || statusValue === "out";
   }
-  function openInterviewIds(items) {
-    return [...items || []].filter((interview) => interview?.id && OPEN_INTERVIEW_STATUSES.includes(interview.status)).map((interview) => interview.id);
+  function openInterviewIds(items, now = Date.now()) {
+    return [...items || []].filter((interview) => interview?.id && OPEN_INTERVIEW_STATUSES.includes(interview.status)).filter((interview) => UNCONFIRMED_INTERVIEW_STATUSES.includes(interview.status) || isUpcoming(interview, now)).map((interview) => interview.id);
+  }
+  function isUpcoming(interview, now) {
+    const times = (Array.isArray(interview.dates) ? interview.dates : []).map((date) => Date.parse(date));
+    return times.length > 0 && times.every((time) => !Number.isNaN(time) && time > now);
   }
   function interviewsWithDates(items, statuses) {
     return [...items || []].filter((interview) => interview?.id && statuses.includes(interview.status)).map((interview) => ({ id: interview.id, status: interview.status, dates: Array.isArray(interview.dates) ? interview.dates : [] }));

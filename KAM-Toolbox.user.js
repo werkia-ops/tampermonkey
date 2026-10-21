@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.300
+// @version      1.19.306
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -16788,6 +16788,9 @@ ${buildCbreBody(current)}`;
   var ROW_SELECTOR12 = "tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
   var STAR_CLASS = "werkia-prio-star";
+  function employerEntries(raw) {
+    return (raw || []).filter((item) => !item?.daten?.candidateId).map(normalizeEntry);
+  }
   var REFRESH_MS3 = 5 * 60 * 1e3;
   var REVIEW_CHECK_MS = 60 * 1e3;
   var STAR_PATH = "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
@@ -16976,7 +16979,7 @@ ${buildCbreBody(current)}`;
         loading = (async () => {
           try {
             const raw = await getClient().liste(BEREICH);
-            entries = raw.map(normalizeEntry);
+            entries = employerEntries(raw);
             loaded = true;
             error = "";
           } catch (failure) {
@@ -16996,7 +16999,7 @@ ${buildCbreBody(current)}`;
       foreign.set(id, state);
       renderPanel();
       try {
-        state.entries = (await getClient().liste(BEREICH, { fuer: id })).map(normalizeEntry);
+        state.entries = employerEntries(await getClient().liste(BEREICH, { fuer: id }));
         const name = state.entries.find((entry) => entry.autorName)?.autorName;
         const person = absent.find((item) => item.id === id);
         if (person && name && !person.name) person.name = name;

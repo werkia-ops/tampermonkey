@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.23.332
+// @version      1.24.337
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6587,6 +6587,7 @@ ${add}` : add;
         "Terminvorschläge erscheinen mit Datum und Uhrzeit wie im Adminpanel, z. B. „Do., 08.10. um 16 Uhr“.",
         "Unterschrift und E-Mail kommen vom angemeldeten Adminpanel-Nutzer.",
         "Bei der VT Bestätigung vor Ort wird die Fahrzeit vom Kandidaten zur Terminadresse nachgeladen.",
+        "Die VT Erinnerung gibt es auch für den Probetag: Gesprächsart „Probetag (HT)“. Bei HT-Terminen ist sie schon vorgewählt.",
         "Eigene Vorlagen: im WA-Menü „+ Neue Vorlage …“. Name, „Kandidat“ oder „Match“ wählen und Text schreiben; Platzhalter wie {Vorname Kandidat} oder {Arbeitgeber} per Klick einfügen, sie werden beim Verwenden gefüllt. Danach stehen sie unter „Meine Vorlagen“.",
         "Im „Match WA“-Menü sind „Kandidat“ und „Meine Vorlagen“ zugeklappt; ein Klick auf die Überschrift öffnet sie. Rechtsklick auf eine eigene Vorlage: Bearbeiten oder Löschen (mit Rückfrage).",
         "Eigene Vorlagen liegen nur in deinem Browser. „Vorlagen verwalten …“ zum Bearbeiten, Löschen und Sortieren (↑/↓ = Reihenfolge im Menü). „Text kopieren“ kopiert den Rohtext mit Platzhaltern; wer ihn bekommt (oder du auf einem neuen PC), fügt ihn unter „+ Neue Vorlage“ ein.",
@@ -6662,9 +6663,10 @@ ${add}` : add;
       steps: [
         "„An KAM“ in der Zeile klicken.",
         "Im Dialog prüfen, wer die Nachricht bekommt. Optional einen Kommentar schreiben.",
-        "„Senden“ klicken. Der Dialog meldet, an wen die DM ging."
+        "„Senden“ klicken. Der Dialog meldet, an wen die DM ging und ob der Matchkommentar angelegt ist."
       ],
       notes: [
+        "Beim Senden kommt automatisch ein Matchkommentar unter deinem Namen ans Match: „per Slack DM bei KAM nachgefragt (Name):“, darunter „Notes: …“ mit deinem Kommentar. Klappt das nicht, sagt es der Dialog; dann bitte von Hand nachtragen.",
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die KAM-Person, die beim Arbeitgeber eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
         "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
         "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht.",
@@ -13858,6 +13860,7 @@ ${add}` : add;
   }
 
   // src/features/cem-ampel/rewrite.js
+  var NEW_MISSING_MESSAGE = "Der NEW-Filter ist gerade nicht verfügbar. Bitte später noch einmal versuchen.";
   var NO_MATCH_ID2 = "00000000-0000-0000-0000-000000000000";
   var INSTALLED_FLAG3 = "__werkiaCemAmpelRewrite";
   function bodyHasMarker2(body) {
@@ -13917,7 +13920,10 @@ ${add}` : add;
       } catch {
         return originalFetch.call(pageWindow, input, init);
       }
-      return Promise.all(filters.map((filter) => loadFarben(listScope(filter)).catch((error) => {
+      return Promise.all(filters.map((filter) => loadFarben(listScope(filter)).then((farben) => {
+        if (markerFarbe(filter[AMPEL_MARKER]) === "neu" && !Array.isArray(farben?.neu)) throw new Error(NEW_MISSING_MESSAGE);
+        return farben;
+      }).catch((error) => {
         onError(error);
         return null;
       }))).then((results) => {
@@ -13973,7 +13979,7 @@ ${add}` : add;
       const cached = lists.get(key);
       if (cached && Date.now() - cached.at < CACHE_MS7) return cached.promise;
       const promise = call({ action: "liste", ...scope }).then((data) => {
-        if (!Array.isArray(data.farben?.neu)) throw new Error("Der NEW-Filter ist gerade nicht verfügbar. Bitte später noch einmal versuchen.");
+        if (!data.farben || typeof data.farben !== "object") throw new Error("CEM-Ampel: Antwort ohne Farben.");
         listError = "";
         return data.farben;
       });
@@ -14971,7 +14977,8 @@ ${add}` : add;
   var MODES = [
     { value: "phone", label: "telefonisch" },
     { value: "digital", label: "digital" },
-    { value: "onsite", label: "vor Ort" }
+    { value: "onsite", label: "vor Ort" },
+    { value: "trial", label: "Probetag (HT)", only: ["te"] }
   ];
   var MODE_BY_INTERVIEW_TYPE = {
     phone: "phone",
@@ -14981,10 +14988,19 @@ ${add}` : add;
     interview: "onsite",
     rescheduled_interview: "onsite",
     second_interview: "onsite",
-    rescheduled_second_interview: "onsite"
+    rescheduled_second_interview: "onsite",
+    trial_day: "trial",
+    rescheduled_trial_day: "trial",
+    second_trial_day: "trial",
+    rescheduled_second_trial_day: "trial"
   };
-  function modeForInterviewType(type) {
-    return MODE_BY_INTERVIEW_TYPE[String(type || "")] || "";
+  function modesFor(templateId) {
+    return MODES.filter((mode) => !mode.only || mode.only.includes(templateId));
+  }
+  function modeForInterviewType(type, templateId) {
+    const mode = MODE_BY_INTERVIEW_TYPE[String(type || "")] || "";
+    if (!mode || templateId === void 0) return mode;
+    return modesFor(templateId).some((item) => item.value === mode) ? mode : "";
   }
   function berlinParts(date) {
     const parts = new Intl.DateTimeFormat("de-DE", {
@@ -15164,6 +15180,17 @@ ${add}` : add;
       const time = date ? formatTime(date) : slot("Uhrzeit", "");
       const employer = slot("Arbeitgeber", ctx.employerName);
       const sign = `LG ${slot("Vorname CEM", ctx.cem?.firstName)}`;
+      if (ctx.mode === "trial") return [
+        `Hi ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
+        "",
+        `für Deinen Probetag ${when} mit ${employer} um ${time} drücke ich Dir die Daumen 🍀`,
+        "",
+        "Weißt Du, wo Du hin musst und wer Dein Ansprechpartner vor Ort ist?",
+        "",
+        "Bin gespannt, was Du danach berichtest. 🙂",
+        "",
+        sign
+      ];
       if (ctx.mode === "onsite") return [
         `Hi ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
         "",
@@ -15938,13 +15965,13 @@ ${add}` : add;
       const interview = template.interview ? pickInterview(context.interviews, template.interview) : null;
       const suggestion = template.custom && context.interviews ? pickInterview(context.interviews, "suggestion") : null;
       subtitle.textContent = [context.candidateFirstName, context.employerName].filter(Boolean).join(" · ");
-      const state = { mode: modeForInterviewType((interview || suggestion)?.type), contact: context.defaultContact || null, commuteMinutes: 0, dirty: false, gaps: [] };
+      const state = { mode: modeForInterviewType((interview || suggestion)?.type, template.id), contact: context.defaultContact || null, commuteMinutes: 0, dirty: false, gaps: [] };
       const controls = element5("div", { className: "wa-row" });
       let modeSelect = null;
       if (template.needs.includes("mode")) {
         modeSelect = element5("select");
         modeSelect.append(element5("option", { value: "", textContent: "– wählen –" }));
-        MODES.forEach((mode) => modeSelect.append(element5("option", { value: mode.value, textContent: mode.label })));
+        modesFor(template.id).forEach((mode) => modeSelect.append(element5("option", { value: mode.value, textContent: mode.label })));
         modeSelect.value = state.mode;
         controls.append(element5("label", { textContent: "Gesprächsart" }, [modeSelect]));
       }
@@ -16775,7 +16802,10 @@ Trotzdem speichern?`)) return void 0;
   }
   function sentMessage(response) {
     const names = response?.gesendet || [];
-    return names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+    const sent = names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+    if (response?.matchkommentar === true) return `${sent} Matchkommentar angelegt.`;
+    if (response?.matchkommentar === false) return `${sent} Der Matchkommentar konnte nicht angelegt werden, bitte von Hand nachtragen.`;
+    return sent;
   }
   function vacancyLine(preview) {
     const place = [preview?.arbeitgeber, preview?.ort ? `(${preview.ort})` : ""].filter(Boolean).join(" ");
@@ -16973,7 +17003,7 @@ Trotzdem speichern?`)) return void 0;
           const response = await send({ action: "senden", direction: dialogDirection, matchId, comment: comment.value });
           if (!dialog.isConnected) return;
           setStatus(dialog, sentMessage(response), "ok");
-          closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
+          if (response?.matchkommentar !== false) closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
         } catch (error) {
           if (!dialog.isConnected) return;
           setStatus(dialog, error.message || String(error), "error");

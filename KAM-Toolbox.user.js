@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.311
+// @version      1.19.337
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -6587,9 +6587,10 @@ ${add}` : add;
       steps: [
         "„An CEM“ in der Zeile klicken.",
         "Im Dialog prüfen, wer die Nachricht bekommt. Optional einen Kommentar schreiben.",
-        "„Senden“ klicken. Der Dialog meldet, an wen die DM ging."
+        "„Senden“ klicken. Der Dialog meldet, an wen die DM ging und ob der Matchkommentar angelegt ist."
       ],
       notes: [
+        "Beim Senden kommt automatisch ein Matchkommentar unter deinem Namen ans Match: „per Slack DM bei CEM nachgefragt (Name):“, darunter „Notes: …“ mit deinem Kommentar. Klappt das nicht, sagt es der Dialog; dann bitte von Hand nachtragen.",
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die CEM-Person, die beim Kandidaten eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
         "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
         "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht.",
@@ -12770,7 +12771,10 @@ ${add}` : add;
   }
   function sentMessage(response) {
     const names = response?.gesendet || [];
-    return names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+    const sent = names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+    if (response?.matchkommentar === true) return `${sent} Matchkommentar angelegt.`;
+    if (response?.matchkommentar === false) return `${sent} Der Matchkommentar konnte nicht angelegt werden, bitte von Hand nachtragen.`;
+    return sent;
   }
   function vacancyLine(preview) {
     const place = [preview?.arbeitgeber, preview?.ort ? `(${preview.ort})` : ""].filter(Boolean).join(" ");
@@ -12968,7 +12972,7 @@ ${add}` : add;
           const response = await send({ action: "senden", direction: dialogDirection, matchId, comment: comment.value });
           if (!dialog.isConnected) return;
           setStatus(dialog, sentMessage(response), "ok");
-          closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
+          if (response?.matchkommentar !== false) closeTimer = runtime.setTimeout(closeDialog, CLOSE_AFTER_SENT_MS);
         } catch (error) {
           if (!dialog.isConnected) return;
           setStatus(dialog, error.message || String(error), "error");

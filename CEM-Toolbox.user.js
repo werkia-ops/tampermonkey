@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.22.313
+// @version      1.23.332
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -15041,6 +15041,11 @@ ${add}` : add;
   function contactName2(contact) {
     return [contact?.name, contact?.surname].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
   }
+  function formalName(contact) {
+    const surname = String(contact?.surname || "").trim();
+    const title = { male: "Herrn", female: "Frau" }[contact?.gender];
+    return title && surname ? `${title} ${surname}` : contactName2(contact);
+  }
   function cleanAddress(value) {
     return String(value || "").replace(/,\s*(Deutschland|Germany)\s*$/i, "").trim();
   }
@@ -15066,7 +15071,7 @@ ${add}` : add;
   var TEMPLATES = [
     { id: "vta", scope: "match", label: "1. WA mit Terminvorschlägen (VTA)", needs: ["mode"], interview: "suggestion" },
     { id: "tb", scope: "match", label: "VT Bestätigung", needs: ["mode", "contact"], interview: "confirmed" },
-    { id: "te", scope: "match", label: "VT Erinnerung", needs: ["mode"], interview: "confirmed" },
+    { id: "te", scope: "match", label: "VT Erinnerung", needs: ["mode", "contact"], interview: "confirmed" },
     { id: "fbvt", scope: "match", label: "VT Feedback", needs: [], interview: "confirmed" },
     { id: "ul", scope: "candidate", label: "1. WA Unterlagen (UL)", needs: [] },
     { id: "krm", scope: "candidate", label: "OUT - krm Bew", needs: [] },
@@ -15186,9 +15191,9 @@ ${add}` : add;
       return [
         `Hi ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
         "",
-        `für Deinen ${ctx.mode === "phone" ? "Telefontermin" : slot("Telefontermin/Termin", "")} ${when} bei ${employer} um ${time} wünsche ich Dir viel Erfolg 🍀`,
+        `für Deinen ${ctx.mode === "phone" ? "Telefontermin" : slot("Telefontermin/Termin", "")} ${when} mit ${employer} um ${time} wünsche ich Dir viel Erfolg 🍀`,
         "",
-        "Bitte stell sicher, dass Du erreichbar bist und rufe ggf. zurück.",
+        `Bitte stell sicher, dass Du erreichbar bist. Falls Du nicht angerufen wirst, melde Dich bitte selbstständig bei ${slot("Ansprechpartner", formalName(ctx.contact))} unter ${slot("Telefon Ansprechpartner", ctx.contact?.phoneNumbers?.[0])}.`,
         "",
         "Freue mich danach auf Dein Feedback. 🙂",
         "",

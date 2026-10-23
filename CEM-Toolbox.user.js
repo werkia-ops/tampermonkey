@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.24.342
+// @version      1.25.346
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -144,6 +144,37 @@
         few_career_opportunities: "Wenig Aufstiegschancen",
         already_worked_for_this_organisation: "War schon bei diesem AG"
       });
+      var OM_FEEDBACK_LABELS2 = Object.freeze({
+        too_far: "Distanz / zu weiter Arbeitsweg",
+        willingness_to_travel: "Montagebereitschaft",
+        no_driver_license: "Kein Führerschein",
+        other_focus: "Anderer Fachbereich / Schwerpunkt",
+        no_qualification: "Fehlende Qualifikation",
+        no_experience: "Fehlende Erfahrung",
+        no_recognition: "Fehlende Anerkennung",
+        german_language_skills: "Unzureichende Deutschkenntnisse",
+        salary_or_conditions: "Gehalt / Konditionen",
+        working_hours: "Arbeitszeiten / Schicht / Rufbereitschaft",
+        job_fit: "Tätigkeit passt nicht",
+        start_date: "Starttermin zu spät / zu früh",
+        no_longer_available: "Stelle besetzt / kein Bedarf mehr",
+        bew_known: "BEW bereits bekannt",
+        too_many_job_changes: "Zu viele Wechsel / instabiler Lebenslauf",
+        incomplete_profile: "Fehlende Unterlagen / unvollständiges Profil",
+        bew_not_interested: "BEW kein Interesse",
+        bew_unresponsive: "BEW nicht responsive",
+        bew_found_external: "BEW hat privat etwas gefunden",
+        team_fit: "Persönlicher Eindruck / Teamfit",
+        profile_deleted: "Profil gelöscht",
+        only_part_time: "Nur Minijob/Geringfügig",
+        no_visa_or_permit: "Arbeitserlaubnis/Visum fehlt",
+        accepted_by_accident: "Match versehentlich angenommen",
+        offline_application: "Direktbewerbung beim Arbeitgeber (offline)",
+        partnership_ended: "Partnerschaft mit Unternehmen beendet/pausiert",
+        job_scope: "Stellenumfang passt nicht",
+        duplicate: "Doppelt",
+        no_school_certificate: "Kein Schulabschluss"
+      });
       var NO_REASON2 = "ohne Grund";
       function clean4(value) {
         return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -158,17 +189,28 @@
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
       }
-      function declineText2(values) {
+      function omFeedbackLabel2(value) {
+        const text = clean4(value);
+        if (!text) return "";
+        return Object.prototype.hasOwnProperty.call(OM_FEEDBACK_LABELS2, text) ? OM_FEEDBACK_LABELS2[text] : text;
+      }
+      function joinLabels(values, labelOf) {
         const list = Array.isArray(values) ? values : [];
         const seen = /* @__PURE__ */ new Set();
         const out = [];
         for (const value of list) {
-          const label2 = declineLabel2(value);
+          const label2 = labelOf(value);
           if (!/[\p{L}\p{N}]/u.test(label2) || seen.has(label2)) continue;
           seen.add(label2);
           out.push(label2);
         }
         return out.join(", ");
+      }
+      function declineText2(values) {
+        return joinLabels(values, declineLabel2);
+      }
+      function omOutReason2(values) {
+        return joinLabels(values, omFeedbackLabel2) || NO_REASON2;
       }
       function outReason2({ feedback, declineFeedbacks } = {}) {
         const label2 = feedbackLabel2(feedback);
@@ -177,7 +219,18 @@
         if (decline) return `Absage in der App: ${decline}`;
         return NO_REASON2;
       }
-      module.exports = { FEEDBACK_LABELS: FEEDBACK_LABELS2, DECLINE_LABELS: DECLINE_LABELS2, NO_REASON: NO_REASON2, feedbackLabel: feedbackLabel2, declineLabel: declineLabel2, declineText: declineText2, outReason: outReason2 };
+      module.exports = {
+        FEEDBACK_LABELS: FEEDBACK_LABELS2,
+        DECLINE_LABELS: DECLINE_LABELS2,
+        OM_FEEDBACK_LABELS: OM_FEEDBACK_LABELS2,
+        NO_REASON: NO_REASON2,
+        feedbackLabel: feedbackLabel2,
+        declineLabel: declineLabel2,
+        declineText: declineText2,
+        omFeedbackLabel: omFeedbackLabel2,
+        omOutReason: omOutReason2,
+        outReason: outReason2
+      };
     }
   });
 
@@ -6249,8 +6302,19 @@ ${add}` : add;
 
   // ../../shared/js/out-gruende/core.js
   var import_labels = __toESM(require_labels(), 1);
-  var { FEEDBACK_LABELS, DECLINE_LABELS, NO_REASON, feedbackLabel, declineLabel, declineText, outReason } = import_labels.default;
-  var SIDE_LABELS = Object.freeze({ kam: "KAM-Out", cem: "CEM-Out" });
+  var {
+    FEEDBACK_LABELS,
+    DECLINE_LABELS,
+    OM_FEEDBACK_LABELS,
+    NO_REASON,
+    feedbackLabel,
+    declineLabel,
+    declineText,
+    omFeedbackLabel,
+    omOutReason,
+    outReason
+  } = import_labels.default;
+  var SIDE_LABELS = Object.freeze({ kam: "KAM-Out", cem: "CEM-Out", om: "OM-Out" });
   var OUT_REASONS_QUERY = `query outGruende($page: Int, $perPage: Int, $filter: MatchFilter) {
   items: allMatches(page: $page, perPage: $perPage, filter: $filter) {
     id
@@ -6260,6 +6324,8 @@ ${add}` : add;
     cemFeedback
     connectionStatus
     declineFeedbacks
+    onlineMatchStatus
+    onlineMatchesFeedback
     __typename
   }
 }`;
@@ -6276,6 +6342,9 @@ ${add}` : add;
       if (side === "cem" && match.cemStatus === "out") {
         const declineFeedbacks = match.connectionStatus === "declined" ? match.declineFeedbacks : [];
         out.push({ side, label: SIDE_LABELS.cem, reason: outReason({ feedback: match.cemFeedback, declineFeedbacks }) });
+      }
+      if (side === "om" && match.onlineMatchStatus === "dont_send") {
+        out.push({ side, label: SIDE_LABELS.om, reason: omOutReason(match.onlineMatchesFeedback) });
       }
     }
     return out;
@@ -6306,6 +6375,7 @@ ${add}` : add;
       notes: [
         scopeNote || "Gezeigt werden KAM- und CEM-Out, sobald eine Seite auf Out steht. Ohne hinterlegten Grund steht „ohne Grund“.",
         "Absagen aus der Kandidaten-App stehen als „Absage in der App: …“.",
+        "Setzt OM einen Match auf „Nicht senden“, steht dessen Grund als „OM-Out: …“.",
         "Bei jedem neuen Out schreibt zusätzlich der n8n-Workflow „Out-Gründe“ den Grund als Matchkommentar."
       ]
     };
@@ -6759,7 +6829,7 @@ ${add}` : add;
     matchContactPersonTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     employerCommentsReadTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
     omQuestionnaireColumnTopic({ page: "Matchkommentar-Dialog (Meine Matches, Meine Kandidaten)", routes: onBulkPages }),
-    outGruendeTopic({ page: "CEM › Meine Matches, Meine Kandidaten und KAM › Meine Matches", routes: [...onBulkPages, ROUTES.kamMyMatches], statusName: "CEM Status", scopeNote: "In der KAM-Ansicht steht der KAM-Out-Grund unter dem KAM-Status. In den CEM-Ansichten stehen CEM- und KAM-Out-Gründe, der KAM-Grund wenn möglich direkt hinter „KAM Status: Out“." })
+    outGruendeTopic({ page: "CEM › Meine Matches, Meine Kandidaten und KAM › Meine Matches", routes: [...onBulkPages, ROUTES.kamMyMatches], statusName: "CEM Status", scopeNote: "In der KAM-Ansicht steht der KAM-Out-Grund unter dem KAM-Status. Bei OM „Nicht senden“ steht zusätzlich „OM-Out: …“. In den CEM-Ansichten stehen CEM- und KAM-Out-Gründe, der KAM-Grund wenn möglich direkt hinter „KAM Status: Out“." })
   ];
   var cemHelp = createToolboxHelp({ namespace: "cem", toolboxName: "CEM-Toolbox", topics: CEM_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -17935,11 +18005,11 @@ Trotzdem speichern?`)) return void 0;
 
   // src/features/out-gruende.js
   var CEM_OUT_VIEWS = [
-    { route: ROUTES.kamMyMatches, cellSelector: "td.column-kamStatus", sides: ["kam"], ownSide: "kam" },
+    { route: ROUTES.kamMyMatches, cellSelector: "td.column-kamStatus", sides: ["kam", "om"], ownSide: "kam" },
     ...[ROUTES.cemMyMatches, ROUTES.cemMyCandidates].map((route) => ({
       route,
       cellSelector: "td.column-cemStatus",
-      sides: ["cem", "kam"],
+      sides: ["cem", "kam", "om"],
       // KAM-Grund hinter "KAM Status: Out" in der Job-Spalte (Wunsch Bella).
       inline: { side: "kam", cellSelector: "td.column-jobPositionId", pattern: /^KAM Status:/ }
     }))

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.24.337
+// @version      1.24.340
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6724,7 +6724,7 @@ ${add}` : add;
       steps: [
         "Mit der Maus auf den Kreis zeigen, um den Grund zu sehen, z. B. „Hot Case“, „Bestätigter VT am 21.10.“ oder „7 Werktage ohne Kontakt“.",
         "Auf den Kreis klicken, um die Farbe selbst zu setzen (Grün, Gelb, Rot) oder zurück auf „Automatisch“ zu stellen. Eine selbst gesetzte Farbe hat einen gestrichelten Rand.",
-        "Neben dem Focus-Mode filtern Grün, Gelb, Rot und „Nur NEW“ die gesamte Liste. „Nur NEW“ zeigt Kandidaten ohne Kontakt seit der Zuteilung. Ein zweiter Klick hebt den Filter auf."
+        "Neben dem Focus-Mode filtern Grün, Gelb, Rot und „Nur NEW“ die gesamte Liste. „Nur NEW“ zeigt Kandidaten ohne Kontakt seit der Zuteilung. Ein zweiter Klick hebt den Filter auf. Dafür muss im Filter „CEM“ mindestens eine Person stehen."
       ],
       notes: [
         "Grün: ein Match ist Hot Case (CEM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
@@ -13860,6 +13860,7 @@ ${add}` : add;
   }
 
   // src/features/cem-ampel/rewrite.js
+  var NO_CEM_MESSAGE = "Der Ampel-Filter braucht mindestens eine CEM-Person im Filter „CEM“. Bitte dort auswählen.";
   var NEW_MISSING_MESSAGE = "Der NEW-Filter ist gerade nicht verfügbar. Bitte später noch einmal versuchen.";
   var NO_MATCH_ID2 = "00000000-0000-0000-0000-000000000000";
   var INSTALLED_FLAG3 = "__werkiaCemAmpelRewrite";
@@ -13920,7 +13921,10 @@ ${add}` : add;
       } catch {
         return originalFetch.call(pageWindow, input, init);
       }
-      return Promise.all(filters.map((filter) => loadFarben(listScope(filter)).then((farben) => {
+      return Promise.all(filters.map((filter) => Promise.resolve().then(() => {
+        if (!listScope(filter).cemEmployeeIds.length) throw new Error(NO_CEM_MESSAGE);
+        return loadFarben(listScope(filter));
+      }).then((farben) => {
         if (markerFarbe(filter[AMPEL_MARKER]) === "neu" && !Array.isArray(farben?.neu)) throw new Error(NEW_MISSING_MESSAGE);
         return farben;
       }).catch((error) => {
@@ -13940,6 +13944,7 @@ ${add}` : add;
   var ROUTE_RE = /^#\/CEM\/MyCandidates(?:[/?]|$)/i;
   var IDS7 = { style: "werkia-cem-ampel-style", menu: "werkia-cem-ampel-menu", info: "werkia-cem-ampel-info" };
   var DOT_CLASS = "werkia-cem-ampel-dot";
+  var SIDE_BOX_ID = "werkia-cem-cand-focus-side";
   var NEW_CLASS = "werkia-cem-ampel-new";
   var OWNER_ATTR = "data-werkia-cem-ampel";
   function candidateRows(root = document) {
@@ -14036,7 +14041,7 @@ ${add}` : add;
       ${FARB_IDS.map((farbe) => `.${DOT_CLASS}[data-farbe="${farbe}"] { background:${FARBEN[farbe].fill}; border-color:${FARBEN[farbe].ring}; }`).join("\n      ")}
       .${DOT_CLASS}[data-kam-warnung="true"] { border:3px solid ${FARBEN.rot.fill}; box-shadow:0 0 0 2px ${FARBEN.rot.fill}, 0 1px 3px rgba(9,9,11,.35); }
       .${NEW_CLASS} { display:inline-block; margin:0 0 0 8px; padding:2px 7px; border-radius:5px; background:${THEME.accent}; color:#fff; font:800 12px/1.25 ${font}; letter-spacing:.06em; vertical-align:middle; box-shadow:0 1px 2px rgba(9,9,11,.3); cursor:default; }
-      #${IDS7.info} { margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
+      #${IDS7.info} { display:block; margin:0 0 8px; color:${THEME.badInk}; font:400 12px/1.3 ${font}; }
       ${m} { position:absolute; z-index:2147483000; width:280px; box-sizing:border-box; padding:12px; border:1px solid ${THEME.line}; border-radius:12px; background:${THEME.surface}; color:${THEME.ink}; box-shadow:${THEME.shadowRaised}; font:400 13px/1.4 ${font}; }
       ${m} h3 { display:flex; align-items:center; gap:6px; margin:0 0 6px; color:${THEME.inkSecondary}; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
       ${m} p { margin:0 0 8px; }
@@ -14179,11 +14184,12 @@ ${add}` : add;
         return;
       }
       const table = rows[0]?.row.closest("table") || document.querySelector("table");
-      if (!table?.parentElement) return;
-      if (!info) {
-        info = el4("div", { id: IDS7.info });
-        table.parentElement.insertBefore(info, table);
-      }
+      const side = document.getElementById(SIDE_BOX_ID);
+      const anchor = table?.parentElement ? table : side;
+      if (!anchor?.parentElement) return;
+      if (!info) info = el4("div", { id: IDS7.info });
+      if (anchor === table && info.nextSibling !== table) table.parentElement.insertBefore(info, table);
+      if (anchor === side && info.previousSibling !== side) side.after(info);
       if (info.textContent !== text) info.textContent = text;
     }
     function clear() {

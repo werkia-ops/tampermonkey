@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.19.337
+// @version      1.20.344
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -6604,11 +6604,13 @@ ${add}` : add;
       page: MY_MATCHES,
       routes: onMyMatches,
       kind: "write",
-      summary: "Zeigt bei jedem Arbeitgeber, wie schnell er antwortet. Das Dropdown neben dem Arbeitgeber ändert den Wert direkt im Arbeitgeberprofil.",
+      summary: "Zeigt bei jedem Arbeitgeber, wie schnell er antwortet. Das Dropdown neben dem Arbeitgeber ändert den Wert direkt im Arbeitgeberprofil. Passt der Wert nicht zu den VT-Zahlen der letzten 4 Wochen, steht ein Vorschlag dahinter.",
       notes: [
         "Direkter Kontakt (0–1 Tage), Indirekter Kontakt (2–5 Tage), Kein Kontakt (über eine Woche), Keine Antwort. „Leer“ heißt, dass beim Arbeitgeber nichts hinterlegt ist. Leeren lässt sich der Wert hier nicht.",
         "Hat derselbe Arbeitgeber mehrere Matches in der Liste, ändern sich alle Zeilen mit. Neben dem Dropdown erscheint kurz ✓, wenn gespeichert wurde. Schlägt das Speichern fehl, springt es auf den alten Wert zurück.",
-        "Der Wert kommt aus dem Arbeitgeberprofil und wird alle 5 Minuten nachgeladen."
+        "Der Wert kommt aus dem Arbeitgeberprofil und wird alle 5 Minuten nachgeladen.",
+        "Vorschlag: Alle 4 Wochen werden VTA, vereinbarte (VTV) und stattgefundene Termine (VTS) je Arbeitgeber ausgewertet. Ab 5 VTA: VTV-Quote ab 30 % Direkter Kontakt, ab 15 % Indirekter Kontakt, darunter Kein Kontakt, kein einziges VTV bei mindestens 10 VTA Keine Antwort. Finden von mindestens 3 VTV weniger als 40 % statt, eine Stufe tiefer.",
+        "Weicht der Vorschlag vom eingetragenen Wert ab, steht er gestrichelt hinter dem Dropdown. ✓ übernimmt ihn, ✕ lässt den Wert stehen. Wählst du selbst im Dropdown, zählt das auch als Entscheidung. Danach kommt der Vorschlag erst mit der nächsten Auswertung wieder. Die Zahlen und der Grund stehen im Tooltip."
       ]
     },
     matchContactPersonTopic({ page: `${MY_MATCHES} › Matchkommentar-Dialog`, routes: onMyMatches }),
@@ -8153,12 +8155,88 @@ ${add}` : add;
     throw new Error("Zu viele Arbeitgeber-Seiten, Abbruch");
   }
 
+  // src/features/kam-suite/response-rate-vorschlag.js
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/response-rate-vorschlag/241b3a36-9aa5-4880-b33b-89cf354e7e58";
+  var REQUEST_TIMEOUT_MS3 = 15e3;
+  var OFFLINE_MESSAGE3 = "Der Server für die Vorschläge zur Response Rate ist gerade nicht erreichbar.";
+  var MAX_IDS = 100;
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaResponseRateMe {
+  me: currentEmployee { id __typename }
+}`;
+  function parseResponse3(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Response-Rate-Vorschlag: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createVorschlagClient({ request, url = WEBHOOK_URL3 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: REQUEST_TIMEOUT_MS3,
+        onload(response) {
+          try {
+            resolve(parseResponse3(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+      });
+    });
+  }
+  function shortDay(day) {
+    const [, month, date] = String(day || "").split("-");
+    return month && date ? `${date}.${month}.` : "";
+  }
+  function periodeText(periode) {
+    return periode ? `${shortDay(periode.von)}–${shortDay(periode.bis)}` : "";
+  }
+  function zahlenText(entry, periode) {
+    if (!entry?.zahlen) return "";
+    const { vta, vtv, vts } = entry.zahlen;
+    return `VT-Zahlen ${periodeText(periode)}: ${vta} VTA, ${vtv} VTV, ${vts} VTS`;
+  }
+  function vorschlagTitle(entry, periode, labels2 = {}) {
+    const ziel = labels2[entry.vorschlag] || entry.vorschlag;
+    return [
+      `Vorschlag aus den VT-Zahlen ${periodeText(periode)}: ${ziel}`,
+      entry.grund,
+      periode?.naechste ? `Nächste Auswertung ab ${shortDay(periode.naechste)}.` : "",
+      "Übernehmen setzt den Wert beim Arbeitgeber, Überstimmen lässt ihn stehen. Beides gilt bis zur nächsten Auswertung."
+    ].filter(Boolean).join("\n");
+  }
+  function openVorschlag(entry, currentValue) {
+    if (!entry?.vorschlag) return null;
+    if (currentValue && currentValue === entry.vorschlag) return null;
+    return entry.vorschlag;
+  }
+  function entscheidungForChoice(vorschlag, next) {
+    if (!vorschlag) return "";
+    return next === vorschlag ? "uebernommen" : "ueberstimmt";
+  }
+  function chunks2(ids, size = MAX_IDS) {
+    const list = [];
+    for (let index = 0; index < ids.length; index += size) list.push(ids.slice(index, index + size));
+    return list;
+  }
+
   // src/features/kam-suite/contact-badges.js
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
   var STYLE_ID6 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
+  var VORSCHLAG_RETRY_MS = 60 * 1e3;
   var CONTACT_OPTIONS = {
     no_contact: { short: "Kein Kontakt", full: "Kein Kontakt (>1 Woche)", tone: "no-contact", priority: 2 },
     indirect_contact: { short: "Indirekter Kontakt", full: "Indirekter Kontakt (2–5 Tage)", tone: "indirect", priority: 3 },
@@ -8183,11 +8261,23 @@ ${add}` : add;
     const placeholder = WRITABLE_CONTACT_VALUES.includes(value) ? "" : `<option value="${escapeHtml2(value)}" disabled>${escapeHtml2(CONTACT_OPTIONS[value]?.short || value)}</option>`;
     return placeholder + WRITABLE_CONTACT_VALUES.map((key) => `<option value="${key}">${escapeHtml2(CONTACT_OPTIONS[key].short)}</option>`).join("");
   }
-  function executeContactBadges(runtime) {
+  function executeContactBadges(runtime, {
+    getGraphqlAdapter = getKamGraphqlAdapter,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+  } = {}) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/contact-badges.js");
+    runtime.registerSource("kam/toolbox/src/features/kam-suite/response-rate-vorschlag.js");
     const contactStates = /* @__PURE__ */ new Map();
     const contactIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
+    const postVorschlag = request ? createVorschlagClient({ request }) : null;
+    const vorschlaege = /* @__PURE__ */ new Map();
+    const vorschlagLoadedAt = /* @__PURE__ */ new Map();
+    const deciding = /* @__PURE__ */ new Set();
+    let vorschlagPeriode = null;
+    let vorschlagPromise = null;
+    let vorschlagFailedAt = 0;
+    let myId = "";
     function getRows() {
       return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
     }
@@ -8235,6 +8325,18 @@ ${add}` : add;
       .werkia-kam-contact [data-state] { min-width: 12px; font: 700 13px/1 Arial,sans-serif; }
       .werkia-kam-contact [data-state="ok"] { color: #18752b; }
       .werkia-kam-contact [data-state="error"] { color: #b3261e; }
+      .werkia-kam-rr { display: inline-flex; align-items: center; gap: 2px; }
+      .werkia-kam-rr:empty { display: none; }
+      .werkia-kam-rr__pill { padding: 3px 8px; border: 1.5px dashed #aaa; border-radius: 999px; font: 700 12px/1.2 Arial,sans-serif; white-space: nowrap; cursor: help; }
+      .werkia-kam-rr__pill[data-tone="direct"] { color: #0b5d1e; border-color: #46a35d; background: #f0faf2; }
+      .werkia-kam-rr__pill[data-tone="indirect"] { color: #7a4b00; border-color: #d59b2b; background: #fff8e1; }
+      .werkia-kam-rr__pill[data-tone="no-contact"] { color: #8a3d00; border-color: #e07a1f; background: #fff4e8; }
+      .werkia-kam-rr__pill[data-tone="response"] { color: #8f1d16; border-color: #cf6b63; background: #fef1f0; }
+      .werkia-kam-rr button { width: 22px; height: 22px; padding: 0; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #3f3f46; font: 700 12px/1 Arial,sans-serif; cursor: pointer; }
+      .werkia-kam-rr button:hover { background: #f4f4f5; }
+      .werkia-kam-rr button[data-rr="uebernehmen"] { color: #18752b; }
+      .werkia-kam-rr button[data-rr="ueberstimmen"] { color: #b3261e; }
+      .werkia-kam-rr button:disabled { cursor: wait; opacity: .6; }
     `;
       document.head.appendChild(style);
     }
@@ -8252,10 +8354,11 @@ ${add}` : add;
     async function saveContact(employerId, next) {
       if (saving.has(employerId)) return;
       const previous = contactIndex.get(employerId);
+      const vorschlag = openVorschlag(vorschlaege.get(employerId), previous);
       saving.set(employerId, next);
       renderContactBadges();
       try {
-        const saved = await updateEmployerContact(getKamGraphqlAdapter().request, employerId, next);
+        const saved = await updateEmployerContact(getGraphqlAdapter().request, employerId, next);
         contactStates.delete(employerId);
         contactIndex.set(employerId, saved);
         saving.delete(employerId);
@@ -8264,6 +8367,8 @@ ${add}` : add;
         runtime.setTimeout(() => {
           for (const wrap2 of wrapsForEmployer(employerId)) if (wrap2.querySelector('[data-state="ok"]')) setMarker(wrap2, "");
         }, 2500);
+        const entscheidung = entscheidungForChoice(vorschlag, saved);
+        if (entscheidung) decide(employerId, entscheidung, previous ?? "").catch((error) => console.warn("[Werkia KAM Response Rate Vorschlag]", error));
       } catch (error) {
         saving.delete(employerId);
         if (previous === void 0) contactIndex.delete(employerId);
@@ -8278,7 +8383,7 @@ ${add}` : add;
       const wrap2 = document.createElement("span");
       wrap2.className = "werkia-kam-contact";
       wrap2.dataset.employerId = employerId;
-      wrap2.innerHTML = '<select aria-label="AG Response Rate"></select><span data-state=""></span>';
+      wrap2.innerHTML = '<select aria-label="AG Response Rate"></select><span data-state=""></span><span class="werkia-kam-rr"></span>';
       ["click", "mousedown", "mouseup", "pointerdown", "pointerup", "keydown"].forEach((type) => {
         wrap2.addEventListener(type, (event) => event.stopPropagation());
       });
@@ -8289,7 +8394,87 @@ ${add}` : add;
         if (!next || next === previous || !WRITABLE_CONTACT_VALUES.includes(next)) return;
         saveContact(employerId, next);
       });
+      wrap2.addEventListener("click", (event) => {
+        const button3 = event.target.closest?.("button[data-rr]");
+        if (!button3 || !wrap2.contains(button3)) return;
+        event.preventDefault();
+        const vorschlag = openVorschlag(vorschlaege.get(employerId), contactIndex.get(employerId));
+        if (!vorschlag) return;
+        if (button3.dataset.rr === "uebernehmen") saveContact(employerId, vorschlag);
+        else decide(employerId, "ueberstimmt", contactIndex.get(employerId) ?? "").catch((error) => {
+          console.warn("[Werkia KAM Response Rate Vorschlag]", error);
+          window.alert(`Überstimmen konnte nicht gespeichert werden: ${error.message}`);
+        });
+      });
       return wrap2;
+    }
+    async function ensureMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    async function decide(employerId, entscheidung, vorher) {
+      if (!postVorschlag || deciding.has(employerId)) return;
+      deciding.add(employerId);
+      renderContactBadges();
+      try {
+        const data = await postVorschlag({ action: "entscheiden", employeeId: await ensureMyId(), employerId, entscheidung, vorher });
+        if (data.arbeitgeber?.id) vorschlaege.set(employerId, data.arbeitgeber);
+        if (data.periode) vorschlagPeriode = data.periode;
+      } finally {
+        deciding.delete(employerId);
+        renderContactBadges();
+      }
+    }
+    function loadVorschlaege({ force = false } = {}) {
+      if (!postVorschlag || vorschlagPromise) return vorschlagPromise;
+      if (!force && Date.now() - vorschlagFailedAt < VORSCHLAG_RETRY_MS) return null;
+      const now = Date.now();
+      const employerIds = getEmployerChoices().map((choice) => choice.id).filter((id) => force || now - (vorschlagLoadedAt.get(id) || 0) >= REFRESH_INTERVAL_MS);
+      if (!employerIds.length) return null;
+      vorschlagPromise = (async () => {
+        try {
+          const employeeId = await ensureMyId();
+          for (const ids of chunks2(employerIds)) {
+            const data = await postVorschlag({ action: "status", employeeId, employerIds: ids });
+            vorschlagPeriode = data.periode || null;
+            for (const entry of data.arbeitgeber || []) vorschlaege.set(entry.id, entry);
+            for (const id of ids) vorschlagLoadedAt.set(id, Date.now());
+          }
+          vorschlagFailedAt = 0;
+        } catch (error) {
+          vorschlagFailedAt = Date.now();
+          console.warn("[Werkia KAM Response Rate Vorschlag]", error);
+        } finally {
+          vorschlagPromise = null;
+          renderContactBadges();
+        }
+      })();
+      return vorschlagPromise;
+    }
+    const SHORT_LABELS = Object.fromEntries(Object.entries(CONTACT_OPTIONS).map(([key, option]) => [key, option.short]));
+    function vorschlagView(employerId, currentValue) {
+      const entry = vorschlaege.get(employerId);
+      const vorschlag = openVorschlag(entry, currentValue);
+      return {
+        zahlen: zahlenText(entry, vorschlagPeriode),
+        vorschlag,
+        title: vorschlag ? vorschlagTitle(entry, vorschlagPeriode, SHORT_LABELS) : "",
+        busy: deciding.has(employerId)
+      };
+    }
+    function renderVorschlag(wrap2, view) {
+      const box = wrap2.querySelector(".werkia-kam-rr");
+      if (!box) return;
+      if (!view.vorschlag) {
+        box.innerHTML = "";
+        return;
+      }
+      const option = CONTACT_OPTIONS[view.vorschlag];
+      const disabled = view.busy ? " disabled" : "";
+      box.innerHTML = `<span class="werkia-kam-rr__pill" data-tone="${option?.tone || "empty"}" title="${escapeHtml2(view.title)}">Vorschlag: ${escapeHtml2(option?.short || view.vorschlag)}</span><button type="button" data-rr="uebernehmen" title="Vorschlag übernehmen"${disabled}>✓</button><button type="button" data-rr="ueberstimmen" title="Überstimmen: aktuellen Wert behalten"${disabled}>✕</button>`;
     }
     function viewForState(state, employerId) {
       if (saving.has(employerId)) {
@@ -8316,12 +8501,15 @@ ${add}` : add;
           link.insertAdjacentElement("afterend", wrap2);
         }
         const view = viewForState(contactStateForEmployer(employer.id), employer.id);
-        const key = `${view.kind}|${view.value || view.text}|${view.title}`;
+        const rr = view.kind === "ready" ? vorschlagView(employer.id, view.value) : { zahlen: "", vorschlag: null, title: "", busy: false };
+        const key = `${view.kind}|${view.value || view.text}|${view.title}|${rr.zahlen}|${rr.vorschlag}|${rr.title}|${rr.busy}`;
         const select = wrap2.querySelector("select");
         if (wrap2.dataset.renderKey === key) return;
         wrap2.dataset.renderKey = key;
         wrap2.dataset.tone = view.tone;
-        wrap2.title = view.title;
+        wrap2.title = rr.zahlen ? `${view.title}
+${rr.zahlen}` : view.title;
+        renderVorschlag(wrap2, rr);
         if (view.kind === "info") {
           wrap2.dataset.value = "";
           select.innerHTML = `<option value="">${escapeHtml2(view.text)}</option>`;
@@ -8348,7 +8536,7 @@ ${add}` : add;
       renderContactBadges();
       loadPromise = (async () => {
         try {
-          const fetched = await fetchEmployerContacts(getKamGraphqlAdapter().request, employerIds);
+          const fetched = await fetchEmployerContacts(getGraphqlAdapter().request, employerIds);
           for (const id of employerIds) {
             if (saving.has(id)) continue;
             contactStates.delete(id);
@@ -8381,12 +8569,15 @@ ${add}` : add;
         ensureStyle7();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
+        loadVorschlaege();
       }, 150);
     };
     runtime.createMutationObserver(scheduleContactBadges).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleContactBadges);
     runtime.setInterval(() => {
-      if (isTargetPage2()) loadEmployerContacts({ force: true }).catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
+      if (!isTargetPage2()) return;
+      loadEmployerContacts({ force: true }).catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
+      loadVorschlaege({ force: true });
     }, REFRESH_INTERVAL_MS);
     scheduleContactBadges();
   }
@@ -8585,7 +8776,7 @@ ${add}` : add;
   var HOT_STATUSES = ["hot_case", "hot_hot_case"];
   var REFRESH_MS = 2 * 60 * 1e3;
   var OPEN_TIMEOUT_MS = 6e3;
-  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaKamTagsHcMe {
+  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaKamTagsHcMe {
   me: currentEmployee { id __typename }
 }`;
   var COUNT_QUERY = `query WerkiaKamTagsHcCount($filter: MatchFilter) {
@@ -8713,7 +8904,7 @@ ${add}` : add;
       try {
         const request = getRequest();
         if (!myId) {
-          const data2 = await request(CURRENT_EMPLOYEE_QUERY3, {});
+          const data2 = await request(CURRENT_EMPLOYEE_QUERY4, {});
           myId = String(data2?.me?.id || "");
           if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
         }
@@ -9055,14 +9246,14 @@ ${add}` : add;
   var EMPLOYEE_NAMES_QUERY2 = `query allEmployees($filter: EmployeeFilter!) {
   items: allEmployees(filter: $filter) { id firstName lastName __typename }
 }`;
-  function chunks2(values, size) {
+  function chunks3(values, size) {
     const result = [];
     for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
     return result;
   }
   async function loadMatches(request, matchIds) {
     const matches = /* @__PURE__ */ new Map();
-    for (const ids of chunks2(matchIds, BATCH_SIZE3)) {
+    for (const ids of chunks3(matchIds, BATCH_SIZE3)) {
       try {
         const result = await request(MATCHES_BY_IDS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
         for (const item of result?.items || []) {
@@ -9073,7 +9264,7 @@ ${add}` : add;
       }
     }
     const missing = matchIds.filter((id) => !matches.has(id));
-    for (const ids of chunks2(missing, SINGLE_MATCH_CONCURRENCY)) {
+    for (const ids of chunks3(missing, SINGLE_MATCH_CONCURRENCY)) {
       await Promise.all(ids.map(async (id) => {
         try {
           const match = (await request(MATCH_QUERY, { id }))?.data;
@@ -9087,7 +9278,7 @@ ${add}` : add;
   }
   async function loadById(request, query, ids) {
     const byId2 = /* @__PURE__ */ new Map();
-    for (const batch of chunks2(ids, BATCH_SIZE3)) {
+    for (const batch of chunks3(ids, BATCH_SIZE3)) {
       const result = await request(query, { filter: { ids: batch } });
       for (const item of result?.items || []) if (item?.id) byId2.set(item.id, item);
     }
@@ -12673,10 +12864,10 @@ ${add}` : add;
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS3 = 2e4;
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS4 = 2e4;
   var MAX_COMMENT = 1500;
-  var OFFLINE_MESSAGE3 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE4 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
   var DIRECTIONS = {
     AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
@@ -12690,7 +12881,7 @@ ${add}` : add;
       { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
     ]
   };
-  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaSlackDmMe {
+  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaSlackDmMe {
   me: currentEmployee { id slackId __typename }
 }`;
   var TEAMS = ["KAM", "CEM"];
@@ -12721,7 +12912,7 @@ ${add}` : add;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse3(status, text) {
+  function parseResponse4(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -12733,7 +12924,7 @@ ${add}` : add;
     if (status === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
@@ -12750,13 +12941,13 @@ ${add}` : add;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse3(response.status, response.responseText));
+            resolve(parseResponse4(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE3)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE3))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
       });
     });
   }
@@ -13001,7 +13192,7 @@ ${add}` : add;
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
       try {
-        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY4, {});
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY5, {});
         if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
         if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
         scheduleSync();
@@ -13554,11 +13745,11 @@ ${add}` : add;
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS7 = 35e3;
+    const REQUEST_TIMEOUT_MS8 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS7);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS8);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -14721,9 +14912,9 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/outlook-assistent/core.js
-  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
-  var REQUEST_TIMEOUT_MS4 = 2e4;
-  var OFFLINE_MESSAGE4 = "Der Toolbox-Server ist gerade nicht erreichbar.";
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var REQUEST_TIMEOUT_MS5 = 2e4;
+  var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar.";
   var PRESELECT_FROM = 0.8;
   var MAILART_LABELS = {
     absage: "Absage",
@@ -14774,7 +14965,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Mail-Assistent: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
+  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
     const post = (payload) => new Promise((resolve, reject) => {
       const auth = getAuth() || {};
       if (!auth.bearer) {
@@ -14794,8 +14985,8 @@ ${buildCbreBody(current)}`;
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
       });
     });
     return {
@@ -16611,10 +16802,10 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
-  var REQUEST_TIMEOUT_MS5 = 15e3;
-  var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaToolboxDatenMe {
+  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS6 = 15e3;
+  var OFFLINE_MESSAGE6 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay2(date = /* @__PURE__ */ new Date()) {
@@ -16627,7 +16818,7 @@ ${buildCbreBody(current)}`;
     while ([0, 6].includes(date.getUTCDay()));
     return date.toISOString().slice(0, 10);
   }
-  function parseResponse4(status, text) {
+  function parseResponse5(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -16638,7 +16829,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL6, timeoutMs = REQUEST_TIMEOUT_MS6 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -16648,13 +16839,13 @@ ${buildCbreBody(current)}`;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse4(response.status, response.responseText));
+            resolve(parseResponse5(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE6)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE6))
       });
     });
   }
@@ -16662,7 +16853,7 @@ ${buildCbreBody(current)}`;
     let pending = null;
     return () => {
       if (!pending) {
-        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY5, {}).then((data) => {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY6, {}).then((data) => {
           const id = String(data?.me?.id || "");
           if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
           return id;
@@ -16674,7 +16865,7 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL5 }) {
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL6 }) {
     const post = createToolboxDatenRequest({ request, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
@@ -19762,16 +19953,16 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS6 = 15e3;
+  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS7 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
-  var OFFLINE_MESSAGE6 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE7 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
-  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaArbeitgeberPauseMe {
+  var CURRENT_EMPLOYEE_QUERY7 = `query WerkiaArbeitgeberPauseMe {
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse5(status, text) {
+  function parseResponse6(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -19782,23 +19973,23 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL6 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL7 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS6,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS7,
         onload(response) {
           try {
-            resolve(parseResponse5(response.status, response.responseText));
+            resolve(parseResponse6(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE6)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE6))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE7)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE7))
       });
     });
   }
@@ -19971,7 +20162,7 @@ ${buildCbreBody(current)}`;
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY6, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY7, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;

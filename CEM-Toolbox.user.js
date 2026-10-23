@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.24.340
+// @version      1.24.342
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6728,7 +6728,7 @@ ${add}` : add;
       ],
       notes: [
         "Grün: ein Match ist Hot Case (CEM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
-        "Grün mit roter Umrandung: Ein Match ist bei dir Hot Case, bei KAM aber out. Auf KAM-Seite stimmt dann etwas nicht.",
+        "Grün mit roter Umrandung: Alle Matches, die bei dir Hot Case sind, stehen bei KAM auf out. Auf KAM-Seite stimmt dann etwas nicht. Ist einer davon bei KAM noch drin, gibt es keine Umrandung.",
         "Gelb: nach den ersten 7 Werktagen kein Hot Case, kein bestätigter VT, kein KAM-VTA, aber noch Matches in Onboarding (oder noch keine Matches).",
         "Rot: Kandidat inaktiv, alle Matches out, oder 7 Werktage ohne Kontakt von dir. Kontakt heißt: dein Matchkommentar auf einem Match des Kandidaten oder dein Anruf (sipgate).",
         "Werktage sind Montag bis Freitag, Feiertage zählen mit.",

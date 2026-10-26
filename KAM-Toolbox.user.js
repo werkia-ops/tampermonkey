@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.21.361
+// @version      1.21.363
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1335,6 +1335,7 @@
   function createCommuteProvider({ request }) {
     const jobs = /* @__PURE__ */ new Map();
     const candidates = /* @__PURE__ */ new Map();
+    const candidateLists = /* @__PURE__ */ new Map();
     const inFlight2 = /* @__PURE__ */ new Map();
     let serviceAreasBroken = false;
     const fresh = (entry) => entry && entry.expiresAt > Date.now();
@@ -1421,6 +1422,37 @@
           throw error;
         });
         candidates.set(id, { promise, expiresAt: 0 });
+        return promise;
+      },
+      // Alle Adressen des Kandidaten, fuer die Listen-Badges (Owner
+      // 2026-10-26): der Fragebogen rechnet ueber alle Adressen und nimmt die
+      // schnellste; mit nur der neuesten zeigte die Liste einen Totenkopf,
+      // obwohl eine aeltere Adresse nah lag. undefined = noch nicht geladen,
+      // [] = keine Adresse.
+      peekCandidateLocations(candidateId) {
+        const cached = candidateLists.get(String(candidateId || "").toLowerCase());
+        return fresh(cached) ? cached.locations : void 0;
+      },
+      async loadCandidateLocations(candidateId) {
+        const id = String(candidateId || "").toLowerCase();
+        const cached = candidateLists.get(id);
+        if (fresh(cached)) return cached.locations;
+        if (cached?.promise) return cached.promise;
+        const promise = request(CANDIDATE_LOCATIONS_QUERY, {
+          filter: { candidateId: id },
+          page: 0,
+          perPage: 25,
+          sortField: "id",
+          sortOrder: "DESC"
+        }).then((result) => {
+          const locations = (result?.items || []).map(toCommuteLocation).filter(Boolean);
+          candidateLists.set(id, { locations, expiresAt: Date.now() + CACHE_MS });
+          return locations;
+        }).catch((error) => {
+          candidateLists.set(id, { locations: [], expiresAt: Date.now() + ERROR_CACHE_MS });
+          throw error;
+        });
+        candidateLists.set(id, { promise, expiresAt: 0 });
         return promise;
       }
     };

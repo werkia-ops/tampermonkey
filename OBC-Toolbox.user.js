@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.361
+// @version      1.10.363
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1303,6 +1303,7 @@
   function createCommuteProvider({ request }) {
     const jobs = /* @__PURE__ */ new Map();
     const candidates = /* @__PURE__ */ new Map();
+    const candidateLists = /* @__PURE__ */ new Map();
     const inFlight2 = /* @__PURE__ */ new Map();
     let serviceAreasBroken = false;
     const fresh = (entry) => entry && entry.expiresAt > Date.now();
@@ -1389,6 +1390,37 @@
           throw error;
         });
         candidates.set(id, { promise, expiresAt: 0 });
+        return promise;
+      },
+      // Alle Adressen des Kandidaten, fuer die Listen-Badges (Owner
+      // 2026-10-26): der Fragebogen rechnet ueber alle Adressen und nimmt die
+      // schnellste; mit nur der neuesten zeigte die Liste einen Totenkopf,
+      // obwohl eine aeltere Adresse nah lag. undefined = noch nicht geladen,
+      // [] = keine Adresse.
+      peekCandidateLocations(candidateId) {
+        const cached = candidateLists.get(String(candidateId || "").toLowerCase());
+        return fresh(cached) ? cached.locations : void 0;
+      },
+      async loadCandidateLocations(candidateId) {
+        const id = String(candidateId || "").toLowerCase();
+        const cached = candidateLists.get(id);
+        if (fresh(cached)) return cached.locations;
+        if (cached?.promise) return cached.promise;
+        const promise = request(CANDIDATE_LOCATIONS_QUERY, {
+          filter: { candidateId: id },
+          page: 0,
+          perPage: 25,
+          sortField: "id",
+          sortOrder: "DESC"
+        }).then((result) => {
+          const locations = (result?.items || []).map(toCommuteLocation).filter(Boolean);
+          candidateLists.set(id, { locations, expiresAt: Date.now() + CACHE_MS });
+          return locations;
+        }).catch((error) => {
+          candidateLists.set(id, { locations: [], expiresAt: Date.now() + ERROR_CACHE_MS });
+          throw error;
+        });
+        candidateLists.set(id, { promise, expiresAt: 0 });
         return promise;
       }
     };
@@ -4380,6 +4412,20 @@
   }
   function isSurelyLocal(job) {
     return classifyCommute(job)?.key === "local" && Array.isArray(job?.serviceAreaTypes);
+  }
+  function pickFastestRouteEntry(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length || list.some((entry) => !entry)) return null;
+    let best = null;
+    let bestMinutes = Infinity;
+    for (const entry of list) {
+      const minutes = exactRouteMinutes(entry);
+      if (minutes !== null && minutes < bestMinutes) {
+        best = entry;
+        bestMinutes = minutes;
+      }
+    }
+    return best || list[0];
   }
   function describeCommute(commuteClass, entry) {
     const minutes = routeMinutes(entry);
@@ -7829,19 +7875,21 @@
         jobIds.forEach((jobId) => attempts.set(`${candidateId}|${jobId}`, Date.now()));
         if (jobIds.length) {
           const provider = getProvider();
-          const [candidateLocation, jobs] = await Promise.all([
-            provider.loadCandidateLocation(candidateId).then((location2) => {
+          const [candidateLocations, jobs] = await Promise.all([
+            provider.loadCandidateLocations(candidateId).then((locations2) => {
               candidateErrors.delete(candidateId);
-              return location2;
+              return locations2;
             }, (error) => {
               candidateErrors.set(candidateId, "Kandidatenadresse nicht ladbar.");
               console.warn("[Werkia Fahrzeit] Kandidatenadresse nicht ladbar:", error);
-              return null;
+              return [];
             }),
             provider.loadJobs(jobIds)
           ]);
           const locations = [...jobs.values()].map((job) => job?.location).filter(Boolean);
-          if (candidateLocation && locations.length) await getRoutesFromCandidate(candidateLocation, locations);
+          if (locations.length) {
+            for (const candidateLocation of candidateLocations) await getRoutesFromCandidate(candidateLocation, locations);
+          }
         }
       } catch (error) {
         console.warn("[Werkia Fahrzeit] Routen nicht berechenbar:", candidateId, error);
@@ -7859,8 +7907,8 @@
         });
       }
     }
-    function candidateLocationFor(provider, candidateId) {
-      return provider.peekCandidateLocation(candidateId);
+    function candidateLocationsFor(provider, candidateId) {
+      return provider.peekCandidateLocations(candidateId);
     }
     function render() {
       const page = findPage(location.hash || "", pageKeys);
@@ -7891,9 +7939,10 @@
       let hiddenCount = 0;
       for (const item of items) {
         if (!candidateLocations.has(item.candidateId)) {
-          candidateLocations.set(item.candidateId, candidateLocationFor(provider, item.candidateId));
+          candidateLocations.set(item.candidateId, candidateLocationsFor(provider, item.candidateId));
         }
-        const candidateLocation = candidateLocations.get(item.candidateId);
+        const addresses = candidateLocations.get(item.candidateId);
+        const noAddress = Array.isArray(addresses) && !addresses.length;
         const cachedJob = provider.getCachedJob(item.jobId);
         const job = cachedJob?.job || null;
         const commuteClass = classifyCommute(job);
@@ -7901,7 +7950,7 @@
           renderBadge(item, { text: "🚗 ?", level: "unknown", title: "Vakanzdaten nicht ladbar." });
           continue;
         }
-        if (candidateLocation === null) {
+        if (noAddress) {
           renderBadge(item, { text: `${commuteClass?.icon || "🚗"} ?`, level: "unknown", title: candidateErrors.get(item.candidateId) || "Keine Kandidatenadresse hinterlegt." });
           continue;
         }
@@ -7909,8 +7958,9 @@
           renderBadge(item, { text: `${commuteClass.icon} ${commuteClass.key === "local" ? "" : `${commuteClass.label} · `}keine Adresse`, level: "unknown", title: "Bei der Vakanz ist keine Adresse hinterlegt." });
           continue;
         }
-        const entry = job && candidateLocation ? getCachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : null;
+        const entry = job && addresses ? pickFastestRouteEntry(addresses.map((location2) => getCachedRoute(location2.address, job.location.address, { acceptTable: true }))) : null;
         const view = describeCommute(commuteClass, entry);
+        if (entry && addresses.length > 1) view.title = `${view.title} Schnellste von ${addresses.length} Kandidatenadressen.`;
         const sure = Boolean(view.skull && isSurelyLocal(job));
         view.hide = page.skullMode === "hide" && sure;
         view.big = page.skullMode === "emphasize" && sure;
@@ -7918,7 +7968,7 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && candidateLocation !== null && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
+        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
           toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }

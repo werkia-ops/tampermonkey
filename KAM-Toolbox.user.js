@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.21.346
+// @version      1.21.361
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -831,44 +831,122 @@
   // ../../shared/js/werkia-graphql/client.js
   var GRAPHQL_URL = "https://api.werkia.de/graphql";
   var GRAPHQL_TIMEOUT_MS = 3e4;
-  function createGraphqlRequest({ request, getAuth, timeoutMs = GRAPHQL_TIMEOUT_MS }) {
-    return (query, variables) => new Promise((resolve, reject) => {
-      const { bearer, fingerprint } = getAuth();
-      if (!bearer || !fingerprint) {
-        reject(new Error("GraphQL-Authentifizierung noch nicht aus dem Adminpanel erfasst."));
-        return;
-      }
-      request({
-        method: "POST",
-        url: GRAPHQL_URL,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${bearer}`,
-          "x-fingerprint": fingerprint,
-          Origin: "https://admin.werkia.de",
-          Referer: "https://admin.werkia.de/"
-        },
-        data: JSON.stringify({ query, variables }),
-        timeout: timeoutMs,
-        onload(response) {
-          let payload;
-          try {
-            payload = JSON.parse(response.responseText);
-          } catch {
-            reject(new Error(response.status !== 200 ? `GraphQL HTTP ${response.status}: Antwort ist kein JSON.` : `GraphQL-Antwort ist kein JSON (HTTP ${response.status}).`));
-            return;
-          }
-          if (response.status !== 200 || payload.errors) {
-            const detail = payload.errors?.map((error) => error.message).join("; ");
-            reject(new Error(`GraphQL HTTP ${response.status}${detail ? `: ${detail}` : ""}`));
-            return;
-          }
-          resolve(payload.data);
-        },
-        onerror: () => reject(new Error("GraphQL-Netzwerkfehler.")),
-        ontimeout: () => reject(new Error("GraphQL-Timeout."))
+  var AUTH_CHECK_QUERY = "query WerkiaAuthCheck { currentEmployee { id } }";
+  var AUTH_RECHECK_MS = 10 * 60 * 1e3;
+  var AUTH_OK_MS = 60 * 1e3;
+  var BACKOFF_BASE_MS = 1e3;
+  var BACKOFF_MAX_MS = 60 * 1e3;
+  var AUTH_EXPIRED_CODE = "WERKIA_AUTH_EXPIRED";
+  var AUTH_EXPIRED_MESSAGE = "GraphQL Unauthorized: Anmeldung im Adminpanel abgelaufen. Bitte admin.werkia.de neu laden und neu anmelden.";
+  var BACKOFF_CODE = "WERKIA_GRAPHQL_BACKOFF";
+  var AUTH_KEYWORD_RE = /unauthori[sz]ed|unauthenticated|jwt expired|invalid token/i;
+  function failure(message, extra = {}) {
+    return Object.assign(new Error(message), extra);
+  }
+  function createGraphqlRequest({ request, getAuth, timeoutMs = GRAPHQL_TIMEOUT_MS, now = Date.now }) {
+    let blocked = null;
+    let authOk = null;
+    let authCheck = null;
+    let failures = 0;
+    let pausedUntil = 0;
+    function send(query, variables, auth) {
+      return new Promise((resolve, reject) => {
+        request({
+          method: "POST",
+          url: GRAPHQL_URL,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.bearer}`,
+            "x-fingerprint": auth.fingerprint,
+            Origin: "https://admin.werkia.de",
+            Referer: "https://admin.werkia.de/"
+          },
+          data: JSON.stringify({ query, variables }),
+          timeout: timeoutMs,
+          onload(response) {
+            let payload;
+            try {
+              payload = JSON.parse(response.responseText);
+            } catch {
+              reject(failure(response.status !== 200 ? `GraphQL HTTP ${response.status}: Antwort ist kein JSON.` : `GraphQL-Antwort ist kein JSON (HTTP ${response.status}).`, { status: response.status }));
+              return;
+            }
+            if (response.status !== 200 || payload.errors) {
+              const detail = payload.errors?.map((error) => error.message).join("; ");
+              reject(failure(`GraphQL HTTP ${response.status}${detail ? `: ${detail}` : ""}`, { status: response.status, detail: detail || "" }));
+              return;
+            }
+            resolve(payload.data);
+          },
+          onerror: () => reject(failure("GraphQL-Netzwerkfehler.", { transient: true })),
+          ontimeout: () => reject(failure("GraphQL-Timeout.", { transient: true }))
+        });
       });
-    });
+    }
+    function block(bearer) {
+      blocked = { bearer, at: now() };
+      authOk = null;
+    }
+    function checkAuth(auth) {
+      if (authCheck?.bearer === auth.bearer) return authCheck.promise;
+      const promise = send(AUTH_CHECK_QUERY, {}, auth).then(
+        (data) => Boolean(data?.currentEmployee?.id),
+        // Nur ein eindeutiger Auth-Fehler sperrt; Stoerungen und andere
+        // Fehler der Pruefung lassen die Anmeldung gelten.
+        (error) => !isAuthFailure(error)
+      ).then((valid) => {
+        if (valid) authOk = { bearer: auth.bearer, at: now() };
+        else block(auth.bearer);
+        return valid;
+      }).finally(() => {
+        if (authCheck?.promise === promise) authCheck = null;
+      });
+      authCheck = { bearer: auth.bearer, promise };
+      return promise;
+    }
+    function isAuthFailure(error) {
+      return error?.status === 401 || error?.status === 403 || error?.status === 200 && AUTH_KEYWORD_RE.test(error.detail || "");
+    }
+    function isTransient(error) {
+      return Boolean(error?.transient) || error?.status === 429 || error?.status >= 500 && error?.status < 600;
+    }
+    return async (query, variables) => {
+      const auth = getAuth();
+      const { bearer, fingerprint } = auth;
+      if (!bearer || !fingerprint) {
+        throw new Error("GraphQL-Authentifizierung noch nicht aus dem Adminpanel erfasst.");
+      }
+      if (blocked) {
+        if (blocked.bearer === bearer && now() - blocked.at < AUTH_RECHECK_MS) {
+          throw failure(AUTH_EXPIRED_MESSAGE, { code: AUTH_EXPIRED_CODE });
+        }
+        blocked = null;
+        if (!await checkAuth(auth)) throw failure(AUTH_EXPIRED_MESSAGE, { code: AUTH_EXPIRED_CODE });
+      }
+      const pause = pausedUntil - now();
+      if (pause > 0) {
+        throw failure(`GraphQL pausiert nach Verbindungsfehlern, nächster Versuch in ${Math.ceil(pause / 1e3)} s.`, { code: BACKOFF_CODE, transient: true });
+      }
+      try {
+        const data = await send(query, variables, auth);
+        failures = 0;
+        return data;
+      } catch (error) {
+        if (isTransient(error)) {
+          failures += 1;
+          if (failures >= 2) pausedUntil = now() + Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (failures - 2));
+          throw error;
+        }
+        failures = 0;
+        if (error.status === 401 || error.status === 403) {
+          block(bearer);
+        } else if (error.status === 200 && AUTH_KEYWORD_RE.test(error.detail || "")) {
+          const checked = authOk?.bearer === bearer && now() - authOk.at < AUTH_OK_MS;
+          if (!checked) await checkAuth(auth);
+        }
+        throw error;
+      }
+    };
   }
 
   // ../../shared/js/werkia-graphql/match-provider.js
@@ -8748,9 +8826,9 @@ ${rr.zahlen}` : view.title;
         runtime.setTimeout(() => {
           if (wrap2.querySelector('[data-state="ok"]')) setState(wrap2, "");
         }, 2500);
-      } catch (failure) {
+      } catch (failure2) {
         input.value = previous;
-        setState(wrap2, "error", `Nicht gespeichert: ${failure.message}`);
+        setState(wrap2, "error", `Nicht gespeichert: ${failure2.message}`);
       } finally {
         input.disabled = false;
       }
@@ -13457,10 +13535,10 @@ ${rr.zahlen}` : view.title;
   }
   var AUTH_MISSING_MESSAGE = "GraphQL-Authentifizierung noch nicht aus dem Adminpanel erfasst.";
   var AUTH_HTTP_ERROR_RE = /^GraphQL HTTP 40[13]\b/;
-  var AUTH_KEYWORD_RE = /unauthori[sz]ed|unauthenticated|forbidden/i;
+  var AUTH_KEYWORD_RE2 = /unauthori[sz]ed|unauthenticated|forbidden/i;
   function isAuthError(error) {
     const message = String(error?.message || "");
-    return message === AUTH_MISSING_MESSAGE || AUTH_HTTP_ERROR_RE.test(message) || AUTH_KEYWORD_RE.test(message);
+    return message === AUTH_MISSING_MESSAGE || AUTH_HTTP_ERROR_RE.test(message) || AUTH_KEYWORD_RE2.test(message);
   }
   function isTimeoutError(error) {
     return /^GraphQL-Timeout\b/.test(String(error?.message || ""));
@@ -17253,8 +17331,8 @@ ${buildCbreBody(current)}`;
             entries = employerEntries(raw);
             loaded = true;
             error = "";
-          } catch (failure) {
-            error = failure?.message || String(failure);
+          } catch (failure2) {
+            error = failure2?.message || String(failure2);
           } finally {
             loadedAt = Date.now();
             loading = null;
@@ -17274,8 +17352,8 @@ ${buildCbreBody(current)}`;
         const name = state.entries.find((entry) => entry.autorName)?.autorName;
         const person = absent.find((item) => item.id === id);
         if (person && name && !person.name) person.name = name;
-      } catch (failure) {
-        state.error = failure?.message || String(failure);
+      } catch (failure2) {
+        state.error = failure2?.message || String(failure2);
       }
       state.loading = false;
       renderPanel();
@@ -17285,9 +17363,9 @@ ${buildCbreBody(current)}`;
       absentLoaded = true;
       try {
         absent = await loadAbsent();
-      } catch (failure) {
+      } catch (failure2) {
         absent = [];
-        console.warn("[Prio-Liste] Vertretungen nicht geladen:", failure);
+        console.warn("[Prio-Liste] Vertretungen nicht geladen:", failure2);
       }
       renderPanel();
     }
@@ -17300,8 +17378,8 @@ ${buildCbreBody(current)}`;
         await action();
         error = "";
         message = success;
-      } catch (failure) {
-        error = failure?.message || String(failure);
+      } catch (failure2) {
+        error = failure2?.message || String(failure2);
         if (collapsed()) {
           store.set(STORAGE_KEYS.collapsed, "0");
           placePanel2();
@@ -17454,8 +17532,8 @@ ${buildCbreBody(current)}`;
         let element7 = null;
         try {
           element7 = renderEmployerExtras(employerId) || null;
-        } catch (failure) {
-          console.warn("[Prio-Liste] Zusatz am Arbeitgeber:", failure);
+        } catch (failure2) {
+          console.warn("[Prio-Liste] Zusatz am Arbeitgeber:", failure2);
         }
         extrasCache.set(employerId, element7);
       }
@@ -17686,8 +17764,8 @@ ${buildCbreBody(current)}`;
         for (const payload of saves) {
           try {
             replaceEntry(await getClient().speichern(BEREICH, payload));
-          } catch (failure) {
-            failed.push(failure?.message || String(failure));
+          } catch (failure2) {
+            failed.push(failure2?.message || String(failure2));
           }
         }
         renderPanel();
@@ -17771,7 +17849,7 @@ ${buildCbreBody(current)}`;
     });
     runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     runtime.setInterval(() => {
-      checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
+      checkReview().catch((failure2) => console.warn("[Prio-Liste] Popup:", failure2));
     }, REVIEW_CHECK_MS);
     runtime.addCleanup?.(() => {
       owned(IDS8.button)?.remove();
@@ -17785,7 +17863,7 @@ ${buildCbreBody(current)}`;
     });
     schedule();
     runtime.setTimeout(() => {
-      checkReview().catch((failure) => console.warn("[Prio-Liste] Popup:", failure));
+      checkReview().catch((failure2) => console.warn("[Prio-Liste] Popup:", failure2));
     }, 3e3);
     return { load: load2, openReview, checkReview, tick, get entries() {
       return entries;
@@ -18889,9 +18967,9 @@ ${buildCbreBody(current)}`;
         const item = saved.id ? saved : { ...current, id: current.id };
         templates.items = sortTemplates([...templates.items.filter((entry) => entry.id !== item.id), item]);
         if (form === current) form = null;
-      } catch (failure) {
+      } catch (failure2) {
         current.saving = false;
-        current.error = `Nicht gespeichert: ${failure?.message || failure}`;
+        current.error = `Nicht gespeichert: ${failure2?.message || failure2}`;
       }
       renderBar();
     }
@@ -18909,10 +18987,10 @@ ${buildCbreBody(current)}`;
         await getTemplatesClient().loeschen(TEMPLATE_AREA, current.id);
         templates.items = templates.items.filter((entry) => entry.id !== current.id);
         if (form === current) form = null;
-      } catch (failure) {
+      } catch (failure2) {
         current.saving = false;
         current.confirmDelete = false;
-        current.error = `Nicht gelöscht: ${failure?.message || failure}`;
+        current.error = `Nicht gelöscht: ${failure2?.message || failure2}`;
       }
       renderBar();
     }
@@ -21435,6 +21513,11 @@ ${next}`;
       const urgentIndex = /* @__PURE__ */ new Map();
       let refreshTimer = null;
       let loadPromise = null;
+      const RETRY_BASE_MS = 30 * 1e3;
+      const RETRY_MAX_MS = 10 * 60 * 1e3;
+      let failures = 0;
+      let retryAt = 0;
+      let blockedBearer = "";
       const capturedAuth = { bearer: "", fingerprint: "" };
       function isPotentialMatchesPage() {
         return POTENTIAL_MATCHES_ROUTE.test(location.hash || "");
@@ -21519,6 +21602,7 @@ ${next}`;
               Referer: "https://admin.werkia.de/"
             },
             data: JSON.stringify({ query, variables }),
+            timeout: 3e4,
             onload: (response) => {
               let payload;
               try {
@@ -21603,9 +21687,16 @@ ${next}`;
         ensureStyles2();
         rowsByJobId.forEach((rows, jobId) => rows.forEach((row2) => applyHighlight(row2, urgentIndex.get(jobId) === true)));
       }
+      function paused() {
+        if (blockedBearer && getBearer() !== blockedBearer) {
+          blockedBearer = "";
+          retryAt = 0;
+        }
+        return Date.now() < retryAt;
+      }
       async function loadUrgentFlags(jobIds, { force = false } = {}) {
         const missing = jobIds.filter((id) => force || !urgentIndex.has(id));
-        if (!missing.length) return;
+        if (!missing.length || paused()) return;
         if (loadPromise) {
           await loadPromise;
           await loadUrgentFlags(jobIds, { force: false });
@@ -21615,7 +21706,13 @@ ${next}`;
           try {
             const flags = await fetchUrgentFlags(missing);
             missing.forEach((id) => urgentIndex.set(id, flags.get(id) === true));
+            failures = 0;
+            retryAt = 0;
           } catch (error) {
+            failures += 1;
+            const unauthorized = /unauthori[sz]ed|unauthenticated|GraphQL HTTP 40[13]\b/i.test(String(error?.message || ""));
+            blockedBearer = unauthorized ? getBearer() : "";
+            retryAt = Date.now() + (unauthorized ? RETRY_MAX_MS : Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** (failures - 1)));
             console.warn("[Werkia dringende Vakanzen] Aktualisierung fehlgeschlagen.", error);
           } finally {
             loadPromise = null;

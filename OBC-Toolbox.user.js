@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.257
+// @version      1.10.361
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -704,44 +704,122 @@
   // ../../shared/js/werkia-graphql/client.js
   var GRAPHQL_URL = "https://api.werkia.de/graphql";
   var GRAPHQL_TIMEOUT_MS = 3e4;
-  function createGraphqlRequest({ request, getAuth, timeoutMs = GRAPHQL_TIMEOUT_MS }) {
-    return (query, variables) => new Promise((resolve, reject) => {
-      const { bearer, fingerprint } = getAuth();
-      if (!bearer || !fingerprint) {
-        reject(new Error("GraphQL-Authentifizierung noch nicht aus dem Adminpanel erfasst."));
-        return;
-      }
-      request({
-        method: "POST",
-        url: GRAPHQL_URL,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${bearer}`,
-          "x-fingerprint": fingerprint,
-          Origin: "https://admin.werkia.de",
-          Referer: "https://admin.werkia.de/"
-        },
-        data: JSON.stringify({ query, variables }),
-        timeout: timeoutMs,
-        onload(response) {
-          let payload;
-          try {
-            payload = JSON.parse(response.responseText);
-          } catch {
-            reject(new Error(response.status !== 200 ? `GraphQL HTTP ${response.status}: Antwort ist kein JSON.` : `GraphQL-Antwort ist kein JSON (HTTP ${response.status}).`));
-            return;
-          }
-          if (response.status !== 200 || payload.errors) {
-            const detail = payload.errors?.map((error) => error.message).join("; ");
-            reject(new Error(`GraphQL HTTP ${response.status}${detail ? `: ${detail}` : ""}`));
-            return;
-          }
-          resolve(payload.data);
-        },
-        onerror: () => reject(new Error("GraphQL-Netzwerkfehler.")),
-        ontimeout: () => reject(new Error("GraphQL-Timeout."))
+  var AUTH_CHECK_QUERY = "query WerkiaAuthCheck { currentEmployee { id } }";
+  var AUTH_RECHECK_MS = 10 * 60 * 1e3;
+  var AUTH_OK_MS = 60 * 1e3;
+  var BACKOFF_BASE_MS = 1e3;
+  var BACKOFF_MAX_MS = 60 * 1e3;
+  var AUTH_EXPIRED_CODE = "WERKIA_AUTH_EXPIRED";
+  var AUTH_EXPIRED_MESSAGE = "GraphQL Unauthorized: Anmeldung im Adminpanel abgelaufen. Bitte admin.werkia.de neu laden und neu anmelden.";
+  var BACKOFF_CODE = "WERKIA_GRAPHQL_BACKOFF";
+  var AUTH_KEYWORD_RE = /unauthori[sz]ed|unauthenticated|jwt expired|invalid token/i;
+  function failure(message, extra = {}) {
+    return Object.assign(new Error(message), extra);
+  }
+  function createGraphqlRequest({ request, getAuth, timeoutMs = GRAPHQL_TIMEOUT_MS, now = Date.now }) {
+    let blocked = null;
+    let authOk = null;
+    let authCheck = null;
+    let failures = 0;
+    let pausedUntil = 0;
+    function send(query, variables, auth) {
+      return new Promise((resolve, reject) => {
+        request({
+          method: "POST",
+          url: GRAPHQL_URL,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.bearer}`,
+            "x-fingerprint": auth.fingerprint,
+            Origin: "https://admin.werkia.de",
+            Referer: "https://admin.werkia.de/"
+          },
+          data: JSON.stringify({ query, variables }),
+          timeout: timeoutMs,
+          onload(response) {
+            let payload;
+            try {
+              payload = JSON.parse(response.responseText);
+            } catch {
+              reject(failure(response.status !== 200 ? `GraphQL HTTP ${response.status}: Antwort ist kein JSON.` : `GraphQL-Antwort ist kein JSON (HTTP ${response.status}).`, { status: response.status }));
+              return;
+            }
+            if (response.status !== 200 || payload.errors) {
+              const detail = payload.errors?.map((error) => error.message).join("; ");
+              reject(failure(`GraphQL HTTP ${response.status}${detail ? `: ${detail}` : ""}`, { status: response.status, detail: detail || "" }));
+              return;
+            }
+            resolve(payload.data);
+          },
+          onerror: () => reject(failure("GraphQL-Netzwerkfehler.", { transient: true })),
+          ontimeout: () => reject(failure("GraphQL-Timeout.", { transient: true }))
+        });
       });
-    });
+    }
+    function block(bearer) {
+      blocked = { bearer, at: now() };
+      authOk = null;
+    }
+    function checkAuth(auth) {
+      if (authCheck?.bearer === auth.bearer) return authCheck.promise;
+      const promise = send(AUTH_CHECK_QUERY, {}, auth).then(
+        (data) => Boolean(data?.currentEmployee?.id),
+        // Nur ein eindeutiger Auth-Fehler sperrt; Stoerungen und andere
+        // Fehler der Pruefung lassen die Anmeldung gelten.
+        (error) => !isAuthFailure(error)
+      ).then((valid) => {
+        if (valid) authOk = { bearer: auth.bearer, at: now() };
+        else block(auth.bearer);
+        return valid;
+      }).finally(() => {
+        if (authCheck?.promise === promise) authCheck = null;
+      });
+      authCheck = { bearer: auth.bearer, promise };
+      return promise;
+    }
+    function isAuthFailure(error) {
+      return error?.status === 401 || error?.status === 403 || error?.status === 200 && AUTH_KEYWORD_RE.test(error.detail || "");
+    }
+    function isTransient(error) {
+      return Boolean(error?.transient) || error?.status === 429 || error?.status >= 500 && error?.status < 600;
+    }
+    return async (query, variables) => {
+      const auth = getAuth();
+      const { bearer, fingerprint } = auth;
+      if (!bearer || !fingerprint) {
+        throw new Error("GraphQL-Authentifizierung noch nicht aus dem Adminpanel erfasst.");
+      }
+      if (blocked) {
+        if (blocked.bearer === bearer && now() - blocked.at < AUTH_RECHECK_MS) {
+          throw failure(AUTH_EXPIRED_MESSAGE, { code: AUTH_EXPIRED_CODE });
+        }
+        blocked = null;
+        if (!await checkAuth(auth)) throw failure(AUTH_EXPIRED_MESSAGE, { code: AUTH_EXPIRED_CODE });
+      }
+      const pause = pausedUntil - now();
+      if (pause > 0) {
+        throw failure(`GraphQL pausiert nach Verbindungsfehlern, nächster Versuch in ${Math.ceil(pause / 1e3)} s.`, { code: BACKOFF_CODE, transient: true });
+      }
+      try {
+        const data = await send(query, variables, auth);
+        failures = 0;
+        return data;
+      } catch (error) {
+        if (isTransient(error)) {
+          failures += 1;
+          if (failures >= 2) pausedUntil = now() + Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (failures - 2));
+          throw error;
+        }
+        failures = 0;
+        if (error.status === 401 || error.status === 403) {
+          block(bearer);
+        } else if (error.status === 200 && AUTH_KEYWORD_RE.test(error.detail || "")) {
+          const checked = authOk?.bearer === bearer && now() - authOk.at < AUTH_OK_MS;
+          if (!checked) await checkAuth(auth);
+        }
+        throw error;
+      }
+    };
   }
 
   // ../../shared/js/werkia-graphql/match-provider.js
@@ -7901,6 +7979,11 @@
       const urgentIndex = /* @__PURE__ */ new Map();
       let refreshTimer = null;
       let loadPromise = null;
+      const RETRY_BASE_MS = 30 * 1e3;
+      const RETRY_MAX_MS = 10 * 60 * 1e3;
+      let failures = 0;
+      let retryAt = 0;
+      let blockedBearer = "";
       const capturedAuth = { bearer: "", fingerprint: "" };
       function isPotentialMatchesPage() {
         return POTENTIAL_MATCHES_ROUTE3.test(location.hash || "");
@@ -7985,6 +8068,7 @@
               Referer: "https://admin.werkia.de/"
             },
             data: JSON.stringify({ query, variables }),
+            timeout: 3e4,
             onload: (response) => {
               let payload;
               try {
@@ -8069,9 +8153,16 @@
         ensureStyles2();
         rowsByJobId.forEach((rows, jobId) => rows.forEach((row) => applyHighlight(row, urgentIndex.get(jobId) === true)));
       }
+      function paused() {
+        if (blockedBearer && getBearer() !== blockedBearer) {
+          blockedBearer = "";
+          retryAt = 0;
+        }
+        return Date.now() < retryAt;
+      }
       async function loadUrgentFlags(jobIds, { force = false } = {}) {
         const missing = jobIds.filter((id) => force || !urgentIndex.has(id));
-        if (!missing.length) return;
+        if (!missing.length || paused()) return;
         if (loadPromise) {
           await loadPromise;
           await loadUrgentFlags(jobIds, { force: false });
@@ -8081,7 +8172,13 @@
           try {
             const flags = await fetchUrgentFlags(missing);
             missing.forEach((id) => urgentIndex.set(id, flags.get(id) === true));
+            failures = 0;
+            retryAt = 0;
           } catch (error) {
+            failures += 1;
+            const unauthorized = /unauthori[sz]ed|unauthenticated|GraphQL HTTP 40[13]\b/i.test(String(error?.message || ""));
+            blockedBearer = unauthorized ? getBearer() : "";
+            retryAt = Date.now() + (unauthorized ? RETRY_MAX_MS : Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** (failures - 1)));
             console.warn("[Werkia dringende Vakanzen] Aktualisierung fehlgeschlagen.", error);
           } finally {
             loadPromise = null;

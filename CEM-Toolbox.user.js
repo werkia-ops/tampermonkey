@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.25.363
+// @version      1.25.365
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -6846,7 +6846,7 @@ ${add}` : add;
         "„Senden“ klicken. Der Dialog meldet, an wen die DM ging und ob der Matchkommentar angelegt ist."
       ],
       notes: [
-        "Beim Senden kommt automatisch ein Matchkommentar unter deinem Namen ans Match: „per Slack DM bei KAM nachgefragt (Name):“, darunter „Notes: …“ mit deinem Kommentar. Klappt das nicht, sagt es der Dialog; dann bitte von Hand nachtragen.",
+        "Beim Senden kommt automatisch ein Matchkommentar unter deinem Namen ans Match: „per Slack DM bei KAM nachgefragt (Name):“, darunter „Notes: …“ mit deinem Kommentar und der Hinweis, dass er automatisch erstellt ist. Klappt das nicht, sagt es der Dialog; dann bitte von Hand nachtragen.",
         "Wer die DM bekommt, bestimmt der Bot aus dem Adminpanel: die KAM-Person, die beim Arbeitgeber eingetragen ist. Ist die Person gerade vertreten, bekommt die Vertretung dieselbe Nachricht.",
         "Die Nachricht kommt im Chat „OPS-Bot“ an; vorn steht, dass sie von dir ist. Antworten an den Bot kommen nicht bei dir an; dafür hat die Nachricht den Link „Antworten an …“, der die DM mit dir öffnet.",
         "Die Toolbox schickt deine Adminpanel-Anmeldung mit, damit der Bot prüfen kann, dass die Nachricht wirklich von dir kommt. Gespeichert wird sie nicht.",

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.23.370
+// @version      1.24.371
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -7010,6 +7010,19 @@ ${add}` : add;
       ]
     },
     {
+      id: "crawling-herkunft",
+      title: "Marke „Gecrawlt“ an Vakanzen",
+      page: `Vakanzen, ${MY_MATCHES}`,
+      routes: [ROUTES.vacancyList, ...onMyMatches],
+      kind: "view",
+      summary: "Kommt eine Vakanz aus dem Auto-Crawling, steht hinter ihrem Titel die kleine Marke „Gecrawlt“. Alle anderen Vakanzen haben keine Marke.",
+      notes: [
+        "Mit der Maus über der Marke steht, wann die Stelle gecrawlt wurde.",
+        "Gezählt wird wie im KPI-Dashboard: Stellen aus der Airtable-Tabelle Vakanzen mit Crawler-Grund, ohne die als „Ersetzen“ entschiedenen.",
+        "Der Stand wird alle 30 Minuten aus Airtable übernommen. Eine gerade erst veröffentlichte Stelle bekommt die Marke deshalb manchmal etwas später."
+      ]
+    },
+    {
       id: "tags-wvl",
       title: "KAM WVL in der Tags-Ansicht",
       page: `${MY_MATCHES} › Tags`,
@@ -13964,11 +13977,11 @@ ${rr.zahlen}` : view.title;
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS8 = 35e3;
+    const REQUEST_TIMEOUT_MS9 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS8);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS9);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -18584,6 +18597,252 @@ ${buildCbreBody(current)}`;
     });
   }
 
+  // ../../shared/js/crawling-herkunft/core.js
+  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/crawling-herkunft/3eabb03f-f46f-45c5-88dc-b0cf3a2f8f7c";
+  var REQUEST_TIMEOUT_MS7 = 15e3;
+  var MAX_IDS2 = 300;
+  var RETRY_MS4 = 60 * 1e3;
+  var BADGE_TEXT = "Gecrawlt";
+  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function normalizeId(value) {
+    const id = String(value || "").trim().toLowerCase();
+    return UUID_RE3.test(id) ? id : "";
+  }
+  function normalizeIds(values) {
+    return [...new Set((values || []).map(normalizeId).filter(Boolean))];
+  }
+  function chunk2(values, size = MAX_IDS2) {
+    const result = [];
+    for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
+    return result;
+  }
+  function parseResponse6(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === false && data.fehler) throw new Error(data.fehler);
+    if (!data || typeof data.crawled !== "object" || data.crawled === null) {
+      throw new Error(`Crawling-Herkunft: unerwartete Antwort (HTTP ${status}).`);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const [key, value] of Object.entries(data.crawled)) {
+      const id = normalizeId(key);
+      if (id) result.set(id, DAY_RE.test(String(value || "")) ? String(value) : "");
+    }
+    return result;
+  }
+  function createCrawlingClient({ request, url = WEBHOOK_URL7, timeoutMs = REQUEST_TIMEOUT_MS7 }) {
+    return (ids) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify({ ids }),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse6(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error("Crawling-Herkunft: Server nicht erreichbar.")),
+        ontimeout: () => reject(new Error("Crawling-Herkunft: Zeitüberschreitung."))
+      });
+    });
+  }
+  function formatDay4(day) {
+    const match = String(day || "").match(DAY_RE);
+    return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+  }
+  function badgeTitle(day) {
+    const text = formatDay4(day);
+    return text ? `Gecrawlt am ${text}` : "Aus dem Auto-Crawling";
+  }
+  function createCrawlingProvider({
+    fetchCrawled,
+    onChange = () => {
+    },
+    schedule = (callback) => setTimeout(callback, 0),
+    now = () => Date.now(),
+    retryMs = RETRY_MS4,
+    onError = (error) => console.warn("[Crawling-Herkunft]", error)
+  }) {
+    const known = /* @__PURE__ */ new Map();
+    const pending = /* @__PURE__ */ new Set();
+    const loading = /* @__PURE__ */ new Set();
+    let failedUntil = 0;
+    let scheduled = false;
+    async function flush() {
+      scheduled = false;
+      const ids = [...pending].filter((id) => !known.has(id) && !loading.has(id));
+      pending.clear();
+      if (!ids.length) return 0;
+      ids.forEach((id) => loading.add(id));
+      let fresh = 0;
+      try {
+        for (const group of chunk2(ids)) {
+          const crawled = await fetchCrawled(group);
+          for (const id of group) {
+            if (crawled.has(id)) {
+              known.set(id, crawled.get(id));
+              fresh += 1;
+            } else {
+              known.set(id, null);
+            }
+          }
+        }
+      } catch (error) {
+        failedUntil = now() + retryMs;
+        onError(error);
+      } finally {
+        ids.forEach((id) => loading.delete(id));
+      }
+      if (fresh) onChange(fresh);
+      return fresh;
+    }
+    function want(ids) {
+      if (now() < failedUntil) return false;
+      const missing = normalizeIds(ids).filter((id) => !known.has(id) && !loading.has(id));
+      if (!missing.length) return false;
+      missing.forEach((id) => pending.add(id));
+      if (!scheduled) {
+        scheduled = true;
+        schedule(() => {
+          flush();
+        });
+      }
+      return true;
+    }
+    function lookup(id) {
+      const value = known.get(normalizeId(id));
+      return value === void 0 ? null : value;
+    }
+    const isCrawled = (id) => lookup(id) !== null;
+    return { want, lookup, isCrawled, flush };
+  }
+
+  // ../../shared/js/crawling-herkunft/index.js
+  var BADGE_CLASS = "werkia-crawl-badge";
+  function createObserver2(runtime, callback) {
+    if (runtime.createMutationObserver) return runtime.createMutationObserver(callback);
+    return new MutationObserver(callback);
+  }
+  function executeCrawlingHerkunft(runtime, config = {}) {
+    const {
+      sourcePath,
+      namespace = "werkia",
+      isMatchListRoute = () => false,
+      request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+    } = config;
+    runtime.registerSource?.(sourcePath);
+    if (!request) {
+      console.warn("[Crawling-Herkunft] GM_xmlhttpRequest ist nicht verfügbar.");
+      return;
+    }
+    const STYLE_ID18 = `werkia-${namespace}-crawl-badge-style`;
+    const provider = createCrawlingProvider({
+      fetchCrawled: createCrawlingClient({ request }),
+      onChange: () => scheduleInstall(),
+      schedule: (callback) => runtime.setTimeout(callback, 0)
+    });
+    function injectStyle() {
+      if (document.getElementById(STYLE_ID18)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID18;
+      style.textContent = `
+      .${BADGE_CLASS} { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid #0f7d7a; border-radius: 999px; background: #e7f4f3; color: #0b5f5d; font: 700 11px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; white-space: nowrap; vertical-align: middle; cursor: default; }
+    `;
+      document.head.appendChild(style);
+    }
+    function idFromLinks(root) {
+      for (const link of root.querySelectorAll('a[href*="#/JobPosition/"]')) {
+        const id = vacancyIdFromHref(link.getAttribute("href") || link.href);
+        if (id) return { id: id.toLowerCase(), link };
+      }
+      return null;
+    }
+    function visibleEntries(hash) {
+      if (isVacancyListRoute(hash)) {
+        return [...document.querySelectorAll("tbody tr")].map((row2) => {
+          const cell = row2.querySelector(":scope > td.column-mainTitle");
+          const found = cell ? idFromLinks(row2) : null;
+          return found ? { id: found.id, cell, place: (badge) => cell.appendChild(badge) } : null;
+        }).filter(Boolean);
+      }
+      if (isMatchListRoute(hash)) {
+        return [...document.querySelectorAll("tbody tr.RaDataTable-row")].map((row2) => {
+          const cell = row2.querySelector(":scope > td.column-jobPositionId");
+          const found = cell ? idFromLinks(cell) : null;
+          return found ? { id: found.id, cell, place: (badge) => found.link.insertAdjacentElement("afterend", badge) } : null;
+        }).filter(Boolean);
+      }
+      return [];
+    }
+    function installEntry(entry) {
+      let badge = entry.cell.querySelector(`.${BADGE_CLASS}`);
+      if (badge && badge.dataset.jobId !== entry.id) {
+        badge.remove();
+        badge = null;
+      }
+      if (!provider.isCrawled(entry.id)) {
+        badge?.remove();
+        return;
+      }
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = BADGE_CLASS;
+        badge.dataset.jobId = entry.id;
+        badge.textContent = BADGE_TEXT;
+        entry.place(badge);
+      }
+      const title = badgeTitle(provider.lookup(entry.id));
+      if (badge.title !== title) badge.title = title;
+    }
+    function teardown() {
+      document.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+    }
+    function install() {
+      const entries = visibleEntries(location.hash);
+      if (!entries.length) {
+        if (!isVacancyListRoute(location.hash) && !isMatchListRoute(location.hash)) teardown();
+        return;
+      }
+      injectStyle();
+      entries.forEach(installEntry);
+      provider.want(entries.map((entry) => entry.id));
+    }
+    let scheduled = false;
+    function scheduleInstall() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        install();
+      }, 150);
+    }
+    createObserver2(runtime, scheduleInstall).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleInstall);
+    runtime.addCleanup?.(() => {
+      teardown();
+      document.getElementById(STYLE_ID18)?.remove();
+    });
+    scheduleInstall();
+  }
+
+  // src/features/crawling-herkunft.js
+  function executeCrawlingHerkunft2(runtime) {
+    executeCrawlingHerkunft(runtime, {
+      sourcePath: "kam/toolbox/src/features/crawling-herkunft.js",
+      namespace: "kam",
+      isMatchListRoute: isKamMyMatchesRoute
+    });
+  }
+
   // ../../shared/js/comment-shortcuts/core.js
   var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
   var GROUPS = [
@@ -20395,8 +20654,8 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS7 = 15e3;
+  var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS8 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
   var OFFLINE_MESSAGE7 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
@@ -20404,7 +20663,7 @@ ${buildCbreBody(current)}`;
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse6(status, text) {
+  function parseResponse7(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -20415,17 +20674,17 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL7 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL8 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS7,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS8,
         onload(response) {
           try {
-            resolve(parseResponse6(response.status, response.responseText));
+            resolve(parseResponse7(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -20444,7 +20703,7 @@ ${buildCbreBody(current)}`;
     date.setUTCDate(date.getUTCDate() + days);
     return date.toISOString().slice(0, 10);
   }
-  function formatDay4(day) {
+  function formatDay5(day) {
     const [year, month, date] = String(day || "").split("-");
     return year && month && date ? `${date}.${month}.${year}` : String(day || "");
   }
@@ -20458,7 +20717,7 @@ ${buildCbreBody(current)}`;
   }
   function entryMeta2(entry) {
     return [
-      `wieder aktiv ab ${formatDay4(entry.wiederAktivAb)}`,
+      `wieder aktiv ab ${formatDay5(entry.wiederAktivAb)}`,
       `${stellenText(entry.stellen)} pausiert`,
       entry.grund,
       entry.pausiertVon ? `von ${entry.pausiertVon}` : ""
@@ -20836,7 +21095,7 @@ ${buildCbreBody(current)}`;
     function buttonLabel(employerId) {
       if (!employerId) return { text: "AG-Pause", title: "Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
       const entry = findEntry(cache?.entries, employerId);
-      if (entry) return { text: `Pausiert bis ${lastPausedDay(entry.wiederAktivAb)}`, title: `Wieder aktiv ab ${formatDay4(entry.wiederAktivAb)}. Klicken zum Ändern oder Beenden.`, paused: true };
+      if (entry) return { text: `Pausiert bis ${lastPausedDay(entry.wiederAktivAb)}`, title: `Wieder aktiv ab ${formatDay5(entry.wiederAktivAb)}. Klicken zum Ändern oder Beenden.`, paused: true };
       return { text: "Pausieren", title: "Diesen Arbeitgeber samt Stellen bis zu einem Datum pausieren", paused: false };
     }
     function placeButton() {
@@ -20988,7 +21247,7 @@ ${buildCbreBody(current)}`;
     const tail = after && !after.startsWith("\n") ? "\n" : "";
     return { value: `${before}${lead}${block}${tail}${after}`, caret: from + lead.length + block.length };
   }
-  function chunk2(items, size) {
+  function chunk3(items, size) {
     const out = [];
     for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
     return out;
@@ -21009,7 +21268,7 @@ ${buildCbreBody(current)}`;
       const jobIds = [...new Set(open.map((m) => String(m.jobPositionId || "")).filter(Boolean))];
       const byIds = async (query, ids) => {
         const items = [];
-        for (const part of chunk2(ids, NAMES_CHUNK)) items.push(...(await request(query, { ids: part }))?.items || []);
+        for (const part of chunk3(ids, NAMES_CHUNK)) items.push(...(await request(query, { ids: part }))?.items || []);
         return items;
       };
       if (!candidateIds.length) return [];
@@ -21517,7 +21776,7 @@ ${next}`;
     field.dispatchEvent(new ViewEvent("input", { bubbles: true }));
     field.dispatchEvent(new ViewEvent("change", { bubbles: true }));
   }
-  function createObserver2(runtime, callback) {
+  function createObserver3(runtime, callback) {
     if (runtime?.createMutationObserver) {
       return runtime.createMutationObserver(callback);
     }
@@ -21766,7 +22025,7 @@ ${next}`;
         renderToolbar();
       }, 80);
     }
-    const observer = createObserver2(runtime, scheduleRender);
+    const observer = createObserver3(runtime, scheduleRender);
     observer.observe(document.documentElement, { childList: true, subtree: true });
     addWindowListener(runtime, "hashchange", scheduleRender);
     addWindowListener(runtime, "resize", scheduleRender);
@@ -21799,7 +22058,7 @@ ${next}`;
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
       const STYLE_ID18 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
-      const BADGE_CLASS = "werkia-urgent-vacancy-badge";
+      const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
       const POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
@@ -21949,16 +22208,16 @@ ${next}`;
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
       .${ROW_CLASS}:hover > td, .${ROW_CLASS}:hover > th { background: #ffe8a3 !important; }
-      .${BADGE_CLASS} { display: inline-flex; align-items: center; margin: 6px 0 2px 8px; padding: 5px 9px; border: 1px solid #92400e; border-radius: 999px; background: #b45309; color: #fff; font: 800 12px/1.2 Arial, sans-serif; letter-spacing: .15px; vertical-align: middle; white-space: nowrap; }
+      .${BADGE_CLASS2} { display: inline-flex; align-items: center; margin: 6px 0 2px 8px; padding: 5px 9px; border: 1px solid #92400e; border-radius: 999px; background: #b45309; color: #fff; font: 800 12px/1.2 Arial, sans-serif; letter-spacing: .15px; vertical-align: middle; white-space: nowrap; }
     `;
         document.head.appendChild(style);
       }
       function removeHighlight(row2) {
         row2.classList.remove(ROW_CLASS);
-        row2.querySelectorAll(`.${BADGE_CLASS}`).forEach((badge) => badge.remove());
+        row2.querySelectorAll(`.${BADGE_CLASS2}`).forEach((badge) => badge.remove());
       }
       function applyHighlight(row2, urgent) {
-        const existingBadge = row2.querySelector(`.${BADGE_CLASS}`);
+        const existingBadge = row2.querySelector(`.${BADGE_CLASS2}`);
         if (row2.matches(MATCH_PRESENT_ROW_SELECTOR)) {
           if (row2.classList.contains(ROW_CLASS) || existingBadge) removeHighlight(row2);
           return;
@@ -21972,7 +22231,7 @@ ${next}`;
         row2.classList.add(ROW_CLASS);
         const target = row2.querySelector("td.column-jobPositionId") || row2.querySelector("td") || row2;
         const badge = document.createElement("span");
-        badge.className = BADGE_CLASS;
+        badge.className = BADGE_CLASS2;
         badge.textContent = "Dringende Suche";
         badge.title = "Der KAM hat diese Vakanz als dringend markiert.";
         target.appendChild(badge);
@@ -22090,6 +22349,7 @@ ${next}`;
       helpTip: () => kamHelp.tip("arbeitgeber-pause")
     }) },
     { id: "vacancy-status", execute: executeVacancyStatus2 },
+    { id: "crawling-herkunft", execute: executeCrawlingHerkunft2 },
     { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
     { id: "match-mention", execute: executeKamMatchMention },
     { id: "match-mail", execute: (runtime) => executeMatchMail(runtime, {

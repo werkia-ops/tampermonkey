@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.25.365
+// @version      1.25.370
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -11131,6 +11131,16 @@ ${add}` : add;
   function statusConfirmed(returned, expected) {
     return (returned ?? "") === (expected ?? "");
   }
+  var COUNTERPART_OUT_VALUE = "__counterpart__";
+  function counterpartOutFeedback(status2, feedback) {
+    if (status2 !== "out") return "";
+    return normalize5(feedback);
+  }
+  function buildCounterpartOutQuery(statusField, feedbackField) {
+    return `query BulkCounterpartOut($id: UUID!) {
+  data: Match(id: $id) { id ${statusField} ${feedbackField} }
+}`;
+  }
 
   // ../../shared/js/bulk-match-actions/index.js
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
@@ -11154,6 +11164,7 @@ ${add}` : add;
       resolveOutFeedback,
       declineInterviewsOnOut = false,
       nativeOutFeedbackTemplates = null,
+      counterpartOut = null,
       helpTip = {}
     } = config;
     const tip = (key) => helpTip[key]?.() || "";
@@ -11161,6 +11172,8 @@ ${add}` : add;
     const STATUS_MUTATION = buildStatusMutation(fields.status);
     const STATUS_WITH_FEEDBACK_MUTATION = buildStatusWithFeedbackMutation(fields.status, fields.feedback);
     const WVL_MUTATION = buildFollowUpMutation(fields.followUp);
+    const COUNTERPART_QUERY = counterpartOut ? buildCounterpartOutQuery(counterpartOut.status, counterpartOut.feedback) : "";
+    const COUNTERPART_OPTION = counterpartOut ? { value: COUNTERPART_OUT_VALUE, label: `Grund wie ${counterpartOut.team} (je Match)` } : null;
     const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
     async function waitFor(find, timeoutMs = 3e3, intervalMs = 50) {
       const started = Date.now();
@@ -11313,6 +11326,7 @@ ${add}` : add;
         <label data-out-feedback hidden>Grund
           <select name="outFeedback">
             <option value="__choose__">Bitte auswählen</option>
+            ${COUNTERPART_OPTION ? `<option value="${COUNTERPART_OPTION.value}">${COUNTERPART_OPTION.label}</option>` : ""}
             ${outFeedbackOptions.map((reason) => `<option value="${reason.value}">${reason.label}</option>`).join("")}
           </select>
         </label>
@@ -11587,7 +11601,7 @@ ${add}` : add;
       const targetValue = dialog.querySelector('[name="status"]').value;
       const targetStatus = statusOptions.find((status2) => status2.value === targetValue);
       const outFeedbackValue = dialog.querySelector('[name="outFeedback"]').value;
-      const outFeedback = outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
+      const outFeedback = outFeedbackValue === COUNTERPART_OUT_VALUE && COUNTERPART_OPTION ? COUNTERPART_OPTION : outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
       const outFeedbackText = normalize5(dialog.querySelector('[name="outFeedbackText"]').value);
       if (!selection.length) return setStatus("Bitte mindestens ein Match anhaken.", "error");
       if (!targetStatus || targetValue === "__choose__") return setStatus(`Bitte einen ${team} Status auswählen.`, "error");
@@ -11598,20 +11612,41 @@ ${add}` : add;
       if (isOut && outFeedback.freeText && !outFeedbackText) {
         return setStatus("Bitte den eigenen Grund eintragen.", "error");
       }
+      const counterpartFeedback = /* @__PURE__ */ new Map();
+      let skippedText = "";
+      if (isOut && outFeedback === COUNTERPART_OPTION) {
+        setStatus(`Lese ${counterpartOut.team}-Out-Gründe …`, "busy");
+        try {
+          for (const match of selection) {
+            const data = await getRequest()(COUNTERPART_QUERY, { id: match.matchId });
+            const feedback2 = counterpartOutFeedback(data?.data?.[counterpartOut.status], data?.data?.[counterpartOut.feedback]);
+            if (feedback2) counterpartFeedback.set(match.matchId, feedback2);
+          }
+        } catch (error) {
+          return setStatus(`${counterpartOut.team}-Out-Gründe nicht lesbar: ${error.message}`, "error");
+        }
+        const skipped = selection.filter((match) => !counterpartFeedback.has(match.matchId));
+        if (skipped.length === selection.length) {
+          return setStatus(`Keines der angehakten Matches ist bei ${counterpartOut.team} mit Grund auf „Out“.`, "error");
+        }
+        for (const match of skipped) selection.splice(selection.indexOf(match), 1);
+        skippedText = skipped.length ? ` ${skipped.length} ohne ${counterpartOut.team}-Out-Grund bleiben unverändert.` : "";
+      }
       const declinesInterviews = isOut && declineInterviewsOnOut;
       const clearsWvl = statusClearsWvl(targetStatus.value);
       const cleanupText = clearsWvl ? ` Die ${team} WVL dieser Matches wird ebenfalls gelöscht.` : "";
       const interviewText = declinesInterviews ? " Offene Terminvorschläge werden ebenfalls abgelehnt." : "";
       const reasonLabel = isOut ? outFeedback.freeText ? outFeedbackText : outFeedback.label : "";
+      const confirmSkipped = skippedText;
       const reasonText = isOut ? ` Grund: „${reasonLabel}“.` : "";
-      if (!window.confirm(`${scopeText(selection)} auf ${team} Status „${targetStatus.label}“ setzen?${reasonText}${cleanupText}${interviewText}${hiddenSelectionText(dialog)}`)) return;
+      if (!window.confirm(`${scopeText(selection)} auf ${team} Status „${targetStatus.label}“ setzen?${reasonText}${confirmSkipped}${cleanupText}${interviewText}${hiddenSelectionText(dialog)}`)) return;
       let declinedInterviews = 0;
       const partial = [];
-      const feedback = isOut ? resolveOutFeedback(outFeedback, outFeedbackText) : null;
+      const feedback = isOut && outFeedback !== COUNTERPART_OPTION ? resolveOutFeedback(outFeedback, outFeedbackText) : null;
       const result = await kit.runQueue(dialog, selection, {
         progress: (current, total) => `Ändere Status ${current} von ${total} …`,
         update: async (match, index) => {
-          await updateMatchStatus(match.matchId, targetStatus, feedback);
+          await updateMatchStatus(match.matchId, targetStatus, counterpartFeedback.get(match.matchId) || feedback);
           kit.markWritten(dialog);
           const missing = [];
           if (clearsWvl) {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.24.371
+// @version      1.25.372
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -5234,9 +5234,9 @@
     if (!sample || !view) return null;
     const computed = view.getComputedStyle(sample);
     const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
-    const icon2 = sample.querySelector("svg");
-    const iconStyle = icon2 ? view.getComputedStyle(icon2) : null;
-    const iconBox = icon2?.parentElement && icon2.parentElement !== sample ? view.getComputedStyle(icon2.parentElement) : null;
+    const icon3 = sample.querySelector("svg");
+    const iconStyle = icon3 ? view.getComputedStyle(icon3) : null;
+    const iconBox = icon3?.parentElement && icon3.parentElement !== sample ? view.getComputedStyle(icon3.parentElement) : null;
     return {
       style,
       iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
@@ -5550,16 +5550,16 @@
         if (look) {
           vertretungenButton.className = "wv-native";
           Object.assign(vertretungenButton.style, look.style);
-          const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          icon2.setAttribute("viewBox", "0 0 24 24");
-          icon2.setAttribute("aria-hidden", "true");
-          icon2.style.width = look.iconSize;
-          icon2.style.height = look.iconSize;
-          icon2.style.marginRight = look.iconGap;
+          const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon3.setAttribute("viewBox", "0 0 24 24");
+          icon3.setAttribute("aria-hidden", "true");
+          icon3.style.width = look.iconSize;
+          icon3.style.height = look.iconSize;
+          icon3.style.marginRight = look.iconGap;
           const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
           path.setAttribute("d", PEOPLE_ICON_PATH);
-          icon2.append(path);
-          vertretungenButton.prepend(icon2);
+          icon3.append(path);
+          vertretungenButton.prepend(icon3);
         } else {
           vertretungenButton.className = "wv-own";
         }
@@ -5856,17 +5856,17 @@ ${add}` : add;
       });
     }
     function noteIcon(size) {
-      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon2.setAttribute("viewBox", "0 0 24 24");
-      icon2.setAttribute("aria-hidden", "true");
+      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon3.setAttribute("viewBox", "0 0 24 24");
+      icon3.setAttribute("aria-hidden", "true");
       if (size) {
-        icon2.style.width = size;
-        icon2.style.height = size;
+        icon3.style.width = size;
+        icon3.style.height = size;
       }
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", NOTE_ICON_PATH);
-      icon2.append(path);
-      return icon2;
+      icon3.append(path);
+      return icon3;
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
@@ -6475,7 +6475,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID18 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID19 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -6483,9 +6483,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle7() {
-      if (document.getElementById(STYLE_ID18)) return;
+      if (document.getElementById(STYLE_ID19)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID18;
+      style.id = STYLE_ID19;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -6538,11 +6538,11 @@ ${add}` : add;
         if (existing.textContent !== text) existing.textContent = text;
       } else {
         existing?.remove();
-        const span = document.createElement("span");
-        span.className = `${LINE_CLASS2}-inline`;
-        span.title = `${entry.label}: ${entry.reason}`;
-        span.textContent = text;
-        target.appendChild(span);
+        const span2 = document.createElement("span");
+        span2.className = `${LINE_CLASS2}-inline`;
+        span2.title = `${entry.label}: ${entry.reason}`;
+        span2.textContent = text;
+        target.appendChild(span2);
       }
       return entries.filter((item) => item !== entry);
     }
@@ -6932,6 +6932,23 @@ ${add}` : add;
         "Offene Reminder von früheren Tagen stehen oben als „fällig“, bis du sie erledigst oder löschst.",
         "Team-Einträge schreibt, wer Admin der Vertretungen ist. Sie sind für alle, ein Team oder einzelne Personen sichtbar.",
         "Reminder und Team-Einträge liegen auf dem Toolbox-Server, nicht im Adminpanel. Ist er nicht erreichbar, zeigt die Leiste einen Hinweis und Termine und WVL trotzdem."
+      ]
+    },
+    {
+      id: "day-phases",
+      title: "Tagesphasen",
+      page: "jede Adminpanel-Seite, unten in der Mitte",
+      kind: "view",
+      summary: "Die Leiste unten zeigt, in welchem Block des KAM-Arbeitstags du gerade bist (Ablauf von Niklas), wie lange er noch läuft und was danach kommt. Am Wochenende bleibt sie weg.",
+      steps: [
+        "„Ablauf“ klappt alle Phasen des Tages mit Uhrzeit auf.",
+        "Der orange Knopf springt in die passende Ansicht: Tags öffnen, VTA-Session, Feedbacks einholen oder „Heute“ mit den WVL des Tages.",
+        "„–“ klappt die Leiste zum kleinen Chip ein, ein Klick auf den Chip wieder auf. „×“ schließt sie bis morgen."
+      ],
+      notes: [
+        "Ganz ab- und wieder anschalten: Tampermonkey-Menü › „KAM-Toolbox: Tagesphasen ein/aus“.",
+        "Uhrzeiten in deutscher Zeit. In den letzten 15 Minuten der VTV-Phase erinnert sie daran, die Tags auf 0 zu bringen.",
+        "Nur Anzeige, im Adminpanel ändert sich nichts. Die Einstellungen liegen im Browser."
       ]
     },
     {
@@ -9590,7 +9607,7 @@ ${rr.zahlen}` : view.title;
     `;
       document.head.appendChild(style);
     }
-    function icon2(path) {
+    function icon3(path) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("aria-hidden", "true");
@@ -9618,7 +9635,7 @@ ${rr.zahlen}` : view.title;
       button3.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button3.append(label, icon2(COPY_ICON_PATH2));
+      button3.append(label, icon3(COPY_ICON_PATH2));
       return button3;
     }
     function renderState(matchId) {
@@ -9723,11 +9740,11 @@ ${rr.zahlen}` : view.title;
       copyText(name).then(() => {
         button3.dataset.copied = "true";
         button3.title = "Kopiert";
-        button3.querySelector("svg")?.replaceWith(icon2(CHECK_ICON_PATH));
+        button3.querySelector("svg")?.replaceWith(icon3(CHECK_ICON_PATH));
         runtime.setTimeout(() => {
           delete button3.dataset.copied;
           button3.title = "CEM-Namen kopieren";
-          button3.querySelector("svg")?.replaceWith(icon2(COPY_ICON_PATH2));
+          button3.querySelector("svg")?.replaceWith(icon3(COPY_ICON_PATH2));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -10055,7 +10072,7 @@ ${rr.zahlen}` : view.title;
       const width = Math.min(520, window.innerWidth - 40);
       return { left: window.innerWidth - width - MARGIN, top: 80, width, maxHeight: window.innerHeight - 100 };
     }
-    function makeVacancySection(heading, items, icon2 = "✓") {
+    function makeVacancySection(heading, items, icon3 = "✓") {
       const wrap2 = document.createElement("div");
       const h = document.createElement("div");
       h.style.cssText = `
@@ -10072,8 +10089,8 @@ ${rr.zahlen}` : view.title;
         display:flex; gap:10px; margin-bottom:10px;
         color:#222; font-size:16px; align-items:flex-start; line-height:1.65;
       `;
-        const iconColor = icon2 === "✓" ? "#16a34a" : "#888";
-        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon2)}</span><span>${escapeHtml(item)}</span>`;
+        const iconColor = icon3 === "✓" ? "#16a34a" : "#888";
+        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon3)}</span><span>${escapeHtml(item)}</span>`;
         ul.appendChild(li);
       });
       wrap2.appendChild(ul);
@@ -11698,9 +11715,9 @@ ${rr.zahlen}` : view.title;
         opacity: 1
       }));
       const start = performance.now();
-      const duration = 1800;
+      const duration2 = 1800;
       function animate(now) {
-        const progress = (now - start) / duration;
+        const progress = (now - start) / duration2;
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         pieces.forEach((p) => {
           p.x += p.speedX;
@@ -11762,7 +11779,7 @@ ${rr.zahlen}` : view.title;
         if (explosions >= 8) runtime.clearInterval(rocketTimer);
       }, 220);
       const start = performance.now();
-      const duration = 2500;
+      const duration2 = 2500;
       function animate(now) {
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         particles.forEach((p) => {
@@ -11777,7 +11794,7 @@ ${rr.zahlen}` : view.title;
           ctx.fill();
         });
         ctx.globalAlpha = 1;
-        if (now - start < duration) requestAnimationFrame(animate);
+        if (now - start < duration2) requestAnimationFrame(animate);
         else canvas.remove();
       }
       requestAnimationFrame(animate);
@@ -12640,7 +12657,7 @@ ${rr.zahlen}` : view.title;
 .werkia-interview-type { white-space: nowrap; }`;
       document.head.appendChild(style);
     }
-    function chipText(chip) {
+    function chipText2(chip) {
       const clone = chip.cloneNode(true);
       clone.querySelectorAll(OWN_SELECTOR2).forEach((node) => node.remove());
       return [...clone.querySelectorAll("p, span")].map((node) => node.textContent).join(" ") || clone.textContent;
@@ -12719,7 +12736,7 @@ ${rr.zahlen}` : view.title;
           if (!pending.has(matchId)) missing.push(matchId);
           if (!entry) continue;
         }
-        const texts = chips.map(chipText);
+        const texts = chips.map(chipText2);
         const assigned = assignInterviews(texts, entry.interviews);
         chips.forEach((chip, index) => {
           decorateType(chip, assigned[index], texts[index]);
@@ -14214,9 +14231,9 @@ ${rr.zahlen}` : view.title;
       radio.name = name;
       radio.value = String(index);
       radio.checked = checked;
-      const span = document.createElement("span");
-      span.textContent = labelText;
-      option.append(radio, span);
+      const span2 = document.createElement("span");
+      span2.textContent = labelText;
+      option.append(radio, span2);
       if (href) {
         const anchor = document.createElement("a");
         anchor.textContent = linkLabel;
@@ -17785,16 +17802,16 @@ ${buildCbreBody(current)}`;
       if (existing.dataset.active !== active) existing.dataset.active = active;
     }
     function starIcon(size = "18px", gap = "0") {
-      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon2.setAttribute("viewBox", "0 0 24 24");
-      icon2.setAttribute("aria-hidden", "true");
-      icon2.style.width = size;
-      icon2.style.height = size;
-      if (gap) icon2.style.marginRight = gap;
+      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon3.setAttribute("viewBox", "0 0 24 24");
+      icon3.setAttribute("aria-hidden", "true");
+      icon3.style.width = size;
+      icon3.style.height = size;
+      if (gap) icon3.style.marginRight = gap;
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", STAR_PATH);
-      icon2.append(path);
-      return icon2;
+      icon3.append(path);
+      return icon3;
     }
     function togglePanel() {
       store.set(STORAGE_KEYS.collapsed, collapsed() ? "0" : "1");
@@ -18744,16 +18761,16 @@ ${buildCbreBody(current)}`;
       console.warn("[Crawling-Herkunft] GM_xmlhttpRequest ist nicht verfügbar.");
       return;
     }
-    const STYLE_ID18 = `werkia-${namespace}-crawl-badge-style`;
+    const STYLE_ID19 = `werkia-${namespace}-crawl-badge-style`;
     const provider = createCrawlingProvider({
       fetchCrawled: createCrawlingClient({ request }),
       onChange: () => scheduleInstall(),
       schedule: (callback) => runtime.setTimeout(callback, 0)
     });
     function injectStyle() {
-      if (document.getElementById(STYLE_ID18)) return;
+      if (document.getElementById(STYLE_ID19)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID18;
+      style.id = STYLE_ID19;
       style.textContent = `
       .${BADGE_CLASS} { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid #0f7d7a; border-radius: 999px; background: #e7f4f3; color: #0b5f5d; font: 700 11px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; white-space: nowrap; vertical-align: middle; cursor: default; }
     `;
@@ -18829,7 +18846,7 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(STYLE_ID18)?.remove();
+      document.getElementById(STYLE_ID19)?.remove();
     });
     scheduleInstall();
   }
@@ -20653,6 +20670,292 @@ ${buildCbreBody(current)}`;
     });
   }
 
+  // ../../shared/js/admin-interface/features/day-phases.js
+  var BERLIN = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Berlin",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  });
+  var toMin = (hhmm) => {
+    const m = String(hhmm || "").match(/^(\d{1,2}):(\d{2})$/);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  function berlinClock(now = /* @__PURE__ */ new Date()) {
+    const p = Object.fromEntries(BERLIN.formatToParts(now).map((x) => [x.type, x.value]));
+    const weekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(p.weekday) + 1;
+    return { weekday, minute: Number(p.hour) * 60 + Number(p.minute) };
+  }
+  function phaseNow(phases, now = /* @__PURE__ */ new Date()) {
+    const { weekday, minute } = berlinClock(now);
+    if (!phases?.length || weekday > 5) return { state: "weekend", index: -1, phase: null, next: null, left: 0, progress: 0, inTail: false };
+    const first = toMin(phases[0].from);
+    if (minute < first) return { state: "before", index: -1, phase: null, next: phases[0], left: first - minute, progress: 0, inTail: false };
+    for (let i = 0; i < phases.length; i += 1) {
+      const ph = phases[i];
+      const from = toMin(ph.from);
+      const to = ph.to ? toMin(ph.to) : 24 * 60;
+      if (minute >= from && minute < to) {
+        const left = to - minute;
+        const tail = ph.tail && ph.to ? left <= ph.tail.minutes : false;
+        return { state: "during", index: i, phase: ph, next: phases[i + 1] || null, left: ph.to ? left : null, progress: ph.to ? (minute - from) / (to - from) : 0, inTail: tail };
+      }
+      const nextPh = phases[i + 1];
+      if (nextPh && minute >= to && minute < toMin(nextPh.from)) {
+        return { state: "gap", index: i, phase: null, next: nextPh, left: toMin(nextPh.from) - minute, progress: 0, inTail: false };
+      }
+    }
+    return { state: "gap", index: phases.length - 1, phase: null, next: null, left: 0, progress: 0, inTail: false };
+  }
+  var span = (ph) => ph.to ? `${ph.from}–${ph.to}` : `ab ${ph.from}`;
+  var duration = (min) => min >= 60 ? `${Math.floor(min / 60)} Std. ${min % 60 ? `${min % 60} Min.` : ""}`.trim() : `${min} Min.`;
+  function phaseBarHtml(phases, info, { esc, icon: icon3 = () => "", open = false } = {}) {
+    if (!phases?.length || info.state === "weekend") return "";
+    const ph = info.phase;
+    const main = info.state === "before" ? `<b>Gleich:</b> ${esc(info.next.label)} <span class="meta">ab ${esc(info.next.from)} (in ${esc(duration(info.left))})</span>` : info.state === "gap" ? info.next ? `<b>Gleich:</b> ${esc(info.next.label)} <span class="meta">ab ${esc(info.next.from)}</span>` : "<b>Feierabend</b>" : `<span class="dp-step num">${info.index + 1}/${phases.length}</span><b>${esc(ph.label)}</b> <span class="meta">${esc(span(ph))}${info.left !== null ? ` · noch ${esc(duration(info.left))}` : ""}</span>${info.inTail ? ` <span class="dp-tail">${esc(ph.tail.label)}</span>` : ""}`;
+    const go = ph?.go ? `<button class="btn sm dp-go" data-phase-go="${esc(ph.go)}">${esc(ph.goLabel || "Öffnen")}${icon3("arrow", "sm")}</button>` : "";
+    const after = info.state === "during" && info.next ? `<span class="meta dp-next">Danach: ${esc(info.next.label)}</span>` : "";
+    const bar = info.state === "during" && info.left !== null ? `<span class="dp-prog"><span style="width:${Math.round(info.progress * 100)}%"></span></span>` : "";
+    const list = open ? `<ol class="dp-list">${phases.map((p, i) => `<li class="${i === info.index && info.state === "during" ? "on" : i < info.index || info.state === "gap" && i <= info.index ? "past" : ""}"><span class="num dp-time">${esc(span(p))}</span><span><b>${esc(p.label)}</b>${p.hint ? `<span class="meta"> · ${esc(p.hint)}</span>` : ""}${p.tail ? `<span class="meta"> · letzte ${p.tail.minutes} Min.: ${esc(p.tail.label)}</span>` : ""}</span>${p.go ? `<button class="btn sm ghost" data-phase-go="${esc(p.go)}">${esc(p.goLabel || "Öffnen")}</button>` : ""}</li>`).join("")}</ol>` : "";
+    return `<div class="card dp ${info.inTail ? "tail" : ""}" id="day-phase">
+    <div class="dp-row">${icon3("clock", "sm")}<span class="dp-main">${main}</span>${bar}${after}<span class="sp"></span>${go}
+      <button class="btn sm ghost" data-phase-toggle aria-expanded="${open}">${open ? "Ablauf zu" : "Ablauf"}</button></div>${list}</div>`;
+  }
+  var DAY_PHASES_CSS = `
+.dp { padding: 10px 14px; margin-bottom: 16px; }
+.dp.tail { border-color: var(--warn); }
+.dp-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dp-main { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.dp-step { font-size: 11px; color: var(--muted); padding: 1px 6px; border-radius: 999px; background: var(--sunken); }
+.dp-tail { font-size: 11px; font-weight: 650; color: var(--warn); }
+.dp-prog { width: 90px; height: 4px; border-radius: 4px; background: var(--sunken); overflow: hidden; display: inline-block; }
+.dp-prog > span { display: block; height: 100%; background: var(--accent); }
+.dp-next { white-space: nowrap; }
+.dp-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.dp-list li { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 8px; }
+.dp-list li.on { background: var(--accent-soft); }
+.dp-list li.past { opacity: .55; }
+.dp-time { font-size: 12px; color: var(--muted); }
+`;
+
+  // ../../shared/js/admin-interface/features/kam-day-phases.js
+  var KAM_DAY_PHASES = [
+    { id: "prios", from: "08:30", to: "09:30", label: "Schriftliche Prios", hint: "Prio-Mails und Prio-Tags", go: "tags", goLabel: "Erwähnungen" },
+    { id: "neu", from: "09:30", to: "11:00", label: "Frische Matches", go: "tp-neu", goLabel: "Frische Matches" },
+    { id: "hc", from: "11:00", to: "12:00", label: "Hot Cases", go: "view:hhc", goLabel: "Hot Hot Cases" },
+    { id: "vtv", from: "12:00", to: "13:00", label: "VTV und CEM-VTA", go: "view:vta", goLabel: "VTA-Session", tail: { minutes: 15, label: "Tags auf 0 bringen" } },
+    { id: "pause", from: "13:00", to: "14:00", label: "Pause" },
+    { id: "calls", from: "14:00", to: "15:00", label: "Matches und VTV callen", go: "view:wvl", goLabel: "WVL fällig" },
+    { id: "feedback", from: "15:00", to: "16:00", label: "VT-Feedbacks", go: "saved:b:feedbacks", goLabel: "Feedbacks einholen" },
+    { id: "orga", from: "16:00", to: "17:00", label: "QM-Calls, UPP, BuHa (Orga)", hint: "Outs usw. hier" },
+    { id: "todos", from: "17:00", to: null, label: "Offene Todos, Tags auf 0", go: "tags", goLabel: "Erwähnungen" }
+  ];
+
+  // src/features/day-phases/core.js
+  var PREFS_KEY = "werkia_kam_day_phases_v1";
+  var TOOLBOX_GO = {
+    tags: { go: "tags", goLabel: "Tags öffnen" },
+    "view:vta": { go: "focus:vta-session", goLabel: "VTA-Session" },
+    "saved:b:feedbacks": { go: "focus:feedbacks-einholen", goLabel: "Feedbacks einholen" },
+    "view:wvl": { go: "heute", goLabel: "Heute (WVL)" }
+  };
+  function toolboxPhases(phases = KAM_DAY_PHASES) {
+    return phases.map((phase) => {
+      const { go, goLabel, ...rest } = phase;
+      const target = go ? TOOLBOX_GO[go] : null;
+      return target ? { ...rest, ...target } : rest;
+    });
+  }
+  var BERLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
+  var berlinDay3 = (now = /* @__PURE__ */ new Date()) => BERLIN_DAY.format(now);
+  function readPrefs(raw) {
+    try {
+      const value = JSON.parse(raw || "{}");
+      return {
+        off: value.off === true,
+        closedDay: typeof value.closedDay === "string" ? value.closedDay : "",
+        mini: value.mini === true,
+        open: value.open === true
+      };
+    } catch {
+      return { off: false, closedDay: "", mini: false, open: false };
+    }
+  }
+  var isHidden = (prefs, now = /* @__PURE__ */ new Date()) => prefs.off || prefs.closedDay === berlinDay3(now);
+  function chipText(info) {
+    if (info.state === "before") return `Gleich: ${info.next.label} ab ${info.next.from}`;
+    if (info.state === "gap") return info.next ? `Gleich: ${info.next.label} ab ${info.next.from}` : "Feierabend";
+    if (info.state !== "during") return "";
+    const left = info.left === null ? "" : ` · noch ${info.left >= 60 ? `${Math.floor(info.left / 60)} Std. ${info.left % 60 ? `${info.left % 60} Min.` : ""}`.trim() : `${info.left} Min.`}`;
+    return `${info.phase.label}${left}`;
+  }
+  function scopeCss(css, scope) {
+    return css.split("\n").map((line) => line.startsWith(".") ? `${scope} ${line}` : line).join("\n");
+  }
+
+  // src/features/day-phases/index.js
+  var SOURCE_PATH5 = "kam/toolbox/src/features/day-phases/index.js";
+  var ROOT_ID = "werkia-kam-day-phase";
+  var STYLE_ID16 = "werkia-kam-day-phase-style";
+  var MY_MATCHES2 = "#/KAM/MyMatches";
+  var FOCUS_SELECT_ID = "werkia-focus-select";
+  var TAGESPLAN_BUTTON_ID = "werkia-tagesplan-button";
+  var REFRESH_MS4 = 20 * 1e3;
+  var ICONS = {
+    clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>'
+  };
+  var icon2 = (name) => ICONS[name] || "";
+  var CSS4 = `
+#${ROOT_ID} { --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
+  --accent:#ef6c00; --accent-ink:#b85400; --accent-soft:#fff3e8; --warn:#8a6700;
+  position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:1200; max-width:min(860px,calc(100vw - 32px));
+  font:400 13px/1.4 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:var(--ink); }
+#${ROOT_ID} * { box-sizing:border-box; }
+#${ROOT_ID} .card { background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 32px -14px rgba(9,9,11,.3); }
+#${ROOT_ID} .dp { margin:0; }
+#${ROOT_ID} .meta { color:var(--ink-2); font-size:12px; }
+#${ROOT_ID} .num { font-variant-numeric:tabular-nums; }
+#${ROOT_ID} .sp { flex:1; }
+#${ROOT_ID} svg { width:16px; height:16px; fill:currentColor; flex:none; }
+#${ROOT_ID} .dp-row > svg { color:var(--accent); }
+#${ROOT_ID} .btn { display:inline-flex; align-items:center; gap:4px; min-height:26px; padding:3px 9px; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; font:inherit; font-size:12px; font-weight:600; line-height:1; }
+#${ROOT_ID} .btn:hover { background:var(--accent-ink); border-color:var(--accent-ink); }
+#${ROOT_ID} .btn svg { width:13px; height:13px; }
+#${ROOT_ID} .btn.ghost { background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
+#${ROOT_ID} .btn.ghost:hover { background:var(--sunken); }
+#${ROOT_ID} .wdp-x { min-height:26px; width:26px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--ink-2); cursor:pointer; font:inherit; font-size:16px; line-height:26px; }
+#${ROOT_ID} .wdp-x:hover { background:var(--sunken); color:var(--ink); }
+#${ROOT_ID} .wdp-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 6px 5px 10px; }
+#${ROOT_ID} .wdp-chip.tail { border-color:var(--warn); }
+#${ROOT_ID} .wdp-chip-main { display:inline-flex; align-items:center; gap:6px; border:0; background:transparent; padding:0; cursor:pointer; font:inherit; color:inherit; }
+#${ROOT_ID} .wdp-chip-main svg { color:var(--accent); }
+${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
+`;
+  function executeDayPhases(runtime, {
+    now = () => /* @__PURE__ */ new Date(),
+    storage = typeof localStorage !== "undefined" ? localStorage : null,
+    phases = toolboxPhases(),
+    helpTip = () => kamHelp.tip("day-phases")
+  } = {}) {
+    runtime.registerSource(SOURCE_PATH5);
+    const loadPrefs = () => readPrefs((() => {
+      try {
+        return storage?.getItem(PREFS_KEY);
+      } catch {
+        return null;
+      }
+    })());
+    const savePrefs = (patch) => {
+      const next = { ...loadPrefs(), ...patch };
+      try {
+        storage?.setItem(PREFS_KEY, JSON.stringify(next));
+      } catch {
+      }
+      render(true);
+    };
+    function ensureStyle7() {
+      if (document.getElementById(STYLE_ID16)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID16;
+      style.textContent = CSS4;
+      document.head.appendChild(style);
+    }
+    let lastHtml = "";
+    function render(force = false) {
+      const prefs = loadPrefs();
+      const info = phaseNow(phases, now());
+      let root = document.getElementById(ROOT_ID);
+      if (isHidden(prefs, now()) || info.state === "weekend") {
+        root?.remove();
+        lastHtml = "";
+        return;
+      }
+      const html = prefs.mini ? `<div class="card wdp-chip ${info.inTail ? "tail" : ""}"><button type="button" class="wdp-chip-main" data-wdp-expand title="Tagesphase aufklappen">${icon2("clock")}<span>${escapeHtml(chipText(info))}</span></button><button type="button" class="wdp-x" data-wdp-close title="Für heute schließen" aria-label="Für heute schließen">×</button></div>` : phaseBarHtml(phases, info, { esc: escapeHtml, icon: icon2, open: prefs.open });
+      if (!force && root && html === lastHtml) return;
+      ensureStyle7();
+      if (!root) {
+        root = document.createElement("div");
+        root.id = ROOT_ID;
+        root.addEventListener("click", onClick);
+        document.body.appendChild(root);
+      }
+      root.innerHTML = html;
+      lastHtml = html;
+      if (!prefs.mini) {
+        const row2 = root.querySelector(".dp-row");
+        const tip = (() => {
+          try {
+            return helpTip?.();
+          } catch {
+            return null;
+          }
+        })();
+        if (tip) row2?.insertBefore(tip, row2.querySelector(".sp"));
+        row2?.insertAdjacentHTML("beforeend", '<button type="button" class="wdp-x" data-wdp-mini title="Einklappen" aria-label="Einklappen">–</button><button type="button" class="wdp-x" data-wdp-close title="Für heute schließen" aria-label="Für heute schließen">×</button>');
+      }
+    }
+    function waitFor(find, onFound, tries = 40) {
+      const found = find();
+      if (found) {
+        onFound(found);
+        return;
+      }
+      if (tries > 0) runtime.setTimeout(() => waitFor(find, onFound, tries - 1), 250);
+    }
+    function toMyMatches() {
+      if (!/^#\/KAM\/MyMatches(?:[/?]|$)/i.test(location.hash)) location.hash = MY_MATCHES2;
+    }
+    function jump(go) {
+      toMyMatches();
+      if (go === "tags") {
+        waitFor(() => findTagsButton(document), (button3) => button3.click());
+      } else if (go === "heute") {
+        waitFor(() => document.getElementById(TAGESPLAN_BUTTON_ID), (button3) => button3.click());
+      } else if (go.startsWith("focus:")) {
+        const id = go.slice("focus:".length);
+        waitFor(() => {
+          const select = document.getElementById(FOCUS_SELECT_ID);
+          return select && [...select.options].some((option) => option.value === id) ? select : null;
+        }, (select) => {
+          if (select.value === id) return;
+          select.value = id;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+    }
+    function onClick(event) {
+      const target = event.target.closest("button");
+      if (!target) return;
+      if (target.dataset.phaseGo) jump(target.dataset.phaseGo);
+      else if (target.hasAttribute("data-phase-toggle")) savePrefs({ open: !loadPrefs().open });
+      else if (target.hasAttribute("data-wdp-mini")) savePrefs({ mini: true });
+      else if (target.hasAttribute("data-wdp-expand")) savePrefs({ mini: false });
+      else if (target.hasAttribute("data-wdp-close")) savePrefs({ closedDay: berlinDay3(now()) });
+    }
+    if (typeof GM_registerMenuCommand === "function") {
+      try {
+        GM_registerMenuCommand("KAM-Toolbox: Tagesphasen ein/aus", () => {
+          const prefs = loadPrefs();
+          const visible = !isHidden(prefs, now());
+          savePrefs(visible ? { off: true } : { off: false, closedDay: "" });
+        });
+      } catch {
+      }
+    }
+    runtime.addWindowListener("storage", (event) => {
+      if (event.key === PREFS_KEY) render(true);
+    });
+    runtime.setInterval(() => render(), REFRESH_MS4);
+    runtime.addCleanup?.(() => {
+      document.getElementById(ROOT_ID)?.remove();
+      document.getElementById(STYLE_ID16)?.remove();
+    });
+    render();
+    return { render };
+  }
+
   // src/features/arbeitgeber-pause/core.js
   var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
   var REQUEST_TIMEOUT_MS8 = 15e3;
@@ -20831,17 +21134,17 @@ ${buildCbreBody(current)}`;
       return el7("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function pauseIcon(size) {
-      const icon2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon2.setAttribute("viewBox", "0 0 24 24");
-      icon2.setAttribute("aria-hidden", "true");
+      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon3.setAttribute("viewBox", "0 0 24 24");
+      icon3.setAttribute("aria-hidden", "true");
       if (size) {
-        icon2.style.width = size;
-        icon2.style.height = size;
+        icon3.style.width = size;
+        icon3.style.height = size;
       }
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", PAUSE_ICON_PATH);
-      icon2.append(path);
-      return icon2;
+      icon3.append(path);
+      return icon3;
     }
     function confirmButton(label, question, onConfirm, className = "wap-danger") {
       let armed = false;
@@ -21292,7 +21595,7 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID16 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID17 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -21326,9 +21629,9 @@ ${buildCbreBody(current)}`;
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
   function ensureStyle6(doc) {
-    if (doc.getElementById(STYLE_ID16)) return;
+    if (doc.getElementById(STYLE_ID17)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID16;
+    style.id = STYLE_ID17;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -21729,7 +22032,7 @@ ${buildCbreBody(current)}`;
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID17 = "werkia-om-notes-template-style";
+  var STYLE_ID18 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -21798,11 +22101,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID17)) {
+    if (document.getElementById(STYLE_ID18)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID17;
+    style.id = STYLE_ID18;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -22036,7 +22339,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID17)?.remove();
+      document.getElementById(STYLE_ID18)?.remove();
     });
     renderToolbar();
   }
@@ -22056,7 +22359,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID18 = "werkia-urgent-vacancy-style";
+      const STYLE_ID19 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -22201,9 +22504,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID18)) return;
+        if (document.getElementById(STYLE_ID19)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID18;
+        style.id = STYLE_ID19;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -22343,6 +22646,7 @@ ${next}`;
     { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
     { id: "prio-liste", execute: executePrioListe2 },
     { id: "tagesplan", execute: executeTagesplan2 },
+    { id: "day-phases", execute: executeDayPhases },
     { id: "arbeitgeber-pause", execute: (runtime) => executeArbeitgeberPause(runtime, {
       getGraphqlAdapter: getKamGraphqlAdapter,
       sourcePath: "kam/toolbox/src/features/arbeitgeber-pause/index.js",

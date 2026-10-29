@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.26.383
+// @version      1.26.385
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -1861,7 +1861,7 @@
       return parsed?.namespace === namespace ? { button: button2, topicId: parsed.topicId } : null;
     }
     const popover = () => document.getElementById(popoverId);
-    function closePopover() {
+    function closePopover2() {
       timers2.clearTimeout(showTimer);
       timers2.clearTimeout(hideTimer);
       popover()?.remove();
@@ -1885,7 +1885,7 @@
         current.pinned = current.pinned || pinned;
         return;
       }
-      closePopover();
+      closePopover2();
       const box = el2("div", {
         position: "fixed",
         zIndex: Z_TOP,
@@ -1946,7 +1946,7 @@
       if (!current || current.pinned) return;
       timers2.clearTimeout(hideTimer);
       hideTimer = timers2.setTimeout(() => {
-        if (current && !current.pinned) closePopover();
+        if (current && !current.pinned) closePopover2();
       }, 200);
     }
     function closeOverview() {
@@ -1981,7 +1981,7 @@
       return wrap2;
     }
     function openOverview({ topicId } = {}) {
-      closePopover();
+      closePopover2();
       closeOverview();
       ensureExtraStyles();
       const { here, elsewhere } = splitTopicsByLocation(topics, { hash: location.hash || "", hostname: location.hostname || "" });
@@ -2139,7 +2139,7 @@
         if (own) {
           event.preventDefault();
           event.stopPropagation();
-          if (current?.anchor === own.button && current.pinned) closePopover();
+          if (current?.anchor === own.button && current.pinned) closePopover2();
           else showPopover(own.button, own.topicId, true);
           return;
         }
@@ -2150,7 +2150,7 @@
           openOverview({ topicId: overviewLink.dataset.werkiaHelpOverviewLink });
           return;
         }
-        if (current && !popover()?.contains(event.target)) closePopover();
+        if (current && !popover()?.contains(event.target)) closePopover2();
       }, true);
       runtime.addDocumentListener("mouseover", (event) => {
         const own = ownTipFrom(event.target);
@@ -2175,16 +2175,16 @@
         if (event.key !== "Escape" || !current) return;
         event.preventDefault();
         event.stopPropagation();
-        closePopover();
+        closePopover2();
       }, true);
       runtime.addWindowListener("scroll", () => {
         const box = popover();
         if (!box || !current) return;
-        if (!current.anchor.isConnected) closePopover();
+        if (!current.anchor.isConnected) closePopover2();
         else positionPopover(box, current.anchor);
       }, true);
       runtime.addWindowListener("resize", () => {
-        if (current) closePopover();
+        if (current) closePopover2();
       });
       if (dock) {
         runtime.addWindowListener("hashchange", syncDock);
@@ -2198,7 +2198,7 @@
         }
       }
       runtime.addCleanup(() => {
-        closePopover();
+        closePopover2();
         closeOverview();
         const dockEl = document.getElementById(DOCK_ID);
         dockEl?.querySelector(`[data-werkia-help-dock-button="${namespace}"]`)?.remove();
@@ -3249,6 +3249,112 @@
     return providers.get(graphqlAdapter);
   }
 
+  // ../../shared/js/employer-notes/prozess-check.js
+  var PROZESS_CHECK_TITLE = "Prozess-Check";
+  var PROZESS_CHECK_TAG = "Prozess";
+  var PROZESS_CHECK_SECTIONS = [
+    {
+      title: "Terminfindung",
+      questions: [
+        "AP für uns erreichbar (wann, wie)",
+        "Terminslots für Bewerber"
+      ]
+    },
+    {
+      title: "VT-Feedback",
+      questions: [
+        "Dauer, bis RM an uns gehen kann",
+        "HT Standard oder optional"
+      ]
+    },
+    {
+      title: "AV-Prozess",
+      questions: [
+        "Benötigte Unterlagen",
+        "Betriebsrat dazwischen (ja/nein)",
+        "Dauer der AV-Erstellung",
+        "AV per Mail oder Post oder vor Ort",
+        "Dauer bei Standardprozess, bis BEW nach Zusage AV erhält"
+      ]
+    }
+  ];
+  var PROZESS_CHECK_QUESTIONS = PROZESS_CHECK_SECTIONS.flatMap((section) => section.questions);
+  function questionKey(label2) {
+    return String(label2 || "").toLowerCase().replace(/\([^)]*\)/g, " ").replace(/[^a-z0-9äöüß]+/g, " ").trim();
+  }
+  var KEY_TO_QUESTION = new Map(PROZESS_CHECK_QUESTIONS.map((question) => [questionKey(question), question]));
+  var SECTION_KEYS = new Set(PROZESS_CHECK_SECTIONS.map((section) => questionKey(section.title)));
+  var EMPTY_ANSWER = /^(?:[-–—?.…_]*|offen|tbd|k\. ?a\.?)$/i;
+  function isProzessCheckText(text) {
+    const first = String(text || "").trimStart().split(/\r?\n/, 1)[0] || "";
+    return questionKey(first) === questionKey(PROZESS_CHECK_TITLE);
+  }
+  function isProzessCheckNote(note) {
+    return Boolean(note) && isProzessCheckText(note.text ?? note.plain);
+  }
+  function parseProzessCheck(text) {
+    const answers = /* @__PURE__ */ new Map();
+    const extra = [];
+    const lines = String(text || "").split(/\r?\n/);
+    let titleSeen = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (!titleSeen && isProzessCheckText(line)) {
+        titleSeen = true;
+        continue;
+      }
+      const colon = line.indexOf(":");
+      const question = colon > 0 ? KEY_TO_QUESTION.get(questionKey(line.slice(0, colon))) : null;
+      if (question) {
+        const answer = line.slice(colon + 1).trim();
+        if (!answers.get(question)) answers.set(question, answer);
+        continue;
+      }
+      if (SECTION_KEYS.has(questionKey(line))) continue;
+      extra.push(line);
+    }
+    return { answers, extra };
+  }
+  function isAnswered(answer) {
+    const value = String(answer || "").trim();
+    return Boolean(value) && !EMPTY_ANSWER.test(value);
+  }
+  function prozessCheckProgress(text) {
+    const { answers } = parseProzessCheck(text);
+    const open = PROZESS_CHECK_QUESTIONS.filter((question) => !isAnswered(answers.get(question)));
+    return { answered: PROZESS_CHECK_QUESTIONS.length - open.length, total: PROZESS_CHECK_QUESTIONS.length, open };
+  }
+  function prozessCheckStatus(notes) {
+    const note = (notes || []).find(isProzessCheckNote) || null;
+    if (!note) {
+      return { state: "missing", note: null, answered: 0, total: PROZESS_CHECK_QUESTIONS.length, open: [...PROZESS_CHECK_QUESTIONS] };
+    }
+    const progress = prozessCheckProgress(note.text ?? note.plain);
+    return { state: progress.open.length ? "incomplete" : "complete", note, ...progress };
+  }
+  function prozessCheckDraft(previousText = "") {
+    const { answers, extra } = parseProzessCheck(previousText);
+    const lines = [PROZESS_CHECK_TITLE];
+    for (const section of PROZESS_CHECK_SECTIONS) {
+      lines.push("", section.title);
+      for (const question of section.questions) {
+        lines.push(`${question}: ${answers.get(question) || ""}`);
+      }
+    }
+    if (extra.length) lines.push("", ...extra);
+    return lines.join("\n");
+  }
+  function prozessCheckLabel(status2) {
+    if (!status2 || status2.state === "missing") return `${PROZESS_CHECK_TITLE} fehlt`;
+    return `${PROZESS_CHECK_TITLE} ${status2.answered}/${status2.total}`;
+  }
+  function prozessCheckHint(status2) {
+    if (!status2 || status2.state === "missing") return `Noch kein ${PROZESS_CHECK_TITLE} an diesem Arbeitgeber. ${PROZESS_CHECK_QUESTIONS.length} Fragen zu Terminfindung, VT-Feedback und AV-Prozess.`;
+    if (status2.state === "complete") return `${PROZESS_CHECK_TITLE} vollständig.`;
+    return `Offen: ${status2.open.join(" · ")}`;
+  }
+
   // ../../shared/js/match-dialog-top/core.js
   var TOP_SLOTS = Object.freeze({
     "contact-person": 10,
@@ -3371,7 +3477,7 @@
   }
 
   // ../../shared/js/employer-notes/index.js
-  var STYLE_ID3 = "werkia-agn-style-v4";
+  var STYLE_ID3 = "werkia-agn-style-v5";
   var PANEL_ATTRIBUTE = "data-werkia-agn-panel";
   var EDITOR_SELECTOR3 = '.ProseMirror[contenteditable="true"]';
   var COMMENTS_BUTTON_SELECTOR2 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
@@ -3394,6 +3500,15 @@
 .werkia-agn-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT3}; cursor: pointer; }
 .werkia-agn-chip:hover, .werkia-agn-chip[aria-expanded="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
 .werkia-agn-chip b { font-weight: 700; color: #b85400; }
+.werkia-agn-chip[data-pc] { border-color: #f1c27d; background: #fff8eb; color: #8a4b00; }
+.werkia-agn-chip[data-pc]:hover, .werkia-agn-chip[data-pc][aria-expanded="true"] { border-color: #ef6c00; background: #fff3e8; color: #b85400; }
+.werkia-agn-pc-list { margin: 0; padding: 0 0 0 16px; color: #3f3f46; }
+.werkia-agn-pc-list li + li { margin-top: 3px; }
+.werkia-agn-pc-hint { margin: 8px 0 0; color: #8b8b94; font-size: 12px; }
+.werkia-agn-write .werkia-agn-badge { margin: 0 0 0 4px; }
+.werkia-agn-pc { height: 22px; padding: 0 8px; border: 1px solid #f1c27d; border-radius: 6px; background: #fff8eb; color: #8a4b00; font: 600 11.5px/1 ${FONT3}; cursor: pointer; }
+.werkia-agn-pc:hover { border-color: #ef6c00; color: #b85400; }
+.werkia-agn-pc:disabled { opacity: .45; cursor: default; }
 .werkia-agn-pop { position: fixed; z-index: 2147483000; width: 340px; max-height: 60vh; overflow: auto; padding: 12px 12px 10px; border: 1px solid #e4e4e7; border-radius: 10px; background: #fafafa; box-shadow: 0 16px 48px -16px rgba(9,9,11,.28); }
 .werkia-agn-close { margin-left: auto; border: 0; background: transparent; color: #8b8b94; cursor: pointer; font: 400 14px/1 ${FONT3}; padding: 2px 4px; }
 .werkia-agn-panel[data-mode="read"] { display: block; }
@@ -3528,6 +3643,96 @@
       reload: () => load2({ fresh: true })
     };
   }
+  var openPopovers = /* @__PURE__ */ new WeakMap();
+  function closePopover(doc) {
+    const open = openPopovers.get(doc);
+    if (!open) return;
+    open.pop.remove();
+    open.chip.setAttribute("aria-expanded", "false");
+    open.cleanup();
+    openPopovers.delete(doc);
+  }
+  function openPopoverWith(doc, chip, title, nodes) {
+    closePopover(doc);
+    const pop = element2(doc, "div", "werkia-agn-pop");
+    pop.setAttribute("role", "dialog");
+    const head = element2(doc, "div", "werkia-agn-head");
+    const close = element2(doc, "button", "werkia-agn-close", "✕");
+    close.type = "button";
+    close.setAttribute("aria-label", "Schließen");
+    head.append(element2(doc, "span", "", title), close);
+    pop.append(head, ...nodes);
+    doc.body.appendChild(pop);
+    const view = doc.defaultView;
+    const rect = chip.getBoundingClientRect();
+    const width = 340;
+    const left = Math.max(8, Math.min(rect.left, (view?.innerWidth || 1200) - width - 8));
+    pop.style.left = `${left}px`;
+    pop.style.top = `${rect.bottom + 6}px`;
+    const onDown = (event) => {
+      if (pop.contains(event.target) || chip.contains(event.target)) return;
+      closePopover(doc);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") closePopover(doc);
+    };
+    doc.addEventListener("mousedown", onDown, true);
+    doc.addEventListener("keydown", onKey, true);
+    close.addEventListener("click", () => closePopover(doc));
+    chip.setAttribute("aria-expanded", "true");
+    openPopovers.set(doc, {
+      pop,
+      chip,
+      cleanup() {
+        doc.removeEventListener("mousedown", onDown, true);
+        doc.removeEventListener("keydown", onKey, true);
+      }
+    });
+  }
+  function createProzessCheckBadge({ provider, employerId, document: doc = document, hint = "Ausfüllen über „Prozess-Check“ im Matchkommentar-Dialog, dann als AG-Notiz speichern." }) {
+    ensureEmployerNotesStyle(doc);
+    const root = element2(doc, "span", "werkia-agn-badge");
+    root.hidden = true;
+    root.dataset.employerId = String(employerId || "");
+    root.dataset.prozessCheck = "";
+    const chip = element2(doc, "button", "werkia-agn-chip");
+    chip.type = "button";
+    chip.dataset.pc = "warn";
+    chip.setAttribute("aria-expanded", "false");
+    root.appendChild(chip);
+    let status2 = null;
+    ["click", "mousedown", "mouseup", "pointerdown", "pointerup"].forEach((type) => {
+      root.addEventListener(type, (event) => event.stopPropagation());
+    });
+    chip.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (chip.getAttribute("aria-expanded") === "true") {
+        closePopover(doc);
+        return;
+      }
+      if (!status2 || status2.state === "complete") return;
+      const list = element2(doc, "ul", "werkia-agn-pc-list");
+      list.append(...status2.open.map((question) => element2(doc, "li", "", question)));
+      const head = element2(doc, "div", "werkia-agn-pc-hint", status2.state === "missing" ? "Noch kein Prozess-Check an diesem Arbeitgeber. Offen sind alle Fragen:" : `${status2.answered} von ${status2.total} beantwortet. Offen:`);
+      head.style.margin = "0 0 6px";
+      openPopoverWith(doc, chip, "Prozess-Check", [head, list, element2(doc, "div", "werkia-agn-pc-hint", hint)]);
+    });
+    async function load2({ fresh = false } = {}) {
+      try {
+        status2 = prozessCheckStatus(await provider.list(root.dataset.employerId, { fresh }));
+      } catch (error) {
+        console.warn("[AG-Notizen]", error);
+        status2 = null;
+      }
+      root.dataset.prozessCheck = status2?.state || "";
+      chip.textContent = status2 ? prozessCheckLabel(status2) : "";
+      chip.title = status2 ? prozessCheckHint(status2) : "";
+      root.hidden = !status2 || status2.state === "complete";
+    }
+    watch(provider, root, () => root.dataset.employerId, load2);
+    load2();
+    return root;
+  }
   function findMatchCommentsDialog(doc = document) {
     const dialogs = [...doc.querySelectorAll('div[role="dialog"], .MuiDialog-paper')].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR3));
     return dialogs[dialogs.length - 1] || null;
@@ -3538,6 +3743,21 @@
     } catch {
       return null;
     }
+  }
+  function setEditorText(editorElement, text) {
+    const html = textToHtml(text);
+    const editor = tiptapOf2(editorElement);
+    try {
+      if (editor?.commands?.setContent) {
+        editor.commands.setContent(html, true);
+        editor.commands.focus?.("start");
+        return;
+      }
+    } catch {
+    }
+    editorElement.innerHTML = html;
+    const ViewEvent = editorElement.ownerDocument?.defaultView?.Event || Event;
+    editorElement.dispatchEvent(new ViewEvent("input", { bubbles: true }));
   }
   function editorText(editorElement) {
     const editor = tiptapOf2(editorElement);
@@ -3604,6 +3824,34 @@
       if (!button2) return;
       const disabled = state.saving || !state.employerId;
       if (button2.disabled !== disabled) button2.disabled = disabled;
+      const pc = state.panel.querySelector(".werkia-agn-pc");
+      if (pc && pc.disabled !== disabled) pc.disabled = disabled;
+    }
+    function setEmployer(current, employerId) {
+      current.employerId = String(employerId || "");
+      current.list.setEmployerId(current.employerId);
+      const slot = current.panel.querySelector(".werkia-agn-pc-slot");
+      if (slot) slot.replaceChildren(...current.employerId ? [createProzessCheckBadge({ provider: current.provider, employerId: current.employerId, document, hint: "Ausfüllen: „Prozess-Check“ unten legt die Vorlage ins Kommentarfeld, Antworten hinter die Doppelpunkte, dann „Speichern“." })] : []);
+    }
+    async function insertProzessCheck() {
+      if (!state || state.saving || !state.employerId) return;
+      const current = state;
+      const editor = current.dialog.querySelector(EDITOR_SELECTOR3);
+      if (!editor) {
+        setStatus("Kommentarfeld nicht gefunden.", "error");
+        return;
+      }
+      let previous = "";
+      try {
+        previous = prozessCheckStatus(await current.provider.list(current.employerId)).note?.text || "";
+      } catch (error) {
+        console.warn("[AG-Notizen]", error);
+      }
+      if (state !== current) return;
+      if (editorText(editor) && !isProzessCheckText(editorText(editor)) && !(document.defaultView?.confirm?.("Im Kommentarfeld steht schon Text. Durch die Prozess-Check-Vorlage ersetzen?") ?? true)) return;
+      setEditorText(editor, prozessCheckDraft(previous));
+      current.panel.querySelector(`.werkia-agn-toggle[data-tag="${PROZESS_CHECK_TAG}"]`)?.setAttribute("aria-pressed", "true");
+      setStatus(previous ? "Letzter Prozess-Check eingefügt. Offenes ergänzen, dann „Speichern“." : "Vorlage eingefügt. Antworten hinter die Doppelpunkte schreiben, dann „Speichern“.", "ok");
     }
     async function save() {
       if (!state || state.saving) return;
@@ -3615,6 +3863,7 @@
         setStatus("Erst den Text ins Kommentarfeld schreiben.", "error");
         return;
       }
+      if (isProzessCheckText(text) && !tags.includes(PROZESS_CHECK_TAG)) tags.push(PROZESS_CHECK_TAG);
       if (!current.employerId) {
         setStatus("Arbeitgeber nicht erkannt, Notiz nicht gespeichert.", "error");
         return;
@@ -3647,6 +3896,7 @@
       const list = createEmployerNotesList({ provider: notesProvider, tag: "Matches", limit, document, helpTip: helpTip() });
       const write = element2(document, "div", "werkia-agn-write");
       const head = element2(document, "div", "werkia-agn-head", "Als AG-Notiz speichern");
+      head.appendChild(element2(document, "span", "werkia-agn-pc-slot"));
       const tags = element2(document, "div", "werkia-agn-tags");
       for (const tag of NOTE_TAGS) {
         const toggle = element2(document, "button", "werkia-agn-toggle", tag.label);
@@ -3661,6 +3911,14 @@
         });
         tags.appendChild(toggle);
       }
+      const pc = element2(document, "button", "werkia-agn-pc", "Prozess-Check");
+      pc.type = "button";
+      pc.title = "Legt die Fragen zu Terminfindung, VT-Feedback und AV-Prozess ins Kommentarfeld, mit den Antworten des letzten Prozess-Checks. Ausfüllen und mit „Speichern“ als AG-Notiz ablegen.";
+      pc.addEventListener("click", (event) => {
+        event.preventDefault();
+        insertProzessCheck();
+      });
+      tags.appendChild(pc);
       const button2 = element2(document, "button", "werkia-agn-save", "Speichern");
       button2.type = "button";
       button2.title = "Speichert den Text aus dem Kommentarfeld zusätzlich am Arbeitgeber. Der Matchkommentar bleibt stehen. Tags sind freiwillig und bestimmen, wo die Notiz in der Toolbox erscheint.";
@@ -3680,8 +3938,7 @@
     function resolveEmployer(current, matchId) {
       current.provider.employerIdForMatch(matchId).then((employerId) => {
         if (state !== current) return;
-        current.employerId = employerId;
-        current.list.setEmployerId(employerId);
+        setEmployer(current, employerId);
         if (!employerId) setStatus("Arbeitgeber zu diesem Match nicht gefunden.", "error");
         updateSaveState();
       }, (error) => {
@@ -3713,7 +3970,7 @@
         const { panel, list } = buildPanel(notesProvider);
         state = { panel, list, dialog, provider: notesProvider, matchId: target.matchId, employerId: target.employerId, saving: false };
         placePanel(panel, dialog);
-        if (target.employerId) list.setEmployerId(target.employerId);
+        if (target.employerId) setEmployer(state, target.employerId);
         else if (target.matchId) resolveEmployer(state, target.matchId);
         else {
           list.setEmployerId("");
@@ -17742,7 +17999,7 @@ Trotzdem speichern?`)) return void 0;
       main.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (openMatchId === matchId) closePopover();
+        if (openMatchId === matchId) closePopover2();
         else openPopover(group);
       });
       const maps = el4("a", { className: "mc-maps", target: "_blank", rel: "noopener noreferrer", text: "Maps ↗" });
@@ -17773,7 +18030,7 @@ Trotzdem speichern?`)) return void 0;
       syncTimer = null;
       if (!isTargetPage3()) {
         document.querySelectorAll(`.${BUTTON_CLASS3}`).forEach((button2) => button2.remove());
-        closePopover();
+        closePopover2();
         return;
       }
       if (waitForAdminpanel()) return;
@@ -17811,7 +18068,7 @@ Trotzdem speichern?`)) return void 0;
       if (missingJobs.size) provider.loadJobs([...missingJobs]).then(scheduleSync, () => {
       });
       [...toEnqueue].sort((a, b) => Number(b[1]) - Number(a[1])).forEach(([candidateId]) => enqueue(candidateId));
-      if (openMatchId && !findButton(openMatchId)) closePopover();
+      if (openMatchId && !findButton(openMatchId)) closePopover2();
     }
     function scheduleSync() {
       if (syncTimer !== null) return;
@@ -17888,7 +18145,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function renderPopover(popover, result) {
       const head = el4("div", { className: "mc-head" }, [el4("h2", { text: "Distanz zur Vakanz" }), cemHelp.tip("match-commute")]);
-      const close = el4("button", { type: "button", className: "mc-close", "aria-label": "Schließen", text: "×", onclick: closePopover });
+      const close = el4("button", { type: "button", className: "mc-close", "aria-label": "Schließen", text: "×", onclick: closePopover2 });
       const body = [];
       if (!result) {
         body.push(el4("div", { className: "mc-muted", text: "Route wird berechnet …" }));
@@ -17917,7 +18174,7 @@ Trotzdem speichern?`)) return void 0;
       }
     }
     function openPopover(button2) {
-      closePopover();
+      closePopover2();
       const matchId = button2.dataset.matchId;
       openMatchId = matchId;
       const popover = el4("div", { id: IDS10.popover, role: "dialog", "aria-label": "Distanz zur Vakanz" });
@@ -17953,7 +18210,7 @@ Trotzdem speichern?`)) return void 0;
         });
       }
     }
-    function closePopover() {
+    function closePopover2() {
       openMatchId = "";
       resizeObserver?.disconnect();
       resizeObserver = null;
@@ -17962,13 +18219,13 @@ Trotzdem speichern?`)) return void 0;
     runtime.addDocumentListener("mousedown", (event) => {
       if (!openMatchId) return;
       if (event.target?.closest?.(`#${IDS10.popover}, .${BUTTON_CLASS3}`)) return;
-      closePopover();
+      closePopover2();
     }, true);
     runtime.addDocumentListener("keydown", (event) => {
-      if (event.key === "Escape" && openMatchId) closePopover();
+      if (event.key === "Escape" && openMatchId) closePopover2();
     }, true);
     runtime.addWindowListener("scroll", (event) => {
-      if (openMatchId && !event.target?.closest?.(`#${IDS10.popover}`)) closePopover();
+      if (openMatchId && !event.target?.closest?.(`#${IDS10.popover}`)) closePopover2();
     }, true);
     runtime.addWindowListener("hashchange", scheduleSync);
     runtime.addWindowListener("scroll", scheduleSync, { passive: true, capture: true });

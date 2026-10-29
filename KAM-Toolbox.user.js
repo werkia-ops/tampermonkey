@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.25.375
+// @version      1.25.382
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -241,7 +241,7 @@
 
   // ../../shared/js/werkia-toolbox/update-check.js
   var SERVER_BASE_URL = "https://scripts.werkia-ops.de/intern/";
-  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/willywerkia/tampermonkey/main/";
+  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/";
   var SERVER_TIMEOUT_MS = 5e3;
   var CHECK_INTERVAL_MS = 5 * 60 * 1e3;
   var TICK_MS = 60 * 1e3;

@@ -6,7 +6,7 @@ Installation: die gewuenschte `.user.js`-Datei unten anklicken - Tampermonkey er
 
 ## KAM Toolbox
 
-[KAM-Toolbox.user.js](https://raw.githubusercontent.com/willywerkia/tampermonkey/main/KAM-Toolbox.user.js)
+[KAM-Toolbox.user.js](https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/KAM-Toolbox.user.js)
 
 Enthaltene Funktionen:
 
@@ -54,7 +54,7 @@ Enthaltene Funktionen:
 
 ## CEM Toolbox
 
-[CEM-Toolbox.user.js](https://raw.githubusercontent.com/willywerkia/tampermonkey/main/CEM-Toolbox.user.js)
+[CEM-Toolbox.user.js](https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/CEM-Toolbox.user.js)
 
 Enthaltene Funktionen:
 
@@ -96,7 +96,7 @@ Enthaltene Funktionen:
 
 ## OBC Toolbox
 
-[OBC-Toolbox.user.js](https://raw.githubusercontent.com/willywerkia/tampermonkey/main/OBC-Toolbox.user.js)
+[OBC-Toolbox.user.js](https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/OBC-Toolbox.user.js)
 
 Enthaltene Funktionen:
 

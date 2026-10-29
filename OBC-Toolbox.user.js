@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.375
+// @version      1.10.382
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -114,7 +114,7 @@
 
   // ../../shared/js/werkia-toolbox/update-check.js
   var SERVER_BASE_URL = "https://scripts.werkia-ops.de/intern/";
-  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/willywerkia/tampermonkey/main/";
+  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/";
   var SERVER_TIMEOUT_MS = 5e3;
   var CHECK_INTERVAL_MS = 5 * 60 * 1e3;
   var TICK_MS = 60 * 1e3;

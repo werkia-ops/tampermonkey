@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.25.375
+// @version      1.25.382
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -237,7 +237,7 @@
 
   // ../../shared/js/werkia-toolbox/update-check.js
   var SERVER_BASE_URL = "https://scripts.werkia-ops.de/intern/";
-  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/willywerkia/tampermonkey/main/";
+  var MIRROR_BASE_URL = "https://raw.githubusercontent.com/werkia-ops/tampermonkey/main/";
   var SERVER_TIMEOUT_MS = 5e3;
   var CHECK_INTERVAL_MS = 5 * 60 * 1e3;
   var TICK_MS = 60 * 1e3;
@@ -15238,6 +15238,8 @@ ${add}` : add;
     // Sarah Buse
     "25544016-ecbe-4736-abf5-c8c69e209753": "f",
     // Vivian Kruse
+    "c9149b79-5a96-4265-b5ca-477a56bdd1b5": "m",
+    // Steven-Landu Geese (2026-10-29, Angabe Willy)
     "2a6af863-1c13-4cac-aa49-0ef41b371585": "m",
     // Eno Lika (OPS, nutzt die Vorlagen)
     // OBC (Stand 2026-10-09, Angaben Eno)

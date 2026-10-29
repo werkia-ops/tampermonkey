@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.25.382
+// @version      1.26.383
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -15349,6 +15349,11 @@ ${add}` : add;
     const title = { male: "Herrn", female: "Frau" }[contact?.gender];
     return title && surname ? `${title} ${surname}` : contactName2(contact);
   }
+  function addressName(contact) {
+    const surname = String(contact?.surname || "").trim();
+    const title = { male: "Herr", female: "Frau" }[contact?.gender];
+    return title && surname ? `${title} ${surname}` : "";
+  }
   function cleanAddress(value) {
     return String(value || "").replace(/,\s*(Deutschland|Germany)\s*$/i, "").trim();
   }
@@ -15376,6 +15381,9 @@ ${add}` : add;
     { id: "tb", scope: "match", label: "VT Bestätigung", needs: ["mode", "contact"], interview: "confirmed" },
     { id: "te", scope: "match", label: "VT Erinnerung", needs: ["mode", "contact"], interview: "confirmed" },
     { id: "fbvt", scope: "match", label: "VT Feedback", needs: [], interview: "confirmed" },
+    { id: "kdap", scope: "match", label: "KD AP an Bew", needs: ["contact"] },
+    { id: "mailvt1", scope: "match", label: "Emailvorlage 1. VT Bew x AP", needs: ["contact"] },
+    { id: "mailvt2", scope: "match", label: "Emailvorlage 2. VT Bew x AP", needs: ["contact"] },
     { id: "ul", scope: "candidate", label: "1. WA Unterlagen (UL)", needs: [] },
     { id: "krm", scope: "candidate", label: "OUT - krm Bew", needs: [] },
     { id: "out", scope: "candidate", label: "Hat selbst neue Stelle", needs: [] },
@@ -15406,6 +15414,14 @@ ${add}` : add;
       onsite: ["*vor Ort Termin*", "*vor Ort Termine*"]
     }[mode] || ["Termin", "Termine"];
     return several ? `einen dieser ${plural}` : `diesen ${singular}`;
+  }
+  var MAIL_DATE_LINES = ["[Datum] um [Uhrzeit]", "[Datum] um [Uhrzeit]", "[Datum] um [Uhrzeit]"];
+  function candidateSignature(ctx, slot) {
+    const name = [ctx.candidateFirstName, ctx.candidateLastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
+    return [
+      slot("Vorname Nachname Kandidat", ctx.candidateLastName ? name : ""),
+      slot("Telefon Kandidat", ctx.candidatePhone)
+    ];
   }
   var BUILDERS = {
     ul: (ctx, slot) => [
@@ -15528,6 +15544,58 @@ ${add}` : add;
         `LG ${slot("Vorname CEM", ctx.cem?.firstName)}`
       ];
     },
+    kdap: (ctx, slot) => [
+      `Hallo ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
+      `wie eben besprochen hier nochmal die Kontaktdaten von ${slot("Arbeitgeber", ctx.employerName)}:`,
+      "",
+      slot("Ansprechpartner", contactName2(ctx.contact)),
+      slot("E-Mail Ansprechpartner", ctx.contact?.email),
+      slot("Telefon Ansprechpartner", ctx.contact?.phoneNumbers?.[0]),
+      "",
+      "Bitte melde Dich heute oder morgen telefonisch beim Ansprechpartner.",
+      "Falls niemand rangeht, kannst Du auch gerne eine WhatsApp an die Nummer schicken oder eine Email.",
+      "",
+      "Ich drücke die Daumen!",
+      `LG ${slot("Vorname CEM", ctx.cem?.firstName)}`
+    ],
+    mailvt1: (ctx, slot) => {
+      const name = addressName(ctx.contact);
+      const salutation = name ? `${ctx.contact.gender === "male" ? "Sehr geehrter" : "Sehr geehrte"} ${name}` : slot("Anrede Ansprechpartner", "");
+      return [
+        `${salutation},`,
+        "",
+        `über werkia.de bin ich auf Ihre Stellenausschreibung für die Position als ${slot("Jobtitel", ctx.jobTitle)} aufmerksam geworden. Die ausgeschriebene Stelle hat mein Interesse geweckt, und ich würde mich freuen, Sie und Ihr Unternehmen in einem persönlichen Gespräch näher kennenzulernen.`,
+        "",
+        "Gerne möchte ich daher einen Termin für ein Vorstellungsgespräch mit Ihnen vereinbaren. Folgende Termine würden mir gut passen:",
+        "",
+        ...MAIL_DATE_LINES,
+        "",
+        "Das Gespräch kann gerne persönlich vor Ort oder alternativ telefonisch stattfinden. Sollte keiner der genannten Termine für Sie passend sein, bin ich gerne bereit, einen alternativen Termin mit Ihnen abzustimmen.",
+        "",
+        "Ich freue mich auf Ihre Rückmeldung und die Möglichkeit, mich Ihnen persönlich vorzustellen.",
+        "",
+        "Mit freundlichen Grüßen",
+        ...candidateSignature(ctx, slot)
+      ];
+    },
+    mailvt2: (ctx, slot) => [
+      `Guten Tag ${slot("Herr/Frau Ansprechpartner", addressName(ctx.contact))},`,
+      "",
+      "vielen Dank für das angenehme und informative Gespräch. Ich habe einen sehr positiven Eindruck von unserem Austausch gewonnen und fand es spannend, mehr über die Position und Ihr Unternehmen zu erfahren.",
+      "",
+      "Mein Interesse an der Stelle hat sich dadurch weiter verstärkt. Daher würde ich mich sehr freuen, die Gelegenheit zu einem zweiten Gespräch zu erhalten, um den Austausch zu vertiefen und mehr über die nächsten Schritte zu erfahren.",
+      "",
+      "Für ein weiteres Gespräch würden mir folgende Termine gut passen:",
+      "",
+      ...MAIL_DATE_LINES,
+      "",
+      "Sollte keiner dieser Termine für Sie passend sein, richte ich mich gerne nach Ihren zeitlichen Möglichkeiten.",
+      "",
+      "Ich freue mich auf Ihre Rückmeldung und den weiteren Austausch.",
+      "",
+      "Mit freundlichen Grüßen",
+      ...candidateSignature(ctx, slot)
+    ],
     krm: (ctx, slot) => [
       `Hallo ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
       "",
@@ -15586,7 +15654,7 @@ ${add}` : add;
   var WA_MATCH_QUERY = `query Match($id: UUID!) {
   data: Match(id: $id) {
     id
-    candidate { id firstName obcEmployeeId __typename }
+    candidate { id firstName lastName phoneNumber obcEmployeeId __typename }
     jobPosition { id mainTitle employer { id name __typename } __typename }
     interviews { id type status dates location createdAt __typename }
     __typename
@@ -15606,7 +15674,7 @@ ${add}` : add;
 }`;
   var WA_CONTACTS_QUERY = `query allMatchContactPeople($employerId: UUID) {
   items: allMatchContactPeople(filter: { employerId: $employerId }, perPage: 100) {
-    id name surname gender isMain phoneNumbers __typename
+    id name surname gender isMain phoneNumbers email __typename
   }
 }`;
   var WA_INTERVIEW_LOCATIONS_QUERY = `query allEmployerInterviewLocations($employerId: UUID) {
@@ -15680,6 +15748,8 @@ ${add}` : add;
       matchId: match.id,
       candidateId: match.candidate.id,
       candidateFirstName: match.candidate.firstName || "",
+      candidateLastName: match.candidate.lastName || "",
+      candidatePhone: match.candidate.phoneNumber || "",
       cem,
       obc,
       employerName: employer.name || "",

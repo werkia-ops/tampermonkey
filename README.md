@@ -1,6 +1,6 @@
 # Werkia Tampermonkey Toolboxes
 
-Fertig gebaute Tampermonkey-Userscripts fuer KAM/CEM/OBC. Dieses Repo wird automatisch von der internen Werkia_OPS-CI gepflegt (`.github/workflows/mirror-toolboxes.yml`) - Aenderungen hier werden beim naechsten Sync ueberschrieben.
+Fertig gebaute Tampermonkey-Userscripts fuer KAM/CEM/OBC. Dieses Repo wird automatisch von der internen CI (werkia-ops/hub) gepflegt (`.github/workflows/mirror-toolboxes.yml`) - Aenderungen hier werden beim naechsten Sync ueberschrieben.
 
 Installation: die gewuenschte `.user.js`-Datei unten anklicken - Tampermonkey erkennt sie automatisch und bietet die Installation an. Updates kommen danach automatisch ueber Tampermonkeys eigene Update-Pruefung (`@updateURL`), ohne dass hier nochmal etwas angeklickt werden muss.
 

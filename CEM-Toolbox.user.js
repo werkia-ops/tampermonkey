@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.26.389
+// @version      1.27.391
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -10919,6 +10919,204 @@ ${add}` : add;
     return true;
   }
 
+  // ../../shared/js/bulk-match-actions/core.js
+  var OPEN_INTERVIEW_STATUSES = ["suggestion", "forwarded", "confirmed", "not_reconfirmed"];
+  var UNCONFIRMED_INTERVIEW_STATUSES = ["suggestion", "forwarded"];
+  var ALL_INTERVIEWS_QUERY = `query allInterviews($filter: InterviewsFilter!, $sortField: String, $sortOrder: String, $page: Float, $perPage: Float) {
+  items: allInterviews(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
+    id
+    status
+    dates
+  }
+  total: _allInterviewsMeta(filter: $filter, page: $page, perPage: $perPage) {
+    count
+  }
+}`;
+  var UPDATE_INTERVIEW_MUTATION = `mutation updateInterview($id: UUID, $status: String) {
+  data: updateInterview(id: $id, status: $status) {
+    id
+    matchId
+    status
+  }
+}`;
+  var SUGGESTED_INTERVIEWS_QUERY = `query allInterviews($filter: InterviewsFilter!, $sortField: String, $sortOrder: String, $page: Float, $perPage: Float) {
+  items: allInterviews(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
+    id
+    status
+    dates
+  }
+  total: _allInterviewsMeta(filter: $filter, page: $page, perPage: $perPage) {
+    count
+  }
+}`;
+  var FORWARD_INTERVIEW_MUTATION = `mutation updateInterview($id: UUID, $status: String, $dates: [DateTime!]) {
+  data: updateInterview(id: $id, status: $status, dates: $dates) {
+    id
+    matchId
+    status
+  }
+}`;
+  function buildStatusMutation(statusField) {
+    return `mutation updateMatch($id: String!, $${statusField}: String) {
+  data: updateMatch(id: $id, ${statusField}: $${statusField}) {
+    id
+    ${statusField}
+    __typename
+  }
+}`;
+  }
+  function buildStatusWithFeedbackMutation(statusField, feedbackField) {
+    return `mutation updateMatch($id: String!, $${statusField}: String, $${feedbackField}: String) {
+  data: updateMatch(id: $id, ${statusField}: $${statusField}, ${feedbackField}: $${feedbackField}) {
+    id
+    ${statusField}
+    ${feedbackField}
+    __typename
+  }
+}`;
+  }
+  function buildFollowUpMutation(followUpField) {
+    return `mutation updateMatch($id: String!, $${followUpField}: Date) {
+  data: updateMatch(id: $id, ${followUpField}: $${followUpField}) {
+    id
+    ${followUpField}
+    __typename
+  }
+}`;
+  }
+  function normalize4(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+  function parseIsoDate(isoDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+    if (!match) return null;
+    return { year: match[1], month: match[2], day: match[3] };
+  }
+  var FOLLOW_UP_YEARS_BACK = 1;
+  var FOLLOW_UP_YEARS_AHEAD = 5;
+  function checkFollowUpDate(value, { badInput = false, now = /* @__PURE__ */ new Date() } = {}) {
+    if (badInput) {
+      return { iso: null, date: null, error: "Das Datum ist unvollständig. Bitte vollständig ausfüllen oder das Feld ganz leeren." };
+    }
+    if (!value) return { iso: null, date: null, error: null };
+    const date = parseIsoDate(value);
+    if (!date) return { iso: null, date: null, error: "Bitte ein gültiges Datum auswählen oder das Feld leer lassen." };
+    const year = Number(date.year);
+    const first = now.getFullYear() - FOLLOW_UP_YEARS_BACK;
+    const last = now.getFullYear() + FOLLOW_UP_YEARS_AHEAD;
+    if (year < first || year > last) {
+      return { iso: null, date: null, error: `Das Jahr ${year} ist nicht plausibel. Erlaubt sind ${first} bis ${last}.` };
+    }
+    return { iso: value, date, error: null };
+  }
+  function statusClearsWvl(statusValue) {
+    return statusValue === "hired" || statusValue === "out";
+  }
+  function openInterviewIds(items, now = Date.now()) {
+    return [...items || []].filter((interview) => interview?.id && OPEN_INTERVIEW_STATUSES.includes(interview.status)).filter((interview) => UNCONFIRMED_INTERVIEW_STATUSES.includes(interview.status) || isUpcoming(interview, now)).map((interview) => interview.id);
+  }
+  function isUpcoming(interview, now) {
+    const times = (Array.isArray(interview.dates) ? interview.dates : []).map((date) => Date.parse(date));
+    return times.length > 0 && times.every((time) => !Number.isNaN(time) && time > now);
+  }
+  function interviewsWithDates(items, statuses) {
+    return [...items || []].filter((interview) => interview?.id && statuses.includes(interview.status)).map((interview) => ({ id: interview.id, status: interview.status, dates: Array.isArray(interview.dates) ? interview.dates : [] }));
+  }
+  var PAST_DECLINE_STATUSES = ["suggestion", "forwarded"];
+  function isPastSuggestion(interview, now = Date.now()) {
+    const dates = Array.isArray(interview?.dates) ? interview.dates : [];
+    if (!dates.length) return false;
+    const times = dates.map((date) => Date.parse(date));
+    if (times.some(Number.isNaN)) return false;
+    return Math.max(...times) < now;
+  }
+  function isPastInterview(interview, now = Date.now()) {
+    if (interview?.status === "forwarded" && !interview.dates?.length) return true;
+    return isPastSuggestion(interview, now);
+  }
+  var FORWARDED_CHIP_CLASSES = ["MuiChip-colorInterviewForwarded", "MuiChip-filledInterviewForwarded"];
+  var FORWARDED_CHIP_BACKGROUND = "#b9e5fd";
+  function isSuggestionChip(chip) {
+    if (!chip?.classList?.contains("MuiChip-root")) return false;
+    if (chip.dataset?.werkiaDeclined === "true") return false;
+    if ([...chip.classList].some((name) => /^MuiChip-(?:color|filled)InterviewSuggest/i.test(name))) return true;
+    return /^vorschlag$/i.test(String(chip.getAttribute("aria-label") || "").trim());
+  }
+  function markSuggestionChipsForwarded(cell) {
+    if (!cell) return 0;
+    const chips = [...cell.querySelectorAll(".MuiChip-root")].filter(isSuggestionChip);
+    chips.forEach((chip) => {
+      [...chip.classList].filter((name) => /^MuiChip-(?:color|filled)/.test(name)).forEach((name) => chip.classList.remove(name));
+      chip.classList.add(...FORWARDED_CHIP_CLASSES);
+      chip.style.backgroundColor = FORWARDED_CHIP_BACKGROUND;
+      chip.setAttribute("aria-label", "Weitergeleitet");
+      chip.dataset.werkiaForwarded = "true";
+    });
+    return chips.length;
+  }
+  function isForwardedChip(chip) {
+    if (!chip?.classList?.contains("MuiChip-root")) return false;
+    if (chip.dataset?.werkiaDeclined === "true") return false;
+    if ([...chip.classList].some((name) => /^MuiChip-(?:color|filled)InterviewForward/i.test(name))) return true;
+    return /^weitergeleitet$/i.test(String(chip.getAttribute("aria-label") || "").trim());
+  }
+  function markSuggestionChipsDeclined(cell, { includeForwarded = false } = {}) {
+    if (!cell) return 0;
+    const chips = [...cell.querySelectorAll(".MuiChip-root")].filter((chip) => isSuggestionChip(chip) || includeForwarded && isForwardedChip(chip));
+    chips.forEach((chip) => {
+      chip.style.opacity = "0.45";
+      chip.style.textDecoration = "line-through";
+      chip.setAttribute("aria-label", "Abgelehnt");
+      chip.dataset.werkiaDeclined = "true";
+    });
+    return chips.length;
+  }
+  function statusMutationValue(value) {
+    return value || null;
+  }
+  function statusConfirmed(returned, expected) {
+    return (returned ?? "") === (expected ?? "");
+  }
+  var COUNTERPART_OUT_VALUE = "__counterpart__";
+  function counterpartOutFeedback(status2, feedback) {
+    if (status2 !== "out") return "";
+    return normalize4(feedback);
+  }
+  function buildCounterpartOutQuery(statusField, feedbackField) {
+    return `query BulkCounterpartOut($id: UUID!) {
+  data: Match(id: $id) { id ${statusField} ${feedbackField} }
+}`;
+  }
+  var BULK_PARALLEL = 4;
+  async function runParallel(items, worker2, { limit = BULK_PARALLEL, shouldStop = () => false, onSettled = () => {
+  } } = {}) {
+    const results = Array.from({ length: items.length });
+    let next = 0;
+    let finished = 0;
+    async function lane() {
+      while (next < items.length && !shouldStop()) {
+        const index = next;
+        next += 1;
+        try {
+          results[index] = { value: await worker2(items[index], index) };
+        } catch (error) {
+          results[index] = { error };
+        }
+        finished += 1;
+        onSettled(finished, items.length);
+      }
+    }
+    const lanes = Math.max(1, Math.min(limit, items.length));
+    await Promise.all(Array.from({ length: lanes }, lane));
+    return results;
+  }
+  async function allOrFirstError(promises) {
+    const settled = await Promise.allSettled(promises);
+    const failed = settled.find((entry) => entry.status === "rejected");
+    if (failed) throw failed.reason;
+    return settled.map((entry) => entry.value);
+  }
+
   // ../../shared/js/bulk-match-actions/dialog-kit.js
   function checklistHtml({ items, allLabel, searchPlaceholder }) {
     const groups = /* @__PURE__ */ new Map();
@@ -10938,7 +11136,7 @@ ${add}` : add;
     </div>
     <div class="wkw-count" data-count>${items.length} von ${items.length} ausgewählt</div>`;
   }
-  var normalize4 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
+  var normalize5 = (text) => String(text || "").toLocaleLowerCase("de").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim();
   function syncBox(box, children) {
     const checked = children.filter((child) => child.checked).length;
     box.checked = checked === children.length && checked > 0;
@@ -10954,12 +11152,12 @@ ${add}` : add;
     const groups = [...root.querySelectorAll(".wkw-group")].map((group) => ({
       element: group,
       box: group.querySelector("[data-group]"),
-      label: normalize4(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
+      label: normalize5(group.querySelector(".wkw-group-head")?.textContent.replace(/\s*\(\d+\)\s*$/, "")),
       items: [...group.querySelectorAll('input[name="item"]')]
     }));
     let pristine = true;
     const shown = (list) => list.filter((item) => !isHiddenItem(item));
-    const query = () => normalize4(search?.value).replace(/\s+/g, " ");
+    const query = () => normalize5(search?.value).replace(/\s+/g, " ");
     const sync = () => {
       groups.forEach((group) => syncBox(group.box, shown(group.items)));
       const visible = shown(items);
@@ -10981,7 +11179,7 @@ ${add}` : add;
       const groupOf = new Map(groups.flatMap((group) => group.items.map((item) => [item, group])));
       items.forEach((item) => {
         const group = groupOf.get(item);
-        const haystack = `${group ? `${group.label} ` : ""}${normalize4(item.closest("label").textContent)}`;
+        const haystack = `${group ? `${group.label} ` : ""}${normalize5(item.closest("label").textContent)}`;
         item.closest("label").hidden = !haystack.replace(/\s+/g, " ").includes(text);
       });
       groups.forEach((group) => {
@@ -11204,21 +11402,27 @@ ${add}` : add;
       initialFocus?.focus();
       return dialog;
     }
-    async function runQueue(dialog, queue, { progress, label: label2 = (item) => item.label, update, reload = false }) {
+    async function runQueue(dialog, queue, { progress, label: label2 = (item) => item.label, update, reload = false, parallel = 1 }) {
       begin(dialog);
+      if (parallel > 1) setStatus(progress(0, queue.length), "busy", dialog);
+      const results = await runParallel(queue, async (item, index) => {
+        if (parallel <= 1) setStatus(progress(index + 1, queue.length), "busy", dialog);
+        await update(item, index);
+        if (reload) markWritten(dialog);
+      }, {
+        limit: parallel,
+        shouldStop: () => state.cancelRequested,
+        onSettled: (finished) => {
+          if (parallel > 1) setStatus(progress(finished, queue.length), "busy", dialog);
+        }
+      });
       let changed = 0;
       const failures = [];
-      for (let index = 0; index < queue.length; index += 1) {
-        if (state.cancelRequested) break;
-        setStatus(progress(index + 1, queue.length), "busy", dialog);
-        try {
-          await update(queue[index], index);
-          changed += 1;
-          if (reload) markWritten(dialog);
-        } catch (error) {
-          failures.push(`${label2(queue[index], index)}: ${error.message}`);
-        }
-      }
+      results.forEach((result, index) => {
+        if (!result) return;
+        if (result.error) failures.push(`${label2(queue[index], index)}: ${result.error.message}`);
+        else changed += 1;
+      });
       end();
       return { changed, failures };
     }
@@ -11265,175 +11469,6 @@ ${add}` : add;
       report,
       installButton
     };
-  }
-
-  // ../../shared/js/bulk-match-actions/core.js
-  var OPEN_INTERVIEW_STATUSES = ["suggestion", "forwarded", "confirmed", "not_reconfirmed"];
-  var UNCONFIRMED_INTERVIEW_STATUSES = ["suggestion", "forwarded"];
-  var ALL_INTERVIEWS_QUERY = `query allInterviews($filter: InterviewsFilter!, $sortField: String, $sortOrder: String, $page: Float, $perPage: Float) {
-  items: allInterviews(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
-    id
-    status
-    dates
-  }
-  total: _allInterviewsMeta(filter: $filter, page: $page, perPage: $perPage) {
-    count
-  }
-}`;
-  var UPDATE_INTERVIEW_MUTATION = `mutation updateInterview($id: UUID, $status: String) {
-  data: updateInterview(id: $id, status: $status) {
-    id
-    matchId
-    status
-  }
-}`;
-  var SUGGESTED_INTERVIEWS_QUERY = `query allInterviews($filter: InterviewsFilter!, $sortField: String, $sortOrder: String, $page: Float, $perPage: Float) {
-  items: allInterviews(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
-    id
-    status
-    dates
-  }
-  total: _allInterviewsMeta(filter: $filter, page: $page, perPage: $perPage) {
-    count
-  }
-}`;
-  var FORWARD_INTERVIEW_MUTATION = `mutation updateInterview($id: UUID, $status: String, $dates: [DateTime!]) {
-  data: updateInterview(id: $id, status: $status, dates: $dates) {
-    id
-    matchId
-    status
-  }
-}`;
-  function buildStatusMutation(statusField) {
-    return `mutation updateMatch($id: String!, $${statusField}: String) {
-  data: updateMatch(id: $id, ${statusField}: $${statusField}) {
-    id
-    ${statusField}
-    __typename
-  }
-}`;
-  }
-  function buildStatusWithFeedbackMutation(statusField, feedbackField) {
-    return `mutation updateMatch($id: String!, $${statusField}: String, $${feedbackField}: String) {
-  data: updateMatch(id: $id, ${statusField}: $${statusField}, ${feedbackField}: $${feedbackField}) {
-    id
-    ${statusField}
-    ${feedbackField}
-    __typename
-  }
-}`;
-  }
-  function buildFollowUpMutation(followUpField) {
-    return `mutation updateMatch($id: String!, $${followUpField}: Date) {
-  data: updateMatch(id: $id, ${followUpField}: $${followUpField}) {
-    id
-    ${followUpField}
-    __typename
-  }
-}`;
-  }
-  function normalize5(value) {
-    return String(value || "").replace(/\s+/g, " ").trim();
-  }
-  function parseIsoDate(isoDate) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-    if (!match) return null;
-    return { year: match[1], month: match[2], day: match[3] };
-  }
-  var FOLLOW_UP_YEARS_BACK = 1;
-  var FOLLOW_UP_YEARS_AHEAD = 5;
-  function checkFollowUpDate(value, { badInput = false, now = /* @__PURE__ */ new Date() } = {}) {
-    if (badInput) {
-      return { iso: null, date: null, error: "Das Datum ist unvollständig. Bitte vollständig ausfüllen oder das Feld ganz leeren." };
-    }
-    if (!value) return { iso: null, date: null, error: null };
-    const date = parseIsoDate(value);
-    if (!date) return { iso: null, date: null, error: "Bitte ein gültiges Datum auswählen oder das Feld leer lassen." };
-    const year = Number(date.year);
-    const first = now.getFullYear() - FOLLOW_UP_YEARS_BACK;
-    const last = now.getFullYear() + FOLLOW_UP_YEARS_AHEAD;
-    if (year < first || year > last) {
-      return { iso: null, date: null, error: `Das Jahr ${year} ist nicht plausibel. Erlaubt sind ${first} bis ${last}.` };
-    }
-    return { iso: value, date, error: null };
-  }
-  function statusClearsWvl(statusValue) {
-    return statusValue === "hired" || statusValue === "out";
-  }
-  function openInterviewIds(items, now = Date.now()) {
-    return [...items || []].filter((interview) => interview?.id && OPEN_INTERVIEW_STATUSES.includes(interview.status)).filter((interview) => UNCONFIRMED_INTERVIEW_STATUSES.includes(interview.status) || isUpcoming(interview, now)).map((interview) => interview.id);
-  }
-  function isUpcoming(interview, now) {
-    const times = (Array.isArray(interview.dates) ? interview.dates : []).map((date) => Date.parse(date));
-    return times.length > 0 && times.every((time) => !Number.isNaN(time) && time > now);
-  }
-  function interviewsWithDates(items, statuses) {
-    return [...items || []].filter((interview) => interview?.id && statuses.includes(interview.status)).map((interview) => ({ id: interview.id, status: interview.status, dates: Array.isArray(interview.dates) ? interview.dates : [] }));
-  }
-  var PAST_DECLINE_STATUSES = ["suggestion", "forwarded"];
-  function isPastSuggestion(interview, now = Date.now()) {
-    const dates = Array.isArray(interview?.dates) ? interview.dates : [];
-    if (!dates.length) return false;
-    const times = dates.map((date) => Date.parse(date));
-    if (times.some(Number.isNaN)) return false;
-    return Math.max(...times) < now;
-  }
-  function isPastInterview(interview, now = Date.now()) {
-    if (interview?.status === "forwarded" && !interview.dates?.length) return true;
-    return isPastSuggestion(interview, now);
-  }
-  var FORWARDED_CHIP_CLASSES = ["MuiChip-colorInterviewForwarded", "MuiChip-filledInterviewForwarded"];
-  var FORWARDED_CHIP_BACKGROUND = "#b9e5fd";
-  function isSuggestionChip(chip) {
-    if (!chip?.classList?.contains("MuiChip-root")) return false;
-    if (chip.dataset?.werkiaDeclined === "true") return false;
-    if ([...chip.classList].some((name) => /^MuiChip-(?:color|filled)InterviewSuggest/i.test(name))) return true;
-    return /^vorschlag$/i.test(String(chip.getAttribute("aria-label") || "").trim());
-  }
-  function markSuggestionChipsForwarded(cell) {
-    if (!cell) return 0;
-    const chips = [...cell.querySelectorAll(".MuiChip-root")].filter(isSuggestionChip);
-    chips.forEach((chip) => {
-      [...chip.classList].filter((name) => /^MuiChip-(?:color|filled)/.test(name)).forEach((name) => chip.classList.remove(name));
-      chip.classList.add(...FORWARDED_CHIP_CLASSES);
-      chip.style.backgroundColor = FORWARDED_CHIP_BACKGROUND;
-      chip.setAttribute("aria-label", "Weitergeleitet");
-      chip.dataset.werkiaForwarded = "true";
-    });
-    return chips.length;
-  }
-  function isForwardedChip(chip) {
-    if (!chip?.classList?.contains("MuiChip-root")) return false;
-    if (chip.dataset?.werkiaDeclined === "true") return false;
-    if ([...chip.classList].some((name) => /^MuiChip-(?:color|filled)InterviewForward/i.test(name))) return true;
-    return /^weitergeleitet$/i.test(String(chip.getAttribute("aria-label") || "").trim());
-  }
-  function markSuggestionChipsDeclined(cell, { includeForwarded = false } = {}) {
-    if (!cell) return 0;
-    const chips = [...cell.querySelectorAll(".MuiChip-root")].filter((chip) => isSuggestionChip(chip) || includeForwarded && isForwardedChip(chip));
-    chips.forEach((chip) => {
-      chip.style.opacity = "0.45";
-      chip.style.textDecoration = "line-through";
-      chip.setAttribute("aria-label", "Abgelehnt");
-      chip.dataset.werkiaDeclined = "true";
-    });
-    return chips.length;
-  }
-  function statusMutationValue(value) {
-    return value || null;
-  }
-  function statusConfirmed(returned, expected) {
-    return (returned ?? "") === (expected ?? "");
-  }
-  var COUNTERPART_OUT_VALUE = "__counterpart__";
-  function counterpartOutFeedback(status2, feedback) {
-    if (status2 !== "out") return "";
-    return normalize5(feedback);
-  }
-  function buildCounterpartOutQuery(statusField, feedbackField) {
-    return `query BulkCounterpartOut($id: UUID!) {
-  data: Match(id: $id) { id ${statusField} ${feedbackField} }
-}`;
   }
 
   // ../../shared/js/bulk-match-actions/index.js
@@ -11521,18 +11556,18 @@ ${add}` : add;
       const match = link.href.match(/#\/Employer\/([^/]+)\//i);
       return {
         id: match?.[1] || link.href,
-        name: normalize5(link.textContent) || "Unbekannter Arbeitgeber"
+        name: normalize4(link.textContent) || "Unbekannter Arbeitgeber"
       };
     }
     function candidateNameFromRow(row2) {
       const own = row2.querySelector(CANDIDATE_LINK_SELECTOR2);
-      if (own) return normalize5(own.textContent);
+      if (own) return normalize4(own.textContent);
       const parentRow = row2.closest("table")?.closest("tr")?.previousElementSibling;
-      return normalize5(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR2)?.textContent);
+      return normalize4(parentRow?.querySelector(CANDIDATE_LINK_SELECTOR2)?.textContent);
     }
     function labelFromRow(row2) {
       const candidate = candidateNameFromRow(row2);
-      const vacancy = normalize5(row2.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
+      const vacancy = normalize4(row2.querySelector(JOB_POSITION_LINK_SELECTOR)?.textContent);
       const label2 = [candidate, vacancy].filter(Boolean).join(" – ");
       return label2.length > 90 ? `${label2.slice(0, 89)}…` : label2;
     }
@@ -11755,10 +11790,10 @@ ${add}` : add;
     async function declineOpenInterviewsForMatch(matchId, onDeclined = () => {
     }) {
       const interviewIds = await openInterviewIdsForMatch(matchId);
-      for (const interviewId of interviewIds) {
+      await allOrFirstError(interviewIds.map(async (interviewId) => {
         await declineInterview(matchId, interviewId);
         onDeclined();
-      }
+      }));
     }
     async function declineInterview(matchId, interviewId) {
       const request = getRequest();
@@ -11812,7 +11847,7 @@ ${add}` : add;
         noun: "Terminvorschläge",
         verb: "weiterleiten",
         done: "weitergeleitet",
-        progress: "Leite weiter",
+        progress: "Weiterleiten",
         empty: "Keine Terminvorschläge mit Status „Vorschlag“ gefunden.",
         statuses: ["suggestion"],
         select: () => true,
@@ -11827,7 +11862,7 @@ ${add}` : add;
         noun: "vergangene Terminvorschläge",
         verb: "ablehnen",
         done: "abgelehnt",
-        progress: "Lehne ab",
+        progress: "Ablehnen",
         empty: "Keine vergangenen Terminvorschläge mit Status „Vorschlag“ oder „Weitergeleitet“ gefunden.",
         statuses: PAST_DECLINE_STATUSES,
         select: (interview) => isPastInterview(interview),
@@ -11843,18 +11878,18 @@ ${add}` : add;
       const queue = [];
       const failures = [];
       const pendingByMatch = /* @__PURE__ */ new Map();
-      for (let index = 0; index < selection.length; index += 1) {
-        if (kit.state.cancelRequested) break;
-        const { matchId } = selection[index];
-        setStatus(`Lade Terminvorschläge ${index + 1} von ${selection.length} …`, "busy");
-        try {
-          const interviews = await interviewsForMatch(matchId, action.statuses);
-          pendingByMatch.set(matchId, interviews.length);
-          interviews.filter(action.select).forEach((interview) => queue.push({ matchId, interview }));
-        } catch (error) {
-          failures.push(`Laden ${selection[index].label}: ${error.message}`);
-        }
-      }
+      setStatus(`Lade Terminvorschläge 0 von ${selection.length} …`, "busy");
+      const loaded = await runParallel(selection, ({ matchId }) => interviewsForMatch(matchId, action.statuses), {
+        shouldStop: () => kit.state.cancelRequested,
+        onSettled: (finished, total) => setStatus(`Lade Terminvorschläge ${finished} von ${total} …`, "busy")
+      });
+      loaded.forEach((result2, index) => {
+        if (!result2) return;
+        const { matchId, label: label2 } = selection[index];
+        if (result2.error) return failures.push(`Laden ${label2}: ${result2.error.message}`);
+        pendingByMatch.set(matchId, result2.value.length);
+        result2.value.filter(action.select).forEach((interview) => queue.push({ matchId, interview }));
+      });
       kit.end();
       if (!kit.isLive(dialog)) return;
       if (kit.state.cancelRequested) {
@@ -11872,7 +11907,8 @@ ${add}` : add;
         return setStatus(`Nichts ${action.done}.`, "");
       }
       const result = await kit.runQueue(dialog, queue, {
-        progress: (current, total) => `${action.progress} ${current} von ${total} …`,
+        progress: (finished, total) => `${action.progress}: ${finished} von ${total} erledigt …`,
+        parallel: BULK_PARALLEL,
         label: (_item, index) => String(index + 1),
         update: async (item) => {
           await action.write(item.matchId, item.interview);
@@ -11896,7 +11932,7 @@ ${add}` : add;
       const targetStatus = statusOptions.find((status2) => status2.value === targetValue);
       const outFeedbackValue = dialog.querySelector('[name="outFeedback"]').value;
       const outFeedback = outFeedbackValue === COUNTERPART_OUT_VALUE && COUNTERPART_OPTION ? COUNTERPART_OPTION : outFeedbackOptions.find((reason) => reason.value === outFeedbackValue);
-      const outFeedbackText = normalize5(dialog.querySelector('[name="outFeedbackText"]').value);
+      const outFeedbackText = normalize4(dialog.querySelector('[name="outFeedbackText"]').value);
       if (!selection.length) return setStatus("Bitte mindestens ein Match anhaken.", "error");
       if (!targetStatus || targetValue === "__choose__") return setStatus(`Bitte einen ${team} Status auswählen.`, "error");
       const isOut = targetStatus.value === "out";
@@ -11910,15 +11946,13 @@ ${add}` : add;
       let skippedText = "";
       if (isOut && outFeedback === COUNTERPART_OPTION) {
         setStatus(`Lese ${counterpartOut.team}-Out-Gründe …`, "busy");
-        try {
-          for (const match of selection) {
-            const data = await getRequest()(COUNTERPART_QUERY, { id: match.matchId });
-            const feedback2 = counterpartOutFeedback(data?.data?.[counterpartOut.status], data?.data?.[counterpartOut.feedback]);
-            if (feedback2) counterpartFeedback.set(match.matchId, feedback2);
-          }
-        } catch (error) {
-          return setStatus(`${counterpartOut.team}-Out-Gründe nicht lesbar: ${error.message}`, "error");
-        }
+        const read = await runParallel(selection, async (match) => {
+          const data = await getRequest()(COUNTERPART_QUERY, { id: match.matchId });
+          const feedback2 = counterpartOutFeedback(data?.data?.[counterpartOut.status], data?.data?.[counterpartOut.feedback]);
+          if (feedback2) counterpartFeedback.set(match.matchId, feedback2);
+        });
+        const readError = read.find((result2) => result2?.error)?.error;
+        if (readError) return setStatus(`${counterpartOut.team}-Out-Gründe nicht lesbar: ${readError.message}`, "error");
         const skipped = selection.filter((match) => !counterpartFeedback.has(match.matchId));
         if (skipped.length === selection.length) {
           return setStatus(`Keines der angehakten Matches ist bei ${counterpartOut.team} mit Grund auf „Out“.`, "error");
@@ -11938,28 +11972,22 @@ ${add}` : add;
       const partial = [];
       const feedback = isOut && outFeedback !== COUNTERPART_OPTION ? resolveOutFeedback(outFeedback, outFeedbackText) : null;
       const result = await kit.runQueue(dialog, selection, {
-        progress: (current, total) => `Ändere Status ${current} von ${total} …`,
-        update: async (match, index) => {
+        progress: (finished, total) => `Ändere Status: ${finished} von ${total} erledigt …`,
+        parallel: BULK_PARALLEL,
+        update: async (match) => {
           await updateMatchStatus(match.matchId, targetStatus, counterpartFeedback.get(match.matchId) || feedback);
           kit.markWritten(dialog);
           const missing = [];
-          if (clearsWvl) {
-            try {
-              await updateMatchFollowUpDate(match.matchId, null);
-            } catch (error) {
+          await Promise.all([
+            clearsWvl && updateMatchFollowUpDate(match.matchId, null).catch((error) => {
               missing.push(`WVL nicht gelöscht (${error.message})`);
-            }
-          }
-          if (declinesInterviews) {
-            setStatus(`Lehne Terminvorschläge ${index + 1} von ${selection.length} ab …`, "busy");
-            try {
-              await declineOpenInterviewsForMatch(match.matchId, () => {
-                declinedInterviews += 1;
-              });
-            } catch (error) {
+            }),
+            declinesInterviews && declineOpenInterviewsForMatch(match.matchId, () => {
+              declinedInterviews += 1;
+            }).catch((error) => {
               missing.push(`Terminvorschläge nicht alle abgelehnt (${error.message})`);
-            }
-          }
+            })
+          ]);
           if (missing.length) partial.push(`${match.label}: Status gesetzt, ${missing.join(", ")}`);
         }
       });
@@ -11982,7 +12010,8 @@ ${add}` : add;
       const confirmText = clearing ? `Bei ${scopeText(selection)} die ${team} WVL entfernen?` : `${scopeText(selection)} auf ${formatted} setzen?`;
       if (!window.confirm(`${confirmText}${hiddenSelectionText(dialog)}`)) return;
       const result = await kit.runQueue(dialog, selection, {
-        progress: (current, total) => `Ändere ${current} von ${total} …`,
+        progress: (finished, total) => `Ändere WVL: ${finished} von ${total} erledigt …`,
+        parallel: BULK_PARALLEL,
         update: (match) => updateMatchFollowUpDate(match.matchId, isoDate || null),
         reload: true
       });

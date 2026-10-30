@@ -35,7 +35,7 @@ Enthaltene Funktionen:
 - Knopf „An CEM“ je Match in Meine Matches: schickt der CEM-Person des Kandidaten (und ihrer Vertretung) über den OPS-Bot eine Slack-DM mit Kandidat, Vakanz, Match-Link und optionalem Kommentar, unter deinem Namen. Der Dialog zeigt vorher, wer sie bekommt.
 - Liest den Betreff einer geoeffneten Outlook-Bewerbungsmail, findet den passenden Match per GraphQL und setzt KAM Status auf "Out" inkl. Pflichtgrund - offene Terminvorschlaege werden ebenfalls abgelehnt.
 - Ueberdeckt in der Vakanzliste die Statusspalte mit einem Dropdown, das den Vakanz-Status direkt speichert. "Alle ändern" im Spaltenkopf setzt den Status fuer die angehakten sichtbaren Vakanzen gemeinsam.
-- Kleine Marke „Gecrawlt“ hinter dem Vakanztitel in der Vakanzliste und in Meine Matches, wenn die Stelle aus dem Auto-Crawling kommt; Tooltip „Gecrawlt am …“. Andere Vakanzen bekommen keine Marke. Daten aus dem n8n-Workflow Crawling Herkunft (alle 30 Minuten aus Airtable).
+- Kleine Marke „Gecrawlt“ hinter dem Vakanztitel in der Vakanzliste und in Meine Matches, wenn die Stelle aus dem Auto-Crawling kommt; Tooltip „Gecrawlt am …“. Andere Vakanzen bekommen keine Marke. Erkannt am Tag „[Crawling]“ in den Vakanz-Notizen, den der n8n-Workflow Crawling Herkunft setzt; gelesen per GraphQL.
 - Fuegt im Arbeitgeberprofil OM-Flag-Vorlagen direkt am Feld OM Notes ein.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.
 - Knopf "Vertretungen" neben den Filter-Knöpfen von Meine Matches und im Tampermonkey-Menü: trägt Vertretungen ein, die VT Automatik, VT Bot und VT-Status-Hinweis zusätzlich taggen. Gespeichert im n8n-Workflow Vertretungen.

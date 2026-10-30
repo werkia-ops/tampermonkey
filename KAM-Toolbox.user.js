@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.26.389
+// @version      1.26.390
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -7289,9 +7289,9 @@ ${add}` : add;
       kind: "view",
       summary: "Kommt eine Vakanz aus dem Auto-Crawling, steht hinter ihrem Titel die kleine Marke „Gecrawlt“. Alle anderen Vakanzen haben keine Marke.",
       notes: [
-        "Mit der Maus über der Marke steht, wann die Stelle gecrawlt wurde.",
-        "Gezählt wird wie im KPI-Dashboard: Stellen aus der Airtable-Tabelle Vakanzen mit Crawler-Grund, ohne die als „Ersetzen“ entschiedenen.",
-        "Der Stand wird alle 30 Minuten aus Airtable übernommen. Eine gerade erst veröffentlichte Stelle bekommt die Marke deshalb manchmal etwas später."
+        "Mit der Maus über der Marke steht, wann die Stelle angelegt wurde.",
+        "Erkannt wird die Marke am Tag „[Crawling]“ in den Vakanz-Notizen (Additional Notes). Den bekommt jede Stelle aus dem Auto-Crawling beim Anlegen, ohne die als „Ersetzen“ entschiedenen.",
+        "Fehlt der Tag einmal, setzt eine Automation ihn innerhalb von 30 Minuten nach."
       ]
     },
     {
@@ -14253,11 +14253,11 @@ ${rr.zahlen}` : view.title;
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS9 = 35e3;
+    const REQUEST_TIMEOUT_MS8 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS9);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS8);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -18874,13 +18874,16 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/crawling-herkunft/core.js
-  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/crawling-herkunft/3eabb03f-f46f-45c5-88dc-b0cf3a2f8f7c";
-  var REQUEST_TIMEOUT_MS7 = 15e3;
   var MAX_IDS2 = 300;
   var RETRY_MS4 = 60 * 1e3;
   var BADGE_TEXT = "Gecrawlt";
+  var CRAWLING_TAG_RE = /\[\s*crawling\s*\]/i;
+  var CRAWLING_QUERY = `query crawlingHerkunft($ids: [UUID!]) {
+  items: allJobPositions(filter: { ids: $ids }, page: 0, perPage: ${MAX_IDS2}) { id additionalInformation createdAt }
+}`;
   var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  var BERLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
   function normalizeId(value) {
     const id = String(value || "").trim().toLowerCase();
     return UUID_RE3.test(id) ? id : "";
@@ -18893,43 +18896,24 @@ ${buildCbreBody(current)}`;
     for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
     return result;
   }
-  function parseResponse6(status, text) {
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-    if (data && data.ok === false && data.fehler) throw new Error(data.fehler);
-    if (!data || typeof data.crawled !== "object" || data.crawled === null) {
-      throw new Error(`Crawling-Herkunft: unerwartete Antwort (HTTP ${status}).`);
-    }
+  var hasCrawlingTag = (value) => CRAWLING_TAG_RE.test(String(value || ""));
+  function berlinDay3(value) {
+    const date = new Date(String(value || ""));
+    return value && !Number.isNaN(date.getTime()) ? BERLIN_DAY.format(date) : "";
+  }
+  function crawledFromItems(items) {
     const result = /* @__PURE__ */ new Map();
-    for (const [key, value] of Object.entries(data.crawled)) {
-      const id = normalizeId(key);
-      if (id) result.set(id, DAY_RE.test(String(value || "")) ? String(value) : "");
+    for (const item of items || []) {
+      const id = normalizeId(item && item.id);
+      if (id && hasCrawlingTag(item.additionalInformation)) result.set(id, berlinDay3(item.createdAt));
     }
     return result;
   }
-  function createCrawlingClient({ request, url = WEBHOOK_URL7, timeoutMs = REQUEST_TIMEOUT_MS7 }) {
-    return (ids) => new Promise((resolve, reject) => {
-      request({
-        method: "POST",
-        url,
-        headers: { "Content-Type": "application/json" },
-        data: JSON.stringify({ ids }),
-        timeout: timeoutMs,
-        onload(response) {
-          try {
-            resolve(parseResponse6(response.status, response.responseText));
-          } catch (error) {
-            reject(error);
-          }
-        },
-        onerror: () => reject(new Error("Crawling-Herkunft: Server nicht erreichbar.")),
-        ontimeout: () => reject(new Error("Crawling-Herkunft: Zeitüberschreitung."))
-      });
-    });
+  function createCrawlingClient({ request }) {
+    return async (ids) => {
+      const data = await request(CRAWLING_QUERY, { ids });
+      return crawledFromItems(data && data.items);
+    };
   }
   function formatDay4(day) {
     const match = String(day || "").match(DAY_RE);
@@ -19013,11 +18997,11 @@ ${buildCbreBody(current)}`;
       sourcePath,
       namespace = "werkia",
       isMatchListRoute = () => false,
-      request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null
+      request = null
     } = config;
     runtime.registerSource?.(sourcePath);
     if (!request) {
-      console.warn("[Crawling-Herkunft] GM_xmlhttpRequest ist nicht verfügbar.");
+      console.warn("[Crawling-Herkunft] Kein GraphQL-Zugang.");
       return;
     }
     const STYLE_ID19 = `werkia-${namespace}-crawl-badge-style`;
@@ -19115,7 +19099,8 @@ ${buildCbreBody(current)}`;
     executeCrawlingHerkunft(runtime, {
       sourcePath: "kam/toolbox/src/features/crawling-herkunft.js",
       namespace: "kam",
-      isMatchListRoute: isKamMyMatchesRoute
+      isMatchListRoute: isKamMyMatchesRoute,
+      request: (query, variables) => getKamGraphqlAdapter().request(query, variables)
     });
   }
 
@@ -21026,8 +21011,8 @@ ${buildCbreBody(current)}`;
       return target ? { ...rest, ...target } : rest;
     });
   }
-  var BERLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
-  var berlinDay3 = (now = /* @__PURE__ */ new Date()) => BERLIN_DAY.format(now);
+  var BERLIN_DAY2 = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
+  var berlinDay4 = (now = /* @__PURE__ */ new Date()) => BERLIN_DAY2.format(now);
   function readPrefs(raw) {
     try {
       const value = JSON.parse(raw || "{}");
@@ -21041,7 +21026,7 @@ ${buildCbreBody(current)}`;
       return { off: false, closedDay: "", mini: false, open: false };
     }
   }
-  var isHidden = (prefs, now = /* @__PURE__ */ new Date()) => prefs.off || prefs.closedDay === berlinDay3(now);
+  var isHidden = (prefs, now = /* @__PURE__ */ new Date()) => prefs.off || prefs.closedDay === berlinDay4(now);
   function chipText(info) {
     if (info.state === "before") return `Gleich: ${info.next.label} ab ${info.next.from}`;
     if (info.state === "gap") return info.next ? `Gleich: ${info.next.label} ab ${info.next.from}` : "Feierabend";
@@ -21191,7 +21176,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       else if (target.hasAttribute("data-phase-toggle")) savePrefs({ open: !loadPrefs().open });
       else if (target.hasAttribute("data-wdp-mini")) savePrefs({ mini: true });
       else if (target.hasAttribute("data-wdp-expand")) savePrefs({ mini: false });
-      else if (target.hasAttribute("data-wdp-close")) savePrefs({ closedDay: berlinDay3(now()) });
+      else if (target.hasAttribute("data-wdp-close")) savePrefs({ closedDay: berlinDay4(now()) });
     }
     if (typeof GM_registerMenuCommand === "function") {
       try {
@@ -21216,8 +21201,8 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS8 = 15e3;
+  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS7 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
   var OFFLINE_MESSAGE7 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
@@ -21225,7 +21210,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse7(status, text) {
+  function parseResponse6(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -21236,17 +21221,17 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL8 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL7 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS8,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS7,
         onload(response) {
           try {
-            resolve(parseResponse7(response.status, response.responseText));
+            resolve(parseResponse6(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }

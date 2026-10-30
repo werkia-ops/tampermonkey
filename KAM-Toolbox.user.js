@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.27.392
+// @version      1.28.393
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -18816,7 +18816,9 @@ ${buildCbreBody(current)}`;
       }
       try {
         const result = await kit.runQueue(dialog, queue, {
-          progress: (current, total) => `Ändere Status ${current} von ${total} …`,
+          // Mehrere Vakanzen gleichzeitig wie die Match-Sammelaktionen.
+          progress: (finished, total) => `Ändere Status: ${finished} von ${total} erledigt …`,
+          parallel: BULK_PARALLEL,
           update: async (entry) => {
             await writeStatus(entry.id, target);
             remember(entry, target);

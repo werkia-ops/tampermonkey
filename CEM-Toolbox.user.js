@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.27.391
+// @version      1.28.393
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -12220,7 +12220,8 @@ ${add}` : add;
       });
     }
     const runOptions = (label2) => ({
-      progress: (current, total) => `Ändere ${label2} ${current} von ${total} …`,
+      progress: (finished, total) => `Ändere ${label2}: ${finished} von ${total} erledigt …`,
+      parallel: BULK_PARALLEL,
       label: (candidate) => candidate.name
     });
     const restText = "Die übrigen Kandidaten blieben unverändert.";

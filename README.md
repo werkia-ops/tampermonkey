@@ -119,3 +119,4 @@ Enthaltene Funktionen:
 - Dropdown ueber der Liste mit gespeicherten Filterkombinationen. "Aktuellen Filter speichern" uebernimmt Filter, Sortierung und Seitengroesse der Ansicht; Vorlagen liegen lokal im Browser und ueberstehen Toolbox-Updates.
 - Warnt auf Potenzielle Matches, wenn ein vorgeschlagener Arbeitgeber bei diesem Kandidaten als No-Go hinterlegt ist - rot bei demselben Arbeitgeberprofil oder derselben Firmengruppe (gleicher Webauftritt), gelb bei einem blossen Namenstreffer, der noch geprueft werden muss.
 - Erwähnt man im Kommentar-Editor jemanden, der heute vertreten wird, kommt die Vertretung als zweite Erwähnung direkt dahinter. Wer sie wieder löscht, bekommt sie nicht erneut. Ohne Toolbox taggt der n8n-Workflow Vertretungen Erwähnungen per Folgekommentar nach.
+- Haken "Notes posten" im Terminvorschlag-Dialog: schreibt #notes in die Notizen, die VT Automatik haengt die Notizen dann an die Posts des Termins in #termine (VTA, VTV, VTS).

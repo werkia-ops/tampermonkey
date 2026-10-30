@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.10.382
+// @version      1.11.387
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2159,6 +2159,25 @@
       ]
     };
   }
+  function appointmentNotesTopic({ page, routes }) {
+    return {
+      id: "appointment-notes",
+      title: "Notes eines Termins mitposten",
+      page,
+      routes,
+      kind: "form",
+      summary: "Der Haken „Notes posten“ im Terminvorschlag-Dialog schreibt #notes in die Notizen des Termins. Die VT Automatik hängt die Notizen dieses Termins dann an seine Posts in #termine (VTA, VTV, VTS), etwa „BEW soll AP anrufen“.",
+      steps: [
+        "Im Terminvorschlag-Dialog „Notes posten“ ankreuzen.",
+        "Wie gewohnt speichern."
+      ],
+      notes: [
+        "Gespeichert wird erst mit dem Speichern-Knopf des Dialogs. Haken entfernen und speichern nimmt die Markierung zurück.",
+        "Wird der Haken nach dem Post gesetzt oder ändern sich die Notizen danach, ändert der Bot schon gepostete Nachrichten von heute mit.",
+        "Gilt nur für die Notizen genau dieses Termins. Der Marker #notes selbst erscheint nicht im Post."
+      ]
+    };
+  }
   function noGoCheckTopic() {
     return {
       id: "no-go-check",
@@ -2502,7 +2521,8 @@
         "↻ lädt die Liste neu. Sonst bleibt sie eine Minute zwischengespeichert."
       ]
     },
-    filterPresetsTopic({ page: "OBC › Kandidaten", routes: [ROUTES.obcCandidates] })
+    filterPresetsTopic({ page: "OBC › Kandidaten", routes: [ROUTES.obcCandidates] }),
+    appointmentNotesTopic({ page: "Terminvorschlag-Dialog" })
   ];
   var obcHelp = createToolboxHelp({ namespace: "obc", toolboxName: "OBC-Toolbox", topics: OBC_HELP_TOPICS });
   function executeToolboxHelp(runtime) {
@@ -8031,6 +8051,140 @@
     });
   }
 
+  // ../../shared/js/appointment-prio/index.js
+  var PRIO_MARKER = "#prio";
+  var NOTES_MARKER = "#notes";
+  var PRIO_ID = "werkia-appointment-prio";
+  var NOTES_ID = "werkia-appointment-notes";
+  function markerRe(marker) {
+    return new RegExp(`(^|\\s)${marker}(?![\\p{L}\\p{N}_])`, "iu");
+  }
+  function hasMarker(notes, marker) {
+    return markerRe(marker).test(String(notes || ""));
+  }
+  function withMarker(notes, marker, on) {
+    const text = String(notes || "");
+    if (on) return hasMarker(text, marker) ? text : text.trim() ? `${marker} ${text}` : marker;
+    const re = markerRe(marker);
+    let out = text;
+    while (re.test(out)) out = out.replace(re, "$1");
+    return out.replace(/^[ \t]+/, "");
+  }
+  var hasPrioMarker = (notes) => hasMarker(notes, PRIO_MARKER);
+  var withPrioMarker = (notes, on) => withMarker(notes, PRIO_MARKER, on);
+  var hasNotesMarker = (notes) => hasMarker(notes, NOTES_MARKER);
+  var withNotesMarker = (notes, on) => withMarker(notes, NOTES_MARKER, on);
+  var CHECKBOXES = [
+    {
+      key: "prio",
+      id: PRIO_ID,
+      text: "Prio",
+      color: "#b42318",
+      has: hasPrioMarker,
+      set: withPrioMarker,
+      title: "Markiert den Termin als Prio. Die VT Automatik postet VTA/VTV dieses Matches in #termine mit :alert11:."
+    },
+    {
+      key: "notes",
+      id: NOTES_ID,
+      text: "Notes posten",
+      color: "#155eef",
+      has: hasNotesMarker,
+      set: withNotesMarker,
+      title: "Die VT Automatik hängt die Notes dieses Termins an seine Posts in #termine (VTA, VTV, VTS)."
+    }
+  ];
+  function executeAppointmentPrio(runtime, { sourcePath, helpTip = () => null, markers = ["prio", "notes"] } = {}) {
+    runtime.registerSource(sourcePath);
+    const checkboxes = CHECKBOXES.filter((spec) => markers.includes(spec.key));
+    function notesField(dialog) {
+      return dialog.querySelector('textarea[name="notes"]');
+    }
+    function appointmentDialog() {
+      return [...document.querySelectorAll('.MuiDialog-paper, [role="dialog"]')].filter((dialog) => dialog.querySelector(".RaArrayInput-root input.MuiPickersInputBase-input") && notesField(dialog)).at(-1) || null;
+    }
+    function setNotes(textarea, value) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      setter?.call(textarea, value);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function anchor(dialog) {
+      const teamSwitch = [...dialog.querySelectorAll(".MuiFormControlLabel-root")].find((label) => label.querySelector(".MuiSwitch-root") && ["KAM", "CEM"].includes(label.textContent.trim()));
+      if (teamSwitch) return { node: teamSwitch, where: "afterend" };
+      const fromLabel = [...dialog.querySelectorAll("label")].find((label) => label.textContent.replace(/\*/g, "").trim() === "Von");
+      const fromField = fromLabel?.closest(".MuiFormControl-root");
+      if (fromField) return { node: fromField, where: "afterend" };
+      const notes = notesField(dialog).closest(".MuiFormControl-root, .MuiTextField-root") || notesField(dialog);
+      return { node: notes, where: "beforebegin" };
+    }
+    function place(dialog, label, index) {
+      const { node, where } = index ? { node: document.getElementById(checkboxes[index - 1].id), where: "afterend" } : anchor(dialog);
+      const placed = where === "afterend" ? node.nextElementSibling === label : node.previousElementSibling === label;
+      if (!placed) node.insertAdjacentElement(where, label);
+    }
+    function addCheckbox(dialog, spec, index) {
+      const label = document.createElement("label");
+      label.id = spec.id;
+      label.title = spec.title;
+      label.style.cssText = `display:inline-flex; align-items:center; align-self:center; gap:6px; margin:0 16px 0 ${index ? 0 : 16}px; cursor:pointer; font:700 14px/1 Arial, sans-serif; color:${spec.color}; vertical-align:middle; white-space:nowrap;`;
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.style.cssText = `width:18px; height:18px; margin:0; accent-color:${spec.color}; cursor:pointer;`;
+      box.checked = spec.has(notesField(dialog)?.value);
+      box.onchange = () => {
+        const textarea = notesField(dialog);
+        if (textarea) setNotes(textarea, spec.set(textarea.value, box.checked));
+      };
+      label.append(box, document.createTextNode(spec.text));
+      if (index === checkboxes.length - 1) {
+        const tip = helpTip();
+        if (tip) label.append(tip);
+      }
+      place(dialog, label, index);
+    }
+    function sync() {
+      const dialog = appointmentDialog();
+      checkboxes.forEach((spec, index) => {
+        const existing = document.getElementById(spec.id);
+        if (!dialog) {
+          existing?.remove();
+          return;
+        }
+        if (existing && dialog.contains(existing)) {
+          const box = existing.querySelector("input");
+          const marked = spec.has(notesField(dialog)?.value);
+          if (box && box.checked !== marked) box.checked = marked;
+          place(dialog, existing, index);
+          return;
+        }
+        existing?.remove();
+        addCheckbox(dialog, spec, index);
+      });
+    }
+    let timer = null;
+    function scheduleSync() {
+      if (timer !== null) return;
+      timer = runtime.setTimeout(() => {
+        timer = null;
+        sync();
+      }, 100);
+    }
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("input", scheduleSync);
+    runtime.addWindowListener("hashchange", scheduleSync);
+    scheduleSync();
+  }
+
+  // src/features/appointment-notes.js
+  function executeAppointmentNotes(runtime) {
+    executeAppointmentPrio(runtime, {
+      sourcePath: "obc/toolbox/src/features/appointment-notes.js",
+      helpTip: () => obcHelp.tip("appointment-notes"),
+      markers: ["notes"]
+    });
+  }
+
   // obc-legacy-userscript:shared/userscripts/dringende_vakanzen_highlight.user.js
   function executeLegacyModule(runtime) {
     runtime.registerSource("shared/userscripts/dringende_vakanzen_highlight.user.js");
@@ -8321,6 +8475,7 @@
     // See cem/toolbox/src/main.js: last so the No-Go tint is not
     // overpainted by another row highlight on the same route.
     { id: "no-go-check", execute: executeNoGoCheck2 },
-    { id: "vertretung-mittaggen", execute: executeVertretungMittaggen }
+    { id: "vertretung-mittaggen", execute: executeVertretungMittaggen },
+    { id: "appointment-notes", execute: executeAppointmentNotes }
   ]);
 })();

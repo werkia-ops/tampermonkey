@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.26.385
+// @version      1.26.387
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -12353,6 +12353,7 @@ ${rr.zahlen}` : view.title;
   var withoutMarkers = (notes) => withNotesMarker(withPrioMarker(notes, false), false);
   var CHECKBOXES = [
     {
+      key: "prio",
       id: PRIO_ID,
       text: "Prio",
       color: "#b42318",
@@ -12361,6 +12362,7 @@ ${rr.zahlen}` : view.title;
       title: "Markiert den Termin als Prio. Die VT Automatik postet VTA/VTV dieses Matches in #termine mit :alert11:."
     },
     {
+      key: "notes",
       id: NOTES_ID,
       text: "Notes posten",
       color: "#155eef",
@@ -12369,8 +12371,9 @@ ${rr.zahlen}` : view.title;
       title: "Die VT Automatik hängt die Notes dieses Termins an seine Posts in #termine (VTA, VTV, VTS)."
     }
   ];
-  function executeAppointmentPrio(runtime, { sourcePath, helpTip = () => null } = {}) {
+  function executeAppointmentPrio(runtime, { sourcePath, helpTip = () => null, markers = ["prio", "notes"] } = {}) {
     runtime.registerSource(sourcePath);
+    const checkboxes = CHECKBOXES.filter((spec) => markers.includes(spec.key));
     function notesField(dialog) {
       return dialog.querySelector('textarea[name="notes"]');
     }
@@ -12393,7 +12396,7 @@ ${rr.zahlen}` : view.title;
       return { node: notes, where: "beforebegin" };
     }
     function place(dialog, label, index) {
-      const { node, where } = index ? { node: document.getElementById(CHECKBOXES[index - 1].id), where: "afterend" } : anchor(dialog);
+      const { node, where } = index ? { node: document.getElementById(checkboxes[index - 1].id), where: "afterend" } : anchor(dialog);
       const placed = where === "afterend" ? node.nextElementSibling === label : node.previousElementSibling === label;
       if (!placed) node.insertAdjacentElement(where, label);
     }
@@ -12411,7 +12414,7 @@ ${rr.zahlen}` : view.title;
         if (textarea) setNotes(textarea, spec.set(textarea.value, box.checked));
       };
       label.append(box, document.createTextNode(spec.text));
-      if (index === CHECKBOXES.length - 1) {
+      if (index === checkboxes.length - 1) {
         const tip = helpTip();
         if (tip) label.append(tip);
       }
@@ -12419,7 +12422,7 @@ ${rr.zahlen}` : view.title;
     }
     function sync() {
       const dialog = appointmentDialog();
-      CHECKBOXES.forEach((spec, index) => {
+      checkboxes.forEach((spec, index) => {
         const existing = document.getElementById(spec.id);
         if (!dialog) {
           existing?.remove();

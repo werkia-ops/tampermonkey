@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.27.391
+// @version      1.27.392
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -7290,8 +7290,7 @@ ${add}` : add;
       summary: "Kommt eine Vakanz aus dem Auto-Crawling, steht hinter ihrem Titel die kleine Marke „Gecrawlt“. Alle anderen Vakanzen haben keine Marke.",
       notes: [
         "Mit der Maus über der Marke steht, wann die Stelle angelegt wurde.",
-        "Erkannt wird die Marke am Tag „[Crawling]“ in den Vakanz-Notizen (Additional Notes). Den bekommt jede Stelle aus dem Auto-Crawling beim Anlegen, ohne die als „Ersetzen“ entschiedenen.",
-        "Fehlt der Tag einmal, setzt eine Automation ihn innerhalb von 30 Minuten nach."
+        "Erkannt wird die Marke am Tag „[Crawling]“ in den Vakanz-Notizen (Additional Notes). Den bekommt jede Stelle aus dem Auto-Crawling beim Anlegen, ohne die als „Ersetzen“ entschiedenen."
       ]
     },
     {

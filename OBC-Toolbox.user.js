@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.11.387
+// @version      1.11.389
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1104,9 +1104,19 @@
     __typename
   }
 }`;
+  var POSTAL_CODE_RE = /\b\d{5}\b/;
   function formatLocation(location2) {
     if (!location2) return "";
     const name = String(location2.name || "").trim();
+    const state = String(location2.state || "").trim();
+    if (name && state && !POSTAL_CODE_RE.test(name) && !name.toLowerCase().includes(state.toLowerCase())) {
+      const parts = name.split(",").map((part) => part.trim()).filter(Boolean);
+      const country = String(location2.country || "").trim().toLowerCase();
+      const atEnd = parts.length < 2 || parts.at(-1).toLowerCase() !== country;
+      const insertAt = atEnd ? parts.length : parts.length - 1;
+      parts.splice(insertAt, 0, state);
+      return parts.join(", ");
+    }
     if (name) return name;
     return [location2.city, location2.postalCode, location2.state, location2.country].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
   }

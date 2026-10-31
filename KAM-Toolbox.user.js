@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.28.393
+// @version      1.28.395
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1236,13 +1236,22 @@
     if (!location2) return "";
     const name = String(location2.name || "").trim();
     const state = String(location2.state || "").trim();
-    if (name && state && !POSTAL_CODE_RE.test(name) && !name.toLowerCase().includes(state.toLowerCase())) {
+    const postalCode = String(location2.postalCode || "").trim();
+    if (name && !POSTAL_CODE_RE.test(name)) {
       const parts = name.split(",").map((part) => part.trim()).filter(Boolean);
       const country = String(location2.country || "").trim().toLowerCase();
-      const atEnd = parts.length < 2 || parts.at(-1).toLowerCase() !== country;
-      const insertAt = atEnd ? parts.length : parts.length - 1;
-      parts.splice(insertAt, 0, state);
-      return parts.join(", ");
+      const countryAt = parts.length >= 2 && parts.at(-1).toLowerCase() === country ? parts.length - 1 : parts.length;
+      if (/^\d{5}$/.test(postalCode)) {
+        const city = String(location2.city || "").trim();
+        const cityAt = parts.findIndex((part) => part.toLowerCase() === city.toLowerCase());
+        if (cityAt >= 0) parts[cityAt] = `${postalCode} ${parts[cityAt]}`;
+        else parts.splice(countryAt, 0, [postalCode, city].filter(Boolean).join(" "));
+        return parts.join(", ");
+      }
+      if (state && !name.toLowerCase().includes(state.toLowerCase())) {
+        parts.splice(countryAt, 0, state);
+        return parts.join(", ");
+      }
     }
     if (name) return name;
     return [location2.city, location2.postalCode, location2.state, location2.country].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
@@ -11290,6 +11299,21 @@ ${rr.zahlen}` : view.title;
     if (city) queries.push(`${city}, Deutschland`);
     return queries;
   }
+  function mapPoint(place) {
+    if (place && typeof place === "object") {
+      const lat = Number(place.coords?.lat);
+      const lon = Number(place.coords?.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) return `${lat},${lon}`;
+      return String(place.address || "").trim();
+    }
+    return String(place || "").trim();
+  }
+  var hasCoords = (place) => /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(mapPoint(place));
+  function osmDirectionsUrl(from, to) {
+    const base = "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car";
+    if (hasCoords(from) && hasCoords(to)) return `${base}&route=${encodeURIComponent(`${mapPoint(from)};${mapPoint(to)}`)}`;
+    return `${base}&from=${encodeURIComponent(mapPoint(from))}&to=${encodeURIComponent(mapPoint(to))}`;
+  }
 
   // ../../shared/js/werkia-toolbox/cache-storage.js
   function pruneExpiredCacheEntries(cache, isExpired) {
@@ -11688,7 +11712,7 @@ ${rr.zahlen}` : view.title;
       box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;">${escapeHtml3(data.displayText)}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
       box.disabled = false;
-      box.onclick = () => window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&from=${encodeURIComponent(data.candidateAddress)}&to=${encodeURIComponent(data.jobPositionAddress)}`, "_blank", "noopener,noreferrer");
+      box.onclick = () => window.open(osmDirectionsUrl(data.candidateLocation, data.jobLocation), "_blank", "noopener,noreferrer");
     }
     async function loadRoute(route) {
       const provider = getKamGraphqlAdapter().commuteProvider;
@@ -11706,7 +11730,9 @@ ${rr.zahlen}` : view.title;
         displayText,
         previewCoordinates: entry.previewCoordinates,
         candidateAddress: candidateLocation.address,
-        jobPositionAddress: job.location.address
+        jobPositionAddress: job.location.address,
+        candidateLocation,
+        jobLocation: job.location
       };
     }
     function updateRouteBox() {

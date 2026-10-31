@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.28.393
+// @version      1.28.395
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -1232,13 +1232,22 @@
     if (!location2) return "";
     const name = String(location2.name || "").trim();
     const state = String(location2.state || "").trim();
-    if (name && state && !POSTAL_CODE_RE.test(name) && !name.toLowerCase().includes(state.toLowerCase())) {
+    const postalCode = String(location2.postalCode || "").trim();
+    if (name && !POSTAL_CODE_RE.test(name)) {
       const parts = name.split(",").map((part) => part.trim()).filter(Boolean);
       const country = String(location2.country || "").trim().toLowerCase();
-      const atEnd = parts.length < 2 || parts.at(-1).toLowerCase() !== country;
-      const insertAt = atEnd ? parts.length : parts.length - 1;
-      parts.splice(insertAt, 0, state);
-      return parts.join(", ");
+      const countryAt = parts.length >= 2 && parts.at(-1).toLowerCase() === country ? parts.length - 1 : parts.length;
+      if (/^\d{5}$/.test(postalCode)) {
+        const city = String(location2.city || "").trim();
+        const cityAt = parts.findIndex((part) => part.toLowerCase() === city.toLowerCase());
+        if (cityAt >= 0) parts[cityAt] = `${postalCode} ${parts[cityAt]}`;
+        else parts.splice(countryAt, 0, [postalCode, city].filter(Boolean).join(" "));
+        return parts.join(", ");
+      }
+      if (state && !name.toLowerCase().includes(state.toLowerCase())) {
+        parts.splice(countryAt, 0, state);
+        return parts.join(", ");
+      }
     }
     if (name) return name;
     return [location2.city, location2.postalCode, location2.state, location2.country].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
@@ -8933,6 +8942,25 @@ ${add}` : add;
     if (city) queries.push(`${city}, Deutschland`);
     return queries;
   }
+  function mapPoint(place) {
+    if (place && typeof place === "object") {
+      const lat = Number(place.coords?.lat);
+      const lon = Number(place.coords?.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) return `${lat},${lon}`;
+      return String(place.address || "").trim();
+    }
+    return String(place || "").trim();
+  }
+  var hasCoords = (place) => /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(mapPoint(place));
+  function osmDirectionsUrl(from, to) {
+    const base = "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car";
+    if (hasCoords(from) && hasCoords(to)) return `${base}&route=${encodeURIComponent(`${mapPoint(from)};${mapPoint(to)}`)}`;
+    return `${base}&from=${encodeURIComponent(mapPoint(from))}&to=${encodeURIComponent(mapPoint(to))}`;
+  }
+  function googleMapsDirectionsUrl(from, to) {
+    const params = new URLSearchParams({ api: "1", origin: mapPoint(from), destination: mapPoint(to), travelmode: "driving" });
+    return `https://www.google.com/maps/dir/?${params}`;
+  }
 
   // ../../shared/js/werkia-toolbox/cache-storage.js
   function pruneExpiredCacheEntries(cache, isExpired) {
@@ -9391,7 +9419,7 @@ ${add}` : add;
       box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;${skull ? "color:#c92a2a;" : ""}">${escapeHtml3(commute.text || data.displayText)}</div>${commute.kmText ? `<div style="margin-top:2px;font-size:12px;opacity:.8;">${escapeHtml3(commute.kmText)}</div>` : ""}<div style="margin-top:4px;font-size:12px;line-height:1.35;">${escapeHtml3(commute.title || "")}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
       box.disabled = false;
-      box.onclick = () => window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&from=${encodeURIComponent(data.candidateAddress)}&to=${encodeURIComponent(data.jobPositionAddress)}`, "_blank", "noopener,noreferrer");
+      box.onclick = () => window.open(osmDirectionsUrl(data.candidateLocation, data.jobLocation), "_blank", "noopener,noreferrer");
     }
     async function loadRoute(route) {
       const [candidateId, jobPositionId] = route.key.split("|");
@@ -9409,7 +9437,9 @@ ${add}` : add;
         ...entry,
         commute: describeCommute(classifyCommute(job), entry),
         candidateAddress: candidateLocation.address,
-        jobPositionAddress: job.location.address
+        jobPositionAddress: job.location.address,
+        candidateLocation,
+        jobLocation: job.location
       };
     }
     function updateRouteBox() {
@@ -17789,10 +17819,6 @@ Trotzdem speichern?`)) return void 0;
       points: projected.map(([x, y]) => [Number((x - originX).toFixed(1)), Number((y - originY).toFixed(1))])
     };
   }
-  function googleMapsDirectionsUrl(fromAddress, toAddress) {
-    const params = new URLSearchParams({ api: "1", origin: String(fromAddress || ""), destination: String(toAddress || ""), travelmode: "driving" });
-    return `https://www.google.com/maps/dir/?${params}`;
-  }
 
   // src/features/match-commute.js
   var SOURCE_PATH4 = "cem/toolbox/src/features/match-commute.js";
@@ -17831,7 +17857,7 @@ Trotzdem speichern?`)) return void 0;
   }
   function rowView({ info, candidateLocation, cachedJob, entry }) {
     const job = cachedJob?.job || null;
-    const googleUrl = candidateLocation?.address && job?.location?.address ? googleMapsDirectionsUrl(candidateLocation.address, job.location.address) : "";
+    const googleUrl = candidateLocation?.address && job?.location?.address ? googleMapsDirectionsUrl(candidateLocation, job.location) : "";
     const unknown = (title) => ({ label: "🚗 ?", level: "unknown", title, googleUrl });
     if (info === null) return unknown("Match konnte nicht gelesen werden.");
     if (candidateLocation === null) return unknown("Beim Kandidaten ist keine Adresse hinterlegt.");
@@ -17863,7 +17889,9 @@ Trotzdem speichern?`)) return void 0;
       entry,
       commute: describeCommute(classifyCommute(job), entry),
       candidateAddress: candidateLocation.address,
-      jobAddress: job.location.address
+      jobAddress: job.location.address,
+      candidateLocation,
+      jobLocation: job.location
     };
   }
   var CSS3 = `
@@ -18206,7 +18234,7 @@ Trotzdem speichern?`)) return void 0;
             el4("dt", { text: "Vakanz" }),
             el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#e03131" }), result.jobAddress])
           ]),
-          el4("a", { className: "mc-google", href: googleMapsDirectionsUrl(result.candidateAddress, result.jobAddress), target: "_blank", rel: "noopener noreferrer", text: "In Google Maps öffnen ↗" })
+          el4("a", { className: "mc-google", href: googleMapsDirectionsUrl(result.candidateLocation, result.jobLocation), target: "_blank", rel: "noopener noreferrer", text: "In Google Maps öffnen ↗" })
         );
       }
       popover.replaceChildren(close, head, ...body);

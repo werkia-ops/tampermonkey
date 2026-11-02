@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.29.396
+// @version      1.29.397
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -11602,7 +11602,7 @@ ${rr.zahlen}` : view.title;
   }
 
   // src/features/kam-suite/route-calculation.js
-  var ROUTE_BOX_ID = "werkia-obc-route-box";
+  var ROUTE_BOX_ID = "werkia-kam-route-box";
   var QUESTIONNAIRE_LABELS3 = [
     "Reisehäufigkeit",
     "Montagebereitschaft",

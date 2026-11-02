@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.13.398
+// @version      1.13.400
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2416,7 +2416,8 @@
       summary: "Berechnet beim offenen Fragebogen Strecke und Fahrzeit mit dem Auto zwischen Wohnort des Kandidaten und Arbeitsort.",
       notes: [
         ...commute ? [
-          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot."
+          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot.",
+          "Hat der Kandidat mehrere Adressen, zählt wie in der Liste die mit der kürzesten Fahrzeit. Die Box nennt dann, von welcher Adresse aus gerechnet wurde."
         ] : [],
         "Ein Klick auf die Box öffnet die Route in OpenStreetMap.",
         "„Route nicht verfügbar“ heißt meist: Eine der beiden Adressen fehlt oder ließ sich nicht finden. Dann bitte selbst nachsehen.",
@@ -5021,6 +5022,11 @@
     }
     return best || list[0];
   }
+  function pickFastestRoute(locations, entries) {
+    const entry = pickFastestRouteEntry(entries);
+    if (!entry) return null;
+    return { entry, location: (Array.isArray(locations) ? locations : [])[entries.indexOf(entry)] || null };
+  }
   function describeCommute(commuteClass, entry) {
     const minutes = routeMinutes(entry);
     const prefix = entry?.approx ? "ca. " : "";
@@ -5502,6 +5508,16 @@
     inFlight.set(key, promise);
     return promise;
   }
+  async function getFastestRoute(candidateLocations, jobLocation, options = {}, route = getRoute) {
+    const locations = (Array.isArray(candidateLocations) ? candidateLocations : []).filter((location2) => location2?.address);
+    if (!locations.length) return null;
+    const entries = await Promise.all(locations.map((location2) => Promise.resolve().then(() => route(location2, jobLocation, options)).catch((error) => {
+      console.warn("[Werkia Route] Route fuer eine Kandidatenadresse fehlgeschlagen:", location2.address, error?.message || error);
+      return null;
+    }).then((entry) => entry || { unavailable: true })));
+    const best = pickFastestRoute(locations, entries);
+    return best && { ...best, count: locations.length };
+  }
   async function requestTableRow(server, from, targets) {
     const coords = [from, ...targets].map((point) => `${point.lon},${point.lat}`).join(";");
     const destinations = targets.map((_, index) => index + 1).join(";");
@@ -5759,6 +5775,7 @@
       <div style="margin-top:4px;font-size:15px;font-weight:800;${skull ? "color:#c92a2a;" : ""}">${escapeHtml3(commute.text || data.displayText)}</div>
       ${commute.kmText ? `<div style="margin-top:2px;font-size:12px;opacity:.8;">${escapeHtml3(commute.kmText)}</div>` : ""}
       <div style="margin-top:4px;font-size:12px;line-height:1.35;">${escapeHtml3(commute.title || "")}</div>
+      ${data.addressCount > 1 ? `<div style="margin-top:4px;font-size:12px;line-height:1.35;">Schnellste von ${data.addressCount} Kandidatenadressen: ${escapeHtml3(data.candidateAddress)}</div>` : ""}
       ${createRoutePreviewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}
     `;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
@@ -5769,16 +5786,19 @@
     }
     async function loadRouteForQuestionnaire(route) {
       const provider = getObcGraphqlAdapter().commuteProvider;
-      const [candidateLocation, job] = await Promise.all([
-        provider.loadCandidateLocation(route.candidateId),
+      const [candidateLocations, job] = await Promise.all([
+        provider.loadCandidateLocations(route.candidateId),
         provider.loadJob(route.jobId)
       ]);
-      if (!candidateLocation?.address || !job?.location?.address) return null;
-      const entry = await getRoute(candidateLocation, job.location, { withPreview: true });
+      if (!job?.location?.address) return null;
+      const fastest = await getFastestRoute(candidateLocations, job.location, { withPreview: true });
+      const entry = fastest?.entry;
       if (!entry || entry.unavailable) return null;
+      const candidateLocation = fastest.location;
       return {
         ...entry,
         commute: describeCommute(classifyCommute(job), entry),
+        addressCount: fastest.count,
         candidateAddress: candidateLocation.address,
         jobPositionAddress: job.location.address,
         candidateLocation,

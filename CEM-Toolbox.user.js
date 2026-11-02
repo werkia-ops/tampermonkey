@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.30.398
+// @version      1.30.400
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -2527,7 +2527,8 @@
       summary: "Berechnet beim offenen Fragebogen Strecke und Fahrzeit mit dem Auto zwischen Wohnort des Kandidaten und Arbeitsort.",
       notes: [
         ...commute ? [
-          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot."
+          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot.",
+          "Hat der Kandidat mehrere Adressen, zählt wie in der Liste die mit der kürzesten Fahrzeit. Die Box nennt dann, von welcher Adresse aus gerechnet wurde."
         ] : [],
         "Ein Klick auf die Box öffnet die Route in OpenStreetMap.",
         "„Route nicht verfügbar“ heißt meist: Eine der beiden Adressen fehlt oder ließ sich nicht finden. Dann bitte selbst nachsehen.",
@@ -7185,6 +7186,7 @@ ${add}` : add;
         "„Maps ↗“ öffnet dieselbe Strecke direkt in Google Maps."
       ],
       notes: [
+        "Hat der Kandidat mehrere Adressen, zählt die mit der kürzesten Fahrzeit, wie auf Potenzielle Matches. Die Karte nennt dann, von welcher Adresse aus gerechnet wurde.",
         "Grün bis 45 Min, rot mit 💀 über 45 Min bei einer ortsgebundenen Vakanz. 🏠, 🗺️ und 🧳 stehen für Start von Zuhause, landes-/bundesweit und Montage; dort ist die Fahrzeit nur zur Info. Wer mit der Maus auf der Zeit stehen bleibt, sieht die Erklärung.",
         "Gerechnet wird wie im Fragebogen. Berechnete Zeiten bleiben eine Woche im Browser gespeichert.",
         "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet, dann gibt es auch keine Karte.",
@@ -9171,6 +9173,11 @@ ${add}` : add;
     }
     return best || list[0];
   }
+  function pickFastestRoute(locations, entries) {
+    const entry = pickFastestRouteEntry(entries);
+    if (!entry) return null;
+    return { entry, location: (Array.isArray(locations) ? locations : [])[entries.indexOf(entry)] || null };
+  }
   function describeCommute(commuteClass, entry) {
     const minutes = routeMinutes(entry);
     const prefix = entry?.approx ? "ca. " : "";
@@ -9656,6 +9663,16 @@ ${add}` : add;
     inFlight.set(key, promise);
     return promise;
   }
+  async function getFastestRoute(candidateLocations, jobLocation, options = {}, route = getRoute) {
+    const locations = (Array.isArray(candidateLocations) ? candidateLocations : []).filter((location2) => location2?.address);
+    if (!locations.length) return null;
+    const entries = await Promise.all(locations.map((location2) => Promise.resolve().then(() => route(location2, jobLocation, options)).catch((error) => {
+      console.warn("[Werkia Route] Route fuer eine Kandidatenadresse fehlgeschlagen:", location2.address, error?.message || error);
+      return null;
+    }).then((entry) => entry || { unavailable: true })));
+    const best = pickFastestRoute(locations, entries);
+    return best && { ...best, count: locations.length };
+  }
   async function requestTableRow(server, from, targets) {
     const coords = [from, ...targets].map((point) => `${point.lon},${point.lat}`).join(";");
     const destinations = targets.map((_, index) => index + 1).join(";");
@@ -9794,6 +9811,10 @@ ${add}` : add;
       const startLabel = labelPosition(start), endLabel = labelPosition(end, true);
       return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.78);"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Vorschau der Fahrtroute" style="display:block;width:100%;height:270px;min-height:220px;"><defs><pattern id="werkia-route-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#dbe4ea" stroke-width="1"/></pattern></defs><rect width="${width}" height="${height}" fill="#f8fafb"/><rect width="${width}" height="${height}" fill="url(#werkia-route-grid)"/><polyline points="${points.join(" ")}" fill="none" stroke="#1971c2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${points.join(" ")}" fill="none" stroke="#74c0fc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="9" fill="#2f9e44" stroke="#fff" stroke-width="4"/><circle cx="${end[0]}" cy="${end[1]}" r="9" fill="#e03131" stroke="#fff" stroke-width="4"/><foreignObject x="${startLabel.x}" y="${startLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #2f9e44;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#2b8a3e;margin-bottom:2px;">Kandidat</div><div>${escapeHtml3(candidateAddress)}</div></div></foreignObject><foreignObject x="${endLabel.x}" y="${endLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #e03131;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#c92a2a;margin-bottom:2px;">Vakanz</div><div>${escapeHtml3(jobPositionAddress)}</div></div></foreignObject></svg><div style="padding:5px 8px;font-size:11px;font-weight:600;opacity:.65;text-align:center;">Klicken für die vollständige Karte</div></div>`;
     }
+    function addressHint(data) {
+      if (!(data.addressCount > 1)) return "";
+      return `<div style="margin-top:4px;font-size:12px;line-height:1.35;">Schnellste von ${data.addressCount} Kandidatenadressen: ${escapeHtml3(data.candidateAddress)}</div>`;
+    }
     function positionBox(box, dialog) {
       const dialogRect = dialog.getBoundingClientRect();
       const notesRect = document.getElementById("werkia-om-notes-box")?.getBoundingClientRect();
@@ -9835,7 +9856,7 @@ ${add}` : add;
       const skull = commute.level === "skull";
       box.style.background = skull ? "#fff5f5" : "#e7f5ff";
       box.style.borderColor = skull ? "rgba(224,49,49,.55)" : "rgba(25,113,194,.38)";
-      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;${skull ? "color:#c92a2a;" : ""}">${escapeHtml3(commute.text || data.displayText)}</div>${commute.kmText ? `<div style="margin-top:2px;font-size:12px;opacity:.8;">${escapeHtml3(commute.kmText)}</div>` : ""}<div style="margin-top:4px;font-size:12px;line-height:1.35;">${escapeHtml3(commute.title || "")}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
+      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;${skull ? "color:#c92a2a;" : ""}">${escapeHtml3(commute.text || data.displayText)}</div>${commute.kmText ? `<div style="margin-top:2px;font-size:12px;opacity:.8;">${escapeHtml3(commute.kmText)}</div>` : ""}<div style="margin-top:4px;font-size:12px;line-height:1.35;">${escapeHtml3(commute.title || "")}</div>${addressHint(data)}${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
       box.disabled = false;
       box.onclick = () => window.open(osmDirectionsUrl(data.candidateLocation, data.jobLocation), "_blank", "noopener,noreferrer");
@@ -9843,18 +9864,21 @@ ${add}` : add;
     async function loadRoute(route) {
       const [candidateId, jobPositionId] = route.key.split("|");
       const provider = getCemGraphqlAdapter().commuteProvider;
-      const [candidateLocation, job] = await Promise.all([
-        provider.loadCandidateLocation(candidateId),
+      const [candidateLocations, job] = await Promise.all([
+        provider.loadCandidateLocations(candidateId),
         provider.loadJob(jobPositionId)
       ]);
-      if (!candidateLocation?.address) return unavailableRoute("Kandidatenadresse konnte nicht gelesen werden.");
+      if (!candidateLocations?.some((location2) => location2?.address)) return unavailableRoute("Kandidatenadresse konnte nicht gelesen werden.");
       if (!job) return unavailableRoute("Vakanz konnte nicht gelesen werden.");
       if (!job.location?.address) return unavailableRoute("Vakanzadresse konnte nicht gelesen werden.");
-      const entry = await getRoute(candidateLocation, job.location, { withPreview: true });
+      const fastest = await getFastestRoute(candidateLocations, job.location, { withPreview: true });
+      const entry = fastest?.entry;
       if (!entry || entry.unavailable) return unavailableRoute("Adresse nicht gefunden oder der Routenservice hat keine Fahrtroute geliefert.");
+      const candidateLocation = fastest.location;
       return {
         ...entry,
         commute: describeCommute(classifyCommute(job), entry),
+        addressCount: fastest.count,
         candidateAddress: candidateLocation.address,
         jobPositionAddress: job.location.address,
         candidateLocation,
@@ -17994,23 +18018,34 @@ Trotzdem speichern?`)) return void 0;
     const commute = describeCommute(classifyCommute(job), entry);
     return { label: commuteLabel(commute, entry), level: commute.level, title: `${commute.title} Klicken für die Karte.`, googleUrl };
   }
+  function rowEntry(locations, job, lookup) {
+    if (locations === void 0) return { candidateLocation: void 0, entry: void 0 };
+    if (!locations.length) return { candidateLocation: null, entry: void 0 };
+    if (!job?.location?.address) return { candidateLocation: locations[0], entry: void 0 };
+    const entries = locations.map((location2) => lookup(location2.address, job.location.address, { acceptTable: true }) || null);
+    const best = pickFastestRoute(locations, entries);
+    return best ? { candidateLocation: best.location, entry: best.entry } : { candidateLocation: locations[0], entry: void 0 };
+  }
   var unavailable = (reason) => ({ state: "missing", reason });
   async function loadMatchCommute(matchId, { request, provider, route = getRoute }) {
     const result = await request(MATCH_QUERY3, { filter: { ids: [matchId] }, perPage: 1 });
     const match = result?.items?.[0];
     if (!match?.candidateId || !match?.jobPositionId) return unavailable("Match konnte nicht gelesen werden.");
-    const [candidateLocation, job] = await Promise.all([
-      provider.loadCandidateLocation(match.candidateId),
+    const [candidateLocations, job] = await Promise.all([
+      provider.loadCandidateLocations(match.candidateId),
       provider.loadJob(match.jobPositionId)
     ]);
-    if (!candidateLocation?.address) return unavailable("Beim Kandidaten ist keine Adresse hinterlegt.");
+    if (!candidateLocations?.some((location2) => location2?.address)) return unavailable("Beim Kandidaten ist keine Adresse hinterlegt.");
     if (!job) return unavailable("Vakanz konnte nicht gelesen werden.");
     if (!job.location?.address) return unavailable("Bei der Vakanz ist keine Adresse hinterlegt.");
-    const entry = await route(candidateLocation, job.location, { withPreview: true });
+    const fastest = await getFastestRoute(candidateLocations, job.location, { withPreview: true }, route);
+    const entry = fastest?.entry;
     if (!entry || entry.unavailable) return unavailable("Adresse nicht gefunden oder der Routenservice hat keine Route geliefert.");
+    const candidateLocation = fastest.location;
     return {
       state: "ready",
       entry,
+      addressCount: fastest.count,
       commute: describeCommute(classifyCommute(job), entry),
       candidateAddress: candidateLocation.address,
       jobAddress: job.location.address,
@@ -18154,15 +18189,19 @@ Trotzdem speichern?`)) return void 0;
         const jobIds = [...new Set(currentItems().map((item) => matchInfo.get(item.matchId)).filter((info) => info?.candidateId === candidateId).map((info) => info.jobPositionId))];
         jobIds.forEach((jobId) => attempts.set(`${candidateId}|${jobId}`, Date.now()));
         if (jobIds.length) {
-          const [candidateLocation, jobs] = await Promise.all([
-            provider.loadCandidateLocation(candidateId).catch((error) => {
-              console.warn("[Werkia CEM Distanz] Kandidatenadresse nicht ladbar:", error);
-              return null;
+          const [candidateLocations, jobs] = await Promise.all([
+            provider.loadCandidateLocations(candidateId).catch((error) => {
+              console.warn("[Werkia CEM Distanz] Kandidatenadressen nicht ladbar:", error);
+              return [];
             }),
             provider.loadJobs(jobIds)
           ]);
           const locations = [...jobs.values()].map((job) => job?.location).filter((location2) => location2?.address);
-          if (candidateLocation?.address && locations.length) await routesFromCandidate(candidateLocation, locations);
+          if (locations.length) {
+            for (const candidateLocation of candidateLocations.filter((location2) => location2?.address)) {
+              await routesFromCandidate(candidateLocation, locations);
+            }
+          }
         }
       } catch (error) {
         console.warn("[Werkia CEM Distanz] Fahrzeiten nicht berechenbar:", candidateId, error);
@@ -18248,11 +18287,11 @@ Trotzdem speichern?`)) return void 0;
           item.cell.appendChild(group);
         }
         const info = matchInfo.get(item.matchId);
-        const candidateLocation = info ? provider.peekCandidateLocation(info.candidateId) : void 0;
+        const locations = info ? provider.peekCandidateLocations(info.candidateId) : void 0;
         const cachedJob = info ? provider.getCachedJob(info.jobPositionId) : void 0;
         if (info && !cachedJob) missingJobs.add(info.jobPositionId);
         const job = cachedJob?.job || null;
-        const entry = candidateLocation?.address && job?.location?.address ? cachedRoute(candidateLocation.address, job.location.address, { acceptTable: true }) : void 0;
+        const { candidateLocation, entry } = rowEntry(locations, job, cachedRoute);
         paintButton(group, rowView({ info, candidateLocation, cachedJob: cachedJob ?? void 0, entry }));
         const needsWork = info && candidateLocation !== null && (cachedJob === null || cachedJob?.job?.location?.address) && !entry;
         const lastAttempt = info ? attempts.get(`${info.candidateId}|${info.jobPositionId}`) || 0 : 0;
@@ -18354,7 +18393,7 @@ Trotzdem speichern?`)) return void 0;
           mapView(result.entry),
           el4("dl", {}, [
             el4("dt", { text: "Kandidat" }),
-            el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#2f9e44" }), result.candidateAddress]),
+            el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#2f9e44" }), result.candidateAddress, result.addressCount > 1 ? el4("span", { className: "mc-muted", text: ` (schnellste von ${result.addressCount} Adressen)` }) : null]),
             el4("dt", { text: "Vakanz" }),
             el4("dd", {}, [el4("span", { className: "mc-dot", style: "background:#e03131" }), result.jobAddress])
           ]),

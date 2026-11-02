@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.29.400
+// @version      1.30.401
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2386,7 +2386,7 @@
           "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot.",
           "Hat der Kandidat mehrere Adressen, zählt wie in der Liste die mit der kürzesten Fahrzeit. Die Box nennt dann, von welcher Adresse aus gerechnet wurde."
         ] : [],
-        "Ein Klick auf die Box öffnet die Route in OpenStreetMap.",
+        "Die Box zeigt die Route auf einer Karte. Darunter öffnen „Google Maps ↗“ und „OpenStreetMap ↗“ dieselbe Strecke.",
         "„Route nicht verfügbar“ heißt meist: Eine der beiden Adressen fehlt oder ließ sich nicht finden. Dann bitte selbst nachsehen.",
         "Berechnete Routen werden eine Woche im Browser zwischengespeichert."
       ]
@@ -11315,6 +11315,96 @@ ${rr.zahlen}` : view.title;
     if (hasCoords(from) && hasCoords(to)) return `${base}&route=${encodeURIComponent(`${mapPoint(from)};${mapPoint(to)}`)}`;
     return `${base}&from=${encodeURIComponent(mapPoint(from))}&to=${encodeURIComponent(mapPoint(to))}`;
   }
+  function googleMapsDirectionsUrl(from, to) {
+    const params = new URLSearchParams({ api: "1", origin: mapPoint(from), destination: mapPoint(to), travelmode: "driving" });
+    return `https://www.google.com/maps/dir/?${params}`;
+  }
+
+  // ../../shared/js/route-commute/static-map.js
+  var TILE_SIZE = 256;
+  var OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  var OSM_ATTRIBUTION = "© OpenStreetMap";
+  function lonLatToWorldPx(lon, lat, zoom) {
+    const scale = TILE_SIZE * 2 ** zoom;
+    const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+    const sin = Math.sin(clampedLat * Math.PI / 180);
+    return [
+      (lon + 180) / 360 * scale,
+      (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale
+    ];
+  }
+  function fitStaticMap(coordinates, { width = 360, height = 220, padding = 28, minZoom = 3, maxZoom = 15 } = {}) {
+    const points = (Array.isArray(coordinates) ? coordinates : []).map((point) => [Number(point?.[0]), Number(point?.[1])]).filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    if (points.length < 2) return null;
+    let zoom = minZoom;
+    let projected = points.map(([lon, lat]) => lonLatToWorldPx(lon, lat, zoom));
+    for (let candidate = maxZoom; candidate >= minZoom; candidate -= 1) {
+      const candidatePoints = points.map(([lon, lat]) => lonLatToWorldPx(lon, lat, candidate));
+      const xs2 = candidatePoints.map((point) => point[0]);
+      const ys2 = candidatePoints.map((point) => point[1]);
+      if (Math.max(...xs2) - Math.min(...xs2) <= width - padding * 2 && Math.max(...ys2) - Math.min(...ys2) <= height - padding * 2) {
+        zoom = candidate;
+        projected = candidatePoints;
+        break;
+      }
+    }
+    const xs = projected.map((point) => point[0]);
+    const ys = projected.map((point) => point[1]);
+    const originX = (Math.min(...xs) + Math.max(...xs)) / 2 - width / 2;
+    const originY = (Math.min(...ys) + Math.max(...ys)) / 2 - height / 2;
+    const tileCount = 2 ** zoom;
+    const tiles = [];
+    for (let tileY = Math.floor(originY / TILE_SIZE); tileY <= Math.floor((originY + height - 1) / TILE_SIZE); tileY += 1) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      for (let tileX = Math.floor(originX / TILE_SIZE); tileX <= Math.floor((originX + width - 1) / TILE_SIZE); tileX += 1) {
+        const wrappedX = (tileX % tileCount + tileCount) % tileCount;
+        tiles.push({
+          url: OSM_TILE_URL.replace("{z}", zoom).replace("{x}", wrappedX).replace("{y}", tileY),
+          left: Math.round(tileX * TILE_SIZE - originX),
+          top: Math.round(tileY * TILE_SIZE - originY)
+        });
+      }
+    }
+    return {
+      zoom,
+      width,
+      height,
+      tiles,
+      points: projected.map(([x, y]) => [Number((x - originX).toFixed(1)), Number((y - originY).toFixed(1))])
+    };
+  }
+
+  // ../../shared/js/route-commute/route-preview.js
+  var defaultEscape = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  var LABEL = { width: 200, height: 46 };
+  function addressLabel({ x, y, color, title, text, esc }) {
+    return `<foreignObject x="${x}" y="${y}" width="${LABEL.width}" height="${LABEL.height}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:4px 7px;border:1.5px solid ${color};border-radius:6px;background:rgba(255,255,255,.94);color:#1b1b1b;font:600 11px/1.3 sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.18);overflow:hidden;"><div style="font-weight:800;color:${color};">${esc(title)}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(text)}</div></div></foreignObject>`;
+  }
+  function labelPosition(point, { width, height }, preferAbove = false) {
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const [x, y] = point;
+    return {
+      x: Math.round(clamp(x < width / 2 ? x + 12 : x - LABEL.width - 12, 4, width - LABEL.width - 4)),
+      y: Math.round(clamp(preferAbove || y > height / 2 ? y - LABEL.height - 12 : y + 12, 4, height - LABEL.height - 22))
+    };
+  }
+  function routePreviewHtml({ coordinates, candidateAddress = "", jobAddress = "", candidateLocation, jobLocation, width = 500, height = 280, esc = defaultEscape } = {}) {
+    const map = fitStaticMap(coordinates, { width, height, padding: 36 });
+    if (!map) return "";
+    const points = map.points.map((point) => point.join(",")).join(" ");
+    const [start, end] = [map.points[0], map.points.at(-1)];
+    const tiles = map.tiles.map((tile) => `<image href="${esc(tile.url)}" x="${tile.left}" y="${tile.top}" width="256" height="256"/>`).join("");
+    const startLabel = labelPosition(start, map);
+    const endLabel = labelPosition(end, map, true);
+    const labels2 = [
+      candidateAddress ? addressLabel({ ...startLabel, color: "#2b8a3e", title: "Kandidat", text: candidateAddress, esc }) : "",
+      jobAddress ? addressLabel({ ...endLabel, color: "#c92a2a", title: "Vakanz", text: jobAddress, esc }) : ""
+    ].join("");
+    const svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Karte der Fahrtroute" style="display:block;width:100%;height:auto;background:#f4f4f5;">${tiles}<polyline points="${points}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/><polyline points="${points}" fill="none" stroke="#1971c2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="8" fill="#2f9e44" stroke="#fff" stroke-width="3"/><circle cx="${end[0]}" cy="${end[1]}" r="8" fill="#e03131" stroke="#fff" stroke-width="3"/>${labels2}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer"><rect x="${width - 104}" y="${height - 18}" width="104" height="18" fill="rgba(255,255,255,.8)"/><text x="${width - 6}" y="${height - 5}" text-anchor="end" font-family="sans-serif" font-size="11" fill="#333">${esc(OSM_ATTRIBUTION)}</text></a></svg>`;
+    const linkStyle = "color:#1971c2;font-size:12px;font-weight:700;text-decoration:none;";
+    const links = candidateLocation && jobLocation ? `<div style="display:flex;gap:14px;margin-top:6px;"><a href="${esc(googleMapsDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">Google Maps ↗</a><a href="${esc(osmDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">OpenStreetMap ↗</a></div>` : "";
+    return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;">${svg}</div>${links}`;
+  }
 
   // ../../shared/js/werkia-toolbox/cache-storage.js
   function pruneExpiredCacheEntries(cache, isExpired) {
@@ -11649,28 +11739,6 @@ ${rr.zahlen}` : view.title;
       return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS3.filter((label) => labels2.has(label)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog2(dialog)) || null;
-    function previewSvg(coordinates, candidateAddress, jobPositionAddress) {
-      if (!Array.isArray(coordinates) || coordinates.length < 2) return "";
-      const width = 500, height = 270, padding = 42;
-      const averageLatitude = coordinates.reduce((sum, point) => sum + point[1], 0) / coordinates.length;
-      const longitudeScale = Math.max(0.2, Math.cos(averageLatitude * Math.PI / 180));
-      const projected = coordinates.map(([lon, lat]) => [lon * longitudeScale, -lat]);
-      const xs = projected.map((point) => point[0]), ys = projected.map((point) => point[1]);
-      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-      const rangeX = Math.max(maxX - minX, 1e-6), rangeY = Math.max(maxY - minY, 1e-6);
-      const scale = Math.min((width - padding * 2) / rangeX, (height - padding * 2) / rangeY);
-      const offsetX = (width - rangeX * scale) / 2, offsetY = (height - rangeY * scale) / 2;
-      const points = projected.map(([x, y]) => `${(offsetX + (x - minX) * scale).toFixed(1)},${(offsetY + (y - minY) * scale).toFixed(1)}`);
-      const start = points[0].split(","), end = points.at(-1).split(",");
-      const labelWidth = 220, labelHeight = 66;
-      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-      const labelPosition = (point, preferAbove = false) => ({
-        x: clamp(Number(point[0]) < width / 2 ? Number(point[0]) + 12 : Number(point[0]) - labelWidth - 12, 6, width - labelWidth - 6),
-        y: clamp(preferAbove || Number(point[1]) > height / 2 ? Number(point[1]) - labelHeight - 12 : Number(point[1]) + 12, 6, height - labelHeight - 6)
-      });
-      const startLabel = labelPosition(start), endLabel = labelPosition(end, true);
-      return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.78);"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Vorschau der Fahrtroute" style="display:block;width:100%;height:270px;min-height:220px;"><defs><pattern id="werkia-route-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#dbe4ea" stroke-width="1"/></pattern></defs><rect width="${width}" height="${height}" fill="#f8fafb"/><rect width="${width}" height="${height}" fill="url(#werkia-route-grid)"/><polyline points="${points.join(" ")}" fill="none" stroke="#1971c2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${points.join(" ")}" fill="none" stroke="#74c0fc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="9" fill="#2f9e44" stroke="#fff" stroke-width="4"/><circle cx="${end[0]}" cy="${end[1]}" r="9" fill="#e03131" stroke="#fff" stroke-width="4"/><foreignObject x="${startLabel.x}" y="${startLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #2f9e44;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#2b8a3e;margin-bottom:2px;">Kandidat</div><div>${escapeHtml3(candidateAddress)}</div></div></foreignObject><foreignObject x="${endLabel.x}" y="${endLabel.y}" width="${labelWidth}" height="${labelHeight}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:7px 9px;border:2px solid #e03131;border-radius:8px;background:rgba(255,255,255,.96);color:#1b1b1b;font:600 12px/1.3 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.16);overflow:hidden;"><div style="font-size:13px;font-weight:900;color:#c92a2a;margin-bottom:2px;">Vakanz</div><div>${escapeHtml3(jobPositionAddress)}</div></div></foreignObject></svg><div style="padding:5px 8px;font-size:11px;font-weight:600;opacity:.65;text-align:center;">Klicken für die vollständige Karte</div></div>`;
-    }
     function positionBox(box, dialog) {
       const dialogRect = dialog.getBoundingClientRect();
       const notesRect = document.getElementById("werkia-om-notes-box")?.getBoundingClientRect();
@@ -11682,9 +11750,8 @@ ${rr.zahlen}` : view.title;
     function ensureBox(dialog, routeKey) {
       let box = document.getElementById(ROUTE_BOX_ID);
       if (!box) {
-        box = document.createElement("button");
+        box = document.createElement("div");
         box.id = ROUTE_BOX_ID;
-        box.type = "button";
         box.style.cssText = "position:fixed;padding:12px 16px;border:1px solid rgba(25,113,194,.38);border-radius:10px;background:#e7f5ff;color:#164b73;font:inherit;text-align:left;line-height:1.4;box-shadow:0 3px 12px rgba(0,0,0,0.12);z-index:9999999;box-sizing:border-box;";
         document.body.appendChild(box);
       }
@@ -11694,9 +11761,7 @@ ${rr.zahlen}` : view.title;
     }
     function renderBox(dialog, routeKey, state, data = {}) {
       const box = ensureBox(dialog, routeKey);
-      box.onclick = null;
-      box.disabled = state !== "ready";
-      box.style.cursor = state === "ready" ? "pointer" : state === "loading" ? "wait" : "default";
+      box.style.cursor = state === "loading" ? "wait" : "default";
       if (state === "loading") {
         box.innerHTML = '<strong>🗺️ Distanzrechner</strong><div style="margin-top:4px;font-size:13px;opacity:.75;">Route wird berechnet…</div>';
         return;
@@ -11710,10 +11775,8 @@ ${rr.zahlen}` : view.title;
       }
       box.style.background = "#e7f5ff";
       box.style.borderColor = "rgba(25,113,194,.38)";
-      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;">${escapeHtml3(data.displayText)}</div>${previewSvg(data.previewCoordinates, data.candidateAddress, data.jobPositionAddress)}`;
+      box.innerHTML = `<strong>🗺️ Distanz & Fahrzeit</strong><div style="margin-top:4px;font-size:15px;font-weight:800;">${escapeHtml3(data.displayText)}</div>${routePreviewHtml({ coordinates: data.previewCoordinates, candidateAddress: data.candidateAddress, jobAddress: data.jobPositionAddress, candidateLocation: data.candidateLocation, jobLocation: data.jobLocation })}`;
       box.title = `${data.candidateAddress} → ${data.jobPositionAddress}`;
-      box.disabled = false;
-      box.onclick = () => window.open(osmDirectionsUrl(data.candidateLocation, data.jobLocation), "_blank", "noopener,noreferrer");
     }
     async function loadRoute(route) {
       const provider = getKamGraphqlAdapter().commuteProvider;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.12.396
+// @version      1.13.398
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1224,8 +1224,11 @@
       name
       status
       employerUrl
+      groupId
+      group { id name sentMatchMode __typename }
       __typename
     }
+    noGoEmployerGroups { id name __typename }
     __typename
   }
 }`;
@@ -1235,46 +1238,62 @@
     name
     status
     employerUrl
+    groupId
+    group { id name sentMatchMode __typename }
     __typename
   }
 }`;
+  function groupOf(item) {
+    const group = item?.group;
+    const id = group && group.id || item?.groupId || "";
+    if (!id) return null;
+    return { id, name: group && group.name || "", sentMatchMode: group && group.sentMatchMode || "" };
+  }
+  function normalizeNoGoEmployer(item) {
+    return {
+      id: item.id,
+      name: item.name || "",
+      status: item.status || "",
+      employerUrl: item.employerUrl || "",
+      group: groupOf(item)
+    };
+  }
   var EMPLOYER_BATCH_SIZE = 25;
   function createNoGoProvider({ request }) {
     const candidateLoadsInFlight = /* @__PURE__ */ new Map();
     const employerCache = /* @__PURE__ */ new Map();
     const employerLoadsInFlight = /* @__PURE__ */ new Map();
+    async function loadCandidateNoGos(candidateId) {
+      if (!candidateId) return { employers: [], groups: [] };
+      const existing = candidateLoadsInFlight.get(candidateId);
+      if (existing) return existing;
+      const promise = (async () => {
+        const result = await request(CANDIDATE_NO_GO_QUERY, { id: candidateId });
+        const entries = result?.data?.noGoEmployers;
+        const groups = result?.data?.noGoEmployerGroups;
+        return {
+          employers: Array.isArray(entries) ? entries.filter((entry) => entry?.id).map(normalizeNoGoEmployer) : [],
+          groups: Array.isArray(groups) ? groups.filter((group) => group?.id).map((group) => ({ id: group.id, name: group.name || "" })) : []
+        };
+      })();
+      candidateLoadsInFlight.set(candidateId, promise);
+      try {
+        return await promise;
+      } finally {
+        candidateLoadsInFlight.delete(candidateId);
+      }
+    }
     return {
-      // Returns the candidate's No-Go entries as
-      // [{ id, name, status, employerUrl }]. An empty array means "checked,
-      // nothing hinterlegt" — callers must not confuse that with "not loaded
-      // yet", which is why this never resolves to null.
+      loadCandidateNoGos,
+      // Only the No-Go employers, for callers that predate employer groups.
       async loadCandidateNoGoEmployers(candidateId) {
-        if (!candidateId) return [];
-        const existing = candidateLoadsInFlight.get(candidateId);
-        if (existing) return existing;
-        const promise = (async () => {
-          const result = await request(CANDIDATE_NO_GO_QUERY, { id: candidateId });
-          const entries = result?.data?.noGoEmployers;
-          if (!Array.isArray(entries)) return [];
-          return entries.filter((entry) => entry?.id).map((entry) => ({
-            id: entry.id,
-            name: entry.name || "",
-            status: entry.status || "",
-            employerUrl: entry.employerUrl || ""
-          }));
-        })();
-        candidateLoadsInFlight.set(candidateId, promise);
-        try {
-          return await promise;
-        } finally {
-          candidateLoadsInFlight.delete(candidateId);
-        }
+        return (await loadCandidateNoGos(candidateId)).employers;
       },
-      // Resolves employer ids to { id, name, status, employerUrl }. The list
-      // rows already carry the employer id and name, but not the URL, so the
-      // group level needs this lookup. Results are cached for the lifetime of
-      // the page: an employer's URL does not change while someone works
-      // through a match list.
+      // Resolves employer ids to { id, name, status, employerUrl, group }.
+      // The list rows already carry the employer id and name, but not the
+      // group or URL, so the group level needs this lookup. Results are
+      // cached for the lifetime of the page: neither changes while someone
+      // works through a match list.
       async loadEmployersByIds(employerIds) {
         const wanted = [...new Set((employerIds || []).filter(Boolean))];
         const missing = wanted.filter((id) => !employerCache.has(id) && !employerLoadsInFlight.has(id));
@@ -1284,12 +1303,7 @@
             const result = await request(EMPLOYERS_BY_IDS_QUERY, { filter: { ids } });
             for (const item of result?.items || []) {
               if (!item?.id) continue;
-              employerCache.set(item.id, {
-                id: item.id,
-                name: item.name || "",
-                status: item.status || "",
-                employerUrl: item.employerUrl || ""
-              });
+              employerCache.set(item.id, normalizeNoGoEmployer(item));
             }
           })();
           for (const id of ids) employerLoadsInFlight.set(id, batch);
@@ -1492,6 +1506,114 @@
     return String(notes || "").replace(/\[\s*https?:\/\/[^\]]+\]/gi, "").replace(/estimate\s+salary\s+by\s+werkia/gi, "").split("\n").map((line) => line.trim()).filter(Boolean).join("\n").trim();
   }
 
+  // ../../shared/js/werkia-graphql/employer-groups-provider.js
+  var ONE_PER_GROUP = "one_per_group";
+  var EMPLOYER_GROUPS_TTL_MS = 10 * 60 * 1e3;
+  var EMPLOYER_GROUPS_RETRY_MS = 30 * 1e3;
+  var ONE_PER_GROUP_EMPLOYER_GROUPS_QUERY = `query OnePerGroupEmployerGroups {
+  items: allEmployerGroups(perPage: 500, filter: { sentMatchMode: "one_per_group" }) {
+    id
+    name
+    sentMatchMode
+    employers {
+      id
+      name
+      __typename
+    }
+    __typename
+  }
+}`;
+  function defaultNormaliseName(value) {
+    return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+  }
+  var normaliseId = (value) => String(value || "").trim().toLowerCase();
+  function normaliseEmployerGroups(items) {
+    const groups = [];
+    for (const item of Array.isArray(items) ? items : []) {
+      if (!item?.id || item.sentMatchMode !== ONE_PER_GROUP) continue;
+      const employers = Array.isArray(item.employers) ? item.employers : [];
+      groups.push({
+        id: normaliseId(item.id),
+        name: String(item.name || "").trim(),
+        sentMatchMode: item.sentMatchMode,
+        ids: [...new Set(employers.map((employer) => normaliseId(employer?.id)).filter(Boolean))],
+        names: [...new Set(employers.map((employer) => String(employer?.name || "").trim()).filter(Boolean))]
+      });
+    }
+    return groups;
+  }
+  function groupContainsEmployer(group, { employerId = "", employerName = "" } = {}, normaliseName = defaultNormaliseName) {
+    if (!group) return false;
+    const id = normaliseId(employerId);
+    if (id && group.ids.includes(id)) return true;
+    const name = normaliseName(employerName);
+    return Boolean(name) && group.names.some((other) => normaliseName(other) === name);
+  }
+  function findEmployerGroup(groups, { employerId = "", employerName = "" } = {}, normaliseName = defaultNormaliseName) {
+    const list = Array.isArray(groups) ? groups : [];
+    const id = normaliseId(employerId);
+    if (id) {
+      const byId = list.find((group) => group.ids.includes(id));
+      if (byId) return byId;
+    }
+    if (!employerName) return null;
+    return list.find((group) => groupContainsEmployer(group, { employerName }, normaliseName)) || null;
+  }
+  function createEmployerGroupsProvider({
+    request,
+    ttlMs = EMPLOYER_GROUPS_TTL_MS,
+    retryMs = EMPLOYER_GROUPS_RETRY_MS,
+    now = Date.now
+  } = {}) {
+    let groups = null;
+    let loadedAt = 0;
+    let failedAt = null;
+    let pending = null;
+    const listeners = /* @__PURE__ */ new Set();
+    function fresh() {
+      return groups && now() - loadedAt < ttlMs;
+    }
+    function load2({ force = false } = {}) {
+      if (!force && fresh()) return Promise.resolve(groups);
+      if (pending) return pending;
+      pending = Promise.resolve().then(() => request(ONE_PER_GROUP_EMPLOYER_GROUPS_QUERY, {})).then((result) => {
+        groups = normaliseEmployerGroups(result?.items);
+        loadedAt = now();
+        failedAt = null;
+        listeners.forEach((listener) => {
+          try {
+            listener(groups);
+          } catch {
+          }
+        });
+        return groups;
+      }).catch((error) => {
+        failedAt = now();
+        throw error;
+      }).finally(() => {
+        pending = null;
+      });
+      return pending;
+    }
+    function peek() {
+      const waitingAfterError = failedAt !== null && now() - failedAt < retryMs;
+      if (!fresh() && !pending && !waitingAfterError) {
+        load2().catch((error) => console.warn("[Werkia Arbeitgebergruppen] nicht lesbar:", error?.message || error));
+      }
+      return groups;
+    }
+    return {
+      load: load2,
+      peek,
+      // true, solange noch keine Liste da ist und der letzte Versuch scheiterte.
+      hasFailed: () => !groups && failedAt !== null,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+    };
+  }
+
   // src/graphql.js
   var BEARER_STORAGE_KEY = "werkia_obc_graphql_bearer_v1";
   var FINGERPRINT_STORAGE_KEY = "werkia_obc_graphql_fingerprint_v1";
@@ -1510,7 +1632,9 @@
       commuteProvider: createCommuteProvider({ request: base.request }),
       // Vakanz-Notizen (JobPosition.additionalInformation) fuer die Box
       // zwischen OM-Notizen und Routenbox.
-      jobPositionNotesProvider: createJobPositionNotesProvider({ request: base.request })
+      jobPositionNotesProvider: createJobPositionNotesProvider({ request: base.request }),
+      // Arbeitgebergruppen mit "Ein Match pro Gruppe" fuer Doppelte Matches.
+      employerGroupsProvider: createEmployerGroupsProvider({ request: base.request })
     };
     return adapter;
   }
@@ -2207,7 +2331,8 @@
       summary: "Warnt, wenn ein vorgeschlagener Arbeitgeber beim Kandidaten als No-Go hinterlegt ist. Das Adminpanel schlägt solche Arbeitgeber trotzdem vor.",
       notes: [
         "Dunkelrot: Genau dieses Arbeitgeberprofil ist als No-Go hinterlegt. Nicht senden.",
-        "Rot: Das No-Go hat denselben Webauftritt, also dieselbe Firma oder Firmengruppe. Vor dem Senden klären.",
+        "Rot mit Gruppenname: Die ganze Arbeitgebergruppe ist beim Kandidaten No-Go, oder ein No-Go-Arbeitgeber gehört zur selben Gruppe. Vor dem Senden klären.",
+        "Rot ohne Gruppe: Das No-Go hat denselben Webauftritt, also dieselbe Firma. Gilt nur, wenn einer der beiden Arbeitgeber keiner Gruppe angehört.",
         "Gelb: Nur der Name passt zu einem No-Go-Eintrag ohne eigenes Profil. Bitte selbst prüfen.",
         "Die Warnung blendet nichts aus und blockiert nichts. Die Entscheidung liegt bei dir."
       ]
@@ -2531,12 +2656,12 @@
       page: PAGES.questionnaire,
       routes: onPotentialMatches,
       kind: "view",
-      summary: "Zeigt beim offenen Fragebogen unter der Routenbox alle Matches dieses Kandidaten beim selben Arbeitgeber und bei Schwesterfirmen derselben Unternehmensgruppe.",
+      summary: "Zeigt beim offenen Fragebogen unter der Routenbox alle Matches dieses Kandidaten beim selben Arbeitgeber und bei den anderen Arbeitgebern seiner Arbeitgebergruppe.",
       notes: [
         "Die Pille zeigt den OM Status des Matches. „-“ heißt: noch kein OM Status.",
         "„Aktuell“ markiert die Stelle, deren Fragebogen gerade offen ist.",
         "Roter Hinweis oben: Ein anderer Match steht schon auf „Senden“, „Reverse Match senden“ oder „Portal Uploaded“. Den aktuellen Match dann nicht senden.",
-        "🏢 Gruppe: Die Stelle gehört zu einer anderen Firma derselben Unternehmensgruppe. Die Gruppe wird automatisch über den Arbeitgeber erkannt oder über [AG-GRUPPE: KEY] in den OM-Notizen.",
+        "🏢 Gruppe: Die Stelle gehört zu einem anderen Arbeitgeber derselben Arbeitgebergruppe. Es zählen nur Gruppen, die im Adminpanel unter „Arbeitgebergruppen“ auf „Ein Match pro Gruppe“ stehen; die Zuordnung kommt automatisch von dort.",
         "↻ lädt die Liste neu. Sonst bleibt sie eine Minute zwischengespeichert."
       ]
     },
@@ -3213,6 +3338,386 @@
     };
   }
 
+  // ../../shared/js/no-go-check/core.js
+  var LEGAL_FORM_TOKENS = /* @__PURE__ */ new Set([
+    "gmbh",
+    "mbh",
+    "ggmbh",
+    "ag",
+    "kg",
+    "kgaa",
+    "ohg",
+    "gbr",
+    "se",
+    "ug",
+    "ek",
+    "eg",
+    "co",
+    "cie",
+    "partg",
+    "mbb",
+    "inc",
+    "ltd",
+    "llc",
+    "bv",
+    "nv",
+    "sarl",
+    "plc",
+    "holding",
+    "gruppe",
+    "group",
+    "deutschland",
+    "firma",
+    "fa",
+    "und",
+    "der",
+    "die",
+    "das",
+    "den",
+    "von",
+    "am",
+    "im",
+    "in",
+    "fuer",
+    "de"
+  ]);
+  var GENERIC_TOKENS = /* @__PURE__ */ new Set([
+    "elektro",
+    "elektrotechnik",
+    "elektroinstallationen",
+    "elektroanlagen",
+    "elektrobau",
+    "sanitaer",
+    "heizung",
+    "heizungsbau",
+    "lueftung",
+    "klima",
+    "kaelte",
+    "shk",
+    "haustechnik",
+    "gebaeudetechnik",
+    "gebaeude",
+    "anlagenbau",
+    "anlagentechnik",
+    "anlagen",
+    "technik",
+    "solar",
+    "photovoltaik",
+    "energie",
+    "energietechnik",
+    "service",
+    "services",
+    "dienstleistungen",
+    "montage",
+    "facility",
+    "management",
+    "bau",
+    "betrieb",
+    "systeme",
+    "system",
+    "sicherheitstechnik",
+    "versorgungstechnik",
+    "nord",
+    "sued",
+    "ost",
+    "west",
+    "mitte",
+    "zentral",
+    "bayern",
+    "berlin",
+    "hessen"
+  ]);
+  var COMMON_SURNAME_TOKENS = /* @__PURE__ */ new Set([
+    "mueller",
+    "schmidt",
+    "schneider",
+    "fischer",
+    "weber",
+    "meyer",
+    "wagner",
+    "becker",
+    "schulz",
+    "hoffmann",
+    "schaefer",
+    "koch",
+    "bauer",
+    "richter",
+    "klein",
+    "wolf",
+    "schroeder",
+    "neumann",
+    "schwarz",
+    "zimmermann",
+    "braun",
+    "krueger",
+    "hofmann",
+    "hartmann",
+    "lange",
+    "schmitt",
+    "werner",
+    "schmitz",
+    "krause",
+    "meier",
+    "lehmann",
+    "schmid",
+    "schulze",
+    "maier",
+    "koehler",
+    "herrmann",
+    "walter",
+    "koenig",
+    "mayer",
+    "huber",
+    "kaiser",
+    "fuchs",
+    "peters",
+    "lang",
+    "scholz",
+    "moeller",
+    "weiss",
+    "jung",
+    "hahn",
+    "schubert",
+    "vogel",
+    "friedrich",
+    "keller",
+    "guenther",
+    "frank",
+    "berger",
+    "winkler",
+    "roth",
+    "beck",
+    "lorenz",
+    "baumann",
+    "franke",
+    "albrecht",
+    "schuster",
+    "simon",
+    "ludwig",
+    "boehm",
+    "winter",
+    "kraus",
+    "martin",
+    "schumacher",
+    "kraemer",
+    "vogt",
+    "stein",
+    "jaeger",
+    "otto",
+    "sommer",
+    "gross",
+    "seidel",
+    "heinrich",
+    "brandt",
+    "haas",
+    "schreiber",
+    "graf",
+    "dietrich",
+    "ziegler",
+    "kuhn",
+    "kuehn",
+    "pohl",
+    "engel",
+    "horn",
+    "busch",
+    "bergmann",
+    "thomas",
+    "voigt",
+    "sauter",
+    "sander",
+    "stadler",
+    "knapp",
+    "zimmer",
+    "hess",
+    "beyer",
+    "wegener",
+    "rubin"
+  ]);
+  var AGGREGATOR_DOMAINS = [
+    "arbeitsagentur.de",
+    "indeed.com",
+    "indeed.de",
+    "stepstone.de",
+    "linkedin.com",
+    "facebook.com",
+    "instagram.com",
+    "xing.com",
+    "kimeta.de",
+    "jobware.de",
+    "meinestadt.de",
+    "jooble.org",
+    "jobsora.com",
+    "google.com"
+  ];
+  function normalizeEmployerName(value) {
+    return String(value ?? "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/&/g, " und ").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((token) => token && !LEGAL_FORM_TOKENS.has(token)).join(" ");
+  }
+  function isDistinctiveToken(token) {
+    return Boolean(token) && token.length >= 4 && !GENERIC_TOKENS.has(token) && !COMMON_SURNAME_TOKENS.has(token);
+  }
+  function employerDomain(employerUrl) {
+    const raw = String(employerUrl ?? "").trim();
+    if (!raw) return null;
+    let host = "";
+    try {
+      host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+    host = host.replace(/^www\./, "");
+    if (!host.includes(".") || host.startsWith(".") || host.endsWith(".")) return null;
+    if (AGGREGATOR_DOMAINS.some((denied) => host === denied || host.endsWith(`.${denied}`))) return null;
+    return host;
+  }
+  function employerNamesMatch(left, right) {
+    const normalizedLeft = normalizeEmployerName(left);
+    const normalizedRight = normalizeEmployerName(right);
+    if (!normalizedLeft || !normalizedRight) return false;
+    if (normalizedLeft === normalizedRight) return true;
+    const leftTokens = normalizedLeft.split(" ");
+    const rightTokens = normalizedRight.split(" ");
+    const [shorter, longer] = leftTokens.length <= rightTokens.length ? [leftTokens, rightTokens] : [rightTokens, leftTokens];
+    if (!shorter.every((token) => longer.includes(token))) return false;
+    if (shorter.length >= 2) return shorter.some((token) => !GENERIC_TOKENS.has(token));
+    return isDistinctiveToken(shorter[0]);
+  }
+  var COLLISION_LEVELS = ["direct", "group", "name"];
+  function employerGroupOf(employer) {
+    const group = employer?.group;
+    const id = group && group.id || employer?.groupId || "";
+    if (!id) return null;
+    return { id, name: group && group.name || "", sentMatchMode: group && group.sentMatchMode || "" };
+  }
+  function classifyCollision(employer, noGoEmployers, noGoGroups = []) {
+    if (!employer?.id && !employer?.name) return null;
+    const entries = Array.isArray(noGoEmployers) ? noGoEmployers.filter(Boolean) : [];
+    const groups = Array.isArray(noGoGroups) ? noGoGroups.filter((group) => group && group.id) : [];
+    if (!entries.length && !groups.length) return null;
+    const ownGroup = employerGroupOf(employer);
+    const ownDomain = employerDomain(employer.employerUrl);
+    const byLevel = /* @__PURE__ */ new Map();
+    if (ownGroup) {
+      const hit = groups.find((group) => group.id === ownGroup.id);
+      if (hit) byLevel.set("group", { level: "group", noGo: null, group: { ...ownGroup, name: ownGroup.name || hit.name || "" } });
+    }
+    for (const noGo of entries) {
+      if (employer.id && noGo.id === employer.id) {
+        if (!byLevel.has("direct")) byLevel.set("direct", { level: "direct", noGo });
+        continue;
+      }
+      const noGoGroup = employerGroupOf(noGo);
+      if (ownGroup && noGoGroup) {
+        if (ownGroup.id === noGoGroup.id) {
+          const current = byLevel.get("group");
+          if (!current || !current.group) byLevel.set("group", { level: "group", noGo, group: { ...ownGroup, name: ownGroup.name || noGoGroup.name } });
+          continue;
+        }
+      } else {
+        const noGoDomain = employerDomain(noGo.employerUrl);
+        if (ownDomain && noGoDomain && ownDomain === noGoDomain) {
+          if (!byLevel.has("group")) byLevel.set("group", { level: "group", noGo });
+          continue;
+        }
+      }
+      if (employerNamesMatch(employer.name, noGo.name)) {
+        if (!byLevel.has("name")) byLevel.set("name", { level: "name", noGo });
+      }
+    }
+    for (const level of COLLISION_LEVELS) {
+      if (byLevel.has(level)) return byLevel.get(level);
+    }
+    return null;
+  }
+  var BADGE_LABELS = {
+    direct: "No-Go-Arbeitgeber",
+    group: "No-Go: gleiche Firmengruppe",
+    name: "No-Go? Name prüfen"
+  };
+  function describeCollision(collision) {
+    if (!collision) return null;
+    if (collision.level === "group" && collision.group) {
+      const groupName = String(collision.group.name ?? "").replace(/\s+/g, " ").trim() || "ohne Namen";
+      const noGoName = String(collision.noGo?.name ?? "").replace(/\s+/g, " ").trim();
+      return {
+        label: `No-Go: Gruppe ${groupName}`,
+        title: noGoName ? `Beim Kandidaten ist "${noGoName}" als No-Go hinterlegt. Der Arbeitgeber gehört zur selben Arbeitgebergruppe "${groupName}". Nicht senden, ohne das vorher zu klären.` : `Beim Kandidaten ist die ganze Arbeitgebergruppe "${groupName}" als No-Go hinterlegt, dieser Arbeitgeber gehört dazu. Nicht senden.`
+      };
+    }
+    const name = String(collision.noGo?.name ?? "").replace(/\s+/g, " ").trim() || "unbenannt";
+    const label = BADGE_LABELS[collision.level];
+    if (collision.level === "direct") {
+      return {
+        label,
+        title: `Dieser Arbeitgeber ist beim Kandidaten als No-Go hinterlegt ("${name}"). Nicht senden.`
+      };
+    }
+    if (collision.level === "group") {
+      return {
+        label,
+        title: `Beim Kandidaten ist "${name}" als No-Go hinterlegt — derselbe Webauftritt, also dieselbe Firma bzw. Firmengruppe. Nicht senden, ohne das vorher zu klären.`
+      };
+    }
+    return {
+      label,
+      title: `Beim Kandidaten ist "${name}" als No-Go hinterlegt, nur als Namenseintrag ohne eigenes Arbeitgeberprofil. Der Name passt zu diesem Arbeitgeber — vor dem Senden prüfen und das No-Go am echten Profil hinterlegen.`
+    };
+  }
+
+  // ../../shared/js/no-go-check/groups.js
+  var ONE_PER_GROUP2 = "one_per_group";
+  function isOnePerGroup(group) {
+    return Boolean(group && group.id && group.sentMatchMode === ONE_PER_GROUP2);
+  }
+  function later(left, right) {
+    if (!left) return right || "";
+    if (!right) return left;
+    return Date.parse(right) > Date.parse(left) ? right : left;
+  }
+  function findGroupSentMatch(employer, sentEmployerIds, groupOf2, sentAtOf = () => "") {
+    const group = employerGroupOf(employer);
+    if (!isOnePerGroup(group)) return null;
+    let hit = null;
+    for (const sentId of sentEmployerIds || []) {
+      if (!sentId || sentId === employer.id) continue;
+      const other = groupOf2(sentId);
+      if (!other || other.id !== group.id) continue;
+      const sentAt = sentAtOf(sentId) || "";
+      if (!hit) {
+        hit = { group, employerId: sentId, sentAt };
+        continue;
+      }
+      const best = later(hit.sentAt, sentAt);
+      if (best !== hit.sentAt) hit = { group, employerId: sentId, sentAt };
+    }
+    return hit;
+  }
+  function employersSharingGroup(shownEmployerIds, candidateEmployerIds, groupOf2) {
+    const result = new Set((shownEmployerIds || []).filter(Boolean));
+    const groupIds = /* @__PURE__ */ new Set();
+    for (const id of result) {
+      const group = groupOf2(id);
+      if (isOnePerGroup(group)) groupIds.add(group.id);
+    }
+    if (!groupIds.size) return result;
+    for (const id of candidateEmployerIds || []) {
+      if (!id || result.has(id)) continue;
+      const group = groupOf2(id);
+      if (group && groupIds.has(group.id)) result.add(id);
+    }
+    return result;
+  }
+  function groupSentLabel(hit, formatDate) {
+    const name = hit && hit.group && hit.group.name || "ohne Namen";
+    const when = hit && hit.sentAt ? formatDate(hit.sentAt) : "";
+    return when ? `Match in Gruppe ${name} gesendet: ${when}` : `Match in Gruppe ${name} bereits gesendet`;
+  }
+  function groupSentTitle(hit, formatDate, otherName = "") {
+    const name = hit && hit.group && hit.group.name || "ohne Namen";
+    const when = hit && hit.sentAt ? formatDate(hit.sentAt) : "";
+    const at = otherName ? ` an ${otherName}` : " an einen anderen Arbeitgeber der Gruppe";
+    return `Die Arbeitgebergruppe "${name}" steht auf "Ein Match pro Gruppe". Der Kandidat wurde${when ? ` am ${when}` : " bereits"}${at} gesendet. Diesen Vorschlag ignorieren.`;
+  }
+
   // src/features/obc-fragebogen/kam-status-lookup.js
   var OWNER_KEY = "kam-status-potentialMatches";
   var KAM_STATUS_TAG_CLASS = "werkia-obc-kam-status-tag";
@@ -3331,7 +3836,7 @@
       if (chip) chip.insertAdjacentElement("afterend", tag);
       else row.querySelector("td.column-connection, td.column-reverse")?.appendChild(tag);
     }
-    function setMatchPresentTag(row, sentAt, chip = getReverseMatchChip(row)) {
+    function setMatchPresentTag(row, sentAt, chip = getReverseMatchChip(row), groupHit = null) {
       const existing = row.querySelector(`.${MATCH_PRESENT_TAG_CLASS}`);
       if (!sentAt) {
         row.classList.remove(MATCH_PRESENT_ROW_CLASS);
@@ -3349,9 +3854,9 @@
       row.querySelectorAll(".werkia-urgent-vacancy-badge").forEach((badge) => badge.remove());
       const tag = existing || document.createElement("span");
       tag.className = MATCH_PRESENT_TAG_CLASS;
-      const text = `Match gesendet: ${formatSentAt(sentAt)}`;
+      const text = groupHit ? groupSentLabel(groupHit, formatSentAt) : `Match gesendet: ${formatSentAt(sentAt)}`;
       if (tag.textContent !== text) tag.textContent = text;
-      tag.title = `Für diesen Arbeitgeber wurde am ${formatSentAt(sentAt)} bereits ein Match gesendet. Diesen Vorschlag ignorieren.`;
+      tag.title = groupHit ? groupSentTitle(groupHit, formatSentAt, employerGroups.get(groupHit.employerId)?.name || "") : `Für diesen Arbeitgeber wurde am ${formatSentAt(sentAt)} bereits ein Match gesendet. Diesen Vorschlag ignorieren.`;
       tag.style.cssText = "display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:6px 0 2px 8px;padding:5px 9px;border:1px solid #8f2e2e;border-radius:999px;background:#a83232;color:#fff;font:800 12px/1.2 Arial,sans-serif;letter-spacing:.15px;vertical-align:middle;white-space:nowrap;";
       if (!existing) {
         const target = chip || row.querySelector("td.column-jobPositionId") || row.querySelector("td") || row;
@@ -3390,6 +3895,23 @@
       sentEmployerLoads.set(key, load2);
       return load2;
     }
+    const employerGroups = /* @__PURE__ */ new Map();
+    const employerGroupLoads = /* @__PURE__ */ new Set();
+    function loadEmployerGroups(employerIds) {
+      const missing = employerIds.filter((id) => id && !employerGroups.has(id) && !employerGroupLoads.has(id));
+      if (!missing.length) return;
+      missing.forEach((id) => employerGroupLoads.add(id));
+      Promise.resolve().then(() => getObcGraphqlAdapter().noGoProvider.loadEmployersByIds(missing)).catch((error) => {
+        console.warn("[OBC Match] Arbeitgebergruppen konnten nicht geladen werden:", error);
+        return /* @__PURE__ */ new Map();
+      }).then((employers) => {
+        for (const id of missing) employerGroups.set(id, employers.get(id) || { id, name: "", group: null });
+      }).finally(() => {
+        missing.forEach((id) => employerGroupLoads.delete(id));
+        scheduleRender();
+      });
+    }
+    const groupOf2 = (id) => employerGroups.get(id)?.group || null;
     async function lookupKamStatuses(candidateId, employerId) {
       return getObcGraphqlAdapter().matchProvider.loadReverseMatchKamStatuses(candidateId, employerId);
     }
@@ -3444,7 +3966,7 @@
       const rows = [...document.querySelectorAll("tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root")];
       const employerFor = /* @__PURE__ */ new Map();
       const missing = rows.filter((row) => !getResourceIdFromRow(row, "Employer"));
-      const overview = missing.length ? getCachedOverview(candidateId) : null;
+      const overview = getCachedOverview(candidateId);
       rows.forEach((row) => {
         const jobId = getResourceIdFromRow(row, "JobPosition");
         const employerId = getResourceIdFromRow(row, "Employer") || overview?.employerIdByJobPositionId.get(jobId) || "";
@@ -3452,19 +3974,25 @@
       });
       if (missing.length && overview === void 0) return;
       const visibleEmployerIds = [...new Set(employerFor.values())].sort();
-      const fullKey = `${candidateId}|${visibleEmployerIds.join(",")}`;
-      const sentEmployers = getCachedSentEmployers(fullKey);
-      if (sentEmployers === void 0 && visibleEmployerIds.length) loadSentEmployers(fullKey, candidateId, visibleEmployerIds);
+      const candidateEmployerIds = overview ? [...new Set(overview.employerIdByJobPositionId.values())].filter(Boolean) : [];
+      loadEmployerGroups([...visibleEmployerIds, ...candidateEmployerIds]);
+      const groupsReady = [...visibleEmployerIds, ...candidateEmployerIds].every((id) => employerGroups.has(id));
+      const historyEmployerIds = groupsReady ? [...employersSharingGroup(visibleEmployerIds, candidateEmployerIds, groupOf2)].sort() : [];
+      const fullKey = `${candidateId}|${historyEmployerIds.join(",")}`;
+      const sentEmployers = groupsReady ? getCachedSentEmployers(fullKey) : void 0;
+      if (sentEmployers === void 0 && groupsReady && historyEmployerIds.length) loadSentEmployers(fullKey, candidateId, historyEmployerIds);
       rows.forEach((row) => {
         const jobId = getResourceIdFromRow(row, "JobPosition");
         const employerId = employerFor.get(row);
         if (!jobId || !employerId) return;
         const reverseChip = getReverseMatchChip(row);
-        const sentAt = sentEmployers?.sentAtByEmployerId.get(employerId);
-        if (sentEmployers !== void 0) setMatchPresentTag(row, sentAt, reverseChip);
+        const directSentAt = sentEmployers?.sentAtByEmployerId.get(employerId);
+        const groupHit = !directSentAt && sentEmployers ? findGroupSentMatch({ id: employerId, group: groupOf2(employerId) }, sentEmployers.employerIds, groupOf2, (id) => sentEmployers.sentAtByEmployerId.get(id) || "") : null;
+        const sentAt = directSentAt || groupHit?.sentAt;
+        if (sentEmployers !== void 0) setMatchPresentTag(row, sentAt, reverseChip, groupHit);
         const statusesByJob = getCachedKamStatus(`${candidateId}|${employerId}`);
         if (statusesByJob !== void 0) {
-          setMatchPresentTag(row, sentAt, reverseChip);
+          setMatchPresentTag(row, sentAt, reverseChip, groupHit);
           setKamStatusTag(row, reverseChip ? statusesByJob?.get(jobId) || null : null);
           return;
         }
@@ -5314,141 +5842,11 @@
     scheduleRun();
   }
 
-  // ../../ops/om/toolbox/src/features/employer-groups.js
-  var EMPLOYER_GROUPS = {
-    DAUME: {
-      label: "Daume-Gruppe",
-      ids: [
-        "9bbfc658-0e9c-4f12-a8f2-f950d7421e23",
-        "8e16bece-d719-4612-ac2f-b841069e0a7c",
-        "413f7a0b-cdc1-4977-9d4f-e617940d9c3c",
-        "823d6547-240c-48fc-aefe-2cd87f477f12",
-        "52ec7c1e-7cce-4d8e-b150-906fe2ac19cc",
-        "e83cdd66-4af2-473b-a0e9-be10e98dbafa",
-        "4a006d6a-1ba0-4f23-a64e-9c2a2f2c5a06",
-        "6e678b6d-7034-4517-b4fc-3102d271bf42",
-        "c489315f-5c20-4e5b-9f3a-56c752f320e2",
-        "9657bdca-bbda-4298-ae3f-98877a4be98f",
-        "c55b394f-ef2a-4ad1-9a3c-e39a810f5055",
-        "828a2a6b-89bc-4402-b36a-443f102216ec",
-        "bfcc88de-9160-43a1-b065-d9b4abe19122",
-        "540ddc2b-ecbe-4967-8ceb-b3a937972c9a",
-        "f2badd38-3f46-4463-9134-6a357c7de99d",
-        "82f6c33e-7645-4b7c-abef-ded581bf410d",
-        "8b0fd0d0-0e13-408c-bea1-3336ec43ef22",
-        "8dc8d7ab-f9ce-4d76-b566-98d1eb726a1a",
-        "5c6970d9-7e2d-421b-9d17-6852f96d1ecc",
-        "e6be7af1-bf31-4fb9-8a60-d58f58c302b5",
-        "9a0e2e0a-2222-47b4-b7c5-65aaf32734bb",
-        "fa137ded-f901-43b5-a1d3-26365a24384c",
-        "eefebfe5-96a4-4180-add9-6f41153c9a2e",
-        "022b530a-d865-41ab-9a40-7c8a5e99b23f",
-        "46e795b5-a66f-455a-acbd-f82dab1a3d62",
-        "007a064c-a3d4-4453-a04c-1336100510b4",
-        "ebc47444-c112-406b-ba20-48e7c12e2924",
-        "dc884535-5e38-46b6-a355-071587e07ad5",
-        "63a094b1-c7d3-4b06-9da7-a2501e5a4941",
-        "e6601f9a-7be0-488d-aec9-30a3c8d4bc71",
-        "e4031687-3371-45a8-b620-2abcfb0a5691",
-        "c559b14b-a4d6-45b3-ab71-824823fc824e"
-      ],
-      names: [
-        "DF Energietechnik Berlin GmbH",
-        "SMOLA GmbH",
-        "Kurt Möller Heizungsbau GmbH",
-        "Lauerer GmbH",
-        "H. Venjakob GmbH & Co. KG",
-        "Otterpohl GmbH",
-        "Zitron GmbH",
-        "Wilhelm Koch GmbH",
-        "Fröhlich Heizung-Sanitär GmbH & Co. KG",
-        "Wiese Kälte-Klimatechnik GmbH",
-        "Reich Bad Exklusiv Sanitärtechnik GmbH",
-        "ELRO GmbH",
-        "Thies Gebäudetechnik GmbH",
-        "Schalück Kälte- und Klimatechnik GmbH",
-        "DF Anlagentechnik GmbH",
-        "Jürgen Plagge Sanitärtechnik GmbH",
-        "Hoppert Heizungs- und Lüftungsbau GmbH",
-        "Bolte Technik GmbH",
-        "S&J Haustechnik GmbH",
-        "Thomas Mehner Haustechnik GmbH",
-        "Pumpen Lehmann GmbH",
-        "Ehlert Haustechnik GmbH",
-        "SLK Schultz Lüftungs- und Klimatechnik GmbH",
-        "Krüger Heizungs- und Sanitär GmbH",
-        "DK Brandschutz GmbH",
-        "H. Bisplinghoff GmbH",
-        "HKW Heizungs-, Klima- und Wärmepumpentechnik GmbH",
-        "Daume GmbH Heizung-Lüftung-Sanitär",
-        "Trubel Luft- und Klimatechnik GmbH",
-        "DF Energietechnik Cottbus GmbH",
-        "Forster Klimatechnik GmbH",
-        "Georg Degen Zentralheizungen und sanitäre Anlagen GmbH & Co. KG"
-      ]
-    },
-    NETZWELTFABRIK: {
-      label: "NetzweltFabrik-Gruppe",
-      ids: [
-        "ac6b68dd-00f7-4c3e-8892-2de2aa95c6cc",
-        "4f0b2e33-4792-4ee8-b35a-2a00cf18ea4b"
-      ],
-      names: [
-        "NetzweltFabrik GmbH Nordsachsen",
-        "NetzweltFabrik GmbH Südsachsen"
-      ]
-    },
-    DEWARMTE: {
-      label: "DeWarmte",
-      ids: [
-        "04f17ec5-01f5-4694-b4c7-1b77b1304291",
-        "85e5c1a1-2627-4964-a91f-daf26277e4e6"
-      ],
-      // Im Adminpanel als "DeWarmte GmbH " und "DeWarmte gmbH" gespeichert;
-      // clean() gleicht Gross-/Kleinschreibung und Leerzeichen an.
-      names: ["DeWarmte GmbH"]
-    },
-    NDB: {
-      label: "NDB-Gruppe",
-      ids: [
-        "b4eb7afb-082f-4628-ad6c-b40c12897d85",
-        // Johs. Seufert + Sohn
-        "399c7424-ee3e-46ef-929b-a6c01bbe9165",
-        // NDB BAUTECHNIK
-        "29c3bb95-e35c-4608-a69d-4f4c000bed49",
-        // NDB ELEKTROTECHNIK
-        "54d3d733-f1ed-4cf5-9cbd-a255b21bba57",
-        // NDB ELEKTRO- UND KOMMUNIKATIONSTECHNIK
-        "827cd301-844e-4e0d-b995-bbefd6b79ce0",
-        // EFA
-        "67661512-6f71-4cf8-abf5-a40f5a758bd4",
-        // Norddeutsche Bausanierung
-        "3534fb97-9ee6-4d65-b454-5277842b8d8c",
-        // NDB energieKonzepte
-        "4463f577-34c7-4863-ad2e-efaf8709f708"
-        // NDB ELEKTROTECHNIK HAMBURG
-      ],
-      names: [
-        "Johs. Seufert + Sohn GmbH",
-        "NDB BAUTECHNIK GmbH & Co. KG",
-        "NDB ELEKTROTECHNIK GmbH & Co. KG",
-        "NDB ELEKTRO- UND KOMMUNIKATIONSTECHNIK GmbH",
-        "EFA ELEKTRO- UND KOMMUNIKATIONSTECHNIK GmbH & Co. KG",
-        "Norddeutsche Bausanierung GmbH & Co. KG",
-        "NDB energieKonzepte GmbH",
-        "NDB ELEKTROTECHNIK HAMBURG GmbH & Co. KG",
-        // scan.it hat aktuell keinen Datensatz in der Arbeitgeber-Tabelle.
-        "scan.it GmbH"
-      ]
-    }
-  };
-
   // src/features/obc-fragebogen/duplicate-matches.js
   var BOX_ID = "werkia-obc-duplicate-matches-box";
   var REFRESH_BUTTON_ID = "werkia-obc-duplicate-matches-refresh";
   var ROUTE_BOX_ID4 = "werkia-obc-route-box";
   var OM_NOTES_ID3 = "werkia-om-notes-box";
-  var OM_NOTES_LABEL = "Zusätzliche Information - OM";
   var PURPLE = "#e5dbff";
   var GREEN2 = "#d8f5d0";
   var CACHE_TTL_MS = 60 * 1e3;
@@ -5500,27 +5898,14 @@
     if (!value) return "-";
     return ONLINE_MATCH_STATUS_LABELS[value] || value;
   }
-  function parseEmployerGroupKeyFromOmNotes(text, groups = EMPLOYER_GROUPS) {
-    const match = String(text || "").match(/\[\s*AG-GRUPPE\s*:\s*([^\]]+)\]/i);
-    const key = match?.[1]?.trim().toUpperCase();
-    return key && groups[key] ? key : "";
+  function resolveEmployerGroups({ employerId = "", groups = [] } = {}) {
+    const group = employerId ? findEmployerGroup(groups, { employerId }) : null;
+    return group ? [{ key: group.id, label: group.name || "Arbeitgebergruppe", ids: group.ids }] : [];
   }
-  function resolveEmployerGroups({ employerId = "", omNotesText = "", groups = EMPLOYER_GROUPS } = {}) {
-    const resolved = [];
-    const tagKey = parseEmployerGroupKeyFromOmNotes(omNotesText, groups);
-    if (tagKey) resolved.push({ key: tagKey, label: groups[tagKey].label || tagKey, source: "tag" });
-    if (employerId) {
-      for (const [key, group] of Object.entries(groups)) {
-        if (key === tagKey) continue;
-        if ((group.ids || []).includes(employerId)) resolved.push({ key, label: group.label || key, source: "auto" });
-      }
-    }
-    return resolved;
-  }
-  function collectEmployerIds(employerId, resolvedGroups, groups = EMPLOYER_GROUPS) {
+  function collectEmployerIds(employerId, resolvedGroups) {
     const ids = new Set(employerId ? [employerId] : []);
-    for (const { key } of resolvedGroups || []) {
-      for (const id of groups[key]?.ids || []) ids.add(id);
+    for (const group of resolvedGroups || []) {
+      for (const id of group.ids || []) ids.add(id);
     }
     return ids;
   }
@@ -5529,7 +5914,7 @@
     for (const match of matches || []) {
       const job = jobsById.get(match?.jobPositionId);
       const employerId = job?.employer?.id || "";
-      if (!employerId || !employerIds.has(employerId)) continue;
+      if (!employerId || !(employerIds.has(employerId) || employerIds.has(employerId.toLowerCase()))) continue;
       rows.push({
         matchId: match.id || "",
         jobTitle: job.mainTitle || "-",
@@ -5578,12 +5963,12 @@
     }
     return matches;
   }
-  async function loadDuplicateMatches({ request, candidateId, jobId, omNotesText = "", groups = EMPLOYER_GROUPS }) {
+  async function loadDuplicateMatches({ request, candidateId, jobId, groups = [] }) {
     const currentJob = (await loadJobPositions(request, [jobId])).get(jobId);
     const currentEmployerId = currentJob?.employer?.id || "";
     if (!currentEmployerId) throw new Error(`Arbeitgeber zur Vakanz ${jobId} nicht gefunden.`);
-    const resolvedGroups = resolveEmployerGroups({ employerId: currentEmployerId, omNotesText, groups });
-    const employerIds = collectEmployerIds(currentEmployerId, resolvedGroups, groups);
+    const resolvedGroups = resolveEmployerGroups({ employerId: currentEmployerId, groups });
+    const employerIds = collectEmployerIds(currentEmployerId, resolvedGroups);
     const matches = await loadCandidateMatches(request, candidateId);
     const jobsById = await loadJobPositions(
       request,
@@ -5638,9 +6023,13 @@
       </div>`;
     }).join("");
   }
-  function groupLineHtml(groups) {
-    if (!groups?.length) return "";
-    const text = groups.map((group) => `${group.label} (${group.source === "tag" ? "per [AG-GRUPPE]" : "automatisch"})`).join(", ");
+  function groupLineHtml(data) {
+    if (data?.groupsFailed) {
+      return '<div style="margin:0 0 6px 0;font-size:12px;font-weight:800;color:#c92a2a;">Arbeitgebergruppen nicht geladen, nur derselbe Arbeitgeber geprüft.</div>';
+    }
+    const groups = data?.groups || [];
+    if (!groups.length) return "";
+    const text = groups.map((group) => `${group.label} (Ein Match pro Gruppe)`).join(", ");
     return `<div style="margin:0 0 6px 0;font-size:12px;font-weight:800;color:#4c2889;">🏢 ${escapeHtml(text)}</div>`;
   }
   function renderDuplicateMatchesHtml(entry, { isCard = false } = {}) {
@@ -5665,13 +6054,8 @@
       <div style="display:flex;align-items:center;font-size:${isCard ? "14" : "16"}px;font-weight:1000;line-height:1.15;">🔁 Doppelte Matches${count}${obcHelp.tipHtml("obc-duplicate-matches")}</div>
       <button type="button" id="${REFRESH_BUTTON_ID}" title="Neu laden" style="border:1px solid rgba(0,0,0,0.22);background:#fff;color:#000;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:1000;cursor:pointer;">↻</button>
     </div>
-    ${ready ? groupLineHtml(data.groups) : ""}
+    ${ready ? groupLineHtml(data) : ""}
     ${body}`;
-  }
-  function getOmNotesText(dialog) {
-    const field = [...dialog.querySelectorAll("span.ra-field")].find((f) => f.querySelector("p span")?.innerText?.trim() === OM_NOTES_LABEL);
-    const valueEl = field?.querySelector("span.MuiTypography-body2");
-    return valueEl?.innerText || valueEl?.textContent || "";
   }
   function executeDuplicateMatches(runtime) {
     runtime.registerSource("obc/toolbox/src/features/obc-fragebogen/duplicate-matches.js");
@@ -5684,15 +6068,19 @@
       document.getElementById(BOX_ID)?.remove();
       lastSignature = "";
     }
-    function startLoad(cacheKey, omNotesText) {
+    function startLoad(cacheKey) {
       const entry = { state: "loading", data: null, loadedAt: Date.now() };
       cache.set(cacheKey, entry);
-      loadDuplicateMatches({
-        request: getObcGraphqlAdapter().request,
+      const adapter2 = getObcGraphqlAdapter();
+      adapter2.employerGroupsProvider.load().catch((error) => {
+        console.warn("[Werkia OBC Doppelte Matches] Arbeitgebergruppen nicht lesbar:", error);
+        return null;
+      }).then((groups) => loadDuplicateMatches({
+        request: adapter2.request,
         candidateId: context.candidateId,
         jobId: context.jobId,
-        omNotesText
-      }).then((data) => {
+        groups: groups || []
+      }).then((data) => ({ ...data, groupsFailed: !groups }))).then((data) => {
         Object.assign(entry, { state: "ready", data, loadedAt: Date.now() });
       }).catch((error) => {
         console.warn("[Werkia OBC Doppelte Matches] Laden fehlgeschlagen:", error);
@@ -5756,11 +6144,10 @@
       if (!isTargetPage()) return removeBox();
       const dialog = findQuestionnaireDialog(document, { strictMode: false });
       if (!dialog || !context.key) return removeBox();
-      const omNotesText = getOmNotesText(dialog);
-      const cacheKey = `${context.key}|${parseEmployerGroupKeyFromOmNotes(omNotesText)}`;
+      const cacheKey = `${context.key}|`;
       let entry = cache.get(cacheKey);
       if (!entry || entry.state !== "loading" && Date.now() - entry.loadedAt > CACHE_TTL_MS) {
-        entry = startLoad(cacheKey, omNotesText);
+        entry = startLoad(cacheKey);
       }
       const box = ensureBox();
       const width = positionBox(box, dialog);
@@ -6560,302 +6947,6 @@
     });
   }
 
-  // ../../shared/js/no-go-check/core.js
-  var LEGAL_FORM_TOKENS = /* @__PURE__ */ new Set([
-    "gmbh",
-    "mbh",
-    "ggmbh",
-    "ag",
-    "kg",
-    "kgaa",
-    "ohg",
-    "gbr",
-    "se",
-    "ug",
-    "ek",
-    "eg",
-    "co",
-    "cie",
-    "partg",
-    "mbb",
-    "inc",
-    "ltd",
-    "llc",
-    "bv",
-    "nv",
-    "sarl",
-    "plc",
-    "holding",
-    "gruppe",
-    "group",
-    "deutschland",
-    "firma",
-    "fa",
-    "und",
-    "der",
-    "die",
-    "das",
-    "den",
-    "von",
-    "am",
-    "im",
-    "in",
-    "fuer",
-    "de"
-  ]);
-  var GENERIC_TOKENS = /* @__PURE__ */ new Set([
-    "elektro",
-    "elektrotechnik",
-    "elektroinstallationen",
-    "elektroanlagen",
-    "elektrobau",
-    "sanitaer",
-    "heizung",
-    "heizungsbau",
-    "lueftung",
-    "klima",
-    "kaelte",
-    "shk",
-    "haustechnik",
-    "gebaeudetechnik",
-    "gebaeude",
-    "anlagenbau",
-    "anlagentechnik",
-    "anlagen",
-    "technik",
-    "solar",
-    "photovoltaik",
-    "energie",
-    "energietechnik",
-    "service",
-    "services",
-    "dienstleistungen",
-    "montage",
-    "facility",
-    "management",
-    "bau",
-    "betrieb",
-    "systeme",
-    "system",
-    "sicherheitstechnik",
-    "versorgungstechnik",
-    "nord",
-    "sued",
-    "ost",
-    "west",
-    "mitte",
-    "zentral",
-    "bayern",
-    "berlin",
-    "hessen"
-  ]);
-  var COMMON_SURNAME_TOKENS = /* @__PURE__ */ new Set([
-    "mueller",
-    "schmidt",
-    "schneider",
-    "fischer",
-    "weber",
-    "meyer",
-    "wagner",
-    "becker",
-    "schulz",
-    "hoffmann",
-    "schaefer",
-    "koch",
-    "bauer",
-    "richter",
-    "klein",
-    "wolf",
-    "schroeder",
-    "neumann",
-    "schwarz",
-    "zimmermann",
-    "braun",
-    "krueger",
-    "hofmann",
-    "hartmann",
-    "lange",
-    "schmitt",
-    "werner",
-    "schmitz",
-    "krause",
-    "meier",
-    "lehmann",
-    "schmid",
-    "schulze",
-    "maier",
-    "koehler",
-    "herrmann",
-    "walter",
-    "koenig",
-    "mayer",
-    "huber",
-    "kaiser",
-    "fuchs",
-    "peters",
-    "lang",
-    "scholz",
-    "moeller",
-    "weiss",
-    "jung",
-    "hahn",
-    "schubert",
-    "vogel",
-    "friedrich",
-    "keller",
-    "guenther",
-    "frank",
-    "berger",
-    "winkler",
-    "roth",
-    "beck",
-    "lorenz",
-    "baumann",
-    "franke",
-    "albrecht",
-    "schuster",
-    "simon",
-    "ludwig",
-    "boehm",
-    "winter",
-    "kraus",
-    "martin",
-    "schumacher",
-    "kraemer",
-    "vogt",
-    "stein",
-    "jaeger",
-    "otto",
-    "sommer",
-    "gross",
-    "seidel",
-    "heinrich",
-    "brandt",
-    "haas",
-    "schreiber",
-    "graf",
-    "dietrich",
-    "ziegler",
-    "kuhn",
-    "kuehn",
-    "pohl",
-    "engel",
-    "horn",
-    "busch",
-    "bergmann",
-    "thomas",
-    "voigt",
-    "sauter",
-    "sander",
-    "stadler",
-    "knapp",
-    "zimmer",
-    "hess",
-    "beyer",
-    "wegener",
-    "rubin"
-  ]);
-  var AGGREGATOR_DOMAINS = [
-    "arbeitsagentur.de",
-    "indeed.com",
-    "indeed.de",
-    "stepstone.de",
-    "linkedin.com",
-    "facebook.com",
-    "instagram.com",
-    "xing.com",
-    "kimeta.de",
-    "jobware.de",
-    "meinestadt.de",
-    "jooble.org",
-    "jobsora.com",
-    "google.com"
-  ];
-  function normalizeEmployerName(value) {
-    return String(value ?? "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/&/g, " und ").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((token) => token && !LEGAL_FORM_TOKENS.has(token)).join(" ");
-  }
-  function isDistinctiveToken(token) {
-    return Boolean(token) && token.length >= 4 && !GENERIC_TOKENS.has(token) && !COMMON_SURNAME_TOKENS.has(token);
-  }
-  function employerDomain(employerUrl) {
-    const raw = String(employerUrl ?? "").trim();
-    if (!raw) return null;
-    let host = "";
-    try {
-      host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-    host = host.replace(/^www\./, "");
-    if (!host.includes(".") || host.startsWith(".") || host.endsWith(".")) return null;
-    if (AGGREGATOR_DOMAINS.some((denied) => host === denied || host.endsWith(`.${denied}`))) return null;
-    return host;
-  }
-  function employerNamesMatch(left, right) {
-    const normalizedLeft = normalizeEmployerName(left);
-    const normalizedRight = normalizeEmployerName(right);
-    if (!normalizedLeft || !normalizedRight) return false;
-    if (normalizedLeft === normalizedRight) return true;
-    const leftTokens = normalizedLeft.split(" ");
-    const rightTokens = normalizedRight.split(" ");
-    const [shorter, longer] = leftTokens.length <= rightTokens.length ? [leftTokens, rightTokens] : [rightTokens, leftTokens];
-    if (!shorter.every((token) => longer.includes(token))) return false;
-    if (shorter.length >= 2) return shorter.some((token) => !GENERIC_TOKENS.has(token));
-    return isDistinctiveToken(shorter[0]);
-  }
-  var COLLISION_LEVELS = ["direct", "group", "name"];
-  function classifyCollision(employer, noGoEmployers) {
-    if (!employer?.id && !employer?.name) return null;
-    const entries = Array.isArray(noGoEmployers) ? noGoEmployers.filter(Boolean) : [];
-    if (!entries.length) return null;
-    const ownDomain = employerDomain(employer.employerUrl);
-    const byLevel = /* @__PURE__ */ new Map();
-    for (const noGo of entries) {
-      if (employer.id && noGo.id === employer.id) {
-        if (!byLevel.has("direct")) byLevel.set("direct", noGo);
-        continue;
-      }
-      const noGoDomain = employerDomain(noGo.employerUrl);
-      if (ownDomain && noGoDomain && ownDomain === noGoDomain) {
-        if (!byLevel.has("group")) byLevel.set("group", noGo);
-        continue;
-      }
-      if (employerNamesMatch(employer.name, noGo.name)) {
-        if (!byLevel.has("name")) byLevel.set("name", noGo);
-      }
-    }
-    for (const level of COLLISION_LEVELS) {
-      if (byLevel.has(level)) return { level, noGo: byLevel.get(level) };
-    }
-    return null;
-  }
-  var BADGE_LABELS = {
-    direct: "No-Go-Arbeitgeber",
-    group: "No-Go: gleiche Firmengruppe",
-    name: "No-Go? Name prüfen"
-  };
-  function describeCollision(collision) {
-    if (!collision) return null;
-    const name = String(collision.noGo?.name ?? "").replace(/\s+/g, " ").trim() || "unbenannt";
-    const label = BADGE_LABELS[collision.level];
-    if (collision.level === "direct") {
-      return {
-        label,
-        title: `Dieser Arbeitgeber ist beim Kandidaten als No-Go hinterlegt ("${name}"). Nicht senden.`
-      };
-    }
-    if (collision.level === "group") {
-      return {
-        label,
-        title: `Beim Kandidaten ist "${name}" als No-Go hinterlegt — derselbe Webauftritt, also dieselbe Firma bzw. Firmengruppe. Nicht senden, ohne das vorher zu klären.`
-      };
-    }
-    return {
-      label,
-      title: `Beim Kandidaten ist "${name}" als No-Go hinterlegt, nur als Namenseintrag ohne eigenes Arbeitgeberprofil. Der Name passt zu diesem Arbeitgeber — vor dem Senden prüfen und das No-Go am echten Profil hinterlegen.`
-    };
-  }
-
   // ../../shared/js/no-go-check/index.js
   var POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
   var ROW_SELECTOR = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
@@ -6933,7 +7024,7 @@
     function loadCandidateNoGos(candidateId) {
       if (candidateLoadInFlight === candidateId) return;
       candidateLoadInFlight = candidateId;
-      Promise.resolve().then(() => getProvider().loadCandidateNoGoEmployers(candidateId)).then((entries) => {
+      Promise.resolve().then(() => getProvider().loadCandidateNoGos(candidateId)).then((entries) => {
         noGosByCandidate.set(candidateId, entries);
         if (getCandidateIdFromRoute3() === candidateId) scheduleRender();
       }).catch((error) => console.warn(`[${namespace.toUpperCase()} No-Go] No-Go-Arbeitgeber konnten nicht geladen werden:`, error)).finally(() => {
@@ -6962,7 +7053,7 @@
         return;
       }
       const rows = [...document.querySelectorAll(ROW_SELECTOR)];
-      if (!noGos.length) {
+      if (!noGos.employers.length && !noGos.groups.length) {
         rows.forEach(clearRow);
         return;
       }
@@ -6981,9 +7072,10 @@
         const employer = employersById.get(employerId) || {
           id: employerId,
           name: getEmployerLinkFromRow(row)?.textContent?.trim() || "",
-          employerUrl: ""
+          employerUrl: "",
+          group: null
         };
-        paintRow(row, classifyCollision(employer, noGos));
+        paintRow(row, classifyCollision(employer, noGos.employers, noGos.groups));
       }
     }
     function cleanup() {

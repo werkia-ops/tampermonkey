@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.30.401
+// @version      1.31.406
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -4965,6 +4965,249 @@
     scheduleSync();
   }
 
+  // ../../shared/js/kommentar-an-alle/core.js
+  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/kommentar-an-alle/6e80681f-4a09-4b5b-837c-e8f23ab0253f";
+  var REQUEST_TIMEOUT_MS = 15e3;
+  var CURRENT_EMPLOYEE_QUERY = `query WerkiaKommentarAnAlleMe {
+  me: currentEmployee { id __typename }
+}`;
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref3(href) {
+    const id = String(href || "").match(/#\/Match\/([^/?]+)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function parseResponse(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Matchkommentare an alle: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error("Matchkommentare an alle: Server nicht erreichbar.")),
+        ontimeout: () => reject(new Error("Matchkommentare an alle: Zeitüberschreitung."))
+      });
+    });
+  }
+  var pad = (value) => String(value).padStart(2, "0");
+  function displayDate(iso) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return "";
+    return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+  var DATE_RE = /^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$/;
+  var squash = (value) => String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  function commentKey(author, date) {
+    return `${squash(author)}|${String(date || "").trim()}`;
+  }
+  function keyMap(kommentare = []) {
+    const map = /* @__PURE__ */ new Map();
+    for (const item of kommentare) {
+      const date = displayDate(item?.createdAt);
+      const count = Number(item?.matches) || 0;
+      if (!date || count < 2) continue;
+      map.set(commentKey(item.autor, date), count);
+    }
+    return map;
+  }
+  var CHIP_LABEL = "auf alle AG-Matches angewendet";
+  function chipTitle(count) {
+    return `Mit „Für alle Arbeitgeber Matches anwenden“ geschrieben: derselbe Kommentar steht an ${count} Matches dieses Arbeitgebers.`;
+  }
+
+  // ../../shared/js/kommentar-an-alle/index.js
+  var PREFIX2 = "werkia-kaa";
+  var OWNER_ATTR = "data-werkia-kommentar-an-alle";
+  var STYLE_ID6 = `${PREFIX2}-style`;
+  var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
+  var BOX_SELECTOR = '[class~="group/comment-box"]';
+  var COMMENTS_BUTTON_SELECTOR3 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
+  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var CACHE_MS5 = 60 * 1e3;
+  var ERROR_RETRY_MS = 60 * 1e3;
+  var AFTER_NEW_MS = [3e3, 70 * 1e3];
+  function kommentarAnAlleTopic({ page, routes, id = "kommentar-an-alle" }) {
+    return {
+      id,
+      title: "Kommentar an alle Matches des Arbeitgebers erkennen",
+      page,
+      routes,
+      kind: "view",
+      summary: `Wurde ein Matchkommentar mit „Für alle Arbeitgeber Matches anwenden“ geschrieben, steht neben dem Datum der Chip „${CHIP_LABEL}“.`,
+      steps: [
+        "Matchkommentare öffnen wie gewohnt.",
+        `Kommentare, die an alle Matches des Arbeitgebers gingen, tragen „${CHIP_LABEL}“. Die Maus darauf zeigt, an wie vielen Matches er steht.`
+      ],
+      notes: [
+        "Kommentare mit „Für alle Kandidaten Matches anwenden“ markiert das Adminpanel selbst mit „auf alle Matches angewendet“.",
+        "Erkannt wird ein Kommentar daran, dass dieselbe Person denselben Text innerhalb von zwei Minuten auch an andere Matches dieses Arbeitgebers geschrieben hat. Ein später bearbeiteter Kommentar fällt deshalb heraus.",
+        "Ein gerade geschriebener Kommentar bekommt den Chip nach ein paar Sekunden, die volle Zahl nach gut einer Minute."
+      ]
+    };
+  }
+  function ensureStyle3() {
+    if (document.getElementById(STYLE_ID6)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID6;
+    style.textContent = `
+    .${PREFIX2}-chip { display:inline-flex; align-items:center; height:24px; padding:0 8px; box-sizing:border-box;
+      border:1px solid rgba(127,127,127,.45); border-radius:16px; color:inherit; background:transparent;
+      font-family:inherit; font-size:0.8125rem; line-height:1; white-space:nowrap; cursor:default; }
+  `;
+    document.head.appendChild(style);
+  }
+  function readBox(box) {
+    const name = box.querySelector("span.MuiTypography-body2")?.textContent || "";
+    const date = [...box.querySelectorAll(".MuiTypography-caption")].map((node) => (node.textContent || "").trim()).find((text) => DATE_RE.test(text)) || "";
+    return { name, date };
+  }
+  function dateNode(box, date) {
+    return [...box.querySelectorAll(".MuiTypography-caption")].find((node) => (node.textContent || "").trim() === date) || null;
+  }
+  function paint(dialog, keys) {
+    let painted = 0;
+    for (const box of dialog.querySelectorAll(BOX_SELECTOR)) {
+      const existing = box.querySelector(`.${PREFIX2}-chip`);
+      const { name, date } = readBox(box);
+      const count = name && date ? keys.get(commentKey(name, date)) : void 0;
+      if (!count) {
+        existing?.remove();
+        continue;
+      }
+      const title = chipTitle(count);
+      if (existing) {
+        if (existing.title !== title) existing.title = title;
+        painted += 1;
+        continue;
+      }
+      const anchor = dateNode(box, date);
+      const row2 = anchor?.parentElement;
+      if (!row2) continue;
+      const chip = document.createElement("span");
+      chip.className = `${PREFIX2}-chip`;
+      chip.textContent = CHIP_LABEL;
+      chip.title = title;
+      row2.appendChild(chip);
+      painted += 1;
+    }
+    return painted;
+  }
+  function executeKommentarAnAlle(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    now = () => Date.now()
+  } = {}) {
+    if (sourcePath) runtime.registerSource(sourcePath);
+    const root = document.documentElement;
+    if (root.hasAttribute(OWNER_ATTR)) return;
+    root.setAttribute(OWNER_ATTR, sourcePath || "");
+    if (!request) return;
+    const post = createClient({ request });
+    let myId = "";
+    let clickedMatchId = "";
+    let failedAt = 0;
+    const cache = /* @__PURE__ */ new Map();
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
+      return myId;
+    }
+    function load2(matchId, boxes) {
+      const entry = cache.get(matchId) || { at: 0, keys: /* @__PURE__ */ new Map(), boxes: 0, loading: null };
+      cache.set(matchId, entry);
+      if (entry.loading) return entry.loading;
+      entry.loading = (async () => {
+        try {
+          const data = await post({ employeeId: await loadMyId(), matchId });
+          entry.keys = keyMap(data.kommentare);
+          entry.at = now();
+          entry.boxes = boxes;
+          failedAt = 0;
+        } catch (error) {
+          failedAt = now();
+          console.warn("[Werkia] Matchkommentare an alle:", error?.message || error);
+        } finally {
+          entry.loading = null;
+        }
+        scheduleSync();
+      })();
+      return entry.loading;
+    }
+    function findDialog() {
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(BOX_SELECTOR));
+      return dialogs[dialogs.length - 1] || null;
+    }
+    const timers2 = /* @__PURE__ */ new Set();
+    function later(ms, matchId) {
+      const key = `${matchId}:${ms}`;
+      if (timers2.has(key)) return;
+      timers2.add(key);
+      runtime.setTimeout(() => {
+        timers2.delete(key);
+        const entry = cache.get(matchId);
+        if (entry) entry.at = 0;
+        scheduleSync();
+      }, ms);
+    }
+    function sync() {
+      const dialog = findDialog();
+      if (!dialog) return;
+      const matchId = clickedMatchId || matchIdFromHref3(location.hash);
+      if (!matchId) return;
+      const boxes = dialog.querySelectorAll(BOX_SELECTOR).length;
+      const entry = cache.get(matchId);
+      if (entry && entry.at && boxes > entry.boxes) {
+        entry.boxes = boxes;
+        for (const ms of AFTER_NEW_MS) later(ms, matchId);
+      }
+      const stale = !entry || !entry.at || now() - entry.at > CACHE_MS5;
+      const blocked = failedAt && now() - failedAt < ERROR_RETRY_MS;
+      if (stale && !blocked && !entry?.loading) load2(matchId, boxes);
+      if (entry?.at) {
+        ensureStyle3();
+        paint(dialog, entry.keys);
+      }
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR3);
+      if (!button3) return;
+      const row2 = button3.closest("tr");
+      clickedMatchId = matchIdFromHref3(row2?.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+    }, true);
+    let scheduled = false;
+    function scheduleSync() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 200);
+    }
+    runtime.createMutationObserver(scheduleSync).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleSync();
+  }
+
   // ../../shared/js/list-filter-presets/core.js
   var STORAGE_KEY = "werkia_list_filter_presets_v1";
   var STORE_VERSION = 1;
@@ -5167,7 +5410,7 @@
     const isTargetPage9 = () => isTargetRoute(location.hash, routes);
     const currentRoute = () => routeFromHash(location.hash);
     const ownPresets = () => presetsForRoute(presetStorage.load(), currentRoute());
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS.style)) return;
       const style = document.createElement("style");
       style.id = IDS.style;
@@ -5358,7 +5601,7 @@
         closeDialog();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       let bar = document.getElementById(IDS.bar);
       if (bar && bar.dataset.werkiaPresetsOwner !== owner) return;
       if (!bar) {
@@ -5384,10 +5627,10 @@
   }
 
   // ../../shared/js/vertretungen/core.js
-  var WEBHOOK_URL = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
-  var REQUEST_TIMEOUT_MS = 15e3;
+  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vertretungen/a3f0bc8f-9256-41b8-addc-f145028ed9be";
+  var REQUEST_TIMEOUT_MS2 = 15e3;
   var OFFLINE_MESSAGE = "Der Vertretungs-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY = `query WerkiaVertretungenMe {
+  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVertretungenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay(date = /* @__PURE__ */ new Date()) {
@@ -5418,7 +5661,7 @@
     if (!canEditDraft(me, draft)) return "Du kannst nur Vertretungen eintragen, in denen du selbst abwesend oder Vertretung bist.";
     return "";
   }
-  function parseResponse(status, text) {
+  function parseResponse2(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -5429,7 +5672,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Vertretungen: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createVertretungenClient({ request, url = WEBHOOK_URL, timeoutMs = REQUEST_TIMEOUT_MS }) {
+  function createVertretungenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -5439,7 +5682,7 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse(response.status, response.responseText));
+            resolve(parseResponse2(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -5546,7 +5789,7 @@
       const element6 = document.getElementById(id);
       return element6?.dataset.werkiaVertretungenOwner === sourcePath ? element6 : null;
     };
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS2.style)) return;
       const style = document.createElement("style");
       style.id = IDS2.style;
@@ -5613,7 +5856,7 @@
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -5768,7 +6011,7 @@
     }
     async function openDialog() {
       closeDialog();
-      ensureStyle7();
+      ensureStyle8();
       const overlay = el7("div", { id: IDS2.dialog });
       overlay.dataset.werkiaVertretungenOwner = sourcePath;
       overlay.addEventListener("click", (event) => {
@@ -5796,7 +6039,7 @@
         owned(IDS2.bar)?.remove();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       const slot = findSlot(document);
       const existing = owned(IDS2.button);
       if (existing && (slot ? existing.parentElement === slot.parent && (existing.nextElementSibling === slot.before || existing === slot.before) : existing.parentElement?.id === IDS2.bar)) return;
@@ -5866,15 +6109,15 @@
   }
 
   // ../../shared/js/vta-notizen/core.js
-  var WEBHOOK_URL2 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
-  var REQUEST_TIMEOUT_MS2 = 15e3;
+  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
+  var REQUEST_TIMEOUT_MS3 = 15e3;
   var OFFLINE_MESSAGE2 = "Der Server für die VTA-Notizen ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var MAX_NOTE = 1e3;
-  var CURRENT_EMPLOYEE_QUERY2 = `query WerkiaVtaNotizenMe {
+  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaVtaNotizenMe {
   me: currentEmployee { id __typename }
 }`;
-  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function parseResponse2(status, text) {
+  var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function parseResponse3(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -5885,7 +6128,7 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Notizen: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createNotizenClient({ request, url = WEBHOOK_URL2, timeoutMs = REQUEST_TIMEOUT_MS2 }) {
+  function createNotizenClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -5895,7 +6138,7 @@
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse2(response.status, response.responseText));
+            resolve(parseResponse3(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -5907,21 +6150,21 @@
   }
   function employerIdFromHref2(href) {
     const id = String(href || "").match(/#\/Employer\/([^/?]+)/i)?.[1] || "";
-    return UUID_RE.test(id) ? id.toLowerCase() : "";
+    return UUID_RE2.test(id) ? id.toLowerCase() : "";
   }
-  function matchIdFromHref3(href) {
+  function matchIdFromHref4(href) {
     const id = String(href || "").match(/#\/Match\/([^/?]+)/i)?.[1] || "";
-    return UUID_RE.test(id) ? id.toLowerCase() : "";
+    return UUID_RE2.test(id) ? id.toLowerCase() : "";
   }
   function createLookup(entries = []) {
     const byId2 = /* @__PURE__ */ new Map();
     for (const entry of entries) if (entry?.employerId) byId2.set(String(entry.employerId).toLowerCase(), entry);
     return (employerId) => byId2.get(String(employerId || "").toLowerCase()) || null;
   }
-  var squash = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  var squash2 = (value) => String(value || "").replace(/\s+/g, " ").trim();
   function hasNote(notes, notiz) {
-    const needle = squash(notiz);
-    return Boolean(needle) && squash(notes).includes(needle);
+    const needle = squash2(notiz);
+    return Boolean(needle) && squash2(notes).includes(needle);
   }
   function withNote(notes, notiz) {
     const text = String(notes || "");
@@ -5950,7 +6193,7 @@ ${add}` : add;
   };
   var BOX_CLASS = "werkia-vta-notiz-box";
   var OWNER_KEY = "werkiaVtaNotizOwner";
-  var CACHE_MS5 = 5 * 60 * 1e3;
+  var CACHE_MS6 = 5 * 60 * 1e3;
   var RETRY_MS2 = 60 * 1e3;
   var CLICK_MAX_AGE_MS = 10 * 60 * 1e3;
   var CONFIRM_MS2 = 4e3;
@@ -5990,7 +6233,7 @@ ${add}` : add;
     const matchLink = row2.querySelector('a[href*="#/Match/"]');
     return {
       employerId: employerIdFromHref2(employerLink?.getAttribute("href")),
-      matchId: matchIdFromHref3(matchLink?.getAttribute("href"))
+      matchId: matchIdFromHref4(matchLink?.getAttribute("href"))
     };
   }
   function vtaNotizenTopic({ page, routes }) {
@@ -6042,7 +6285,7 @@ ${add}` : add;
       return element6?.dataset[OWNER_KEY] === sourcePath ? element6 : null;
     };
     const currentEmployerId = () => employerIdFromHref2(location.hash || "");
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS3.style)) return;
       const style = document.createElement("style");
       style.id = IDS3.style;
@@ -6149,7 +6392,7 @@ ${add}` : add;
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -6174,7 +6417,7 @@ ${add}` : add;
       return loading;
     }
     function loadList() {
-      if (cache && now() - cache.at < CACHE_MS5) return Promise.resolve(cache);
+      if (cache && now() - cache.at < CACHE_MS6) return Promise.resolve(cache);
       if (failedAt && now() - failedAt < RETRY_MS2) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[VTA-Notizen] Liste nicht geladen:", error?.message || error);
@@ -6326,7 +6569,7 @@ ${add}` : add;
     function currentTarget() {
       if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS && (clicked.matchId || clicked.employerId)) return clicked;
       const hash = location.hash || "";
-      return { matchId: matchIdFromHref3(hash), employerId: employerIdFromHref2(hash) };
+      return { matchId: matchIdFromHref4(hash), employerId: employerIdFromHref2(hash) };
     }
     async function resolveEmployer(target) {
       if (target.employerId) return target.employerId;
@@ -6389,7 +6632,7 @@ ${add}` : add;
       if (claimedBy && claimedBy !== sourcePath) return;
       if (box && box.dialog !== dialog) teardownBox();
       if (!box) {
-        ensureStyle7();
+        ensureStyle8();
         dialog.dataset[OWNER_KEY] = sourcePath;
         const element6 = el7("div", { className: BOX_CLASS });
         element6.dataset[OWNER_KEY] = sourcePath;
@@ -6521,7 +6764,7 @@ ${add}` : add;
     }
     async function openDialog({ employerId = "" } = {}) {
       closeDialog();
-      ensureStyle7();
+      ensureStyle8();
       dialogState = { entries: cache?.entries || [], hits: null, query: "", selected: null, fromOverview: !employerId };
       const overlay = el7("div", { id: IDS3.dialog });
       overlay.dataset[OWNER_KEY] = sourcePath;
@@ -6572,7 +6815,7 @@ ${add}` : add;
       existing?.remove();
       const target = findSlot(document);
       if (!target) return;
-      ensureStyle7();
+      ensureStyle8();
       const noteButton = el7("button", { type: "button", textContent: text, onclick: () => openDialog({ employerId: currentEmployerId() }) });
       noteButton.id = IDS3.button;
       noteButton.title = has2 ? "VTA-Notiz dieses Arbeitgebers ansehen oder ändern" : "Feste Notiz für Terminvorschläge bei diesem Arbeitgeber anlegen";
@@ -6708,7 +6951,7 @@ ${add}` : add;
 
   // ../../shared/js/out-gruende/index.js
   var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
-  var MATCH_LINK_SELECTOR3 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var BATCH_SIZE2 = 25;
   var CACHE_TTL_MS = 5 * 60 * 1e3;
   var STATUS_CHANGE_DELAY_MS = 2e3;
@@ -6736,17 +6979,17 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID19 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID20 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
     let loadPromise = null;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID19)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID20)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID19;
+      style.id = STYLE_ID20;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -6812,7 +7055,7 @@ ${add}` : add;
       if (!view) return;
       for (const row2 of rows(view)) {
         const cell = row2.querySelector(view.cellSelector);
-        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
         let line = cell.querySelector(`.${LINE_CLASS2}`);
         const match = matchId ? cache.get(matchId)?.match : null;
         const entries = renderInline(view, row2, match ? entriesFor(view, cell, match) : []);
@@ -6842,7 +7085,7 @@ ${add}` : add;
     function trackStatusChanges(view) {
       let changed = false;
       for (const row2 of rows(view)) {
-        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
+        const matchId = getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"));
         if (!matchId) continue;
         const text = selectText(row2.querySelector(view.cellSelector));
         const before = lastStatus.get(matchId);
@@ -6866,7 +7109,7 @@ ${add}` : add;
       if (loadPromise) return loadPromise;
       const view = currentView();
       if (!view) return;
-      const ids = [...new Set(rows(view).map((row2) => getMatchId(row2.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"))).filter(Boolean))].filter((id) => force || !fresh(id) && !failed.has(id));
+      const ids = [...new Set(rows(view).map((row2) => getMatchId(row2.querySelector(MATCH_LINK_SELECTOR4)?.getAttribute("href"))).filter(Boolean))].filter((id) => force || !fresh(id) && !failed.has(id));
       if (!ids.length) return;
       loadPromise = (async () => {
         const request = options.getGraphqlAdapter().request;
@@ -6903,7 +7146,7 @@ ${add}` : add;
         scheduled = false;
         const view = currentView();
         if (!view) return;
-        ensureStyle7();
+        ensureStyle8();
         const changed = trackStatusChanges(view);
         render();
         if (!changed) load2().catch((error) => console.warn("[Werkia Out-Gründe]", error));
@@ -6995,6 +7238,7 @@ ${add}` : add;
       ]
     },
     matchMentionTopic({ kind: "cem", page: "Matchkommentar-Dialog", routes: onMyMatches }),
+    kommentarAnAlleTopic({ page: "Matchkommentar-Dialog", routes: onMyMatches }),
     {
       id: "match-mail",
       title: "Mail an AP und offene Bewerber für die Sammelmail",
@@ -7957,7 +8201,7 @@ ${add}` : add;
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
   var FILTERED_OUT_ATTRIBUTE = "data-werkia-filtered-out";
   var LOADING_SELECTOR = '.MuiLinearProgress-root, header [role="progressbar"], header .MuiCircularProgress-root';
   function executeBulkMatchActions(runtime, sourcePath, config) {
@@ -8013,7 +8257,7 @@ ${add}` : add;
       return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
     }
     function isMatchRow(row2) {
-      return row2.querySelector(MATCH_LINK_SELECTOR4) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
+      return row2.querySelector(MATCH_LINK_SELECTOR5) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
     }
     function activeScope() {
       const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR3)].some(isMatchRow));
@@ -8053,7 +8297,7 @@ ${add}` : add;
       return label.length > 90 ? `${label.slice(0, 89)}…` : label;
     }
     function matchIdFromRow2(row2) {
-      const link = row2.querySelector(MATCH_LINK_SELECTOR4);
+      const link = row2.querySelector(MATCH_LINK_SELECTOR5);
       return link?.href.match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
     }
     const kit = createBulkDialogKit({
@@ -8698,14 +8942,14 @@ ${add}` : add;
   }
 
   // src/features/kam-suite/response-rate-vorschlag.js
-  var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/response-rate-vorschlag/241b3a36-9aa5-4880-b33b-89cf354e7e58";
-  var REQUEST_TIMEOUT_MS3 = 15e3;
+  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/response-rate-vorschlag/241b3a36-9aa5-4880-b33b-89cf354e7e58";
+  var REQUEST_TIMEOUT_MS4 = 15e3;
   var OFFLINE_MESSAGE3 = "Der Server für die Vorschläge zur Response Rate ist gerade nicht erreichbar.";
   var MAX_IDS = 100;
-  var CURRENT_EMPLOYEE_QUERY3 = `query WerkiaResponseRateMe {
+  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaResponseRateMe {
   me: currentEmployee { id __typename }
 }`;
-  function parseResponse3(status, text) {
+  function parseResponse4(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -8716,17 +8960,17 @@ ${add}` : add;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Response-Rate-Vorschlag: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createVorschlagClient({ request, url = WEBHOOK_URL3 }) {
+  function createVorschlagClient({ request, url = WEBHOOK_URL4 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: REQUEST_TIMEOUT_MS3,
+        timeout: REQUEST_TIMEOUT_MS4,
         onload(response) {
           try {
-            resolve(parseResponse3(response.status, response.responseText));
+            resolve(parseResponse4(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -8776,7 +9020,7 @@ ${add}` : add;
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
-  var STYLE_ID6 = "werkia-kam-contact-style";
+  var STYLE_ID7 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
   var VORSCHLAG_RETRY_MS = 60 * 1e3;
   var CONTACT_OPTIONS = {
@@ -8848,10 +9092,10 @@ ${add}` : add;
       if (CONTACT_OPTIONS[value]) return { status: "ready", value };
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID6)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID7)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID6;
+      style.id = STYLE_ID7;
       style.textContent = `
       .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
       .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
@@ -8952,7 +9196,7 @@ ${add}` : add;
     }
     async function ensureMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY3, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY4, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -9108,7 +9352,7 @@ ${rr.zahlen}` : view.title;
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage2()) return;
-        ensureStyle7();
+        ensureStyle8();
         renderContactBadges();
         loadEmployerContacts().catch((error) => console.warn("[Werkia KAM Kontakt-Badges]", error));
         loadVorschlaege();
@@ -9126,11 +9370,11 @@ ${rr.zahlen}` : view.title;
 
   // src/features/tags-wvl.js
   var SOURCE_PATH = "kam/toolbox/src/features/tags-wvl.js";
-  var STYLE_ID7 = "werkia-kam-tags-wvl-style";
+  var STYLE_ID8 = "werkia-kam-tags-wvl-style";
   var CELL_ATTR = "data-werkia-tags-wvl";
   var WRAP_CLASS = "werkia-kam-tags-wvl";
   var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
-  var MATCH_LINK_SELECTOR5 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var SAVE_DELAY_MS = 900;
   var clean3 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function germanDateToIso(text) {
@@ -9142,7 +9386,7 @@ ${rr.zahlen}` : view.title;
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
     return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
   }
-  function matchIdFromHref4(href) {
+  function matchIdFromHref5(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function isTagsDialog(element6) {
@@ -9159,9 +9403,9 @@ ${rr.zahlen}` : view.title;
     let wroteSinceOpen = false;
     let dialogWasOpen = false;
     function injectStyle() {
-      if (document.getElementById(STYLE_ID7)) return;
+      if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID7;
+      style.id = STYLE_ID8;
       style.textContent = `
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
       .${WRAP_CLASS} { display: inline-flex; flex-direction: column; gap: 2px; font: 400 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -9259,7 +9503,7 @@ ${rr.zahlen}` : view.title;
     }
     function installCell(cell) {
       const row2 = cell.closest("tr");
-      const matchId = matchIdFromHref4(row2?.querySelector(MATCH_LINK_SELECTOR5)?.getAttribute("href"));
+      const matchId = matchIdFromHref5(row2?.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
       if (!matchId) return;
       let wrap2 = cell.querySelector(`:scope > .${WRAP_CLASS}`);
       if (wrap2 && wrap2.dataset.matchId !== matchId) {
@@ -9310,7 +9554,7 @@ ${rr.zahlen}` : view.title;
 
   // src/features/tags-hc.js
   var SOURCE_PATH2 = "kam/toolbox/src/features/tags-hc.js";
-  var STYLE_ID8 = "werkia-kam-tags-hc-style";
+  var STYLE_ID9 = "werkia-kam-tags-hc-style";
   var ROOT_CLASS = "werkia-kam-tags-hc";
   var DIALOG_ATTR = "data-werkia-tags-hc";
   var STORE_KEY = "RaStore.UnreadMatchCommentMentionMatches.listParams";
@@ -9318,7 +9562,7 @@ ${rr.zahlen}` : view.title;
   var HOT_STATUSES = ["hot_case", "hot_hot_case"];
   var REFRESH_MS = 2 * 60 * 1e3;
   var OPEN_TIMEOUT_MS = 6e3;
-  var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaKamTagsHcMe {
+  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaKamTagsHcMe {
   me: currentEmployee { id __typename }
 }`;
   var COUNT_QUERY = `query WerkiaKamTagsHcCount($filter: MatchFilter) {
@@ -9412,9 +9656,9 @@ ${rr.zahlen}` : view.title;
       ls.removeItem(PENDING_KEY);
     }
     function injectStyle() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       .${ROOT_CLASS} { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; flex-shrink: 0; }
       .${ROOT_CLASS} > button { white-space: nowrap; }
@@ -9446,7 +9690,7 @@ ${rr.zahlen}` : view.title;
       try {
         const request = getRequest();
         if (!myId) {
-          const data2 = await request(CURRENT_EMPLOYEE_QUERY4, {});
+          const data2 = await request(CURRENT_EMPLOYEE_QUERY5, {});
           myId = String(data2?.me?.id || "");
           if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
         }
@@ -9658,7 +9902,7 @@ ${rr.zahlen}` : view.title;
   // src/features/kam-suite/vacancy-city-badges.js
   var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID9 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID10 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage4(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -9688,10 +9932,10 @@ ${rr.zahlen}` : view.title;
       });
       return [...ids];
     }
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID9)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -9759,7 +10003,7 @@ ${rr.zahlen}` : view.title;
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage4()) return;
-        ensureStyle7();
+        ensureStyle8();
         renderCityBadges();
         loadJobPositionCities().catch((error) => console.warn("[Werkia KAM Vakanz-Stadt]", error));
       }, 150);
@@ -9851,9 +10095,9 @@ ${rr.zahlen}` : view.title;
   // src/features/kam-suite/cem-status-line.js
   var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
-  var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID10 = "werkia-kam-cem-line-style";
+  var STYLE_ID11 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH2 = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
@@ -9879,12 +10123,12 @@ ${rr.zahlen}` : view.title;
       return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
     function matchIdFromRow2(row2) {
-      return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
+      return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR7)?.getAttribute("href"));
     }
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID10)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -10019,7 +10263,7 @@ ${rr.zahlen}` : view.title;
       runtime.setTimeout(() => {
         scheduled = false;
         if (!isTargetPage5()) return;
-        ensureStyle7();
+        ensureStyle8();
         renderLines();
         loadCemInfo().catch((error) => console.warn("[Werkia KAM CEM-Status]", error));
       }, 150);
@@ -10090,7 +10334,7 @@ ${rr.zahlen}` : view.title;
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID11 = "werkia-match-status-filter-style";
+  var STYLE_ID12 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -10107,10 +10351,10 @@ ${rr.zahlen}` : view.title;
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage9 = () => route.test(location.hash);
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID11)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID12)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID11;
+      style.id = STYLE_ID12;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -10168,7 +10412,7 @@ ${rr.zahlen}` : view.title;
         bar?.remove();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       if (!bar) {
         const anchor = findListAnchor(document);
         if (!anchor?.parentElement) return;
@@ -12416,10 +12660,10 @@ ${rr.zahlen}` : view.title;
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
   var ROW_SELECTOR9 = "tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row2) {
-    const link = row2?.querySelector(MATCH_LINK_SELECTOR7);
+    const link = row2?.querySelector(MATCH_LINK_SELECTOR8);
     return link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
   }
   function getEmployerIdFromChatRow(row2) {
@@ -12950,9 +13194,9 @@ ${rr.zahlen}` : view.title;
   var MARK = "data-werkia-cem-vta-pill";
   var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
   var TYPE_ATTRIBUTE = "data-werkia-interview-type";
-  var STYLE_ID12 = "werkia-interview-pill-style";
+  var STYLE_ID13 = "werkia-interview-pill-style";
   var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
-  var CACHE_MS6 = 60 * 1e3;
+  var CACHE_MS7 = 60 * 1e3;
   var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
   var OWN_SELECTOR2 = `[${ORIGIN_ATTRIBUTE}], [${TYPE_ATTRIBUTE}]`;
   var MATCH_INTERVIEWS_QUERY = `query allMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
@@ -13023,10 +13267,10 @@ ${rr.zahlen}` : view.title;
     runtime.registerSource(sourcePath);
     const cache = /* @__PURE__ */ new Map();
     const pending = /* @__PURE__ */ new Set();
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID12)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `.MuiChip-root[${MARK}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
 .werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
 .werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -13096,7 +13340,7 @@ ${rr.zahlen}` : view.title;
     }
     function render() {
       if (!isRoute(location.hash)) return;
-      ensureStyle7();
+      ensureStyle8();
       const rows = /* @__PURE__ */ new Map();
       document.querySelectorAll(CHIP_SELECTOR).forEach((chip) => {
         const row2 = chip.closest("tr");
@@ -13109,7 +13353,7 @@ ${rr.zahlen}` : view.title;
       const now = Date.now();
       for (const [matchId, chips] of rows) {
         const entry = cache.get(matchId);
-        if (!entry || now - entry.at > CACHE_MS6) {
+        if (!entry || now - entry.at > CACHE_MS7) {
           if (!pending.has(matchId)) missing.push(matchId);
           if (!entry) continue;
         }
@@ -13221,11 +13465,11 @@ ${rr.zahlen}` : view.title;
   var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
   var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID13 = "werkia-kam-match-actions-style";
+  var STYLE_ID14 = "werkia-kam-match-actions-style";
   var STORE_KEY2 = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
@@ -13235,7 +13479,7 @@ ${rr.zahlen}` : view.title;
   function jobPositionIdFromHref(href) {
     return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
   }
-  function matchIdFromHref5(href) {
+  function matchIdFromHref6(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function gmPost(url, payload) {
@@ -13287,16 +13531,16 @@ ${rr.zahlen}` : view.title;
     function rowIds(row2) {
       return {
         jobPositionId: jobPositionIdFromHref(row2.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR8)?.href)
+        matchId: matchIdFromHref6(row2.querySelector(MATCH_LINK_SELECTOR9)?.href)
       };
     }
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID13)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -13463,7 +13707,7 @@ ${rr.zahlen}` : view.title;
         removeBars();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       render();
       loadUrgency(visibleJobPositionIds().filter((id) => !requested.has(id)));
       if (openPendingIds().length) schedulePendingPoll();
@@ -13484,14 +13728,14 @@ ${rr.zahlen}` : view.title;
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID13)?.remove();
+      document.getElementById(STYLE_ID14)?.remove();
     });
     scheduleSync();
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL4 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS4 = 2e4;
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS5 = 2e4;
   var MAX_COMMENT = 1500;
   var OFFLINE_MESSAGE4 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
@@ -13507,7 +13751,7 @@ ${rr.zahlen}` : view.title;
       { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
     ]
   };
-  var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaSlackDmMe {
+  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaSlackDmMe {
   me: currentEmployee { id slackId __typename }
 }`;
   var TEAMS = ["KAM", "CEM"];
@@ -13516,10 +13760,10 @@ ${rr.zahlen}` : view.title;
     if (!slackId) return false;
     return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  var UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref6(href) {
+  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref7(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE2.test(id) ? id : "";
+    return UUID_RE3.test(id) ? id : "";
   }
   function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
@@ -13538,7 +13782,7 @@ ${rr.zahlen}` : view.title;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse4(status, text) {
+  function parseResponse5(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -13550,7 +13794,7 @@ ${rr.zahlen}` : view.title;
     if (status === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL4, timeoutMs = REQUEST_TIMEOUT_MS4 }) {
+  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
@@ -13567,7 +13811,7 @@ ${rr.zahlen}` : view.title;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse4(response.status, response.responseText));
+            resolve(parseResponse5(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -13600,7 +13844,7 @@ ${rr.zahlen}` : view.title;
 
   // ../../shared/js/slack-dm/index.js
   var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS = "werkia-slack-dm-button";
   var IDS5 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
@@ -13663,7 +13907,7 @@ ${rr.zahlen}` : view.title;
     let closeTimer = null;
     let stopped = false;
     const isTargetPage9 = () => routes.some((route) => route.test(location.hash));
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS5.style)) return;
       const style = document.createElement("style");
       style.id = IDS5.style;
@@ -13683,8 +13927,8 @@ ${rr.zahlen}` : view.title;
     }
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
-      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR9)).find(Boolean);
-      const matchId = matchIdFromHref6(link?.getAttribute("href"));
+      const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR10)).find(Boolean);
+      const matchId = matchIdFromHref7(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function addButtons(row2) {
@@ -13753,7 +13997,7 @@ ${rr.zahlen}` : view.title;
     async function openDialog(matchId, dialogDirection = direction) {
       const config = DIRECTIONS[dialogDirection];
       closeDialog();
-      ensureStyle7();
+      ensureStyle8();
       const comment = el7("textarea", { id: `${IDS5.dialog}-comment`, maxlength: String(MAX_COMMENT), placeholder: "Optional, z. B. worum es geht oder bis wann" });
       const count = el7("div", { className: "sd-count", text: `0 / ${MAX_COMMENT}` });
       comment.addEventListener("input", () => {
@@ -13812,13 +14056,13 @@ ${rr.zahlen}` : view.title;
         removeButtons();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       document.querySelectorAll(ROW_SELECTOR11).forEach(addButtons);
     }
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
       try {
-        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY5, {});
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY6, {});
         if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
         if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
         scheduleSync();
@@ -14371,11 +14615,11 @@ ${rr.zahlen}` : view.title;
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS8 = 35e3;
+    const REQUEST_TIMEOUT_MS9 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS8);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS9);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -15585,8 +15829,8 @@ ${buildCbreBody(current)}`;
   var DAY_FMT = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" });
 
   // src/features/outlook-assistent/core.js
-  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
-  var REQUEST_TIMEOUT_MS5 = 2e4;
+  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var REQUEST_TIMEOUT_MS6 = 2e4;
   var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar.";
   var PRESELECT_FROM = 0.8;
   var MAILART_LABELS = {
@@ -15638,7 +15882,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Mail-Assistent: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
+  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL6, timeoutMs = REQUEST_TIMEOUT_MS6 }) {
     const post = (payload) => new Promise((resolve, reject) => {
       const auth = getAuth() || {};
       if (!auth.bearer) {
@@ -16051,7 +16295,7 @@ ${buildCbreBody(current)}`;
     if (text) node.textContent = text;
     return node;
   }
-  function ensureStyle3() {
+  function ensureStyle4() {
     if (document.getElementById(IDS7.style)) return;
     const style = el4("style");
     style.id = IDS7.style;
@@ -16096,7 +16340,7 @@ ${buildCbreBody(current)}`;
         removePill();
         return;
       }
-      ensureStyle3();
+      ensureStyle4();
       let pill2 = document.getElementById(IDS7.pill);
       if (!pill2) {
         pill2 = el4("button");
@@ -16323,7 +16567,7 @@ ${buildCbreBody(current)}`;
     function openPanel(result) {
       if (!result?.vorschlag) return;
       closePanel();
-      ensureStyle3();
+      ensureStyle4();
       const { vorschlag } = result;
       const choices = buildChoices(vorschlag, { mailText: vorschlag.mailtext || readMailText() });
       choices.forEach((choice) => {
@@ -17072,7 +17316,7 @@ ${buildCbreBody(current)}`;
       employers.patch(event?.detail?.employerId, event?.detail?.directContact);
     });
     const hasContactMode = () => BUILT_IN_MODES2.some((mode) => mode.keepFilter);
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS11.style)) return;
       const style = document.createElement("style");
       style.id = IDS11.style;
@@ -17363,7 +17607,7 @@ ${buildCbreBody(current)}`;
         return;
       }
       onPage = true;
-      ensureStyle7();
+      ensureStyle8();
       const own = storage.load();
       const state = parseListState(location.hash);
       if (hasStaleEmployerIds(state.filter)) {
@@ -17579,7 +17823,7 @@ ${buildCbreBody(current)}`;
         loading = (async () => {
           try {
             if (!myId) {
-              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY, {});
+              const data2 = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY2, {});
               myId = String(data2?.me?.id || "");
             }
             if (!myId) throw new Error("Eigene Mitarbeiter-ID fehlt.");
@@ -17651,10 +17895,10 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
-  var REQUEST_TIMEOUT_MS6 = 15e3;
+  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS7 = 15e3;
   var OFFLINE_MESSAGE6 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaToolboxDatenMe {
+  var CURRENT_EMPLOYEE_QUERY7 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay2(date = /* @__PURE__ */ new Date()) {
@@ -17667,7 +17911,7 @@ ${buildCbreBody(current)}`;
     while ([0, 6].includes(date.getUTCDay()));
     return date.toISOString().slice(0, 10);
   }
-  function parseResponse5(status, text) {
+  function parseResponse6(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -17678,7 +17922,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL6, timeoutMs = REQUEST_TIMEOUT_MS6 }) {
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL7, timeoutMs = REQUEST_TIMEOUT_MS7 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -17688,7 +17932,7 @@ ${buildCbreBody(current)}`;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse5(response.status, response.responseText));
+            resolve(parseResponse6(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -17702,7 +17946,7 @@ ${buildCbreBody(current)}`;
     let pending = null;
     return () => {
       if (!pending) {
-        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY6, {}).then((data) => {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY7, {}).then((data) => {
           const id = String(data?.me?.id || "");
           if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
           return id;
@@ -17714,7 +17958,7 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL6 }) {
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL7 }) {
     const post = createToolboxDatenRequest({ request, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
@@ -17950,7 +18194,7 @@ ${buildCbreBody(current)}`;
       return element6;
     }
     const button3 = (text, onClick, className = "", title = "") => el7("button", { type: "button", textContent: text, className, title, onclick: onClick });
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS8.style)) return;
       const style = el7("style", { id: IDS8.style });
       const P = `#${IDS8.panel}`;
@@ -18439,7 +18683,7 @@ ${buildCbreBody(current)}`;
       const day = today();
       const open = openEntries(entries, day);
       if (!open.length) return;
-      ensureStyle7();
+      ensureStyle8();
       const decisions2 = new Map(open.map((entry) => [entry.id, "morgen"]));
       const status = el7("div", { className: "wp-status" });
       const items = open.map((entry) => {
@@ -18516,7 +18760,7 @@ ${buildCbreBody(current)}`;
         owned(IDS8.tab)?.remove();
         return;
       }
-      ensureStyle7();
+      ensureStyle8();
       placeButton();
       placePanel2();
       renderRows();
@@ -19001,12 +19245,12 @@ ${buildCbreBody(current)}`;
   var CRAWLING_QUERY = `query crawlingHerkunft($ids: [UUID!]) {
   items: allJobPositions(filter: { ids: $ids }, page: 0, perPage: ${MAX_IDS2}) { id additionalInformation createdAt }
 }`;
-  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var UUID_RE4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var BERLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
   function normalizeId(value) {
     const id = String(value || "").trim().toLowerCase();
-    return UUID_RE3.test(id) ? id : "";
+    return UUID_RE4.test(id) ? id : "";
   }
   function normalizeIds(values) {
     return [...new Set((values || []).map(normalizeId).filter(Boolean))];
@@ -19124,16 +19368,16 @@ ${buildCbreBody(current)}`;
       console.warn("[Crawling-Herkunft] Kein GraphQL-Zugang.");
       return;
     }
-    const STYLE_ID19 = `werkia-${namespace}-crawl-badge-style`;
+    const STYLE_ID20 = `werkia-${namespace}-crawl-badge-style`;
     const provider = createCrawlingProvider({
       fetchCrawled: createCrawlingClient({ request }),
       onChange: () => scheduleInstall(),
       schedule: (callback) => runtime.setTimeout(callback, 0)
     });
     function injectStyle() {
-      if (document.getElementById(STYLE_ID19)) return;
+      if (document.getElementById(STYLE_ID20)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID19;
+      style.id = STYLE_ID20;
       style.textContent = `
       .${BADGE_CLASS} { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid #0f7d7a; border-radius: 999px; background: #e7f4f3; color: #0b5f5d; font: 700 11px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; white-space: nowrap; vertical-align: middle; cursor: default; }
     `;
@@ -19209,7 +19453,7 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(STYLE_ID19)?.remove();
+      document.getElementById(STYLE_ID20)?.remove();
     });
     scheduleInstall();
   }
@@ -19422,8 +19666,8 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
-  var OWNER_ATTR = "data-werkia-shortcut-explain";
-  var STYLE_ID14 = `${EXPLAIN_ID}-style`;
+  var OWNER_ATTR2 = "data-werkia-shortcut-explain";
+  var STYLE_ID15 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -19458,10 +19702,10 @@ ${buildCbreBody(current)}`;
       return null;
     }
   }
-  function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID14)) return;
+  function ensureStyle5(doc) {
+    if (doc.getElementById(STYLE_ID15)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID14;
+    style.id = STYLE_ID15;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -19473,8 +19717,8 @@ ${buildCbreBody(current)}`;
   function executeShortcutExplainer(runtime, { sourcePath } = {}) {
     if (sourcePath) runtime.registerSource(sourcePath);
     const root = document.documentElement;
-    if (root.hasAttribute(OWNER_ATTR)) return;
-    root.setAttribute(OWNER_ATTR, "");
+    if (root.hasAttribute(OWNER_ATTR2)) return;
+    root.setAttribute(OWNER_ATTR2, "");
     let shown = "";
     let last = 0;
     function hide() {
@@ -19485,7 +19729,7 @@ ${buildCbreBody(current)}`;
       const key = `${found.token}|${Math.round(box.left)}|${Math.round(box.top)}`;
       if (shown === key) return;
       shown = key;
-      ensureStyle4(document);
+      ensureStyle5(document);
       let tip = document.getElementById(EXPLAIN_ID);
       if (!tip) {
         tip = document.createElement("div");
@@ -19535,12 +19779,12 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/comment-shortcuts/index.js
-  var PREFIX2 = "werkia-shortcuts";
-  var STYLE_ID15 = `${PREFIX2}-style`;
-  var BAR_CLASS3 = `${PREFIX2}-bar`;
+  var PREFIX3 = "werkia-shortcuts";
+  var STYLE_ID16 = `${PREFIX3}-style`;
+  var BAR_CLASS3 = `${PREFIX3}-bar`;
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
-  var DIALOG_SELECTOR2 = 'div[role="dialog"], .MuiDialog-paper';
-  var GROUP_STORAGE_KEY = `${PREFIX2}-group`;
+  var DIALOG_SELECTOR3 = 'div[role="dialog"], .MuiDialog-paper';
+  var GROUP_STORAGE_KEY = `${PREFIX3}-group`;
   var TEMPLATES_TAB = "vorlagen";
   var GROUPS2 = buttonGroups();
   function tiptapOf4(element6) {
@@ -19612,10 +19856,10 @@ ${buildCbreBody(current)}`;
     const before = node?.nodeType === 3 ? node.textContent.slice(0, selection.anchorOffset) : "";
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
-  function ensureStyle5() {
-    if (document.getElementById(STYLE_ID15)) return;
+  function ensureStyle6() {
+    if (document.getElementById(STYLE_ID16)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID15;
+    style.id = STYLE_ID16;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -19632,36 +19876,36 @@ ${buildCbreBody(current)}`;
     .${BAR_CLASS3} { position:relative; display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:6px 8px; border:1px solid var(--ws-line); border-radius:8px; background:var(--ws-surface); }
     .${BAR_CLASS3} button, .${BAR_CLASS3} input, .${BAR_CLASS3} textarea { font:inherit; color:inherit; }
     .${BAR_CLASS3} :focus-visible { outline:2px solid var(--ws-accent); outline-offset:1px; }
-    .${PREFIX2}-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; }
-    .${PREFIX2}-tab { border:0; background:transparent; padding:3px 8px; border-radius:6px; cursor:pointer; color:var(--ws-ink2); font-weight:500; }
-    .${PREFIX2}-tab:hover { background:var(--ws-sunken); color:var(--ws-ink); }
-    .${PREFIX2}-tab[aria-pressed="true"] { background:var(--ws-accent-soft); color:var(--ws-accent-ink); font-weight:600; }
-    .${PREFIX2}-help { margin-left:auto; display:flex; align-items:center; }
-    .${PREFIX2}-key i { margin-left:4px; color:var(--ws-muted); font-style:normal; font-weight:400; font-size:10px; }
-    .${PREFIX2}-menu { position:absolute; z-index:5; display:flex; flex-direction:column; min-width:180px; max-width:420px; padding:4px; border:1px solid var(--ws-line-strong); border-radius:8px; background:var(--ws-surface); box-shadow:0 8px 24px -12px rgba(9,9,11,.35); }
-    .${PREFIX2}-menu button { text-align:left; border:0; background:transparent; padding:5px 8px; border-radius:6px; cursor:pointer; white-space:normal; }
-    .${PREFIX2}-menu button:hover, .${PREFIX2}-menu button:focus-visible { background:var(--ws-sunken); }
-    .${PREFIX2}-menu button:first-child { font-weight:600; }
-    .${PREFIX2}-keys { display:flex; flex-wrap:wrap; gap:4px; }
-    .${PREFIX2}-key { min-height:24px; padding:2px 8px; border:1px solid var(--ws-line-strong); border-left-width:3px; border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
-    .${PREFIX2}-key:hover { background:var(--ws-sunken); }
-    .${PREFIX2}-key[data-unbestaetigt] { border-style:dashed; border-left-style:solid; }
-    .${PREFIX2}-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-    .${PREFIX2}-btn { height:26px; padding:0 10px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:500; }
-    .${PREFIX2}-btn:hover:not(:disabled) { border-color:var(--ws-ink2); }
-    .${PREFIX2}-btn:disabled { opacity:.5; cursor:default; }
-    .${PREFIX2}-btn[data-tone="primary"] { border-color:var(--ws-accent); background:var(--ws-accent); color:#fff; }
-    .${PREFIX2}-btn[data-tone="danger"] { color:var(--ws-bad); }
-    .${PREFIX2}-link { border:0; background:transparent; padding:0 2px; color:var(--ws-ink2); cursor:pointer; text-decoration:underline; }
-    .${PREFIX2}-status { color:var(--ws-ink2); }
-    .${PREFIX2}-status[data-kind="ok"] { color:var(--ws-good); font-weight:600; }
-    .${PREFIX2}-status[data-kind="error"] { color:var(--ws-bad); }
-    .${PREFIX2}-templates { display:flex; flex-direction:column; gap:4px; }
-    .${PREFIX2}-template { display:flex; align-items:center; gap:6px; }
-    .${PREFIX2}-template .${PREFIX2}-key { border-left-color:var(--ws-line-strong); font-weight:500; max-width:420px; overflow:hidden; text-overflow:ellipsis; }
-    .${PREFIX2}-form { display:flex; flex-direction:column; gap:6px; padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
-    .${PREFIX2}-form input, .${PREFIX2}-form textarea { padding:4px 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
-    .${PREFIX2}-form textarea { min-height:90px; resize:vertical; }
+    .${PREFIX3}-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; }
+    .${PREFIX3}-tab { border:0; background:transparent; padding:3px 8px; border-radius:6px; cursor:pointer; color:var(--ws-ink2); font-weight:500; }
+    .${PREFIX3}-tab:hover { background:var(--ws-sunken); color:var(--ws-ink); }
+    .${PREFIX3}-tab[aria-pressed="true"] { background:var(--ws-accent-soft); color:var(--ws-accent-ink); font-weight:600; }
+    .${PREFIX3}-help { margin-left:auto; display:flex; align-items:center; }
+    .${PREFIX3}-key i { margin-left:4px; color:var(--ws-muted); font-style:normal; font-weight:400; font-size:10px; }
+    .${PREFIX3}-menu { position:absolute; z-index:5; display:flex; flex-direction:column; min-width:180px; max-width:420px; padding:4px; border:1px solid var(--ws-line-strong); border-radius:8px; background:var(--ws-surface); box-shadow:0 8px 24px -12px rgba(9,9,11,.35); }
+    .${PREFIX3}-menu button { text-align:left; border:0; background:transparent; padding:5px 8px; border-radius:6px; cursor:pointer; white-space:normal; }
+    .${PREFIX3}-menu button:hover, .${PREFIX3}-menu button:focus-visible { background:var(--ws-sunken); }
+    .${PREFIX3}-menu button:first-child { font-weight:600; }
+    .${PREFIX3}-keys { display:flex; flex-wrap:wrap; gap:4px; }
+    .${PREFIX3}-key { min-height:24px; padding:2px 8px; border:1px solid var(--ws-line-strong); border-left-width:3px; border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:600; white-space:nowrap; }
+    .${PREFIX3}-key:hover { background:var(--ws-sunken); }
+    .${PREFIX3}-key[data-unbestaetigt] { border-style:dashed; border-left-style:solid; }
+    .${PREFIX3}-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+    .${PREFIX3}-btn { height:26px; padding:0 10px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); cursor:pointer; font-weight:500; }
+    .${PREFIX3}-btn:hover:not(:disabled) { border-color:var(--ws-ink2); }
+    .${PREFIX3}-btn:disabled { opacity:.5; cursor:default; }
+    .${PREFIX3}-btn[data-tone="primary"] { border-color:var(--ws-accent); background:var(--ws-accent); color:#fff; }
+    .${PREFIX3}-btn[data-tone="danger"] { color:var(--ws-bad); }
+    .${PREFIX3}-link { border:0; background:transparent; padding:0 2px; color:var(--ws-ink2); cursor:pointer; text-decoration:underline; }
+    .${PREFIX3}-status { color:var(--ws-ink2); }
+    .${PREFIX3}-status[data-kind="ok"] { color:var(--ws-good); font-weight:600; }
+    .${PREFIX3}-status[data-kind="error"] { color:var(--ws-bad); }
+    .${PREFIX3}-templates { display:flex; flex-direction:column; gap:4px; }
+    .${PREFIX3}-template { display:flex; align-items:center; gap:6px; }
+    .${PREFIX3}-template .${PREFIX3}-key { border-left-color:var(--ws-line-strong); font-weight:500; max-width:420px; overflow:hidden; text-overflow:ellipsis; }
+    .${PREFIX3}-form { display:flex; flex-direction:column; gap:6px; padding:6px 8px; border-radius:6px; background:var(--ws-sunken); }
+    .${PREFIX3}-form input, .${PREFIX3}-form textarea { padding:4px 8px; border:1px solid var(--ws-line-strong); border-radius:6px; background:var(--ws-surface); }
+    .${PREFIX3}-form textarea { min-height:90px; resize:vertical; }
   `;
     document.head.appendChild(style);
   }
@@ -19679,7 +19923,7 @@ ${buildCbreBody(current)}`;
     let form = null;
     const currentBar = () => document.querySelector(`.${BAR_CLASS3}`);
     function findDialog() {
-      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR2)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR5));
+      const dialogs = [...document.querySelectorAll(DIALOG_SELECTOR3)].filter((dialog) => /Matchkommentare/i.test(dialog.textContent || "") && dialog.querySelector(EDITOR_SELECTOR5));
       return dialogs[dialogs.length - 1] || null;
     }
     function editorBoxFor(editor, dialog) {
@@ -19696,10 +19940,10 @@ ${buildCbreBody(current)}`;
       if (!bar) return;
       const tabs = el5(
         "div",
-        { class: `${PREFIX2}-tabs` },
+        { class: `${PREFIX3}-tabs` },
         GROUPS2.map((group2) => el5("button", {
           type: "button",
-          class: `${PREFIX2}-tab`,
+          class: `${PREFIX3}-tab`,
           "aria-pressed": String(activeTab === group2.id),
           dataset: { tab: group2.id },
           text: group2.label,
@@ -19708,14 +19952,14 @@ ${buildCbreBody(current)}`;
         })),
         el5("button", {
           type: "button",
-          class: `${PREFIX2}-tab`,
+          class: `${PREFIX3}-tab`,
           "aria-pressed": String(activeTab === TEMPLATES_TAB),
           dataset: { tab: TEMPLATES_TAB },
           text: "Vorlagen",
           onmousedown: keepFocus2,
           onclick: () => selectTab(TEMPLATES_TAB)
         }),
-        el5("span", { class: `${PREFIX2}-help` }, helpTip())
+        el5("span", { class: `${PREFIX3}-help` }, helpTip())
       );
       const parts = [tabs];
       const group = GROUPS2.find((item) => item.id === activeTab);
@@ -19730,9 +19974,9 @@ ${buildCbreBody(current)}`;
       renderBar();
     }
     function renderKeys(group) {
-      return el5("div", { class: `${PREFIX2}-keys` }, group.items.map((item) => el5("button", {
+      return el5("div", { class: `${PREFIX3}-keys` }, group.items.map((item) => el5("button", {
         type: "button",
-        class: `${PREFIX2}-key`,
+        class: `${PREFIX3}-key`,
         title: buttonTitle2(item),
         dataset: { kuerzel: item.kuerzel, ...item.unbestaetigt ? { unbestaetigt: "" } : {}, ...item.optionen.length ? { optionen: "" } : {} },
         onmousedown: keepFocus2,
@@ -19746,7 +19990,7 @@ ${buildCbreBody(current)}`;
       }, item.label, item.optionen.length ? el5("i", { "aria-hidden": "true", text: "▾" }) : null)));
     }
     function closeMenu() {
-      currentBar()?.querySelector(`.${PREFIX2}-menu`)?.remove();
+      currentBar()?.querySelector(`.${PREFIX3}-menu`)?.remove();
     }
     function openMenu(item, anchor) {
       const bar = currentBar();
@@ -19754,7 +19998,7 @@ ${buildCbreBody(current)}`;
       closeMenu();
       const menu = el5(
         "div",
-        { class: `${PREFIX2}-menu`, role: "menu", "aria-label": `Varianten zu ${item.label}` },
+        { class: `${PREFIX3}-menu`, role: "menu", "aria-label": `Varianten zu ${item.label}` },
         menuOptions(item).map((text) => el5("button", {
           type: "button",
           role: "menuitem",
@@ -19798,31 +20042,31 @@ ${buildCbreBody(current)}`;
       if (activeTab === TEMPLATES_TAB) renderBar();
     }
     function renderTemplates() {
-      const box = el5("div", { class: `${PREFIX2}-templates` });
+      const box = el5("div", { class: `${PREFIX3}-templates` });
       if (templates.state === "loading" || templates.state === "idle") {
-        box.append(el5("span", { class: `${PREFIX2}-status`, text: "Vorlagen werden geladen …" }));
+        box.append(el5("span", { class: `${PREFIX3}-status`, text: "Vorlagen werden geladen …" }));
         return box;
       }
       if (templates.state === "error") {
         box.append(el5(
           "div",
-          { class: `${PREFIX2}-row` },
-          el5("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: templates.error }),
-          el5("button", { type: "button", class: `${PREFIX2}-link`, text: "Erneut versuchen", onclick: loadTemplates })
+          { class: `${PREFIX3}-row` },
+          el5("span", { class: `${PREFIX3}-status`, dataset: { kind: "error" }, text: templates.error }),
+          el5("button", { type: "button", class: `${PREFIX3}-link`, text: "Erneut versuchen", onclick: loadTemplates })
         ));
         return box;
       }
       if (!templates.items.length && !form) {
-        box.append(el5("span", { class: `${PREFIX2}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
+        box.append(el5("span", { class: `${PREFIX3}-status`, text: "Noch keine Vorlagen. Lege eine an, um wiederkehrende Texte per Klick einzufügen." }));
       }
       for (const template of templates.items) {
         if (form?.id === template.id) continue;
         box.append(el5(
           "div",
-          { class: `${PREFIX2}-template` },
+          { class: `${PREFIX3}-template` },
           el5("button", {
             type: "button",
-            class: `${PREFIX2}-key`,
+            class: `${PREFIX3}-key`,
             title: template.text,
             dataset: { vorlage: template.id },
             text: template.titel,
@@ -19832,20 +20076,20 @@ ${buildCbreBody(current)}`;
               if (editor) insertIntoEditor(editor, template.text);
             }
           }),
-          el5("button", { type: "button", class: `${PREFIX2}-link`, text: "Ändern", onclick: () => openForm(template) })
+          el5("button", { type: "button", class: `${PREFIX3}-link`, text: "Ändern", onclick: () => openForm(template) })
         ));
       }
       if (form) box.append(renderForm());
-      else box.append(el5("div", {}, el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
+      else box.append(el5("div", {}, el5("button", { type: "button", class: `${PREFIX3}-btn`, dataset: { action: "template-new" }, text: "+ Neue Vorlage", onclick: () => openForm(null) })));
       return box;
     }
     function openForm(template) {
       form = { id: template?.id || "", titel: template?.titel || "", text: template?.text || "", error: "", saving: false, confirmDelete: false };
       renderBar();
-      currentBar()?.querySelector(`.${PREFIX2}-form input`)?.focus();
+      currentBar()?.querySelector(`.${PREFIX3}-form input`)?.focus();
     }
     function readForm() {
-      const box = currentBar()?.querySelector(`.${PREFIX2}-form`);
+      const box = currentBar()?.querySelector(`.${PREFIX3}-form`);
       if (!box || !form) return;
       form.titel = box.querySelector("input").value;
       form.text = box.querySelector("textarea").value;
@@ -19861,21 +20105,21 @@ ${buildCbreBody(current)}`;
       };
       return el5(
         "div",
-        { class: `${PREFIX2}-form` },
+        { class: `${PREFIX3}-form` },
         el5("input", { type: "text", value: form.titel, placeholder: "Titel, z. B. „Absage nach VT“", "aria-label": "Titel der Vorlage", onkeydown: stop }),
         el5("textarea", { value: form.text, placeholder: "Text der Vorlage", "aria-label": "Text der Vorlage", onkeydown: stop }),
-        form.error ? el5("span", { class: `${PREFIX2}-status`, dataset: { kind: "error" }, text: form.error }) : null,
+        form.error ? el5("span", { class: `${PREFIX3}-status`, dataset: { kind: "error" }, text: form.error }) : null,
         el5(
           "div",
-          { class: `${PREFIX2}-row` },
-          el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
-          el5("button", { type: "button", class: `${PREFIX2}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
+          { class: `${PREFIX3}-row` },
+          el5("button", { type: "button", class: `${PREFIX3}-btn`, dataset: { tone: "primary", action: "template-save" }, disabled: form.saving, text: form.saving ? "Speichert …" : "Speichern", onclick: saveForm }),
+          el5("button", { type: "button", class: `${PREFIX3}-btn`, dataset: { action: "template-cancel" }, text: "Abbrechen", onclick: () => {
             form = null;
             renderBar();
           } }),
           form.id ? el5("button", {
             type: "button",
-            class: `${PREFIX2}-btn`,
+            class: `${PREFIX3}-btn`,
             dataset: { tone: "danger", action: "template-delete" },
             disabled: form.saving,
             text: form.confirmDelete ? "Wirklich löschen?" : "Löschen",
@@ -19929,10 +20173,10 @@ ${buildCbreBody(current)}`;
       renderBar();
     }
     runtime.addDocumentListener("mousedown", (event) => {
-      if (!event.target?.closest?.(`.${PREFIX2}-menu`)) closeMenu();
+      if (!event.target?.closest?.(`.${PREFIX3}-menu`)) closeMenu();
     }, true);
     runtime.addDocumentListener("keydown", (event) => {
-      if (event.key === "Escape" && currentBar()?.querySelector(`.${PREFIX2}-menu`)) {
+      if (event.key === "Escape" && currentBar()?.querySelector(`.${PREFIX3}-menu`)) {
         event.preventDefault();
         event.stopImmediatePropagation();
         closeMenu();
@@ -19950,7 +20194,7 @@ ${buildCbreBody(current)}`;
       if (existing && !dialog.contains(existing)) existing.remove();
       let bar = currentBar();
       if (!bar) {
-        ensureStyle5();
+        ensureStyle6();
         form = null;
         bar = el5("div", { class: BAR_CLASS3, role: "toolbar", "aria-label": "Kürzel und Vorlagen" });
         bar.dataset.mode = isDark2(dialog) ? "dark" : "light";
@@ -19990,6 +20234,14 @@ ${buildCbreBody(current)}`;
       sourcePath: "kam/toolbox/src/features/match-mention.js",
       getGraphqlAdapter: getKamGraphqlAdapter,
       helpTip: () => kamHelp.tip("match-mention")
+    });
+  }
+
+  // src/features/kommentar-an-alle.js
+  function executeKamKommentarAnAlle(runtime) {
+    executeKommentarAnAlle(runtime, {
+      sourcePath: "kam/toolbox/src/features/kommentar-an-alle.js",
+      getGraphqlAdapter: getKamGraphqlAdapter
     });
   }
 
@@ -20285,7 +20537,7 @@ ${buildCbreBody(current)}`;
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
   var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
   var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
-  var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
+  var MATCH_LINK_SELECTOR11 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
   var CLOCK_MS = 1e3;
   var tickSlot = (nowMs) => Math.floor(nowMs / TICK_MS2);
@@ -20413,7 +20665,7 @@ ${buildCbreBody(current)}`;
       element6.classList.add("wtp");
       return element6;
     };
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS9.style)) return;
       document.head.appendChild(el6("style", { id: IDS9.style, textContent: CSS3 }));
     }
@@ -20574,7 +20826,7 @@ ${buildCbreBody(current)}`;
       }
       const signature = items.map((item) => item.key).join("|");
       if (existing?.dataset.signature === signature) return;
-      ensureStyle7();
+      ensureStyle8();
       const popup = existing || own(el6("div", { id: IDS9.popup, role: "alert" }));
       popup.dataset.signature = signature;
       popup.textContent = "";
@@ -20609,7 +20861,7 @@ ${buildCbreBody(current)}`;
     }
     function openReminderDialog(matchId) {
       closeDialog();
-      ensureStyle7();
+      ensureStyle8();
       const overlay = own(el6("div", { id: IDS9.dialog }));
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
@@ -20690,14 +20942,14 @@ ${buildCbreBody(current)}`;
     function decorateRows() {
       if (!isTargetPage9()) return;
       for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
-        const link = row2.querySelector(MATCH_LINK_SELECTOR10);
+        const link = row2.querySelector(MATCH_LINK_SELECTOR11);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
         const cell = row2.querySelector("td.column-buttons") || link.closest("td");
         if (!cell) continue;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
-          ensureStyle7();
+          ensureStyle8();
           rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
@@ -20722,7 +20974,7 @@ ${buildCbreBody(current)}`;
       teamEditing = null;
     }
     async function openPanel() {
-      ensureStyle7();
+      ensureStyle8();
       if (!owned(IDS9.panel)) {
         const panel = own(el6("aside", { id: IDS9.panel, "aria-label": "Tages-Timeline" }));
         document.body.appendChild(panel);
@@ -20931,7 +21183,7 @@ ${buildCbreBody(current)}`;
       if (existing && !slot) return;
       existing?.remove();
       if (!slot) return;
-      ensureStyle7();
+      ensureStyle8();
       const heute = button2("Heute", () => owned(IDS9.panel) ? closePanel() : openPanel(), "");
       heute.id = IDS9.button;
       heute.title = "Tages-Timeline: Termine, WVL, Reminder und Team-Einträge von heute";
@@ -21161,7 +21413,7 @@ ${buildCbreBody(current)}`;
   // src/features/day-phases/index.js
   var SOURCE_PATH5 = "kam/toolbox/src/features/day-phases/index.js";
   var ROOT_ID = "werkia-kam-day-phase";
-  var STYLE_ID16 = "werkia-kam-day-phase-style";
+  var STYLE_ID17 = "werkia-kam-day-phase-style";
   var MY_MATCHES2 = "#/KAM/MyMatches";
   var FOCUS_SELECT_ID = "werkia-focus-select";
   var TAGESPLAN_BUTTON_ID = "werkia-tagesplan-button";
@@ -21219,10 +21471,10 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       }
       render(true);
     };
-    function ensureStyle7() {
-      if (document.getElementById(STYLE_ID16)) return;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID17)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID17;
       style.textContent = CSS4;
       document.head.appendChild(style);
     }
@@ -21238,7 +21490,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       }
       const html = prefs.mini ? `<div class="card wdp-chip ${info.inTail ? "tail" : ""}"><button type="button" class="wdp-chip-main" data-wdp-expand title="Tagesphase aufklappen">${icon2("clock")}<span>${escapeHtml(chipText(info))}</span></button><button type="button" class="wdp-x" data-wdp-close title="Für heute schließen" aria-label="Für heute schließen">×</button></div>` : phaseBarHtml(phases, info, { esc: escapeHtml, icon: icon2, open: prefs.open });
       if (!force && root && html === lastHtml) return;
-      ensureStyle7();
+      ensureStyle8();
       if (!root) {
         root = document.createElement("div");
         root.id = ROOT_ID;
@@ -21314,23 +21566,23 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     runtime.setInterval(() => render(), REFRESH_MS4);
     runtime.addCleanup?.(() => {
       document.getElementById(ROOT_ID)?.remove();
-      document.getElementById(STYLE_ID16)?.remove();
+      document.getElementById(STYLE_ID17)?.remove();
     });
     render();
     return { render };
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS7 = 15e3;
+  var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS8 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
   var OFFLINE_MESSAGE7 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
-  var CURRENT_EMPLOYEE_QUERY7 = `query WerkiaArbeitgeberPauseMe {
+  var CURRENT_EMPLOYEE_QUERY8 = `query WerkiaArbeitgeberPauseMe {
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse6(status, text) {
+  function parseResponse7(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -21341,17 +21593,17 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL7 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL8 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS7,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS8,
         onload(response) {
           try {
-            resolve(parseResponse6(response.status, response.responseText));
+            resolve(parseResponse7(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
@@ -21402,7 +21654,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     style: "werkia-arbeitgeber-pause-style"
   };
   var OWNER_KEY2 = "werkiaArbeitgeberPauseOwner";
-  var CACHE_MS7 = 5 * 60 * 1e3;
+  var CACHE_MS8 = 5 * 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
   var T3 = {
     surface: "#ffffff",
@@ -21443,7 +21695,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     };
     const currentEmployerId = () => employerIdFromHash(location.hash || "");
     const isButtonPage = () => ROUTES.kamMyMatches.test(location.hash || "") || Boolean(currentEmployerId());
-    function ensureStyle7() {
+    function ensureStyle8() {
       if (document.getElementById(IDS10.style)) return;
       const style = document.createElement("style");
       style.id = IDS10.style;
@@ -21530,7 +21782,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY7, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY8, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -21550,7 +21802,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS7) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS8) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[Arbeitgeber-Pause] Liste nicht geladen:", error?.message || error);
         return cache;
@@ -21735,7 +21987,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     }
     async function openDialog({ employerId = "" } = {}) {
       closeDialog();
-      ensureStyle7();
+      ensureStyle8();
       state = { entries: cache?.entries || [], heute: cache?.heute || "", hits: null, query: "", selected: null, editing: "" };
       const overlay = el7("div", { id: IDS10.dialog });
       overlay.dataset[OWNER_KEY2] = sourcePath;
@@ -21784,7 +22036,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       existing?.remove();
       const target = findSlot(document);
       if (!target) return;
-      ensureStyle7();
+      ensureStyle8();
       const pauseButton = button3(label.text, () => openDialog({ employerId: currentEmployerId() }));
       pauseButton.id = IDS10.button;
       pauseButton.title = label.title;
@@ -21849,7 +22101,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   var PAGE_SIZE2 = 200;
   var MAX_PAGES = 20;
   var NAMES_CHUNK = 300;
-  var CACHE_MS8 = 2 * 60 * 1e3;
+  var CACHE_MS9 = 2 * 60 * 1e3;
   var APPLICANTS_PLACEHOLDER = "{{{offeneBewerber}}}";
   var OPEN_MATCHES_QUERY = `query WerkiaKamOffeneMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
   items: allMatches(filter: $filter, page: $page, perPage: $perPage, sortField: "id", sortOrder: "ASC") { id candidateId jobPositionId kamStatus }
@@ -21947,7 +22199,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       const key = String(employerId || "");
       if (!key) return Promise.reject(new Error("Kein Arbeitgeber."));
       const hit = cache.get(key);
-      if (hit && now() - hit.at < CACHE_MS8) return hit.promise;
+      if (hit && now() - hit.at < CACHE_MS9) return hit.promise;
       const promise = load2(key);
       cache.set(key, { at: now(), promise });
       promise.catch(() => {
@@ -21959,7 +22211,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID17 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID18 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -21992,10 +22244,10 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
 .werkia-kmm-employer:hover { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
-  function ensureStyle6(doc) {
-    if (doc.getElementById(STYLE_ID17)) return;
+  function ensureStyle7(doc) {
+    if (doc.getElementById(STYLE_ID18)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID17;
+    style.id = STYLE_ID18;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -22090,7 +22342,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     }
     function showApplicantsDialog(employerIdOrPromise, host = document.body) {
       closeListDialog();
-      ensureStyle6(document);
+      ensureStyle7(document);
       const overlay = element5(document, "div", "werkia-kmm-overlay");
       overlay.setAttribute(LIST_DIALOG_ATTRIBUTE, "");
       const card = element5(document, "div", "werkia-kmm-card");
@@ -22170,7 +22422,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
         existing.setAttribute(EMPLOYER_BUTTON_ATTRIBUTE, employerId);
         return;
       }
-      ensureStyle6(document);
+      ensureStyle7(document);
       const button3 = element5(document, "button", "werkia-kmm-employer", "Offene Bewerber");
       button3.type = "button";
       button3.title = "Alle offenen Bewerbungen dieses Arbeitgebers (KAM-Status weder Hired noch Out) als Liste, kopiert in die Zwischenablage";
@@ -22201,7 +22453,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     function renderOpenButton() {
       const dialog = findMatchCommentsDialog(document);
       if (!dialog || dialog.querySelector(`[${OPEN_ATTRIBUTE}]`)) return;
-      ensureStyle6(document);
+      ensureStyle7(document);
       const wrap2 = element5(document, "span");
       wrap2.setAttribute(OPEN_ATTRIBUTE, "");
       const button3 = element5(document, "button", "werkia-kmm-open");
@@ -22312,7 +22564,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     }
     function renderBars() {
       for (const dialog of findSendMailDialogs(document)) {
-        ensureStyle6(document);
+        ensureStyle7(document);
         if (!bars.has(dialog)) bars.set(dialog, createBar(dialog));
         placeBar(dialog, bars.get(dialog).bar);
       }
@@ -22396,7 +22648,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID18 = "werkia-om-notes-template-style";
+  var STYLE_ID19 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -22465,11 +22717,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID18)) {
+    if (document.getElementById(STYLE_ID19)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID18;
+    style.id = STYLE_ID19;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -22703,7 +22955,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID18)?.remove();
+      document.getElementById(STYLE_ID19)?.remove();
     });
     renderToolbar();
   }
@@ -22723,7 +22975,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID19 = "werkia-urgent-vacancy-style";
+      const STYLE_ID20 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -22868,9 +23120,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID19)) return;
+        if (document.getElementById(STYLE_ID20)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID19;
+        style.id = STYLE_ID20;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -23020,6 +23272,7 @@ ${next}`;
     { id: "crawling-herkunft", execute: executeCrawlingHerkunft2 },
     { id: "comment-shortcuts", execute: executeKamCommentShortcuts },
     { id: "match-mention", execute: executeKamMatchMention },
+    { id: "kommentar-an-alle", execute: executeKamKommentarAnAlle },
     { id: "match-mail", execute: (runtime) => executeMatchMail(runtime, {
       getGraphqlAdapter: getKamGraphqlAdapter,
       sourcePath: "kam/toolbox/src/features/match-mail/index.js",

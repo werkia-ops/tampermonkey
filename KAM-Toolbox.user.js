@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.31.406
+// @version      1.32.408
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -2383,7 +2383,7 @@
       summary: "Berechnet beim offenen Fragebogen Strecke und Fahrzeit mit dem Auto zwischen Wohnort des Kandidaten und Arbeitsort.",
       notes: [
         ...commute ? [
-          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot.",
+          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 40 Min steht ein 💀 davor und die Box wird rot.",
           "Hat der Kandidat mehrere Adressen, zählt wie in der Liste die mit der kürzesten Fahrzeit. Die Box nennt dann, von welcher Adresse aus gerechnet wurde."
         ] : [],
         "Die Box zeigt die Route auf einer Karte. Darunter öffnen „Google Maps ↗“ und „OpenStreetMap ↗“ dieselbe Strecke.",
@@ -11374,7 +11374,7 @@ ${rr.zahlen}` : view.title;
   }
 
   // ../../shared/js/route-commute/core.js
-  var SKULL_MINUTES = 45;
+  var SKULL_MINUTES = 40;
   var COMMUTE_CLASSES = {
     home: {
       key: "home",

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.14.401
+// @version      1.15.408
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2416,7 +2416,7 @@
       summary: "Berechnet beim offenen Fragebogen Strecke und Fahrzeit mit dem Auto zwischen Wohnort des Kandidaten und Arbeitsort.",
       notes: [
         ...commute ? [
-          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 45 Min steht ein 💀 davor und die Box wird rot.",
+          "Zeigt dieselbe Fahrzeit und Vakanzart wie das Badge in der Liste. Bei ortsgebundenen Vakanzen über 40 Min steht ein 💀 davor und die Box wird rot.",
           "Hat der Kandidat mehrere Adressen, zählt wie in der Liste die mit der kürzesten Fahrzeit. Die Box nennt dann, von welcher Adresse aus gerechnet wurde."
         ] : [],
         "Die Box zeigt die Route auf einer Karte. Darunter öffnen „Google Maps ↗“ und „OpenStreetMap ↗“ dieselbe Strecke.",
@@ -2434,8 +2434,8 @@
       kind: "view",
       summary: "Zeigt in jeder Zeile, wie lange der Kandidat mit dem Auto zur Vakanz fährt. Bei ortsgebundenen Stellen bitte vor allem kurze Fahrzeiten bevorzugen: Matches mit langer Fahrzeit führen deutlich seltener zum Erfolg.",
       notes: [
-        "💀 Über 45 Min bei einer ortsgebundenen Vakanz: fester Arbeitsort, der Kandidat pendelt täglich. Solche Zeilen werden ausgeblendet. Die rote Leiste über der Tabelle nennt ihre Zahl, „Anzeigen“ holt sie ausgegraut zurück. Nur in Ausnahmefällen senden.",
-        "🚗 Fahrzeit bis 45 Min bei einer ortsgebundenen Vakanz.",
+        "💀 Über 40 Min bei einer ortsgebundenen Vakanz: fester Arbeitsort, der Kandidat pendelt täglich. Solche Zeilen werden ausgeblendet. Die rote Leiste über der Tabelle nennt ihre Zahl, „Anzeigen“ holt sie ausgegraut zurück. Nur in Ausnahmefällen senden.",
+        "🚗 Fahrzeit bis 40 Min bei einer ortsgebundenen Vakanz.",
         "🏠 Start von Zuhause: Startpunkt „von zu Hause“ oder ortsunabhängig. Die Fahrzeit ist hier nur zur Info.",
         "🗺️ Landes-/bundesweit: Einsatzgebiet ist ein ganzes Bundesland oder Deutschland. Die Fahrzeit ist nur zur Info.",
         "🧳 Montage: Reisetätigkeit „uneingeschränkt“, mit Übernachtung. Die Fahrzeit ist nur zur Info.",
@@ -4950,7 +4950,7 @@
   }
 
   // ../../shared/js/route-commute/core.js
-  var SKULL_MINUTES = 45;
+  var SKULL_MINUTES = 40;
   var COMMUTE_CLASSES = {
     home: {
       key: "home",

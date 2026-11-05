@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.32.418
+// @version      1.32.446
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -4097,7 +4097,7 @@
     const meters = Number(match.distance);
     const distance = has(match.distance) && Number.isFinite(meters) ? `${(meters / 1e3).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km` : "";
     const max = Number(employer.maximumDistanceOfCandidate);
-    const maxText = has(employer.maximumDistanceOfCandidate) && Number.isFinite(max) && max > 0 ? `max. ${max} Min.` : "";
+    const maxText = has(employer.maximumDistanceOfCandidate) && Number.isFinite(max) && max > 0 ? `max. ${max} km` : "";
     return row("distance", "Entfernung", maxText, distance);
   }
   var summaryOf = (rows) => rows.some((r) => r.status === "bad") ? "bad" : rows.some((r) => r.status === "check") ? "check" : "ok";
@@ -11039,7 +11039,7 @@ ${rr.zahlen}` : view.title;
 
   // ../../shared/js/werkia-questionnaire/company-flag.js
   function isFlaggedCompany(value) {
-    return /\bga[\s-]?tec\b/i.test(value || "");
+    return /\bga[\s-]tec\b/i.test(value || "");
   }
   function isFlaggedQuestionnaire(dialog) {
     if (!dialog) return false;

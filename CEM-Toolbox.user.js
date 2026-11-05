@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.33.408
+// @version      1.33.446
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4931,7 +4931,7 @@
     const meters = Number(match.distance);
     const distance = has(match.distance) && Number.isFinite(meters) ? `${(meters / 1e3).toLocaleString("de-DE", { maximumFractionDigits: 1 })} km` : "";
     const max = Number(employer.maximumDistanceOfCandidate);
-    const maxText = has(employer.maximumDistanceOfCandidate) && Number.isFinite(max) && max > 0 ? `max. ${max} Min.` : "";
+    const maxText = has(employer.maximumDistanceOfCandidate) && Number.isFinite(max) && max > 0 ? `max. ${max} km` : "";
     return row("distance", "Entfernung", maxText, distance);
   }
   var summaryOf = (rows) => rows.some((r) => r.status === "bad") ? "bad" : rows.some((r) => r.status === "check") ? "check" : "ok";
@@ -8631,15 +8631,17 @@ ${add}` : add;
     scheduleRender();
   }
 
+  // ../../shared/js/werkia-questionnaire/company-flag.js
+  function isFlaggedCompany(value) {
+    return /\bga[\s-]tec\b/i.test(value || "");
+  }
+
   // src/features/cem-ofm/company-flag.js
   var FLAG_CLASS = "werkia-cem-company-flag";
   var ROW_CLASS = "werkia-cem-flagged-company-row";
   var STYLE_ID7 = "werkia-cem-company-style";
   var FLAG_TEXT = "[absprache vor ofm]";
   var POTENTIAL_MATCHES_ROUTE2 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
-  function isFlaggedCompany(value) {
-    return /\bga[\s-]?tec\b/i.test(value || "");
-  }
   function getEmployerNameFromRow(row2) {
     if (!row2) return "";
     const jobCell = row2.querySelector("td.column-jobPositionId");
@@ -8718,7 +8720,7 @@ ${add}` : add;
   var PANEL_ID = "werkia-vacancy-panel";
   var ROUTE_BOX_ID = "werkia-cem-route-box";
   var POTENTIAL_MATCHES_ROUTE3 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
-  var QUESTIONNAIRE_LABELS = [
+  var QUESTIONNAIRE_LABELS2 = [
     "Reisehäufigkeit",
     "Montagebereitschaft",
     "Berufserfahrung",
@@ -8762,7 +8764,7 @@ ${add}` : add;
       const text = dialog.innerText || dialog.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
       const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
-      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS.filter((label2) => labels2.has(label2)).length >= 3;
+      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS2.filter((label2) => labels2.has(label2)).length >= 3;
     }) || null;
     function removePanel() {
       document.getElementById(PANEL_ID)?.remove();
@@ -9115,7 +9117,7 @@ ${add}` : add;
   var BANNER_ID = "werkia-match-decision-banner";
   var NOTES_ID = "werkia-om-notes-box";
   var COMPANY_FLAG = "[absprache vor ofm]";
-  var QUESTIONNAIRE_LABELS2 = ["Reisehäufigkeit", "Montagebereitschaft", "Berufserfahrung", "Erforderliche Berufserfahrung", "Erforderliche Sprachkentnisse", "Sprachkentnisse", "Recognition status", "Mindestgehalt pro Monat", "Minimumgehalt", "Position", "Positionen", "Zusätzliche Information - OM", "Erforderliche Führerschein", "Führerschein"];
+  var QUESTIONNAIRE_LABELS3 = ["Reisehäufigkeit", "Montagebereitschaft", "Berufserfahrung", "Erforderliche Berufserfahrung", "Erforderliche Sprachkentnisse", "Sprachkentnisse", "Recognition status", "Mindestgehalt pro Monat", "Minimumgehalt", "Position", "Positionen", "Zusätzliche Information - OM", "Erforderliche Führerschein", "Führerschein"];
   var clean3 = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
   var label = (value) => clean3(value).replace(/:$/, "");
   var empty = (value) => !clean3(value) || clean3(value) === "-" || clean3(value) === "–" || clean3(value) === "nicht angegeben";
@@ -9153,7 +9155,7 @@ ${add}` : add;
       const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, span.ra-field p, div.ra-field p span, div.ra-field p, div.MuiStack-root p span, div.MuiStack-root p")].map((element5) => label(element5.innerText || element5.textContent)));
       const hasCandidateHeader = [...labels2].some((value2) => value2 === "kandidat" || value2.startsWith("kandidat "));
       const hasJobHeader = [...labels2].some((value2) => value2 === "job" || value2.startsWith("job "));
-      return hasCandidateHeader && hasJobHeader && QUESTIONNAIRE_LABELS2.filter((fieldName) => labels2.has(label(fieldName))).length >= 3;
+      return hasCandidateHeader && hasJobHeader && QUESTIONNAIRE_LABELS3.filter((fieldName) => labels2.has(label(fieldName))).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && dialogIsQuestionnaire(dialog)) || null;
     const mark = (element5, color, title = "") => {
@@ -10081,7 +10083,7 @@ ${add}` : add;
   // src/features/cem-ofm/route-calculation.js
   var ROUTE_BOX_ID2 = "werkia-cem-route-box";
   var POTENTIAL_MATCHES_ROUTE4 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
-  var QUESTIONNAIRE_LABELS3 = [
+  var QUESTIONNAIRE_LABELS4 = [
     "Reisehäufigkeit",
     "Montagebereitschaft",
     "Berufserfahrung",
@@ -10116,7 +10118,7 @@ ${add}` : add;
       const text = dialog?.innerText || dialog?.textContent || "";
       if (/Matchkommentare|Kandidat Dateien/i.test(text)) return false;
       const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, div.MuiStack-root p span")].map((element5) => (element5.innerText || "").trim()));
-      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS3.filter((label2) => labels2.has(label2)).length >= 3;
+      return labels2.has("Kandidat") && labels2.has("Job") && QUESTIONNAIRE_LABELS4.filter((label2) => labels2.has(label2)).length >= 3;
     };
     const questionnaireDialog = () => [...document.querySelectorAll('.MuiDialog-paper, div[role="dialog"]')].find((dialog) => visible(dialog) && isQuestionnaireDialog(dialog)) || null;
     function addressHint(data) {

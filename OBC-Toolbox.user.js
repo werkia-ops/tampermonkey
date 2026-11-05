@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.16.435
+// @version      1.16.446
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -3207,7 +3207,7 @@
 
   // ../../shared/js/werkia-questionnaire/company-flag.js
   function isFlaggedCompany(value) {
-    return /\bga[\s-]?tec\b/i.test(value || "");
+    return /\bga[\s-]tec\b/i.test(value || "");
   }
   function isFlaggedQuestionnaire(dialog) {
     if (!dialog) return false;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.16.433
+// @version      1.16.435
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -8584,8 +8584,8 @@ ${aliases.join("\n")}
       style.id = STYLE_ID3;
       const font = '"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
       style.textContent = `
-      .${PILL_CLASS} { display:inline-flex; align-items:center; gap:5px; max-width:100%; box-sizing:border-box; margin:4px 0 0; padding:0 8px; min-height:20px; border:1px solid transparent; border-radius:999px; background:${T.surfaceSunken}; color:${T.inkSecondary}; font:500 11px/1.3 ${font}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }
-      .${PILL_CLASS}::before { content:""; flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:${T.inkMuted}; }
+      .${PILL_CLASS} { display:inline-flex; align-items:center; gap:6px; max-width:100%; box-sizing:border-box; margin:6px 0 0; padding:2px 10px; min-height:26px; border:1px solid transparent; border-radius:999px; background:${T.surfaceSunken}; color:${T.inkSecondary}; font:500 13px/1.3 ${font}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }
+      .${PILL_CLASS}::before { content:""; flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:${T.inkMuted}; }
       .${PILL_CLASS}[data-kind="reached"]::before { background:${T.good}; }
       .${PILL_CLASS}[data-kind="missed"]::before { background:${T.bad}; }
       .${PILL_CLASS}[data-kind="none"] { background:transparent; border-color:${T.line}; color:${T.inkMuted}; }

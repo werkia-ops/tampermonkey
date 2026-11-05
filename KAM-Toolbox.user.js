@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.32.408
+// @version      1.32.418
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -16213,7 +16213,7 @@ ${buildCbreBody(current)}`;
     const done = String(aktionen || "").split(",").filter(Boolean);
     const lines = [];
     if (done.includes("verschieben")) lines.push("Mail liegt im Ordner „Out“.");
-    if (done.includes("kategorie-setzen")) lines.push("Kategorie „Werkia“ gesetzt.");
+    if (done.includes("kategorie-setzen")) lines.push("Kategorie in Outlook gesetzt.");
     return { lines, entwurf: done.includes("entwurf") };
   }
 

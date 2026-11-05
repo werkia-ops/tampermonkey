@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.15.408
+// @version      1.16.433
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2667,6 +2667,22 @@
       ]
     },
     filterPresetsTopic({ page: "OBC › Kandidaten", routes: [ROUTES.obcCandidates] }),
+    {
+      id: "cem-kontakt",
+      title: "Letzter CEM-Kontakt",
+      page: "OBC › Kandidaten",
+      routes: [ROUTES.obcCandidates],
+      kind: "view",
+      summary: "In der Spalte mit dem CEM steht unter dem Namen, wann CEM zuletzt Kontakt mit dem Kandidaten hatte, zum Beispiel „CEM · gestern 14:23 · Anruf erreicht“.",
+      notes: [
+        "Gezählt wird der jüngste Matchkommentar von jemandem mit der Rolle CEM, auch Lead CEM und Vertretungen: Anrufprotokolle und normale Kommentare wie „bew tne“ oder „via WA“.",
+        "Grüner Punkt: Anruf erreicht. Roter Punkt: nicht erreicht oder fehlgeschlagen. Grauer Punkt: Kommentar.",
+        "Orange: Der Kontakt ist weniger als 48 Stunden her. Vor dem Anruf kurz mit CEM abstimmen.",
+        "Steht ein Vorname dahinter, kam der Kontakt nicht vom zugeteilten CEM.",
+        "Mit der Maus über der Pille stehen Datum, Person und der Text des Kommentars.",
+        "WhatsApp sieht das Adminpanel nicht. Es zählt nur, wenn CEM dazu einen Kommentar geschrieben hat."
+      ]
+    },
     appointmentNotesTopic({ page: "Terminvorschlag-Dialog" })
   ];
   var obcHelp = createToolboxHelp({ namespace: "obc", toolboxName: "OBC-Toolbox", topics: OBC_HELP_TOPICS });
@@ -7006,7 +7022,7 @@
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS2 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID3 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID4 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -7014,9 +7030,9 @@
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID3)) return;
+      if (document.getElementById(STYLE_ID4)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID3;
+      style.id = STYLE_ID4;
       style.textContent = `
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${LEVEL_STYLES.direct.tint} !important; }
       .${ROW_CLASS2} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES.direct.accent} !important; }
@@ -7973,7 +7989,7 @@
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID3 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID4 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
     const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
@@ -7985,12 +8001,12 @@
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
-    const RETRY_MS2 = 60 * 1e3;
+    const RETRY_MS3 = 60 * 1e3;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID3)) return;
+      if (document.getElementById(STYLE_ID4)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID3;
+      style.id = STYLE_ID4;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES2).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -8173,7 +8189,7 @@
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS2) {
+        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS3) {
           toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }
@@ -8343,6 +8359,297 @@
     });
   }
 
+  // ../../shared/js/kpi-charts/theme.js
+  var TOKENS = {
+    light: {
+      plane: "#fafafa",
+      surface: "#ffffff",
+      surfaceSunken: "#f4f4f5",
+      ink: "#09090b",
+      inkSecondary: "#52525b",
+      inkMuted: "#8b8b94",
+      line: "#e4e4e7",
+      lineStrong: "#d4d4d8",
+      accent: "#ef6c00",
+      accentUi: "#ef6c00",
+      cat1: "#ef6c00",
+      cat2: "#2f7ed8",
+      cat3: "#0e8145",
+      accentInk: "#b85400",
+      accentSoft: "#fff3e8",
+      navy: "#284e75",
+      good: "#0ca30c",
+      goodInk: "#0a7c0a",
+      bad: "#d03b3b",
+      badInk: "#b52f2f",
+      warn: "#d4a106",
+      warnInk: "#8a6700",
+      track: "#ececee",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(9,9,11,.28)"
+    },
+    dark: {
+      plane: "#09090b",
+      surface: "#111113",
+      surfaceSunken: "#18181b",
+      ink: "#fafafa",
+      inkSecondary: "#a1a1aa",
+      inkMuted: "#71717a",
+      line: "#232326",
+      lineStrong: "#303034",
+      accent: "#d86f0e",
+      accentUi: "#ff8a33",
+      cat1: "#d86f0e",
+      cat2: "#4a90e2",
+      cat3: "#199f5c",
+      accentInk: "#ff9a4d",
+      accentSoft: "#26170b",
+      navy: "#7ea6d4",
+      good: "#0ca30c",
+      goodInk: "#3fbf3f",
+      bad: "#d03b3b",
+      badInk: "#e86a6a",
+      warn: "#d4a106",
+      warnInk: "#e6bb3a",
+      track: "#1f1f23",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(0,0,0,.8)"
+    }
+  };
+  function tokensFor(mode) {
+    return TOKENS[mode] || TOKENS.light;
+  }
+
+  // src/features/cem-kontakt/core.js
+  var CACHE_MS3 = 5 * 60 * 1e3;
+  var RETRY_MS2 = 60 * 1e3;
+  var RECENT_MS = 48 * 60 * 60 * 1e3;
+  var MAX_IDS = 50;
+  var TIME_ZONE = "Europe/Berlin";
+  var CEM_ROLE = "CEM";
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var CEM_EMPLOYEES_QUERY = `query WerkiaObcCemKontaktCems {
+  cems: allEmployees(filter: { roles: ["${CEM_ROLE}"] }, perPage: 500) { id firstName lastName }
+}`;
+  function candidateIdFromHref(href) {
+    const id = String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
+    return UUID_RE.test(id) ? id.toLowerCase() : "";
+  }
+  function chunks(ids, size = MAX_IDS) {
+    const out = [];
+    for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+    return out;
+  }
+  function buildContactQuery(ids) {
+    const clean2 = [...new Set((ids || []).map((id) => String(id).toLowerCase()).filter((id) => UUID_RE.test(id)))];
+    if (!clean2.length) return { query: "", ids: [] };
+    const list = clean2.map((id) => `"${id}"`).join(", ");
+    const aliases = clean2.map((id, i) => `  k${i}: allMatchComments(filter: { candidateId: "${id}", roles: ["${CEM_ROLE}"] }, perPage: 1, sortField: "createdAt", sortOrder: "DESC") { id text createdAt automated employeeId }`);
+    const query = `query WerkiaObcCemKontakt {
+  candidates: allCandidates(filter: { ids: [${list}] }, perPage: ${clean2.length}) { id cemEmployeeId }
+${aliases.join("\n")}
+}`;
+    return { query, ids: clean2 };
+  }
+  function parseContactResponse(data, ids) {
+    const owners = new Map((data?.candidates || []).map((c) => [String(c.id).toLowerCase(), c.cemEmployeeId || null]));
+    const out = /* @__PURE__ */ new Map();
+    ids.forEach((id, i) => {
+      const comment = (data?.[`k${i}`] || [])[0] || null;
+      out.set(id, { cemEmployeeId: owners.get(id) || null, comment });
+    });
+    return out;
+  }
+  function stripHtml(html) {
+    return String(html || "").replace(/<br\s*\/?>/gi, " ").replace(/<\/p>\s*<p[^>]*>/gi, " ").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+  }
+  function classifyComment(text) {
+    const plain = stripHtml(text);
+    const time = plain.match(/Zeitpunkt:\s*(\d{1,2}:\d{2})/)?.[1] || "";
+    if (/telefonisch\s+nicht\s+erreicht/i.test(plain)) return { kind: "missed", label: "Anruf nicht erreicht", time, plain };
+    if (/Anruf\s+fehlgeschlagen/i.test(plain)) return { kind: "missed", label: "Anruf fehlgeschlagen", time, plain };
+    if (/telefonisch\s+erreicht/i.test(plain)) return { kind: "reached", label: "Anruf erreicht", time, plain };
+    return { kind: "comment", label: "Kommentar", time: "", plain };
+  }
+  var dayKey = (date, timeZone = TIME_ZONE) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  var hhmm = (date, timeZone = TIME_ZONE) => new Intl.DateTimeFormat("de-DE", { timeZone, hour: "2-digit", minute: "2-digit" }).format(date);
+  var ddmm = (date, timeZone = TIME_ZONE) => new Intl.DateTimeFormat("de-DE", { timeZone, day: "2-digit", month: "2-digit" }).format(date);
+  var fullDate = (date, timeZone = TIME_ZONE) => new Intl.DateTimeFormat("de-DE", { timeZone, weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  function formatWhen(date, now = /* @__PURE__ */ new Date(), time = "") {
+    const shown = time || hhmm(date);
+    const today = dayKey(now);
+    const yesterday = dayKey(new Date(now.getTime() - 24 * 60 * 60 * 1e3));
+    const day = dayKey(date);
+    if (day === today) return `heute ${shown}`;
+    if (day === yesterday) return `gestern ${shown}`;
+    const short = ddmm(date);
+    return short.endsWith(".") ? short : `${short}.`;
+  }
+  function employeeName(employee) {
+    if (!employee) return "";
+    return [employee.firstName, employee.lastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
+  }
+  function pillModel(entry, { now = /* @__PURE__ */ new Date(), employees = /* @__PURE__ */ new Map() } = {}) {
+    if (!entry) return null;
+    const { cemEmployeeId, comment } = entry;
+    if (!comment) {
+      if (!cemEmployeeId) return null;
+      return {
+        kind: "none",
+        recent: false,
+        text: "CEM · noch kein Kontakt",
+        title: "Noch kein Matchkommentar und kein Anruf von CEM bei diesem Kandidaten."
+      };
+    }
+    const date = new Date(comment.createdAt);
+    if (Number.isNaN(date.getTime())) return null;
+    const info = classifyComment(comment.text);
+    const recent = now.getTime() - date.getTime() < RECENT_MS;
+    const author = employees.get(String(comment.employeeId || "").toLowerCase());
+    const authorName = employeeName(author);
+    const other = comment.employeeId && cemEmployeeId && String(comment.employeeId).toLowerCase() !== String(cemEmployeeId).toLowerCase();
+    const parts = ["CEM", formatWhen(date, now, info.time), info.label];
+    if (other && author?.firstName) parts.push(String(author.firstName).trim());
+    const snippet = info.plain.length > 220 ? `${info.plain.slice(0, 219)}…` : info.plain;
+    const lines = [
+      `Letzter CEM-Kontakt: ${fullDate(date)} ${info.time || hhmm(date)} Uhr${authorName ? ` · ${authorName}` : ""}`,
+      info.kind === "comment" ? `„${snippet}“` : snippet
+    ];
+    if (recent) lines.push("CEM hatte in den letzten 2 Tagen Kontakt. Vor dem Anruf kurz mit CEM abstimmen.");
+    return { kind: info.kind, recent, text: parts.join(" · "), title: lines.join("\n") };
+  }
+
+  // src/features/cem-kontakt/index.js
+  var SOURCE_PATH = "obc/toolbox/src/features/cem-kontakt/index.js";
+  var ROUTE_RE = /^#\/Obc\/Candidates(?:[/?]|$)/i;
+  var STYLE_ID3 = "werkia-obc-cem-kontakt-style";
+  var PILL_CLASS = "werkia-obc-cem-kontakt";
+  var T = tokensFor("light");
+  function candidateRows(root = document) {
+    return [...root.querySelectorAll("tbody tr.RaDataTable-row")].filter((row) => !row.parentElement?.closest("tr")).map((row) => {
+      const link = row.querySelector(':scope > td.column-lastName a[href*="#/Candidate/"]');
+      const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
+      const cell = row.querySelector(":scope > td.column-cemEmployeeId");
+      return id && cell ? { row, cell, id } : null;
+    }).filter(Boolean);
+  }
+  function executeCemKontakt(runtime, { now = () => /* @__PURE__ */ new Date() } = {}) {
+    runtime.registerSource(SOURCE_PATH);
+    const known = /* @__PURE__ */ new Map();
+    let employees = null;
+    let loading = null;
+    let failedAt = 0;
+    let lastError = "";
+    const isTargetPage2 = () => ROUTE_RE.test(location.hash || "");
+    const fresh = (id) => {
+      const hit = known.get(id);
+      return hit && Date.now() - hit.at < CACHE_MS3 ? hit : null;
+    };
+    async function loadEmployees(request) {
+      if (employees) return employees;
+      const data = await request(CEM_EMPLOYEES_QUERY, {});
+      employees = new Map((data?.cems || []).map((e) => [String(e.id).toLowerCase(), e]));
+      return employees;
+    }
+    async function load2(ids) {
+      const { request } = getObcGraphqlAdapter();
+      loading = (async () => {
+        await loadEmployees(request).catch(() => {
+          employees = /* @__PURE__ */ new Map();
+        });
+        for (const part of chunks(ids)) {
+          const { query, ids: clean2 } = buildContactQuery(part);
+          if (!query) continue;
+          const data = await request(query, {});
+          const at = Date.now();
+          parseContactResponse(data, clean2).forEach((entry, id) => known.set(id, { at, entry }));
+        }
+        failedAt = 0;
+        lastError = "";
+      })();
+      try {
+        await loading;
+      } catch (error) {
+        failedAt = Date.now();
+        lastError = error?.message || String(error);
+        console.warn("[OBC CEM-Kontakt] nicht geladen:", lastError);
+      } finally {
+        loading = null;
+        scheduleRender();
+      }
+    }
+    function ensureStyle() {
+      if (document.getElementById(STYLE_ID3)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID3;
+      const font = '"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+      style.textContent = `
+      .${PILL_CLASS} { display:inline-flex; align-items:center; gap:5px; max-width:100%; box-sizing:border-box; margin:4px 0 0; padding:0 8px; min-height:20px; border:1px solid transparent; border-radius:999px; background:${T.surfaceSunken}; color:${T.inkSecondary}; font:500 11px/1.3 ${font}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }
+      .${PILL_CLASS}::before { content:""; flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:${T.inkMuted}; }
+      .${PILL_CLASS}[data-kind="reached"]::before { background:${T.good}; }
+      .${PILL_CLASS}[data-kind="missed"]::before { background:${T.bad}; }
+      .${PILL_CLASS}[data-kind="none"] { background:transparent; border-color:${T.line}; color:${T.inkMuted}; }
+      .${PILL_CLASS}[data-kind="error"] { background:transparent; border-color:${T.line}; color:${T.inkMuted}; }
+      .${PILL_CLASS}[data-recent="true"] { background:${T.accentSoft}; border-color:${T.accent}; color:${T.accentInk}; font-weight:600; }
+      .${PILL_CLASS}-wrap { display:block; }
+    `;
+      document.head.appendChild(style);
+    }
+    function paint({ cell, id }) {
+      const hit = known.get(id);
+      let model = hit ? pillModel(hit.entry, { now: now(), employees: employees || /* @__PURE__ */ new Map() }) : null;
+      if (!hit && failedAt) model = { kind: "error", recent: false, text: "CEM-Kontakt nicht geladen", title: `Letzter CEM-Kontakt konnte nicht geladen werden: ${lastError}. Neuer Versuch in einer Minute.` };
+      let wrap2 = cell.querySelector(`:scope > .${PILL_CLASS}-wrap`);
+      if (!model) {
+        wrap2?.remove();
+        return;
+      }
+      if (!wrap2) {
+        wrap2 = document.createElement("div");
+        wrap2.className = `${PILL_CLASS}-wrap`;
+        const pill2 = document.createElement("span");
+        pill2.className = PILL_CLASS;
+        wrap2.appendChild(pill2);
+        cell.appendChild(wrap2);
+      }
+      const pill = wrap2.firstChild;
+      const recent = String(Boolean(model.recent));
+      if (pill.dataset.candidateId !== id) pill.dataset.candidateId = id;
+      if (pill.dataset.kind !== model.kind) pill.dataset.kind = model.kind;
+      if (pill.dataset.recent !== recent) pill.dataset.recent = recent;
+      if (pill.textContent !== model.text) pill.textContent = model.text;
+      if (pill.title !== model.title) pill.title = model.title;
+    }
+    function clear() {
+      document.querySelectorAll(`.${PILL_CLASS}-wrap`).forEach((element) => element.remove());
+    }
+    function render() {
+      if (!isTargetPage2()) {
+        clear();
+        return;
+      }
+      ensureStyle();
+      const rows = candidateRows(document);
+      rows.forEach(paint);
+      const missing = [...new Set(rows.map((entry) => entry.id).filter((id) => !fresh(id)))];
+      if (missing.length && !loading && !(failedAt && Date.now() - failedAt < RETRY_MS2)) load2(missing);
+    }
+    let scheduled = false;
+    function scheduleRender() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 200);
+    }
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    runtime.setInterval(scheduleRender, 60 * 1e3);
+    runtime.addCleanup?.(clear);
+    scheduleRender();
+  }
+
   // obc-legacy-userscript:shared/userscripts/dringende_vakanzen_highlight.user.js
   function executeLegacyModule(runtime) {
     runtime.registerSource("shared/userscripts/dringende_vakanzen_highlight.user.js");
@@ -8358,7 +8665,7 @@
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID3 = "werkia-urgent-vacancy-style";
+      const STYLE_ID4 = "werkia-urgent-vacancy-style";
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -8503,9 +8810,9 @@
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID3)) return;
+        if (document.getElementById(STYLE_ID4)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID3;
+        style.id = STYLE_ID4;
         style.textContent = `
       .${ROW_CLASS2} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background: #fff3cd !important; }
@@ -8626,6 +8933,7 @@
     { id: "obc-fragebogen-duplicate-matches", execute: executeDuplicateMatches },
     { id: "offline-match-bulk", execute: executeOfflineMatchBulk },
     { id: "filter-presets", execute: executeFilterPresets },
+    { id: "cem-kontakt", execute: executeCemKontakt },
     { id: "urgent-vacancy-highlight", execute: executeLegacyModule },
     { id: "om-match-flags", execute: executeOmMatchFlags },
     // After om-match-flags: rows that filter hides are not routed.

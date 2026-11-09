@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.16.446
+// @version      1.17.470
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2670,10 +2670,10 @@
     {
       id: "cem-kontakt",
       title: "Letzter CEM-Kontakt",
-      page: "OBC › Kandidaten",
-      routes: [ROUTES.obcCandidates],
+      page: "OBC › Kandidaten, Kandidaten",
+      routes: [ROUTES.obcCandidates, /^#\/Candidate\/?(?:\?.*)?$/i],
       kind: "view",
-      summary: "In der Spalte mit dem CEM steht unter dem Namen, wann CEM zuletzt Kontakt mit dem Kandidaten hatte, zum Beispiel „CEM · gestern 14:23 · Anruf erreicht“.",
+      summary: "In OBC › Kandidaten steht unter dem CEM, in der normalen Kandidatenliste unter dem OBC-Mitarbeiter, wann CEM zuletzt Kontakt mit dem Kandidaten hatte, zum Beispiel „CEM · gestern 14:23 · Anruf erreicht“.",
       notes: [
         "Gezählt wird der jüngste Matchkommentar von jemandem mit der Rolle CEM, auch Lead CEM und Vertretungen: Anrufprotokolle und normale Kommentare wie „bew tne“ oder „via WA“.",
         "Grüner Punkt: Anruf erreicht. Roter Punkt: nicht erreicht oder fehlgeschlagen. Grauer Punkt: Kommentar.",
@@ -8522,14 +8522,33 @@ ${aliases.join("\n")}
   // src/features/cem-kontakt/index.js
   var SOURCE_PATH = "obc/toolbox/src/features/cem-kontakt/index.js";
   var ROUTE_RE = /^#\/Obc\/Candidates(?:[/?]|$)/i;
+  var CANDIDATE_LIST_RE = /^#\/Candidate\/?(?:\?.*)?$/i;
+  var PAGES3 = [
+    { route: ROUTE_RE, column: "cemEmployeeId", headerRe: /^CEM\b/i },
+    { route: CANDIDATE_LIST_RE, column: "obcEmployeeId", headerRe: /OBC/i }
+  ];
+  function pageFor(hash) {
+    return PAGES3.find((page) => page.route.test(hash || "")) || null;
+  }
   var STYLE_ID3 = "werkia-obc-cem-kontakt-style";
   var PILL_CLASS = "werkia-obc-cem-kontakt";
   var T = tokensFor("light");
-  function candidateRows(root = document) {
+  function headerIndex(table, headerRe) {
+    const ths = [...table?.querySelectorAll(":scope > thead > tr > th") || []];
+    return ths.findIndex((th) => headerRe.test((th.textContent || "").trim()));
+  }
+  function candidateRows(root = document, page = PAGES3[0]) {
+    const indexCache = /* @__PURE__ */ new Map();
     return [...root.querySelectorAll("tbody tr.RaDataTable-row")].filter((row) => !row.parentElement?.closest("tr")).map((row) => {
-      const link = row.querySelector(':scope > td.column-lastName a[href*="#/Candidate/"]');
+      const link = row.querySelector(':scope > td.column-lastName a[href*="#/Candidate/"]') || row.querySelector(':scope > td a[href*="#/Candidate/"]');
       const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
-      const cell = row.querySelector(":scope > td.column-cemEmployeeId");
+      let cell = row.querySelector(`:scope > td.column-${page.column}`);
+      if (!cell && page.headerRe) {
+        const table = row.closest("table");
+        if (!indexCache.has(table)) indexCache.set(table, headerIndex(table, page.headerRe));
+        const index = indexCache.get(table);
+        if (index >= 0) cell = row.children[index] || null;
+      }
       return id && cell ? { row, cell, id } : null;
     }).filter(Boolean);
   }
@@ -8540,7 +8559,6 @@ ${aliases.join("\n")}
     let loading = null;
     let failedAt = 0;
     let lastError = "";
-    const isTargetPage2 = () => ROUTE_RE.test(location.hash || "");
     const fresh = (id) => {
       const hit = known.get(id);
       return hit && Date.now() - hit.at < CACHE_MS3 ? hit : null;
@@ -8624,12 +8642,13 @@ ${aliases.join("\n")}
       document.querySelectorAll(`.${PILL_CLASS}-wrap`).forEach((element) => element.remove());
     }
     function render() {
-      if (!isTargetPage2()) {
+      const page = pageFor(location.hash);
+      if (!page) {
         clear();
         return;
       }
       ensureStyle();
-      const rows = candidateRows(document);
+      const rows = candidateRows(document, page);
       rows.forEach(paint);
       const missing = [...new Set(rows.map((entry) => entry.id).filter((id) => !fresh(id)))];
       if (missing.length && !loading && !(failedAt && Date.now() - failedAt < RETRY_MS2)) load2(missing);

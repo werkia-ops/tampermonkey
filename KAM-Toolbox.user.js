@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.32.446
+// @version      1.33.469
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -5738,9 +5738,9 @@
     if (!sample || !view) return null;
     const computed = view.getComputedStyle(sample);
     const style = Object.fromEntries(COPIED_STYLES.map((name) => [name, computed[name]]).filter(([, value]) => value));
-    const icon3 = sample.querySelector("svg");
-    const iconStyle = icon3 ? view.getComputedStyle(icon3) : null;
-    const iconBox = icon3?.parentElement && icon3.parentElement !== sample ? view.getComputedStyle(icon3.parentElement) : null;
+    const icon4 = sample.querySelector("svg");
+    const iconStyle = icon4 ? view.getComputedStyle(icon4) : null;
+    const iconBox = icon4?.parentElement && icon4.parentElement !== sample ? view.getComputedStyle(icon4.parentElement) : null;
     return {
       style,
       iconSize: iconStyle?.width && iconStyle.width !== "auto" ? iconStyle.width : "18px",
@@ -6054,16 +6054,16 @@
         if (look) {
           vertretungenButton.className = "wv-native";
           Object.assign(vertretungenButton.style, look.style);
-          const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          icon3.setAttribute("viewBox", "0 0 24 24");
-          icon3.setAttribute("aria-hidden", "true");
-          icon3.style.width = look.iconSize;
-          icon3.style.height = look.iconSize;
-          icon3.style.marginRight = look.iconGap;
+          const icon4 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon4.setAttribute("viewBox", "0 0 24 24");
+          icon4.setAttribute("aria-hidden", "true");
+          icon4.style.width = look.iconSize;
+          icon4.style.height = look.iconSize;
+          icon4.style.marginRight = look.iconGap;
           const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
           path.setAttribute("d", PEOPLE_ICON_PATH);
-          icon3.append(path);
-          vertretungenButton.prepend(icon3);
+          icon4.append(path);
+          vertretungenButton.prepend(icon4);
         } else {
           vertretungenButton.className = "wv-own";
         }
@@ -6360,17 +6360,17 @@ ${add}` : add;
       });
     }
     function noteIcon(size) {
-      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon3.setAttribute("viewBox", "0 0 24 24");
-      icon3.setAttribute("aria-hidden", "true");
+      const icon4 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon4.setAttribute("viewBox", "0 0 24 24");
+      icon4.setAttribute("aria-hidden", "true");
       if (size) {
-        icon3.style.width = size;
-        icon3.style.height = size;
+        icon4.style.width = size;
+        icon4.style.height = size;
       }
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", NOTE_ICON_PATH);
-      icon3.append(path);
-      return icon3;
+      icon4.append(path);
+      return icon4;
     }
     function confirmButton(label, question, onConfirm) {
       let armed = false;
@@ -10145,7 +10145,7 @@ ${rr.zahlen}` : view.title;
     `;
       document.head.appendChild(style);
     }
-    function icon3(path) {
+    function icon4(path) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("aria-hidden", "true");
@@ -10173,7 +10173,7 @@ ${rr.zahlen}` : view.title;
       button3.title = "CEM-Namen kopieren";
       const label = document.createElement("span");
       label.textContent = name;
-      button3.append(label, icon3(COPY_ICON_PATH2));
+      button3.append(label, icon4(COPY_ICON_PATH2));
       return button3;
     }
     function renderState(matchId) {
@@ -10278,11 +10278,11 @@ ${rr.zahlen}` : view.title;
       copyText(name).then(() => {
         button3.dataset.copied = "true";
         button3.title = "Kopiert";
-        button3.querySelector("svg")?.replaceWith(icon3(CHECK_ICON_PATH));
+        button3.querySelector("svg")?.replaceWith(icon4(CHECK_ICON_PATH));
         runtime.setTimeout(() => {
           delete button3.dataset.copied;
           button3.title = "CEM-Namen kopieren";
-          button3.querySelector("svg")?.replaceWith(icon3(COPY_ICON_PATH2));
+          button3.querySelector("svg")?.replaceWith(icon4(COPY_ICON_PATH2));
         }, COPIED_FEEDBACK_MS);
       });
     }, true);
@@ -10610,7 +10610,7 @@ ${rr.zahlen}` : view.title;
       const width = Math.min(520, window.innerWidth - 40);
       return { left: window.innerWidth - width - MARGIN, top: 80, width, maxHeight: window.innerHeight - 100 };
     }
-    function makeVacancySection(heading, items, icon3 = "✓") {
+    function makeVacancySection(heading, items, icon4 = "✓") {
       const wrap2 = document.createElement("div");
       const h = document.createElement("div");
       h.style.cssText = `
@@ -10627,8 +10627,8 @@ ${rr.zahlen}` : view.title;
         display:flex; gap:10px; margin-bottom:10px;
         color:#222; font-size:16px; align-items:flex-start; line-height:1.65;
       `;
-        const iconColor = icon3 === "✓" ? "#16a34a" : "#888";
-        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon3)}</span><span>${escapeHtml(item)}</span>`;
+        const iconColor = icon4 === "✓" ? "#16a34a" : "#888";
+        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon4)}</span><span>${escapeHtml(item)}</span>`;
         ul.appendChild(li);
       });
       wrap2.appendChild(ul);
@@ -11621,8 +11621,8 @@ ${rr.zahlen}` : view.title;
   // ../../shared/js/route-commute/route-preview.js
   var defaultEscape = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   var LABEL = { width: 200, height: 46 };
-  function addressLabel({ x, y, color, title, text, esc }) {
-    return `<foreignObject x="${x}" y="${y}" width="${LABEL.width}" height="${LABEL.height}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:4px 7px;border:1.5px solid ${color};border-radius:6px;background:rgba(255,255,255,.94);color:#1b1b1b;font:600 11px/1.3 sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.18);overflow:hidden;"><div style="font-weight:800;color:${color};">${esc(title)}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(text)}</div></div></foreignObject>`;
+  function addressLabel({ x, y, color, title, text, esc: esc2 }) {
+    return `<foreignObject x="${x}" y="${y}" width="${LABEL.width}" height="${LABEL.height}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;box-sizing:border-box;padding:4px 7px;border:1.5px solid ${color};border-radius:6px;background:rgba(255,255,255,.94);color:#1b1b1b;font:600 11px/1.3 sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.18);overflow:hidden;"><div style="font-weight:800;color:${color};">${esc2(title)}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc2(text)}</div></div></foreignObject>`;
   }
   function labelPosition(point, { width, height }, preferAbove = false) {
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -11632,21 +11632,21 @@ ${rr.zahlen}` : view.title;
       y: Math.round(clamp(preferAbove || y > height / 2 ? y - LABEL.height - 12 : y + 12, 4, height - LABEL.height - 22))
     };
   }
-  function routePreviewHtml({ coordinates, candidateAddress = "", jobAddress = "", candidateLocation, jobLocation, width = 500, height = 280, esc = defaultEscape } = {}) {
+  function routePreviewHtml({ coordinates, candidateAddress = "", jobAddress = "", candidateLocation, jobLocation, width = 500, height = 280, esc: esc2 = defaultEscape } = {}) {
     const map = fitStaticMap(coordinates, { width, height, padding: 36 });
     if (!map) return "";
     const points = map.points.map((point) => point.join(",")).join(" ");
     const [start, end] = [map.points[0], map.points.at(-1)];
-    const tiles = map.tiles.map((tile) => `<image href="${esc(tile.url)}" x="${tile.left}" y="${tile.top}" width="256" height="256"/>`).join("");
+    const tiles = map.tiles.map((tile) => `<image href="${esc2(tile.url)}" x="${tile.left}" y="${tile.top}" width="256" height="256"/>`).join("");
     const startLabel = labelPosition(start, map);
     const endLabel = labelPosition(end, map, true);
     const labels2 = [
-      candidateAddress ? addressLabel({ ...startLabel, color: "#2b8a3e", title: "Kandidat", text: candidateAddress, esc }) : "",
-      jobAddress ? addressLabel({ ...endLabel, color: "#c92a2a", title: "Vakanz", text: jobAddress, esc }) : ""
+      candidateAddress ? addressLabel({ ...startLabel, color: "#2b8a3e", title: "Kandidat", text: candidateAddress, esc: esc2 }) : "",
+      jobAddress ? addressLabel({ ...endLabel, color: "#c92a2a", title: "Vakanz", text: jobAddress, esc: esc2 }) : ""
     ].join("");
-    const svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Karte der Fahrtroute" style="display:block;width:100%;height:auto;background:#f4f4f5;">${tiles}<polyline points="${points}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/><polyline points="${points}" fill="none" stroke="#1971c2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="8" fill="#2f9e44" stroke="#fff" stroke-width="3"/><circle cx="${end[0]}" cy="${end[1]}" r="8" fill="#e03131" stroke="#fff" stroke-width="3"/>${labels2}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer"><rect x="${width - 104}" y="${height - 18}" width="104" height="18" fill="rgba(255,255,255,.8)"/><text x="${width - 6}" y="${height - 5}" text-anchor="end" font-family="sans-serif" font-size="11" fill="#333">${esc(OSM_ATTRIBUTION)}</text></a></svg>`;
+    const svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Karte der Fahrtroute" style="display:block;width:100%;height:auto;background:#f4f4f5;">${tiles}<polyline points="${points}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/><polyline points="${points}" fill="none" stroke="#1971c2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="8" fill="#2f9e44" stroke="#fff" stroke-width="3"/><circle cx="${end[0]}" cy="${end[1]}" r="8" fill="#e03131" stroke="#fff" stroke-width="3"/>${labels2}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer"><rect x="${width - 104}" y="${height - 18}" width="104" height="18" fill="rgba(255,255,255,.8)"/><text x="${width - 6}" y="${height - 5}" text-anchor="end" font-family="sans-serif" font-size="11" fill="#333">${esc2(OSM_ATTRIBUTION)}</text></a></svg>`;
     const linkStyle = "color:#1971c2;font-size:12px;font-weight:700;text-decoration:none;";
-    const links = candidateLocation && jobLocation ? `<div style="display:flex;gap:14px;margin-top:6px;"><a href="${esc(googleMapsDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">Google Maps ↗</a><a href="${esc(osmDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">OpenStreetMap ↗</a></div>` : "";
+    const links = candidateLocation && jobLocation ? `<div style="display:flex;gap:14px;margin-top:6px;"><a href="${esc2(googleMapsDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">Google Maps ↗</a><a href="${esc2(osmDirectionsUrl(candidateLocation, jobLocation))}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">OpenStreetMap ↗</a></div>` : "";
     return `<div style="margin-top:10px;border:1px solid rgba(25,113,194,.2);border-radius:8px;overflow:hidden;">${svg}</div>${links}`;
   }
 
@@ -13400,6 +13400,624 @@ ${rr.zahlen}` : view.title;
     });
   }
 
+  // ../../shared/js/kpi-charts/theme.js
+  var TOKENS = {
+    light: {
+      plane: "#fafafa",
+      surface: "#ffffff",
+      surfaceSunken: "#f4f4f5",
+      ink: "#09090b",
+      inkSecondary: "#52525b",
+      inkMuted: "#8b8b94",
+      line: "#e4e4e7",
+      lineStrong: "#d4d4d8",
+      accent: "#ef6c00",
+      accentUi: "#ef6c00",
+      cat1: "#ef6c00",
+      cat2: "#2f7ed8",
+      cat3: "#0e8145",
+      accentInk: "#b85400",
+      accentSoft: "#fff3e8",
+      navy: "#284e75",
+      good: "#0ca30c",
+      goodInk: "#0a7c0a",
+      bad: "#d03b3b",
+      badInk: "#b52f2f",
+      warn: "#d4a106",
+      warnInk: "#8a6700",
+      track: "#ececee",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(9,9,11,.28)"
+    },
+    dark: {
+      plane: "#09090b",
+      surface: "#111113",
+      surfaceSunken: "#18181b",
+      ink: "#fafafa",
+      inkSecondary: "#a1a1aa",
+      inkMuted: "#71717a",
+      line: "#232326",
+      lineStrong: "#303034",
+      accent: "#d86f0e",
+      accentUi: "#ff8a33",
+      cat1: "#d86f0e",
+      cat2: "#4a90e2",
+      cat3: "#199f5c",
+      accentInk: "#ff9a4d",
+      accentSoft: "#26170b",
+      navy: "#7ea6d4",
+      good: "#0ca30c",
+      goodInk: "#3fbf3f",
+      bad: "#d03b3b",
+      badInk: "#e86a6a",
+      warn: "#d4a106",
+      warnInk: "#e6bb3a",
+      track: "#1f1f23",
+      shadow: "none",
+      shadowRaised: "0 16px 48px -16px rgba(0,0,0,.8)"
+    }
+  };
+  function tokensFor(mode) {
+    return TOKENS[mode] || TOKENS.light;
+  }
+  var FONT_STACK = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  function cssVariables(t) {
+    return `  --plane: ${t.plane};
+  --surface: ${t.surface};
+  --sunken: ${t.surfaceSunken};
+  --ink: ${t.ink};
+  --ink-2: ${t.inkSecondary};
+  --muted: ${t.inkMuted};
+  --line: ${t.line};
+  --line-strong: ${t.lineStrong};
+  --accent: ${t.accent};
+  --accent-ui: ${t.accentUi};
+  --cat-1: ${t.cat1};
+  --cat-2: ${t.cat2};
+  --cat-3: ${t.cat3};
+  --accent-ink: ${t.accentInk};
+  --accent-soft: ${t.accentSoft};
+  --navy: ${t.navy};
+  --good: ${t.good};
+  --good-ink: ${t.goodInk};
+  --bad: ${t.bad};
+  --bad-ink: ${t.badInk};
+  --warn: ${t.warn};
+  --warn-ink: ${t.warnInk};
+  --track: ${t.track};
+  --shadow: ${t.shadow};
+  --shadow-raised: ${t.shadowRaised};
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --gap: 16px;`;
+  }
+
+  // ../../shared/js/hiring-ruf/core.js
+  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/hiring-ruf/e96a8a51-8fd0-48e1-b33e-c0f064352816";
+  var REQUEST_TIMEOUT_MS5 = 15e3;
+  var POLL_MS = 30 * 1e3;
+  var SHOW_MS = 9e3;
+  var MAX_TEXT = 120;
+  var OFFLINE_MESSAGE4 = "Der Server für den Hiring-Ruf ist gerade nicht erreichbar.";
+  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaHiringRufMe {
+  me: currentEmployee { id __typename }
+}`;
+  function parseResponse5(status, text) {
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    if (data && data.ok === true) return data;
+    if (data && data.fehler) throw new Error(data.fehler);
+    throw new Error(`Hiring-Ruf: unerwartete Antwort (HTTP ${status}).`);
+  }
+  function createRufClient({ request, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
+    return (payload) => new Promise((resolve, reject) => {
+      request({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify(payload),
+        timeout: timeoutMs,
+        onload(response) {
+          try {
+            resolve(parseResponse5(response.status, response.responseText));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
+      });
+    });
+  }
+  function joinNames(names) {
+    const list = (names || []).filter(Boolean);
+    if (list.length < 2) return list.join("");
+    return `${list.slice(0, -1).join(", ")} und ${list.at(-1)}`;
+  }
+  function formatTime(iso, nowMs = Date.now()) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return "";
+    const day = (d) => new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" }).format(d);
+    const time = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }).format(date);
+    return day(date) === day(new Date(nowMs)) ? time : `${day(date)} ${time}`;
+  }
+  function historyLine(entry, nowMs = Date.now()) {
+    const sent = formatTime(entry.gesendetAm, nowMs);
+    const seen = entry.gesehenAm ? `gesehen ${formatTime(entry.gesehenAm, nowMs)}` : "noch nicht gesehen";
+    return [entry.an, sent, seen].filter(Boolean).join(" · ");
+  }
+
+  // ../../shared/js/hiring-ruf/index.js
+  var MARK2 = "werkiaHiringRuf";
+  var RETRY_MS3 = 5 * 60 * 1e3;
+  var GIF_WAIT_MS = 4e3;
+  var Z = 1600;
+  var esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+  var ICONS = {
+    megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+  };
+  var icon = (name, size = 16) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  var BASE_CSS = `:host { all: initial; ${cssVariables(tokensFor("light"))} font: 14px/1.5 ${FONT_STACK}; color: var(--ink); --shadow-pop: 0 16px 48px -16px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.04); }
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; cursor: pointer; }`;
+  var OVERLAY_CSS = `${BASE_CSS}
+.veil { position: fixed; inset: 0; z-index: ${Z}; display: grid; place-items: center; padding: 32px;
+  background: rgba(9,9,11,.78); cursor: pointer; animation: veil-in 200ms ease-out both; }
+.stage { display: grid; justify-items: center; gap: 24px; max-width: min(1100px, 92vw); text-align: center; }
+.text { margin: 0; color: #fff; font-weight: 900; line-height: .95; letter-spacing: -0.03em;
+  font-size: clamp(48px, 9vw, 148px); text-wrap: balance; overflow-wrap: anywhere;
+  text-shadow: 0 6px 0 var(--accent), 0 18px 40px rgba(0,0,0,.5);
+  animation: stamp 560ms cubic-bezier(.2,.9,.25,1.15) both, shake 420ms ease-in-out 650ms 2; }
+.gif { display: block; max-width: min(520px, 80vw); max-height: 42vh; border-radius: 16px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.7);
+  animation: rise 380ms cubic-bezier(.2,.8,.2,1) 260ms both; }
+.from { color: rgba(255,255,255,.72); font-size: 13px; letter-spacing: .02em; animation: veil-in 300ms ease-out 500ms both; }
+.veil.out { animation: veil-out 220ms ease-in both; }
+.veil.out .stage { transition: transform 220ms ease-in; transform: scale(.96); }
+@keyframes veil-in { from { opacity: 0; } }
+@keyframes veil-out { to { opacity: 0; } }
+@keyframes stamp { 0% { opacity: 0; transform: scale(1.9) rotate(-8deg); } 55% { opacity: 1; transform: scale(.94) rotate(1deg); } 100% { opacity: 1; transform: scale(1) rotate(-2deg); } }
+@keyframes shake { 0%, 100% { transform: scale(1) rotate(-2deg) translateX(0); } 25% { transform: scale(1) rotate(-2deg) translateX(-8px); } 75% { transform: scale(1) rotate(-2deg) translateX(8px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) {
+  .text, .gif, .from { animation: veil-in 200ms ease-out both; transform: rotate(-2deg); }
+  .gif { transform: none; }
+  .veil.out .stage { transition: none; transform: none; }
+}`;
+  function preload(url) {
+    if (!url) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const img = new Image();
+      const timer = setTimeout(() => resolve(false), GIF_WAIT_MS);
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
+      img.src = url;
+    });
+  }
+  async function showRuf(ruf, { doc = document, showMs = SHOW_MS } = {}) {
+    const gifOk = await preload(ruf.gifUrl);
+    return new Promise((resolve) => {
+      const host = doc.createElement("div");
+      host.id = "werkia-hiring-ruf-overlay";
+      host.dataset.werkiaOwned = "true";
+      const shadow = host.attachShadow({ mode: "open" });
+      shadow.innerHTML = `<style>${OVERLAY_CSS}</style>
+<div class="veil" role="alertdialog" aria-live="assertive" aria-label="${esc(ruf.text)}">
+  <div class="stage">
+    <p class="text">${esc(ruf.text)}</p>
+    ${gifOk ? `<img class="gif" src="${esc(ruf.gifUrl)}" alt="">` : ""}
+    <div class="from">${ruf.von ? `von ${esc(ruf.von)} · ` : ""}Klicken zum Schließen</div>
+  </div>
+</div>`;
+      const veil = shadow.querySelector(".veil");
+      let done = false;
+      let timer = null;
+      const close = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        doc.removeEventListener("keydown", onKey, true);
+        veil.classList.add("out");
+        setTimeout(() => {
+          host.remove();
+          resolve();
+        }, 230);
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          close();
+        }
+      };
+      veil.addEventListener("click", close);
+      doc.addEventListener("keydown", onKey, true);
+      timer = setTimeout(close, showMs);
+      (doc.body || doc.documentElement).appendChild(host);
+    });
+  }
+  var DIALOG_CSS = `${BASE_CSS}
+.fab { position: fixed; left: 16px; bottom: 16px; z-index: 1300; width: 40px; height: 40px; border-radius: 999px; border: 0;
+  display: grid; place-items: center; background: var(--ink); color: #fff; box-shadow: var(--shadow-pop);
+  transition: transform 160ms ease-out; }
+.fab:hover { transform: scale(1.06); }
+.fab:active { transform: scale(.96); }
+.fab:focus-visible, .btn:focus-visible, .input:focus-visible, .thumb:focus-visible, .seg button:focus-visible { outline: 2px solid var(--accent-ui); outline-offset: 2px; }
+.veil { position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center; padding: 24px; background: rgba(9,9,11,.42); backdrop-filter: blur(2px); }
+.veil.enter { animation: fade 160ms ease-out both; }
+.veil.enter .modal { animation: pop 200ms cubic-bezier(.2,.8,.2,1) both; }
+.modal { width: min(560px, 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--surface);
+  border-radius: 16px; box-shadow: var(--shadow-pop); }
+.m-head { display: flex; align-items: center; gap: 8px; padding: 16px 20px 12px; color: var(--muted); }
+.m-head h3 { margin: 0; flex: 1; font-size: 16px; font-weight: 650; color: var(--ink); letter-spacing: -0.01em; }
+.m-body { padding: 4px 20px 16px; overflow: auto; display: grid; gap: 16px; }
+.m-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--line); }
+.m-foot .msg { flex: 1; font-size: 12px; color: var(--ink-2); }
+.m-foot .msg.err { color: var(--bad-ink); }
+.lab { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.lab .hint { font-weight: 400; color: var(--muted); }
+.people { display: flex; gap: 16px; flex-wrap: wrap; }
+.people label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.people input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.input { width: 100%; height: 34px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface);
+  font: inherit; color: var(--ink); }
+.input.big { height: 40px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.btn { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 12px; font-weight: 550; }
+.btn:hover { background: var(--sunken); }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn.primary:hover { background: #27272a; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--sunken); }
+.btn.icon { width: 32px; padding: 0; display: grid; place-items: center; }
+.btn[disabled] { opacity: .5; cursor: default; }
+.picked { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 10px; background: var(--sunken); min-height: 56px; }
+.picked img { height: 56px; max-width: 100px; border-radius: 6px; object-fit: cover; }
+.picked .none { color: var(--muted); font-size: 12px; padding-left: 4px; flex: 1; }
+.picked .sp { flex: 1; }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--sunken); }
+.seg button { border: 0; background: transparent; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 550; color: var(--ink-2); }
+.seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 8px; max-height: 236px; overflow: auto; }
+.tile { position: relative; }
+.thumb { display: block; width: 100%; height: 72px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: var(--sunken); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb.on { border-color: var(--accent); }
+.tile .act { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: 0; border-radius: 6px; display: grid; place-items: center;
+  background: rgba(9,9,11,.6); color: #fff; opacity: 0; transition: opacity 120ms ease-out; }
+.tile:hover .act, .tile .act:focus-visible, .tile .act.fav { opacity: 1; }
+.tile .act.fav svg { fill: currentColor; color: #ffb74d; }
+.empty { color: var(--muted); font-size: 12px; padding: 8px 0; }
+.row { display: flex; gap: 8px; }
+.giphy { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.hist { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-2); display: grid; gap: 4px; }
+.toast { position: fixed; left: 64px; bottom: 20px; z-index: 1500; padding: 8px 12px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 13px;
+  box-shadow: var(--shadow-pop); animation: pop 200ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .veil.enter, .veil.enter .modal, .toast { animation: fade 120ms ease-out both; } .fab { transition: none; } }`;
+  function mountSender({ doc, call, initial, now }) {
+    const host = doc.createElement("div");
+    host.id = "werkia-hiring-ruf";
+    host.dataset.werkiaOwned = "true";
+    const shadow = host.attachShadow({ mode: "open" });
+    shadow.innerHTML = `<style>${DIALOG_CSS}</style><button class="fab" type="button" title="Hiring-Ruf senden" aria-label="Hiring-Ruf senden">${icon("megaphone", 18)}</button><div class="layer"></div>`;
+    (doc.body || doc.documentElement).appendChild(host);
+    const layer = shadow.querySelector(".layer");
+    let info = initial;
+    let state = null;
+    let searchTimer = null;
+    let searchSeq = 0;
+    const favUrls = () => new Set((info.favoriten || []).map((f) => f.url));
+    function open() {
+      state = {
+        an: new Set((info.empfaenger || []).map((p) => p.id)),
+        text: info.vorgabe || "MACH HIRINGS",
+        gif: null,
+        // { url, vorschau }
+        tab: (info.favoriten || []).length ? "fav" : "suche",
+        suche: "",
+        gifs: null,
+        searching: false,
+        link: "",
+        msg: "",
+        err: false,
+        busy: false
+      };
+      render();
+      if (state.tab === "suche") search("");
+      shadow.querySelector(".input.big")?.focus();
+      call("ich").then((next) => {
+        if (next?.darfSenden) {
+          info = next;
+          if (state) render();
+        }
+      }).catch(() => {
+      });
+    }
+    function close() {
+      state = null;
+      clearTimeout(searchTimer);
+      layer.innerHTML = "";
+    }
+    function toast(text) {
+      const el7 = doc.createElement("div");
+      el7.className = "toast";
+      el7.textContent = text;
+      shadow.appendChild(el7);
+      setTimeout(() => el7.remove(), 3200);
+    }
+    function tile(gif, { fav = false, removable = false } = {}) {
+      const on = state.gif?.url === gif.url;
+      const act = removable ? `<button class="act" type="button" data-act="unfav" data-id="${esc(gif.id)}" title="Aus Favoriten entfernen">${icon("x", 14)}</button>` : `<button class="act${fav ? " fav" : ""}" type="button" data-act="fav" data-url="${esc(gif.url)}" data-vorschau="${esc(gif.vorschau)}" title="${fav ? "Ist in den Favoriten" : "Zu Favoriten"}">${icon("star", 14)}</button>`;
+      return `<div class="tile"><button class="thumb${on ? " on" : ""}" type="button" data-act="pick" data-url="${esc(gif.url)}" data-vorschau="${esc(gif.vorschau)}" title="${esc(gif.titel || "GIF auswählen")}"><img src="${esc(gif.vorschau)}" alt="" loading="lazy"></button>${act}</div>`;
+    }
+    function gifSection() {
+      const favs = info.favoriten || [];
+      const tabs = `<div class="seg" role="tablist"><button type="button" data-act="tab" data-tab="fav" class="${state.tab === "fav" ? "on" : ""}">Favoriten (${favs.length})</button><button type="button" data-act="tab" data-tab="suche" class="${state.tab === "suche" ? "on" : ""}">Suche</button><button type="button" data-act="tab" data-tab="link" class="${state.tab === "link" ? "on" : ""}">Link</button></div>`;
+      let content = "";
+      if (state.tab === "fav") {
+        content = favs.length ? `<div class="grid">${favs.map((f) => tile(f, { removable: true })).join("")}</div>` : '<div class="empty">Noch keine Favoriten. In der Suche mit dem Stern speichern.</div>';
+      } else if (state.tab === "suche") {
+        const known = favUrls();
+        const list = state.gifs;
+        content = `<div style="margin-top:8px"><input class="input" data-field="suche" placeholder="GIF suchen, z. B. hiring, the office, let's go" value="${esc(state.suche)}"></div>
+${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : ""}</div>` : list.length ? `<div class="grid">${list.map((g) => tile(g, { fav: known.has(g.url) })).join("")}</div>` : '<div class="empty">Nichts gefunden.</div>'}
+<div class="giphy">Powered by GIPHY</div>`;
+      } else {
+        content = `<div class="row" style="margin-top:8px"><input class="input" data-field="link" placeholder="Link von GIPHY oder Tenor einfügen" value="${esc(state.link)}"><button class="btn" type="button" data-act="link">Übernehmen</button></div>`;
+      }
+      return tabs + content;
+    }
+    function render() {
+      if (!state) return;
+      const people = (info.empfaenger || []).map((p) => `<label><input type="checkbox" data-person="${esc(p.id)}" ${state.an.has(p.id) ? "checked" : ""}>${esc(p.name)}</label>`).join("");
+      const picked = state.gif ? `<img src="${esc(state.gif.vorschau || state.gif.url)}" alt=""><span class="sp"></span><button class="btn ghost" type="button" data-act="nogif">Ohne GIF</button>` : '<span class="none">Kein GIF ausgewählt</span>';
+      const hist = (info.verlauf || []).slice(0, 5);
+      const focus = shadow.activeElement?.dataset?.field;
+      const enter = !state.shown;
+      state.shown = true;
+      layer.innerHTML = `<div class="veil${enter ? " enter" : ""}" data-act="veil"><div class="modal" role="dialog" aria-modal="true" aria-label="Hiring-Ruf">
+  <div class="m-head">${icon("megaphone")}<h3>Hiring-Ruf</h3><button class="btn ghost icon" type="button" data-act="close" title="Schließen">${icon("x")}</button></div>
+  <div class="m-body">
+    <div><div class="lab">An</div><div class="people">${people}</div></div>
+    <div><div class="lab">Text <span class="hint">${state.text.length}/${MAX_TEXT}</span></div><input class="input big" data-field="text" maxlength="${MAX_TEXT}" value="${esc(state.text)}"></div>
+    <div><div class="lab">GIF</div><div class="picked">${picked}</div><div style="margin-top:12px">${gifSection()}</div></div>
+    ${hist.length ? `<div><div class="lab">Zuletzt gesendet</div><ul class="hist">${hist.map((h) => `<li>${esc(historyLine(h, now()))}</li>`).join("")}</ul></div>` : ""}
+  </div>
+  <div class="m-foot"><span class="msg${state.err ? " err" : ""}">${esc(state.msg)}</span><button class="btn ghost" type="button" data-act="preview">Vorschau</button><button class="btn primary" type="button" data-act="send" ${state.busy || !state.an.size ? "disabled" : ""}>Senden</button></div>
+</div></div>`;
+      if (focus) {
+        const field = shadow.querySelector(`[data-field="${focus}"]`);
+        if (field) {
+          field.focus();
+          const end = field.value.length;
+          field.setSelectionRange?.(end, end);
+        }
+      }
+    }
+    async function search(text) {
+      const seq = ++searchSeq;
+      state.searching = true;
+      state.gifs = null;
+      render();
+      try {
+        const result = await call("gif-suche", { suche: text });
+        if (!state || seq !== searchSeq) return;
+        state.gifs = result.gifs || [];
+      } catch (error) {
+        if (!state || seq !== searchSeq) return;
+        state.gifs = [];
+        state.msg = error.message;
+        state.err = true;
+      }
+      state.searching = false;
+      render();
+    }
+    async function run(label, fn) {
+      if (!state) return;
+      try {
+        await fn();
+      } catch (error) {
+        if (!state) return;
+        state.msg = `${label}: ${error.message}`;
+        state.err = true;
+        state.busy = false;
+        render();
+      }
+    }
+    shadow.querySelector(".fab").addEventListener("click", () => state ? close() : open());
+    layer.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-act]");
+      if (!target || !state) return;
+      const act = target.dataset.act;
+      if (act === "veil" && event.target !== target) return;
+      if (act === "veil" || act === "close") return close();
+      if (act === "tab") {
+        state.tab = target.dataset.tab;
+        render();
+        if (state.tab === "suche" && state.gifs === null && !state.searching) search(state.suche);
+        return;
+      }
+      if (act === "pick") {
+        state.gif = { url: target.dataset.url, vorschau: target.dataset.vorschau };
+        return render();
+      }
+      if (act === "nogif") {
+        state.gif = null;
+        return render();
+      }
+      if (act === "link") {
+        const url = state.link.trim();
+        if (!/^https:\/\//i.test(url)) {
+          state.msg = "Bitte einen https-Link von GIPHY oder Tenor einfügen.";
+          state.err = true;
+          return render();
+        }
+        state.gif = { url, vorschau: url };
+        state.msg = "";
+        return render();
+      }
+      if (act === "fav") {
+        if (favUrls().has(target.dataset.url)) return;
+        return run("Favorit", async () => {
+          await call("favorit", { gifUrl: target.dataset.url, vorschau: target.dataset.vorschau });
+          info = await call("ich");
+          render();
+        });
+      }
+      if (act === "unfav") {
+        return run("Favorit", async () => {
+          await call("favorit-entfernen", { id: target.dataset.id });
+          info = await call("ich");
+          render();
+        });
+      }
+      if (act === "preview") {
+        return showRuf({ text: state.text.trim() || info.vorgabe, gifUrl: state.gif?.url || "", von: "Vorschau" }, { doc });
+      }
+      if (act === "send") {
+        return run("Senden", async () => {
+          state.busy = true;
+          state.msg = "Wird gesendet …";
+          state.err = false;
+          render();
+          const result = await call("senden", { an: [...state.an], text: state.text, gifUrl: state.gif?.url || "" });
+          close();
+          toast(`Gesendet an ${joinNames(result.an)}. Kommt beim nächsten Abholen an (bis 30 s).`);
+        });
+      }
+      return void 0;
+    });
+    layer.addEventListener("change", (event) => {
+      const id = event.target.dataset?.person;
+      if (!id || !state) return;
+      if (event.target.checked) state.an.add(id);
+      else state.an.delete(id);
+      render();
+    });
+    layer.addEventListener("input", (event) => {
+      const field = event.target.dataset?.field;
+      if (!field || !state) return;
+      if (field === "text") {
+        state.text = event.target.value;
+        const hint = shadow.querySelector(".lab .hint");
+        if (hint) hint.textContent = `${state.text.length}/${MAX_TEXT}`;
+      }
+      if (field === "link") state.link = event.target.value;
+      if (field === "suche") {
+        state.suche = event.target.value;
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => state && search(state.suche.trim()), 450);
+      }
+    });
+    layer.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        close();
+      }
+      if (event.key === "Enter" && event.target.dataset?.field === "link") shadow.querySelector('[data-act="link"]')?.click();
+    });
+    return () => {
+      close();
+      host.remove();
+    };
+  }
+  function startHiringRuf({
+    request,
+    getMyId,
+    timers: timers2 = globalThis,
+    doc = typeof document !== "undefined" ? document : null,
+    now = () => Date.now()
+  } = {}) {
+    const root = doc?.documentElement;
+    if (!root?.dataset || !request || !getMyId || root.dataset[MARK2]) return () => {
+    };
+    root.dataset[MARK2] = "1";
+    const post = createRufClient({ request });
+    let myId = "";
+    let stopped = false;
+    let interval = null;
+    let showing = false;
+    let lastPoll = 0;
+    let unmount = null;
+    const call = async (action, extra = {}) => post({ ...extra, action, employeeId: myId });
+    async function poll() {
+      if (stopped || showing || doc.hidden) return;
+      if (now() - lastPoll < 5e3) return;
+      lastPoll = now();
+      try {
+        const { ruf } = await call("abholen");
+        if (!ruf || stopped) return;
+        showing = true;
+        await showRuf(ruf, { doc });
+      } catch {
+      } finally {
+        showing = false;
+      }
+    }
+    const onVisible = () => {
+      if (!doc.hidden) poll();
+    };
+    async function init() {
+      if (stopped) return;
+      try {
+        myId = String(await getMyId() || "");
+        if (!myId) throw new Error("keine ID");
+        const ich = await call("ich");
+        if (stopped) return;
+        if (ich.empfaengt) {
+          interval = timers2.setInterval(poll, POLL_MS);
+          doc.addEventListener("visibilitychange", onVisible);
+          poll();
+        }
+        if (ich.darfSenden) unmount = mountSender({ doc, call, initial: ich, now });
+      } catch {
+        timers2.setTimeout(init, RETRY_MS3);
+      }
+    }
+    init();
+    return () => {
+      stopped = true;
+      if (interval !== null) timers2.clearInterval(interval);
+      doc.removeEventListener("visibilitychange", onVisible);
+      unmount?.();
+      delete root.dataset[MARK2];
+    };
+  }
+  function executeHiringRuf(runtime, { getGraphqlAdapter, sourcePath, request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null } = {}) {
+    runtime.registerSource?.(sourcePath);
+    if (!request) return;
+    const stop = startHiringRuf({
+      request,
+      getMyId: async () => (await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY6, {}))?.me?.id,
+      timers: {
+        setTimeout: (fn, ms) => runtime.setTimeout(fn, ms),
+        setInterval: (fn, ms) => runtime.setInterval(fn, ms),
+        clearInterval: (handle) => runtime.clearInterval(handle)
+      }
+    });
+    runtime.addCleanup?.(stop);
+  }
+
+  // src/features/hiring-ruf.js
+  function executeHiringRuf2(runtime) {
+    executeHiringRuf(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      sourcePath: "kam/toolbox/src/features/hiring-ruf.js"
+    });
+  }
+
   // ../../shared/js/werkia-graphql/job-position-urgency-provider.js
   var URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
   var JOB_POSITION_URGENCY_QUERY = `query allJobPositions($filter: JobPositionFilter) {
@@ -13734,10 +14352,10 @@ ${rr.zahlen}` : view.title;
   }
 
   // ../../shared/js/slack-dm/core.js
-  var WEBHOOK_URL5 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
-  var REQUEST_TIMEOUT_MS5 = 2e4;
+  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/ops-bot/slack-dm/e7c41a9b-2f58-4d3e-a6b0-9c1d8e5f2a73";
+  var REQUEST_TIMEOUT_MS6 = 2e4;
   var MAX_COMMENT = 1500;
-  var OFFLINE_MESSAGE4 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE5 = "Der Slack-Bot ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var NO_AUTH_MESSAGE = "Die Toolbox kennt deine Adminpanel-Anmeldung noch nicht. Bitte die Seite neu laden und es dann noch einmal versuchen.";
   var DIRECTIONS = {
     AN_CEM: { id: "AN_CEM", label: "An CEM", role: "CEM", title: "Match an die CEM-Person des Kandidaten schicken (Slack-DM)" },
@@ -13751,7 +14369,7 @@ ${rr.zahlen}` : view.title;
       { slackId: "U0ATDV2DVS4", name: "Bella (CEM-Lead)" }
     ]
   };
-  var CURRENT_EMPLOYEE_QUERY6 = `query WerkiaSlackDmMe {
+  var CURRENT_EMPLOYEE_QUERY7 = `query WerkiaSlackDmMe {
   me: currentEmployee { id slackId __typename }
 }`;
   var TEAMS = ["KAM", "CEM"];
@@ -13782,7 +14400,7 @@ ${rr.zahlen}` : view.title;
     if (testChannel) payload.testChannel = testChannel;
     return payload;
   }
-  function parseResponse5(status, text) {
+  function parseResponse6(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -13794,7 +14412,7 @@ ${rr.zahlen}` : view.title;
     if (status === 404) throw new Error("Der Slack-Bot ist noch nicht eingeschaltet (Workflow inaktiv).");
     throw new Error(`Slack-Bot: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
+  function createSlackDmClient({ request, getAuth, team = "", url = WEBHOOK_URL6, timeoutMs = REQUEST_TIMEOUT_MS6 }) {
     return ({ action, direction, matchId, comment, testChannel }) => new Promise((resolve, reject) => {
       let payload;
       try {
@@ -13811,13 +14429,13 @@ ${rr.zahlen}` : view.title;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse5(response.status, response.responseText));
+            resolve(parseResponse6(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE4)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE4))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
       });
     });
   }
@@ -13825,14 +14443,14 @@ ${rr.zahlen}` : view.title;
     const name = String(entry?.name || "").trim() || "Unbekannt";
     return entry?.vertretungVon ? `${name} (Vertretung für ${entry.vertretungVon})` : name;
   }
-  function joinNames(names) {
+  function joinNames2(names) {
     const list = (names || []).filter(Boolean);
     if (list.length <= 1) return list.join("");
     return `${list.slice(0, -1).join(", ")} und ${list[list.length - 1]}`;
   }
   function sentMessage(response) {
     const names = response?.gesendet || [];
-    const sent = names.length ? `Gesendet an ${joinNames(names)}.` : "Gesendet.";
+    const sent = names.length ? `Gesendet an ${joinNames2(names)}.` : "Gesendet.";
     if (response?.matchkommentar === true) return `${sent} Matchkommentar angelegt.`;
     if (response?.matchkommentar === false) return `${sent} Der Matchkommentar konnte nicht angelegt werden, bitte von Hand nachtragen.`;
     return sent;
@@ -14062,7 +14680,7 @@ ${rr.zahlen}` : view.title;
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
       try {
-        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY6, {});
+        const data = await graphqlRequest(CURRENT_EMPLOYEE_QUERY7, {});
         if (stopped || !canSendToOwnTeam(ownTeamDirection, data?.me)) return;
         if (!directions.includes(ownTeamDirection)) directions.push(ownTeamDirection);
         scheduleSync();
@@ -14615,11 +15233,11 @@ ${rr.zahlen}` : view.title;
       }
       return authRecovery;
     }
-    const REQUEST_TIMEOUT_MS9 = 35e3;
+    const REQUEST_TIMEOUT_MS10 = 35e3;
     function withTimeout(promise) {
       let handle;
       const timeout = new Promise((_, reject) => {
-        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS9);
+        handle = runtime.setTimeout(() => reject(new Error("GraphQL-Timeout.")), REQUEST_TIMEOUT_MS10);
       });
       return Promise.race([promise, timeout]).finally(() => runtime.clearTimeout(handle));
     }
@@ -15829,9 +16447,9 @@ ${buildCbreBody(current)}`;
   var DAY_FMT = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" });
 
   // src/features/outlook-assistent/core.js
-  var WEBHOOK_URL6 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
-  var REQUEST_TIMEOUT_MS6 = 2e4;
-  var OFFLINE_MESSAGE5 = "Der Toolbox-Server ist gerade nicht erreichbar.";
+  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
+  var REQUEST_TIMEOUT_MS7 = 2e4;
+  var OFFLINE_MESSAGE6 = "Der Toolbox-Server ist gerade nicht erreichbar.";
   var PRESELECT_FROM = 0.8;
   var MAILART_LABELS = {
     absage: "Absage",
@@ -15882,7 +16500,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Mail-Assistent: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL6, timeoutMs = REQUEST_TIMEOUT_MS6 }) {
+  function createAssistentClient({ request, getAuth, url = WEBHOOK_URL7, timeoutMs = REQUEST_TIMEOUT_MS7 }) {
     const post = (payload) => new Promise((resolve, reject) => {
       const auth = getAuth() || {};
       if (!auth.bearer) {
@@ -15902,8 +16520,8 @@ ${buildCbreBody(current)}`;
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE5)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE5))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE6)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE6))
       });
     });
     return {
@@ -17787,7 +18405,7 @@ ${buildCbreBody(current)}`;
   // ../../shared/js/vertretungen/mentions.js
   var SCAN_MS = 1e3;
   var REFRESH_MS2 = 10 * 60 * 1e3;
-  var RETRY_MS3 = 60 * 1e3;
+  var RETRY_MS4 = 60 * 1e3;
   var EDITOR_SELECTOR4 = '.ProseMirror[contenteditable="true"]';
   function tiptapOf3(element6) {
     try {
@@ -17818,7 +18436,7 @@ ${buildCbreBody(current)}`;
     let failedAt = 0;
     async function loadActive() {
       const fresh = cache.tag === berlinDay() && Date.now() - cache.at < REFRESH_MS2;
-      if (fresh || Date.now() - failedAt < RETRY_MS3) return cache.aktiv;
+      if (fresh || Date.now() - failedAt < RETRY_MS4) return cache.aktiv;
       if (!loading) {
         loading = (async () => {
           try {
@@ -17895,10 +18513,10 @@ ${buildCbreBody(current)}`;
   }
 
   // ../../shared/js/toolbox-daten/core.js
-  var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
-  var REQUEST_TIMEOUT_MS7 = 15e3;
-  var OFFLINE_MESSAGE6 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
-  var CURRENT_EMPLOYEE_QUERY7 = `query WerkiaToolboxDatenMe {
+  var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/toolbox-daten/5c1e9a37-8d42-4b6f-a0e3-7f29d4c8b615";
+  var REQUEST_TIMEOUT_MS8 = 15e3;
+  var OFFLINE_MESSAGE7 = "Der Toolbox-Server ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var CURRENT_EMPLOYEE_QUERY8 = `query WerkiaToolboxDatenMe {
   me: currentEmployee { id __typename }
 }`;
   function berlinDay2(date = /* @__PURE__ */ new Date()) {
@@ -17911,7 +18529,7 @@ ${buildCbreBody(current)}`;
     while ([0, 6].includes(date.getUTCDay()));
     return date.toISOString().slice(0, 10);
   }
-  function parseResponse6(status, text) {
+  function parseResponse7(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -17922,7 +18540,7 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL7, timeoutMs = REQUEST_TIMEOUT_MS7 }) {
+  function createToolboxDatenRequest({ request, url = WEBHOOK_URL8, timeoutMs = REQUEST_TIMEOUT_MS8 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
@@ -17932,13 +18550,13 @@ ${buildCbreBody(current)}`;
         timeout: timeoutMs,
         onload(response) {
           try {
-            resolve(parseResponse6(response.status, response.responseText));
+            resolve(parseResponse7(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE6)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE6))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE7)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE7))
       });
     });
   }
@@ -17946,7 +18564,7 @@ ${buildCbreBody(current)}`;
     let pending = null;
     return () => {
       if (!pending) {
-        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY7, {}).then((data) => {
+        pending = graphqlRequest(CURRENT_EMPLOYEE_QUERY8, {}).then((data) => {
           const id = String(data?.me?.id || "");
           if (!id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden.");
           return id;
@@ -17958,7 +18576,7 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL7 }) {
+  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL8 }) {
     const post = createToolboxDatenRequest({ request, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
@@ -18423,16 +19041,16 @@ ${buildCbreBody(current)}`;
       if (existing.dataset.active !== active) existing.dataset.active = active;
     }
     function starIcon(size = "18px", gap = "0") {
-      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon3.setAttribute("viewBox", "0 0 24 24");
-      icon3.setAttribute("aria-hidden", "true");
-      icon3.style.width = size;
-      icon3.style.height = size;
-      if (gap) icon3.style.marginRight = gap;
+      const icon4 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon4.setAttribute("viewBox", "0 0 24 24");
+      icon4.setAttribute("aria-hidden", "true");
+      icon4.style.width = size;
+      icon4.style.height = size;
+      if (gap) icon4.style.marginRight = gap;
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", STAR_PATH);
-      icon3.append(path);
-      return icon3;
+      icon4.append(path);
+      return icon4;
     }
     function togglePanel() {
       store.set(STORAGE_KEYS.collapsed, collapsed() ? "0" : "1");
@@ -19239,7 +19857,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/crawling-herkunft/core.js
   var MAX_IDS2 = 300;
-  var RETRY_MS4 = 60 * 1e3;
+  var RETRY_MS5 = 60 * 1e3;
   var BADGE_TEXT = "Gecrawlt";
   var CRAWLING_TAG_RE = /\[\s*crawling\s*\]/i;
   var CRAWLING_QUERY = `query crawlingHerkunft($ids: [UUID!]) {
@@ -19293,7 +19911,7 @@ ${buildCbreBody(current)}`;
     },
     schedule = (callback) => setTimeout(callback, 0),
     now = () => Date.now(),
-    retryMs = RETRY_MS4,
+    retryMs = RETRY_MS5,
     onError = (error) => console.warn("[Crawling-Herkunft]", error)
   }) {
     const known = /* @__PURE__ */ new Map();
@@ -20547,7 +21165,7 @@ ${buildCbreBody(current)}`;
   var TODAY_ICON = "M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z";
   var BELL_ICON = "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z";
   var errorText = (error) => error?.message || String(error);
-  function icon(path, size = "18px") {
+  function icon2(path, size = "18px") {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("aria-hidden", "true");
@@ -20950,7 +21568,7 @@ ${buildCbreBody(current)}`;
         let rowButton = cell.querySelector(`.${ROW_BUTTON_CLASS}`);
         if (!rowButton) {
           ensureStyle8();
-          rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon(BELL_ICON, "17px")]);
+          rowButton = el6("button", { type: "button", className: ROW_BUTTON_CLASS }, [icon2(BELL_ICON, "17px")]);
           rowButton.dataset.werkiaTagesplanOwner = sourcePath;
           rowButton.addEventListener("click", (event) => {
             event.preventDefault();
@@ -21192,7 +21810,7 @@ ${buildCbreBody(current)}`;
       if (look) {
         heute.className = "wtp-native";
         Object.assign(heute.style, look.style);
-        const svg = icon(TODAY_ICON, look.iconSize);
+        const svg = icon2(TODAY_ICON, look.iconSize);
         svg.style.marginRight = look.iconGap;
         heute.prepend(svg);
       } else {
@@ -21326,16 +21944,16 @@ ${buildCbreBody(current)}`;
   }
   var span = (ph) => ph.to ? `${ph.from}–${ph.to}` : `ab ${ph.from}`;
   var duration = (min) => min >= 60 ? `${Math.floor(min / 60)} Std. ${min % 60 ? `${min % 60} Min.` : ""}`.trim() : `${min} Min.`;
-  function phaseBarHtml(phases, info, { esc, icon: icon3 = () => "", open = false } = {}) {
+  function phaseBarHtml(phases, info, { esc: esc2, icon: icon4 = () => "", open = false } = {}) {
     if (!phases?.length || info.state === "weekend") return "";
     const ph = info.phase;
-    const main = info.state === "before" ? `<b>Gleich:</b> ${esc(info.next.label)} <span class="meta">ab ${esc(info.next.from)} (in ${esc(duration(info.left))})</span>` : info.state === "gap" ? info.next ? `<b>Gleich:</b> ${esc(info.next.label)} <span class="meta">ab ${esc(info.next.from)}</span>` : "<b>Feierabend</b>" : `<span class="dp-step num">${info.index + 1}/${phases.length}</span><b>${esc(ph.label)}</b> <span class="meta">${esc(span(ph))}${info.left !== null ? ` · noch ${esc(duration(info.left))}` : ""}</span>${info.inTail ? ` <span class="dp-tail">${esc(ph.tail.label)}</span>` : ""}`;
-    const go = ph?.go ? `<button class="btn sm dp-go" data-phase-go="${esc(ph.go)}">${esc(ph.goLabel || "Öffnen")}${icon3("arrow", "sm")}</button>` : "";
-    const after = info.state === "during" && info.next ? `<span class="meta dp-next">Danach: ${esc(info.next.label)}</span>` : "";
+    const main = info.state === "before" ? `<b>Gleich:</b> ${esc2(info.next.label)} <span class="meta">ab ${esc2(info.next.from)} (in ${esc2(duration(info.left))})</span>` : info.state === "gap" ? info.next ? `<b>Gleich:</b> ${esc2(info.next.label)} <span class="meta">ab ${esc2(info.next.from)}</span>` : "<b>Feierabend</b>" : `<span class="dp-step num">${info.index + 1}/${phases.length}</span><b>${esc2(ph.label)}</b> <span class="meta">${esc2(span(ph))}${info.left !== null ? ` · noch ${esc2(duration(info.left))}` : ""}</span>${info.inTail ? ` <span class="dp-tail">${esc2(ph.tail.label)}</span>` : ""}`;
+    const go = ph?.go ? `<button class="btn sm dp-go" data-phase-go="${esc2(ph.go)}">${esc2(ph.goLabel || "Öffnen")}${icon4("arrow", "sm")}</button>` : "";
+    const after = info.state === "during" && info.next ? `<span class="meta dp-next">Danach: ${esc2(info.next.label)}</span>` : "";
     const bar = info.state === "during" && info.left !== null ? `<span class="dp-prog"><span style="width:${Math.round(info.progress * 100)}%"></span></span>` : "";
-    const list = open ? `<ol class="dp-list">${phases.map((p, i) => `<li class="${i === info.index && info.state === "during" ? "on" : i < info.index || info.state === "gap" && i <= info.index ? "past" : ""}"><span class="num dp-time">${esc(span(p))}</span><span><b>${esc(p.label)}</b>${p.hint ? `<span class="meta"> · ${esc(p.hint)}</span>` : ""}${p.tail ? `<span class="meta"> · letzte ${p.tail.minutes} Min.: ${esc(p.tail.label)}</span>` : ""}</span>${p.go ? `<button class="btn sm ghost" data-phase-go="${esc(p.go)}">${esc(p.goLabel || "Öffnen")}</button>` : ""}</li>`).join("")}</ol>` : "";
+    const list = open ? `<ol class="dp-list">${phases.map((p, i) => `<li class="${i === info.index && info.state === "during" ? "on" : i < info.index || info.state === "gap" && i <= info.index ? "past" : ""}"><span class="num dp-time">${esc2(span(p))}</span><span><b>${esc2(p.label)}</b>${p.hint ? `<span class="meta"> · ${esc2(p.hint)}</span>` : ""}${p.tail ? `<span class="meta"> · letzte ${p.tail.minutes} Min.: ${esc2(p.tail.label)}</span>` : ""}</span>${p.go ? `<button class="btn sm ghost" data-phase-go="${esc2(p.go)}">${esc2(p.goLabel || "Öffnen")}</button>` : ""}</li>`).join("")}</ol>` : "";
     return `<div class="card dp ${info.inTail ? "tail" : ""}" id="day-phase">
-    <div class="dp-row">${icon3("clock", "sm")}<span class="dp-main">${main}</span>${bar}${after}<span class="sp"></span>${go}
+    <div class="dp-row">${icon4("clock", "sm")}<span class="dp-main">${main}</span>${bar}${after}<span class="sp"></span>${go}
       <button class="btn sm ghost" data-phase-toggle aria-expanded="${open}">${open ? "Ablauf zu" : "Ablauf"}</button></div>${list}</div>`;
   }
   var DAY_PHASES_CSS = `
@@ -21418,11 +22036,11 @@ ${buildCbreBody(current)}`;
   var FOCUS_SELECT_ID = "werkia-focus-select";
   var TAGESPLAN_BUTTON_ID = "werkia-tagesplan-button";
   var REFRESH_MS4 = 20 * 1e3;
-  var ICONS = {
+  var ICONS2 = {
     clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>'
   };
-  var icon2 = (name) => ICONS[name] || "";
+  var icon3 = (name) => ICONS2[name] || "";
   var CSS4 = `
 #${ROOT_ID} { --surface:#fff; --sunken:#f4f4f5; --ink:#09090b; --ink-2:#52525b; --muted:#8b8b94; --line:#e4e4e7; --line-strong:#d4d4d8;
   --accent:#ef6c00; --accent-ink:#b85400; --accent-soft:#fff3e8; --warn:#8a6700;
@@ -21488,7 +22106,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
         lastHtml = "";
         return;
       }
-      const html = prefs.mini ? `<div class="card wdp-chip ${info.inTail ? "tail" : ""}"><button type="button" class="wdp-chip-main" data-wdp-expand title="Tagesphase aufklappen">${icon2("clock")}<span>${escapeHtml(chipText(info))}</span></button><button type="button" class="wdp-x" data-wdp-close title="Für heute schließen" aria-label="Für heute schließen">×</button></div>` : phaseBarHtml(phases, info, { esc: escapeHtml, icon: icon2, open: prefs.open });
+      const html = prefs.mini ? `<div class="card wdp-chip ${info.inTail ? "tail" : ""}"><button type="button" class="wdp-chip-main" data-wdp-expand title="Tagesphase aufklappen">${icon3("clock")}<span>${escapeHtml(chipText(info))}</span></button><button type="button" class="wdp-x" data-wdp-close title="Für heute schließen" aria-label="Für heute schließen">×</button></div>` : phaseBarHtml(phases, info, { esc: escapeHtml, icon: icon3, open: prefs.open });
       if (!force && root && html === lastHtml) return;
       ensureStyle8();
       if (!root) {
@@ -21573,16 +22191,16 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   }
 
   // src/features/arbeitgeber-pause/core.js
-  var WEBHOOK_URL8 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
-  var REQUEST_TIMEOUT_MS8 = 15e3;
+  var WEBHOOK_URL9 = "https://hooks.werkia-ops.de/webhook/arbeitgeber-pause/7884e5f8-c10f-470c-922d-18876b0ca969";
+  var REQUEST_TIMEOUT_MS9 = 15e3;
   var WRITE_TIMEOUT_MS = 65e3;
-  var OFFLINE_MESSAGE7 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
+  var OFFLINE_MESSAGE8 = "Der Server für die Arbeitgeber-Pause ist gerade nicht erreichbar. Bitte später noch einmal versuchen.";
   var DEFAULT_DAYS = 7;
-  var CURRENT_EMPLOYEE_QUERY8 = `query WerkiaArbeitgeberPauseMe {
+  var CURRENT_EMPLOYEE_QUERY9 = `query WerkiaArbeitgeberPauseMe {
   me: currentEmployee { id __typename }
 }`;
   var WRITE_ACTIONS = /* @__PURE__ */ new Set(["pausieren", "beenden"]);
-  function parseResponse7(status, text) {
+  function parseResponse8(status, text) {
     let data = null;
     try {
       data = JSON.parse(text);
@@ -21593,23 +22211,23 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL8 }) {
+  function createPauseClient({ request, url = WEBHOOK_URL9 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
         headers: { "Content-Type": "application/json" },
         data: JSON.stringify(payload),
-        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS8,
+        timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS9,
         onload(response) {
           try {
-            resolve(parseResponse7(response.status, response.responseText));
+            resolve(parseResponse8(response.status, response.responseText));
           } catch (error) {
             reject(error);
           }
         },
-        onerror: () => reject(new Error(OFFLINE_MESSAGE7)),
-        ontimeout: () => reject(new Error(OFFLINE_MESSAGE7))
+        onerror: () => reject(new Error(OFFLINE_MESSAGE8)),
+        ontimeout: () => reject(new Error(OFFLINE_MESSAGE8))
       });
     });
   }
@@ -21750,17 +22368,17 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       return el7("button", { type: "button", textContent: text, className, onclick: onClick });
     }
     function pauseIcon(size) {
-      const icon3 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon3.setAttribute("viewBox", "0 0 24 24");
-      icon3.setAttribute("aria-hidden", "true");
+      const icon4 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon4.setAttribute("viewBox", "0 0 24 24");
+      icon4.setAttribute("aria-hidden", "true");
       if (size) {
-        icon3.style.width = size;
-        icon3.style.height = size;
+        icon4.style.width = size;
+        icon4.style.height = size;
       }
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", PAUSE_ICON_PATH);
-      icon3.append(path);
-      return icon3;
+      icon4.append(path);
+      return icon4;
     }
     function confirmButton(label, question, onConfirm, className = "wap-danger") {
       let armed = false;
@@ -21782,7 +22400,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     }
     async function loadMyId() {
       if (myId) return myId;
-      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY8, {});
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY9, {});
       myId = String(data?.me?.id || "");
       if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
       return myId;
@@ -23251,6 +23869,7 @@ ${next}`;
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
     { id: "termin-typ", execute: executeTerminTyp },
     { id: "vta-notizen", execute: executeVtaNotizen2 },
+    { id: "hiring-ruf", execute: executeHiringRuf2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },
     { id: "kam-suite-outlook-match-outen", execute: executeOutlookMatchOuten },

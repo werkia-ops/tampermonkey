@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.33.446
+// @version      1.33.491
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -7060,7 +7060,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS = `werkia-${namespace}-out-grund`;
-    const STYLE_ID15 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID16 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -7068,9 +7068,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID15)) return;
+      if (document.getElementById(STYLE_ID16)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID15;
+      style.id = STYLE_ID16;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS}__label { font-weight: 600; color: #b42318; }
@@ -7440,10 +7440,10 @@ ${add}` : add;
     {
       id: "cem-vta-sperre",
       title: "VTA-Sperrliste: Arbeitgeber ohne CEM-VTA",
-      page: "Kandidat › Potenzielle Matches, CEM › Meine Kandidaten",
+      page: "Kandidat › Potenzielle Matches, CEM › Meine Kandidaten, CEM › Meine Matches",
       routes: [ROUTES.potentialMatches, ROUTES.cemMyCandidates, ROUTES.cemMyMatches],
       kind: "external",
-      summary: "Bei Arbeitgebern auf der VTA-Sperrliste stellt CEM keine VTAs. Auf Potenzielle Matches sind ihre Zeilen rot hinterlegt und tragen das Label „Keine CEM-VTA“.",
+      summary: "Bei Arbeitgebern auf der VTA-Sperrliste stellt CEM keine VTAs. Auf Potenzielle Matches sind ihre Zeilen rot hinterlegt und tragen das Label „Keine CEM-VTA“. In Meine Kandidaten und Meine Matches steht das Label in der Spalte Terminvorschläge jeder betroffenen Matchzeile. Ein neuer Terminvorschlag für so einen Arbeitgeber zeigt eine rote Warnung und speichert erst nach dem Haken „trotz Sperre anlegen“.",
       steps: [
         "„VTA-Sperrliste“ neben „Vertretungen“ in Meine Kandidaten klicken (auch im Tampermonkey-Menü oder per Klick auf das rote Label).",
         "Unter „Arbeitgeber hinzufügen“ nach Name oder Employer-ID suchen; ein kopierter Link zum Arbeitgeber geht auch.",
@@ -7526,7 +7526,7 @@ ${add}` : add;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID15 = "werkia-urgent-vacancy-style";
+      const STYLE_ID16 = "werkia-urgent-vacancy-style";
       const ROW_CLASS3 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -7671,9 +7671,9 @@ ${add}` : add;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID15)) return;
+        if (document.getElementById(STYLE_ID16)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID15;
+        style.id = STYLE_ID16;
         style.textContent = `
       .${ROW_CLASS3} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background: #fff3cd !important; }
@@ -10363,7 +10363,7 @@ ${add}` : add;
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID15 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID16 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
     const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
@@ -10375,12 +10375,12 @@ ${add}` : add;
     const queue = [];
     const candidateErrors = /* @__PURE__ */ new Map();
     const attempts = /* @__PURE__ */ new Map();
-    const RETRY_MS7 = 60 * 1e3;
+    const RETRY_MS8 = 60 * 1e3;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID15)) return;
+      if (document.getElementById(STYLE_ID16)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID15;
+      style.id = STYLE_ID16;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -10563,7 +10563,7 @@ ${add}` : add;
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS7) {
+        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS8) {
           toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
         }
       }
@@ -10936,12 +10936,12 @@ ${add}` : add;
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID15 = `${SCRIPT_ID}-style`;
+    const STYLE_ID16 = `${SCRIPT_ID}-style`;
     const PANEL_ID2 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID15)) return;
+      if (document2.getElementById(STYLE_ID16)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID15;
+      style.id = STYLE_ID16;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -12275,7 +12275,7 @@ ${add}` : add;
       helpTip = {}
     } = config;
     const tip = (key) => helpTip[key]?.() || "";
-    const INTERVIEW_CELL_SELECTOR = `td.column-${columns.interview}`;
+    const INTERVIEW_CELL_SELECTOR2 = `td.column-${columns.interview}`;
     const STATUS_MUTATION = buildStatusMutation(fields.status);
     const STATUS_WITH_FEEDBACK_MUTATION = buildStatusWithFeedbackMutation(fields.status, fields.feedback);
     const WVL_MUTATION = buildFollowUpMutation(fields.followUp);
@@ -12606,7 +12606,7 @@ ${add}` : add;
       return interviews;
     }
     function markRow(matchId, markCell) {
-      getRows().filter((row2) => matchIdFromRow2(row2) === matchId).forEach((row2) => markCell(row2.querySelector(INTERVIEW_CELL_SELECTOR)));
+      getRows().filter((row2) => matchIdFromRow2(row2) === matchId).forEach((row2) => markCell(row2.querySelector(INTERVIEW_CELL_SELECTOR2)));
     }
     async function forwardInterview(matchId, interview) {
       const request = getRequest();
@@ -14765,6 +14765,7 @@ ${add}` : add;
   };
   var ROW_CLASS2 = "werkia-cem-vta-sperre-row";
   var LABEL_CLASS = "werkia-cem-vta-sperre-label";
+  var INTERVIEW_CELL_SELECTOR = "td.column-matchInterview, td.column-interview";
   var VERTRETUNGEN_BUTTON_ID = "werkia-vertretungen-button";
   var CACHE_MS9 = 10 * 60 * 1e3;
   var RETRY_MS4 = 60 * 1e3;
@@ -14791,6 +14792,7 @@ ${add}` : add;
   }
   function executeCemVtaSperre(runtime, {
     buttonRoutes = [],
+    listRoutes = [],
     getGraphqlAdapter,
     sourcePath,
     toolboxName = "Toolbox",
@@ -14815,6 +14817,8 @@ ${add}` : add;
     };
     const isPotentialMatches = () => POTENTIAL_MATCHES_ROUTE6.test(location.hash || "");
     const isButtonPage = () => buttonRoutes.some((route) => route.test(location.hash || ""));
+    const isListPage = () => listRoutes.some((route) => route.test(location.hash || ""));
+    const matchEmployers = /* @__PURE__ */ new Map();
     function ensureStyle5() {
       if (document.getElementById(IDS6.style)) return;
       const style = document.createElement("style");
@@ -14826,6 +14830,7 @@ ${add}` : add;
       .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T3.badHover} !important; }
       .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T3.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
       .${LABEL_CLASS}:hover { background:${T3.badInk}; }
+      td.column-matchInterview .${LABEL_CLASS}, td.column-interview .${LABEL_CLASS} { display:flex; margin:6px 0 2px; }
       .${LABEL_CLASS} svg { width:14px; height:14px; fill:currentColor; }
       #${IDS6.button}.wcs-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS6.button}.wcs-native:hover { background:rgba(0,0,0,.04); }
@@ -14969,7 +14974,54 @@ ${add}` : add;
         (employer.link?.parentElement || employer.cell)?.appendChild(createLabel(entry));
       }
     }
+    function interviewCells(root = document) {
+      return [...root.querySelectorAll(INTERVIEW_CELL_SELECTOR)].filter((cell) => cell.closest("tr"));
+    }
+    function employerIdForRow(row2) {
+      const direct = employerFromRow(row2).id;
+      if (direct) return direct;
+      const matchId = matchIdFromRow(row2);
+      if (!matchId) return "";
+      if (!matchEmployers.has(matchId)) {
+        matchEmployers.set(matchId, "");
+        employerNotesProviderFor(getGraphqlAdapter()).employerIdForMatch(matchId).then((id) => {
+          if (!id) {
+            matchEmployers.delete(matchId);
+            return;
+          }
+          matchEmployers.set(matchId, String(id).toLowerCase());
+          scheduleMarks();
+        }).catch(() => matchEmployers.delete(matchId));
+      }
+      return matchEmployers.get(matchId);
+    }
+    function markListRows(lookup) {
+      for (const cell of interviewCells(document)) {
+        const id = employerIdForRow(cell.closest("tr"));
+        const entry = id ? lookup({ id }) : null;
+        const existing = cell.querySelector(`.${LABEL_CLASS}`);
+        if (!entry) {
+          existing?.remove();
+          continue;
+        }
+        if (existing?.dataset.employerId === entry.employerId) continue;
+        existing?.remove();
+        cell.appendChild(createLabel(entry));
+      }
+    }
     async function renderMarks() {
+      if (isListPage()) {
+        if (!interviewCells(document).length) return;
+        const list2 = await loadList();
+        if (!isListPage()) return;
+        if (!list2) {
+          clearMarks();
+          return;
+        }
+        ensureStyle5();
+        markListRows(list2.lookup);
+        return;
+      }
       if (!isPotentialMatches()) {
         clearMarks();
         return;
@@ -15206,6 +15258,7 @@ ${add}` : add;
   function executeCemVtaSperre2(runtime) {
     executeCemVtaSperre(runtime, {
       buttonRoutes: CEM_VTA_SPERRE_BUTTON_ROUTES,
+      listRoutes: CEM_VTA_SPERRE_BUTTON_ROUTES,
       getGraphqlAdapter: getCemGraphqlAdapter,
       toolboxName: "CEM-Toolbox",
       helpTip: () => cemHelp.tip("cem-vta-sperre"),
@@ -15726,7 +15779,7 @@ ${add}` : add;
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS3 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID15 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID16 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -15734,9 +15787,9 @@ ${add}` : add;
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID15)) return;
+      if (document.getElementById(STYLE_ID16)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID15;
+      style.id = STYLE_ID16;
       style.textContent = `
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS3} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -15997,6 +16050,289 @@ ${add}` : add;
       toolboxName: "CEM-Toolbox",
       helpTip: () => cemHelp.tip("vta-notizen"),
       sourcePath: "cem/toolbox/src/features/vta-notizen.js"
+    });
+  }
+
+  // ../../shared/js/cem-vta-sperre/termin-warnung.js
+  var UUID_RE5 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var OWNER_KEY3 = "werkiaVtaSperreWarnungOwner";
+  var BOX_CLASS2 = "werkia-vta-sperre-warnung";
+  var STYLE_ID13 = "werkia-vta-sperre-warnung-style";
+  var ROW_SELECTOR7 = "tr, .MuiTableRow-root";
+  var CACHE_MS10 = 10 * 60 * 1e3;
+  var RETRY_MS6 = 60 * 1e3;
+  var CLICK_MAX_AGE_MS2 = 10 * 60 * 1e3;
+  var SNOOZE_KEY = "werkia-vta-sperre-warnung-snooze";
+  var SNOOZE_MS2 = 5 * 60 * 1e3;
+  var T4 = {
+    ink: "#09090b",
+    ink2: "#52525b",
+    line: "#e4e4e7",
+    surface: "#ffffff",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec"
+  };
+  var FONT7 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  function matchIdFromHash(hash) {
+    const id = String(hash || "").match(/^#\/(?:Match|Chat)\/([^/?#]+)/i)?.[1] || "";
+    return UUID_RE5.test(id) ? id.toLowerCase() : "";
+  }
+  function isSaveButton(button2) {
+    if (!button2 || button2.tagName !== "BUTTON") return false;
+    if ((button2.getAttribute("type") || "").toLowerCase() === "submit") return true;
+    const text = (button2.textContent || "").trim();
+    return /^(speichern|anlegen|erstellen|hinzufügen|vorschlagen)$/i.test(text);
+  }
+  function blockedMessage(entry) {
+    const lines = [`${entry.employerName || "Dieser Arbeitgeber"} steht auf der CEM-VTA-Sperrliste: CEM und AGC stellen hier keine Terminvorschläge.`];
+    if (entry.grund) lines.push(`Grund: ${entry.grund}`);
+    if (entry.geaendertVon) lines.push(`Eingetragen von ${entry.geaendertVon}`);
+    return lines.join("\n");
+  }
+  function readSnooze() {
+    try {
+      return Number(localStorage.getItem(SNOOZE_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  }
+  function writeSnooze(until) {
+    try {
+      localStorage.setItem(SNOOZE_KEY, String(until));
+    } catch {
+    }
+  }
+  function executeVtaSperreWarnung(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const post = createSperreClient({
+      request: request || (() => {
+        throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+      })
+    });
+    let myId = "";
+    let cache = null;
+    let failedAt = 0;
+    let lastError = null;
+    let loading = null;
+    let clicked = { matchId: "", employerId: "", at: 0 };
+    let snoozedUntil = readSnooze();
+    let guard = null;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID13)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID13;
+      const b = `.${BOX_CLASS2}`;
+      style.textContent = `
+      ${b} { box-sizing:border-box; margin:0 0 12px; padding:10px 12px; border:1px solid ${T4.bad}; border-left-width:6px; border-radius:8px; background:${T4.badSoft}; color:${T4.ink}; font:400 13px/1.45 ${FONT7}; }
+      ${b}[data-state="loading"] { border-color:${T4.line}; background:#fafafa; color:${T4.ink2}; font-size:12px; }
+      ${b} .wvsw-title { font-weight:700; color:${T4.badInk}; }
+      ${b} .wvsw-text { margin-top:4px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${b} label { display:flex; align-items:flex-start; gap:8px; margin-top:8px; font-weight:600; cursor:pointer; }
+      ${b} input[type="checkbox"] { margin:2px 0 0; accent-color:${T4.bad}; }
+      ${b} .wvsw-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+      ${b} button { min-height:26px; padding:3px 10px; border:1px solid ${T4.line}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; cursor:pointer; font:600 12px/1 ${FONT7}; }
+      ${b}.wvsw-flash { animation:wvsw-flash .5s ease-out 2; }
+      @keyframes wvsw-flash { 50% { box-shadow:0 0 0 4px rgba(208,59,59,.35); } }
+      @media (prefers-reduced-motion: reduce) { ${b}.wvsw-flash { animation:none; outline:3px solid ${T4.bad}; } }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag, props = {}, children = []) {
+      const element5 = document.createElement(tag);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
+    }
+    async function loadMyId() {
+      if (myId) return myId;
+      const data = await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY5, {});
+      myId = String(data?.me?.id || "");
+      if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      return myId;
+    }
+    function loadLookup() {
+      if (cache && now() - cache.at < CACHE_MS10) return Promise.resolve(cache.lookup);
+      if (failedAt && now() - failedAt < RETRY_MS6) {
+        return cache ? Promise.resolve(cache.lookup) : Promise.reject(lastError || new Error("VTA-Sperrliste nicht erreichbar."));
+      }
+      if (!loading) {
+        loading = loadMyId().then((employeeId) => post({ action: "liste", employeeId })).then((data) => {
+          cache = { at: now(), lookup: createLookup2(data.eintraege || []) };
+          failedAt = 0;
+          lastError = null;
+          return cache.lookup;
+        }).catch((error) => {
+          failedAt = now();
+          lastError = error;
+          console.warn("[VTA-Sperre] Liste nicht geladen:", error?.message || error);
+          if (cache) return cache.lookup;
+          throw error;
+        }).finally(() => {
+          loading = null;
+        });
+      }
+      return loading;
+    }
+    function currentTarget() {
+      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS2 && (clicked.matchId || clicked.employerId)) return clicked;
+      const hash = location.hash || "";
+      return { matchId: matchIdFromHash(hash), employerId: employerIdFromHref3(hash) };
+    }
+    async function resolveEmployer(target) {
+      if (target.employerId) return target.employerId;
+      if (!target.matchId) return "";
+      const provider = employerNotesProviderFor(getGraphqlAdapter());
+      return String(await provider.employerIdForMatch(target.matchId) || "").toLowerCase();
+    }
+    const needsConfirm = (current) => current && !current.confirmed && current.state !== "ok" && !(current.state === "unreachable" && snoozedUntil > now());
+    function render(current) {
+      const box = current.element;
+      box.replaceChildren();
+      box.dataset.state = current.state;
+      box.hidden = current.state === "ok" || current.state === "unreachable" && snoozedUntil > now();
+      if (current.state === "loading") {
+        box.append("VTA-Sperrliste wird geprüft …");
+        return;
+      }
+      if (box.hidden) return;
+      const checkbox = el4("input", { type: "checkbox", checked: current.confirmed });
+      checkbox.addEventListener("change", () => {
+        current.confirmed = checkbox.checked;
+      });
+      if (current.state === "blocked") {
+        box.append(
+          el4("div", { className: "wvsw-title", textContent: "Keine CEM-VTA bei diesem Arbeitgeber" }),
+          el4("div", { className: "wvsw-text", textContent: blockedMessage(current.entry) }),
+          el4("label", {}, [checkbox, document.createTextNode("Ich lege den Terminvorschlag trotz Sperre an.")])
+        );
+        return;
+      }
+      const cause = current.error?.message || String(current.error || "unbekannter Fehler");
+      const snooze = el4("button", { type: "button", textContent: "5 Minuten nicht warnen" });
+      snooze.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        snoozedUntil = now() + SNOOZE_MS2;
+        writeSnooze(snoozedUntil);
+        render(current);
+      });
+      box.append(
+        el4("div", { className: "wvsw-title", textContent: "VTA-Sperrliste nicht erreichbar" }),
+        el4("div", { className: "wvsw-text", textContent: `${cause}
+Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
+        el4("label", {}, [checkbox, document.createTextNode("Ich lege den Terminvorschlag trotzdem an.")]),
+        el4("div", { className: "wvsw-row" }, [snooze])
+      );
+    }
+    function place(current) {
+      const content = current.dialog.querySelector(".MuiDialogContent-root") || current.dialog;
+      if (content.firstElementChild !== current.element) content.prepend(current.element);
+    }
+    async function start(current) {
+      try {
+        const employerId = await resolveEmployer(current.target);
+        if (guard !== current) return;
+        if (!employerId) {
+          current.state = "ok";
+          render(current);
+          return;
+        }
+        const lookup = await loadLookup();
+        if (guard !== current) return;
+        const entry = lookup({ id: employerId });
+        current.entry = entry;
+        current.state = entry ? "blocked" : "ok";
+      } catch (error) {
+        if (guard !== current) return;
+        current.state = "unreachable";
+        current.error = error;
+      }
+      render(current);
+    }
+    function teardown() {
+      if (!guard) return;
+      guard.element.remove();
+      if (guard.dialog.dataset[OWNER_KEY3] === sourcePath) delete guard.dialog.dataset[OWNER_KEY3];
+      guard = null;
+    }
+    function sync() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (guard) {
+          teardown();
+          clicked = { matchId: "", employerId: "", at: 0 };
+        }
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY3];
+      if (claimedBy && claimedBy !== sourcePath) return;
+      if (guard && guard.dialog !== dialog) teardown();
+      if (guard) {
+        place(guard);
+        return;
+      }
+      if (isExistingAppointment(dialog)) return;
+      ensureStyle5();
+      dialog.dataset[OWNER_KEY3] = sourcePath;
+      const element5 = el4("div", { className: BOX_CLASS2 });
+      element5.dataset[OWNER_KEY3] = sourcePath;
+      guard = { dialog, element: element5, target: currentTarget(), state: "loading", entry: null, error: null, confirmed: false };
+      place(guard);
+      render(guard);
+      start(guard);
+    }
+    function flash(current) {
+      const box = current.element;
+      box.classList.remove("wvsw-flash");
+      void box.offsetWidth;
+      box.classList.add("wvsw-flash");
+      box.scrollIntoView?.({ block: "nearest" });
+    }
+    function block(event) {
+      if (!guard || !guard.dialog.contains(event.target) || !needsConfirm(guard)) return false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      flash(guard);
+      return true;
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const buttonEl = event.target?.closest?.("button");
+      if (buttonEl && guard?.dialog.contains(buttonEl) && isSaveButton(buttonEl)) {
+        block(event);
+        return;
+      }
+      const row2 = event.target?.closest?.(ROW_SELECTOR7);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const target = targetFromRow(row2);
+      if (target.matchId || target.employerId) clicked = { ...target, at: now() };
+    }, true);
+    runtime.addDocumentListener("submit", block, true);
+    let scheduled = false;
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    }
+    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule);
+    runtime.addCleanup?.(teardown);
+    schedule();
+  }
+
+  // src/features/vta-sperre-warnung.js
+  function executeVtaSperreWarnung2(runtime) {
+    executeVtaSperreWarnung(runtime, {
+      getGraphqlAdapter: getCemGraphqlAdapter,
+      sourcePath: "cem/toolbox/src/features/vta-sperre-warnung.js"
     });
   }
 
@@ -16700,14 +17036,14 @@ ${add}` : add;
   // src/features/wa-templates/index.js
   var SOURCE_PATH3 = "cem/toolbox/src/features/wa-templates/index.js";
   var ROUTE_RE2 = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
-  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
   var CANDIDATE_ID_RE = /#\/Candidate\/([0-9a-f-]{36})/i;
   var BUTTON_CLASS = "werkia-wa-button";
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
   var IDS8 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
-  var CACHE_MS10 = 2 * 60 * 1e3;
+  var CACHE_MS11 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
   .${CELL_CLASS} .${BUTTON_CLASS} { margin:0; }
@@ -16794,7 +17130,7 @@ ${add}` : add;
       const entry = cache.get(key);
       if (entry && entry.expiresAt > Date.now()) return entry.promise;
       const promise = load2();
-      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS10 });
+      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS11 });
       promise.catch(() => cache.delete(key));
       return promise;
     }
@@ -16884,7 +17220,7 @@ ${add}` : add;
         return;
       }
       ensureStyle5();
-      document.querySelectorAll(ROW_SELECTOR7).forEach(addButton);
+      document.querySelectorAll(ROW_SELECTOR8).forEach(addButton);
       widenExpandedPanels();
     }
     function scheduleSync() {
@@ -17550,11 +17886,11 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/cem-todo/index.js
-  var STYLE_ID13 = "werkia-cem-todo-style";
+  var STYLE_ID14 = "werkia-cem-todo-style";
   var BADGE_CLASS = "werkia-cem-todo-badge";
   var BAR_CLASS3 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var COMMENTS_BUTTON_SELECTOR4 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
@@ -17585,9 +17921,9 @@ Trotzdem speichern?`)) return void 0;
     let dialogSeen = false;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID13)) return;
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
       [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
@@ -17816,7 +18152,7 @@ Trotzdem speichern?`)) return void 0;
       if (!isTargetPage3()) return;
       ensureStyle5();
       const wanted = [];
-      document.querySelectorAll(ROW_SELECTOR8).forEach((row2) => syncRow(row2, wanted));
+      document.querySelectorAll(ROW_SELECTOR9).forEach((row2) => syncRow(row2, wanted));
       wanted.push(...syncDialog());
       if (wanted.length && !loading) load2(wanted);
     }
@@ -17831,7 +18167,7 @@ Trotzdem speichern?`)) return void 0;
     };
     runtime.addDocumentListener("click", (event) => {
       const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR4);
-      const row2 = button2?.closest(ROW_SELECTOR8);
+      const row2 = button2?.closest(ROW_SELECTOR9);
       const matchId = row2 ? rowMatchId(row2) : "";
       if (!matchId) return;
       dialogMatchId = matchId;
@@ -17870,10 +18206,10 @@ Trotzdem speichern?`)) return void 0;
     if (!slackId) return false;
     return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  var UUID_RE5 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var UUID_RE6 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function matchIdFromHref7(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE5.test(id) ? id : "";
+    return UUID_RE6.test(id) ? id : "";
   }
   function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
@@ -17953,21 +18289,21 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
   var IDS9 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT7 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
-  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT7}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT8}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT7}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT8}; color:#09090b; -webkit-font-smoothing:antialiased; }
   #${IDS9.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
   #${IDS9.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
   #${IDS9.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS9.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT7}; }
+  #${IDS9.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT8}; }
   #${IDS9.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS9.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
   #${IDS9.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
@@ -17977,14 +18313,14 @@ Trotzdem speichern?`)) return void 0;
   #${IDS9.dialog} .sd-muted { color:#8b8b94; }
   #${IDS9.dialog} .sd-warn { color:#8a6700; }
   #${IDS9.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS9.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT7}; resize:vertical; }
+  #${IDS9.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT8}; resize:vertical; }
   #${IDS9.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
   #${IDS9.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
   #${IDS9.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
   #${IDS9.dialog} .sd-status.sd-error { color:#b52f2f; }
   #${IDS9.dialog} .sd-status.sd-ok { color:#0a7c0a; }
   #${IDS9.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS9.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT7}; }
+  #${IDS9.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT8}; }
   #${IDS9.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
   #${IDS9.dialog} .sd-secondary:hover { background:#f4f4f5; }
   #${IDS9.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
@@ -18167,7 +18503,7 @@ Trotzdem speichern?`)) return void 0;
         return;
       }
       ensureStyle5();
-      document.querySelectorAll(ROW_SELECTOR9).forEach(addButtons);
+      document.querySelectorAll(ROW_SELECTOR10).forEach(addButtons);
     }
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
@@ -18221,7 +18557,7 @@ Trotzdem speichern?`)) return void 0;
 
   // src/features/match-commute.js
   var SOURCE_PATH4 = "cem/toolbox/src/features/match-commute.js";
-  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS3 = "werkia-cem-match-commute-button";
   var IDS10 = { style: "werkia-cem-match-commute-style", popover: "werkia-cem-match-commute-popover" };
@@ -18233,8 +18569,8 @@ Trotzdem speichern?`)) return void 0;
   var SIZE_STORAGE_KEY = "werkia_cem_match_commute_size_v1";
   var MATCH_BATCH_SIZE = 50;
   var WORKERS = 4;
-  var RETRY_MS6 = 60 * 1e3;
-  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var RETRY_MS7 = 60 * 1e3;
+  var FONT9 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var MATCH_QUERY3 = `query WerkiaCemMatchCommute($filter: MatchFilter, $perPage: Int) {
   items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
 }`;
@@ -18305,7 +18641,7 @@ Trotzdem speichern?`)) return void 0;
     };
   }
   var CSS3 = `
-  .${BUTTON_CLASS3} { display:inline-flex; align-items:stretch; margin:4px 0 0 6px; height:32px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; overflow:hidden; vertical-align:middle; font:600 13px/1 ${FONT8}; white-space:nowrap; }
+  .${BUTTON_CLASS3} { display:inline-flex; align-items:stretch; margin:4px 0 0 6px; height:32px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; overflow:hidden; vertical-align:middle; font:600 13px/1 ${FONT9}; white-space:nowrap; }
   .${BUTTON_CLASS3} > * { display:inline-flex; align-items:center; margin:0; padding:0 10px; border:0; background:transparent; color:#09090b; font:inherit; text-decoration:none; cursor:pointer; }
   .${BUTTON_CLASS3} > .mc-main { font-variant-numeric:tabular-nums; }
   .${BUTTON_CLASS3} > .mc-maps { border-left:1px solid #d4d4d8; color:#1971c2; font-weight:600; }
@@ -18320,10 +18656,10 @@ Trotzdem speichern?`)) return void 0;
   .${BUTTON_CLASS3}[data-level="pending"] > .mc-main { color:#868e96; }
   .${BUTTON_CLASS3}[data-level="unknown"] { border-style:dashed; }
   .${BUTTON_CLASS3}[data-level="unknown"] > .mc-main { color:#868e96; }
-  #${IDS10.popover} { position:fixed; z-index:2147483000; display:flex; flex-direction:column; width:${MAP_WIDTH + POPOVER_PADDING_X}px; min-width:${MIN_POPOVER.width}px; min-height:${MIN_POPOVER.height}px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); box-sizing:border-box; padding:18px 20px; overflow:hidden; resize:both; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 14px/1.5 ${FONT8}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
+  #${IDS10.popover} { position:fixed; z-index:2147483000; display:flex; flex-direction:column; width:${MAP_WIDTH + POPOVER_PADDING_X}px; min-width:${MIN_POPOVER.width}px; min-height:${MIN_POPOVER.height}px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); box-sizing:border-box; padding:18px 20px; overflow:hidden; resize:both; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 14px/1.5 ${FONT9}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
   #${IDS10.popover} .mc-head { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding-right:28px; }
   #${IDS10.popover} h2 { margin:0; font-size:16px; font-weight:600; }
-  #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT8}; }
+  #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT9}; }
   #${IDS10.popover} .mc-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS10.popover} .mc-value { font-size:20px; font-weight:700; }
   #${IDS10.popover} .mc-value.mc-skull { color:#c92a2a; }
@@ -18341,7 +18677,7 @@ Trotzdem speichern?`)) return void 0;
   #${IDS10.popover} dt { color:#8b8b94; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:24px; }
   #${IDS10.popover} dd { margin:0; font-size:14px; line-height:24px; overflow-wrap:anywhere; }
   #${IDS10.popover} .mc-dot { display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; vertical-align:1px; }
-  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:38px; padding:0 18px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:600 14px/1 ${FONT8}; text-decoration:none; }
+  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:38px; padding:0 18px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:600 14px/1 ${FONT9}; text-decoration:none; }
   #${IDS10.popover} .mc-google:hover { background:#b85400; border-color:#b85400; }
   #${IDS10.popover} .mc-muted { color:#8b8b94; }
 `;
@@ -18422,7 +18758,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function currentItems() {
       const items = [];
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR10)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
         const target = matchCellOf(row2);
         if (target?.cell) items.push(target);
       }
@@ -18546,7 +18882,7 @@ Trotzdem speichern?`)) return void 0;
         paintButton(group, rowView({ info, candidateLocation, cachedJob: cachedJob ?? void 0, entry }));
         const needsWork = info && candidateLocation !== null && (cachedJob === null || cachedJob?.job?.location?.address) && !entry;
         const lastAttempt = info ? attempts.get(`${info.candidateId}|${info.jobPositionId}`) || 0 : 0;
-        if (needsWork && isVisible(item.cell) && Date.now() - lastAttempt >= RETRY_MS6) {
+        if (needsWork && isVisible(item.cell) && Date.now() - lastAttempt >= RETRY_MS7) {
           toEnqueue.set(info.candidateId, toEnqueue.get(info.candidateId) || inViewport(item.cell));
         }
       }
@@ -18869,7 +19205,7 @@ Trotzdem speichern?`)) return void 0;
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR3 = "data-werkia-shortcut-explain";
-  var STYLE_ID14 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID15 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -18905,9 +19241,9 @@ Trotzdem speichern?`)) return void 0;
     }
   }
   function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID14)) return;
+    if (doc.getElementById(STYLE_ID15)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID14;
+    style.id = STYLE_ID15;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -19252,6 +19588,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "no-go-check", execute: executeNoGoCheck2 },
     { id: "appointment-prio", execute: executeAppointmentPrio2 },
     { id: "vta-notizen", execute: executeVtaNotizen2 },
+    { id: "vta-sperre-warnung", execute: executeVtaSperreWarnung2 },
     { id: "wa-templates", execute: executeWaTemplates },
     { id: "cem-todo", execute: executeCemTodo },
     { id: "slack-dm", execute: executeSlackDm2 },

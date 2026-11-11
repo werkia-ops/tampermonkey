@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.469
+// @version      1.33.492
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -23405,7 +23405,7 @@ ${next}`;
     document.querySelectorAll(`[${CEM_ANCHOR_ATTR}]`).forEach((anchor) => anchor.removeAttribute(CEM_ANCHOR_ATTR));
     document.getElementById(TOOLBAR_ID)?.remove();
   }
-  function executeOmNotesTemplates(runtime, { helpTip } = {}) {
+  function executeOmNotesTemplates(runtime, { helpTip, extraGroups = [] } = {}) {
     runtime?.registerSource?.("shared/js/om-notes-templates/index.js");
     let refreshTimer = null;
     let currentField = null;
@@ -23415,6 +23415,13 @@ ${next}`;
         return;
       }
       toolbar.querySelectorAll(".werkia-om-notes-chip").forEach((button3) => {
+        const { extraGroup, extraChip } = button3.dataset;
+        if (extraGroup !== void 0) {
+          const chip = extraGroups[Number(extraGroup)]?.chips(field.value)[Number(extraChip)];
+          button3.classList.toggle("is-active", Boolean(chip?.active));
+          if (chip?.title) button3.title = chip.title;
+          return;
+        }
         button3.classList.toggle("is-active", hasOmNote(field.value, button3.title));
       });
     }
@@ -23506,6 +23513,32 @@ ${next}`;
           button3.title = template.value;
           button3.classList.toggle("is-active", hasOmNote(field.value, template.value));
           button3.addEventListener("click", () => write(toggleOmNote(field.value, template.value)));
+          chips.appendChild(button3);
+        });
+        group.appendChild(chips);
+        groups.appendChild(group);
+      });
+      extraGroups.forEach((extra, groupIndex) => {
+        const group = document.createElement("div");
+        group.className = "werkia-om-notes-group";
+        const label = document.createElement("span");
+        label.className = "werkia-om-notes-group-label";
+        label.textContent = extra.group;
+        group.appendChild(label);
+        const chips = document.createElement("div");
+        chips.className = "werkia-om-notes-chips";
+        extra.chips(field.value).forEach((chip, chipIndex) => {
+          const button3 = document.createElement("button");
+          button3.type = "button";
+          button3.className = "werkia-om-notes-chip";
+          button3.textContent = chip.label;
+          button3.title = chip.title || chip.label;
+          button3.dataset.extraGroup = String(groupIndex);
+          button3.dataset.extraChip = String(chipIndex);
+          button3.addEventListener("click", () => {
+            const current = extra.chips(field.value)[chipIndex];
+            if (current) write(current.next(field.value));
+          });
           chips.appendChild(button3);
         });
         group.appendChild(chips);

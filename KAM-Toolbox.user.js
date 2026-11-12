@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.492
+// @version      1.33.496
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -13706,7 +13706,7 @@ button { font: inherit; color: inherit; cursor: pointer; }`;
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .veil.enter, .veil.enter .modal, .toast { animation: fade 120ms ease-out both; } .fab { transition: none; } }`;
-  function mountSender({ doc, call, initial, now }) {
+  function mountSender({ doc, call, initial, now, sperre = null }) {
     const host = doc.createElement("div");
     host.id = "werkia-hiring-ruf";
     host.dataset.werkiaOwned = "true";
@@ -13719,6 +13719,18 @@ button { font: inherit; color: inherit; cursor: pointer; }`;
     let searchTimer = null;
     let searchSeq = 0;
     const favUrls = () => new Set((info.favoriten || []).map((f) => f.url));
+    const gesperrt = () => {
+      try {
+        return String(sperre?.() || "");
+      } catch {
+        return "";
+      }
+    };
+    const meldeSperre = (grund) => {
+      state.msg = grund;
+      state.err = false;
+      render();
+    };
     function open() {
       state = {
         an: new Set((info.empfaenger || []).map((p) => p.id)),
@@ -13784,6 +13796,8 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       const people = (info.empfaenger || []).map((p) => `<label><input type="checkbox" data-person="${esc(p.id)}" ${state.an.has(p.id) ? "checked" : ""}>${esc(p.name)}</label>`).join("");
       const picked = state.gif ? `<img src="${esc(state.gif.vorschau || state.gif.url)}" alt=""><span class="sp"></span><button class="btn ghost" type="button" data-act="nogif">Ohne GIF</button>` : '<span class="none">Kein GIF ausgewählt</span>';
       const hist = (info.verlauf || []).slice(0, 5);
+      const grund = gesperrt();
+      const msg = state.msg || grund;
       const focus = shadow.activeElement?.dataset?.field;
       const enter = !state.shown;
       state.shown = true;
@@ -13795,7 +13809,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     <div><div class="lab">GIF</div><div class="picked">${picked}</div><div style="margin-top:12px">${gifSection()}</div></div>
     ${hist.length ? `<div><div class="lab">Zuletzt gesendet</div><ul class="hist">${hist.map((h) => `<li>${esc(historyLine(h, now()))}</li>`).join("")}</ul></div>` : ""}
   </div>
-  <div class="m-foot"><span class="msg${state.err ? " err" : ""}">${esc(state.msg)}</span><button class="btn ghost" type="button" data-act="preview">Vorschau</button><button class="btn primary" type="button" data-act="send" ${state.busy || !state.an.size ? "disabled" : ""}>Senden</button></div>
+  <div class="m-foot"><span class="msg${state.err ? " err" : ""}">${esc(msg)}</span><button class="btn ghost" type="button" data-act="preview">Vorschau</button><button class="btn primary" type="button" data-act="send" ${state.busy || !state.an.size || grund ? "disabled" : ""}${grund ? ` title="${esc(grund)}"` : ""}>Senden</button></div>
 </div></div>`;
       if (focus) {
         const field = shadow.querySelector(`[data-field="${focus}"]`);
@@ -13870,6 +13884,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       }
       if (act === "fav") {
         if (favUrls().has(target.dataset.url)) return;
+        if (gesperrt()) return meldeSperre(gesperrt());
         return run("Favorit", async () => {
           await call("favorit", { gifUrl: target.dataset.url, vorschau: target.dataset.vorschau });
           info = await call("ich");
@@ -13877,6 +13892,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
         });
       }
       if (act === "unfav") {
+        if (gesperrt()) return meldeSperre(gesperrt());
         return run("Favorit", async () => {
           await call("favorit-entfernen", { id: target.dataset.id });
           info = await call("ich");
@@ -13887,6 +13903,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
         return showRuf({ text: state.text.trim() || info.vorgabe, gifUrl: state.gif?.url || "", von: "Vorschau" }, { doc });
       }
       if (act === "send") {
+        if (gesperrt()) return meldeSperre(gesperrt());
         return run("Senden", async () => {
           state.busy = true;
           state.msg = "Wird gesendet …";
@@ -13936,6 +13953,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   function startHiringRuf({
     request,
     getMyId,
+    sperre = null,
     timers: timers2 = globalThis,
     doc = typeof document !== "undefined" ? document : null,
     now = () => Date.now()
@@ -13981,7 +13999,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
           doc.addEventListener("visibilitychange", onVisible);
           poll();
         }
-        if (ich.darfSenden) unmount = mountSender({ doc, call, initial: ich, now });
+        if (ich.darfSenden) unmount = mountSender({ doc, call, initial: ich, now, sperre });
       } catch {
         timers2.setTimeout(init, RETRY_MS3);
       }

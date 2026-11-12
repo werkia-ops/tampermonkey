@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.496
+// @version      1.33.515
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -21161,6 +21161,45 @@ ${buildCbreBody(current)}`;
     const limit = new Date(now).getTime() - 3 * 24 * 36e5;
     return Object.fromEntries(Object.entries(gesehen).filter(([, at]) => new Date(at).getTime() >= limit));
   }
+  var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
+  function readJson(storage, key) {
+    try {
+      return JSON.parse(storage?.getItem(key) || "{}") || {};
+    } catch {
+      return {};
+    }
+  }
+  var POPUP_MARKE_TOOLBOX = "werkiaTagesplanPopup";
+  var POPUP_MARKE_UEBERNAHME = "werkiaReminderPopup";
+  var POPUP_EREIGNIS = "werkia-reminder-popup";
+  var htmlDataset = (doc) => doc?.documentElement?.dataset || null;
+  var currentDocument = () => typeof document !== "undefined" ? document : null;
+  function reminderPopupUebernommen(doc = currentDocument()) {
+    return Boolean(htmlDataset(doc)?.[POPUP_MARKE_UEBERNAHME]);
+  }
+  var ANGEZEIGT_KEY = "werkia_tagesplan_angezeigt_v1";
+  var angezeigtSchluessel = (entry) => `${entry.id}|${entry.faelligUm}`;
+  function angezeigtNehmen(storage, entries = [], now = /* @__PURE__ */ new Date()) {
+    if (!storage) return entries;
+    const stand = pruneGesehen(readJson(storage, ANGEZEIGT_KEY), now);
+    const frei = entries.filter((entry) => !stand[angezeigtSchluessel(entry)]);
+    if (!frei.length) return [];
+    for (const entry of frei) stand[angezeigtSchluessel(entry)] = new Date(now).toISOString();
+    try {
+      storage.setItem(ANGEZEIGT_KEY, JSON.stringify(stand));
+    } catch {
+    }
+    return frei;
+  }
+  function angezeigtFreigeben(storage, entries = []) {
+    if (!storage || !entries.length) return;
+    const stand = readJson(storage, ANGEZEIGT_KEY);
+    for (const entry of entries) delete stand[angezeigtSchluessel(entry)];
+    try {
+      storage.setItem(ANGEZEIGT_KEY, JSON.stringify(stand));
+    } catch {
+    }
+  }
 
   // ../../shared/js/tagesplan/index.js
   var IDS9 = {
@@ -21171,7 +21210,6 @@ ${buildCbreBody(current)}`;
     dialog: "werkia-tagesplan-reminder-dialog"
   };
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
-  var GESEHEN_KEY = "werkia_tagesplan_gesehen_v1";
   var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR11 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
@@ -21454,7 +21492,8 @@ ${buildCbreBody(current)}`;
       return element6;
     }
     function renderPopup() {
-      const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder: daten.reminder, now: now(), gesehen: readGesehen() });
+      const reminder = reminderPopupUebernommen(document) ? [] : daten.reminder;
+      const items = dueItems({ termine: werkia.day === berlinDay2(now()) ? werkia.termine : [], wvl: werkia.day === berlinDay2(now()) ? werkia.wvl : [], reminder, now: now(), gesehen: readGesehen() });
       const existing = owned(IDS9.popup);
       if (!items.length) {
         existing?.remove();
@@ -21474,11 +21513,14 @@ ${buildCbreBody(current)}`;
       reportShown(items);
     }
     function reportShown(items) {
-      const fresh = reminderToReportShown(items, reported);
+      const candidates = reminderToReportShown(items, reported);
+      candidates.forEach((item) => reported.add(item.key));
+      const taken = angezeigtNehmen(storage, candidates.map((item) => item.reminder), now());
+      const fresh = candidates.filter((item) => taken.includes(item.reminder));
       if (!fresh.length) return;
-      fresh.forEach((item) => reported.add(item.key));
       client().angezeigt("reminder", fresh.map((item) => item.reminder.id)).catch((error) => {
         fresh.forEach((item) => reported.delete(item.key));
+        angezeigtFreigeben(storage, fresh.map((item) => item.reminder));
         console.warn(`[${toolboxName} Tagesplan] Angezeigt nicht gemeldet:`, errorText(error));
       });
     }
@@ -21869,6 +21911,9 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("storage", (event) => {
       if (event.key === GESEHEN_KEY) renderPopup();
     });
+    runtime.addWindowListener(POPUP_EREIGNIS, () => renderPopup());
+    const html = document.documentElement;
+    if (!html.dataset[POPUP_MARKE_TOOLBOX]) html.dataset[POPUP_MARKE_TOOLBOX] = toolboxName;
     if (typeof GM_registerMenuCommand === "function") {
       try {
         GM_registerMenuCommand(`${toolboxName}: Heute (Tages-Timeline)`, () => openPanel());
@@ -21896,6 +21941,7 @@ ${buildCbreBody(current)}`;
       });
     }, CLOCK_MS);
     runtime.addCleanup?.(() => {
+      if (html.dataset[POPUP_MARKE_TOOLBOX] === toolboxName) delete html.dataset[POPUP_MARKE_TOOLBOX];
       owned(IDS9.button)?.remove();
       owned(IDS9.popup)?.remove();
       closeDialog();

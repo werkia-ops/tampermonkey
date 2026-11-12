@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.17.470
+// @version      1.17.500
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1523,22 +1523,46 @@
     __typename
   }
 }`;
+  var ALL_EMPLOYER_GROUPS_QUERY = `query AllEmployerGroups {
+  items: allEmployerGroups(perPage: 500) {
+    id
+    name
+    sentMatchMode
+    employers {
+      id
+      name
+      __typename
+    }
+    __typename
+  }
+}`;
   function defaultNormaliseName(value) {
     return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
   }
   var normaliseId = (value) => String(value || "").trim().toLowerCase();
-  function normaliseEmployerGroups(items) {
+  function normaliseEmployerGroups(items, { alle = false } = {}) {
     const groups = [];
     for (const item of Array.isArray(items) ? items : []) {
-      if (!item?.id || item.sentMatchMode !== ONE_PER_GROUP) continue;
+      if (!item?.id || !alle && item.sentMatchMode !== ONE_PER_GROUP) continue;
       const employers = Array.isArray(item.employers) ? item.employers : [];
-      groups.push({
+      const group = {
         id: normaliseId(item.id),
         name: String(item.name || "").trim(),
         sentMatchMode: item.sentMatchMode,
         ids: [...new Set(employers.map((employer) => normaliseId(employer?.id)).filter(Boolean))],
         names: [...new Set(employers.map((employer) => String(employer?.name || "").trim()).filter(Boolean))]
-      });
+      };
+      if (alle) {
+        const seen = /* @__PURE__ */ new Set();
+        group.members = [];
+        for (const employer of employers) {
+          const id = normaliseId(employer?.id);
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          group.members.push({ id, name: String(employer?.name || "").trim() });
+        }
+      }
+      groups.push(group);
     }
     return groups;
   }
@@ -1561,6 +1585,8 @@
   }
   function createEmployerGroupsProvider({
     request,
+    alle = false,
+    query = alle ? ALL_EMPLOYER_GROUPS_QUERY : ONE_PER_GROUP_EMPLOYER_GROUPS_QUERY,
     ttlMs = EMPLOYER_GROUPS_TTL_MS,
     retryMs = EMPLOYER_GROUPS_RETRY_MS,
     now = Date.now
@@ -1576,8 +1602,8 @@
     function load2({ force = false } = {}) {
       if (!force && fresh()) return Promise.resolve(groups);
       if (pending) return pending;
-      pending = Promise.resolve().then(() => request(ONE_PER_GROUP_EMPLOYER_GROUPS_QUERY, {})).then((result) => {
-        groups = normaliseEmployerGroups(result?.items);
+      pending = Promise.resolve().then(() => request(query, {})).then((result) => {
+        groups = normaliseEmployerGroups(result?.items, { alle });
         loadedAt = now();
         failedAt = null;
         listeners.forEach((listener) => {

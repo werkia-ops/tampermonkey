@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.17.500
+// @version      1.17.521
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -4127,6 +4127,13 @@
     "Erforderliche Führerschein",
     "Führerschein"
   ];
+  function vacancyListItemHtml(item, icon = "✓") {
+    const iconColor = icon === "✓" ? "#16a34a" : "#888";
+    return `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${escapeHtml(icon)}</span><span>${escapeHtml(item)}</span>`;
+  }
+  function vacancyLoadingHtml(jobTitle) {
+    return `<div style="font-weight:800;color:#1e3a8a;margin-bottom:10px;font-size:16px;">${escapeHtml(jobTitle || "Stellenanzeige")}</div><div>⏳ Wird geladen...</div>`;
+  }
   function isCandidatePotentialMatchesPage3(hash = location.hash) {
     return CANDIDATE_POTENTIAL_MATCHES_RE4.test(hash || "");
   }
@@ -4231,8 +4238,7 @@
         display:flex; gap:10px; margin-bottom:10px;
         color:#222; font-size:16px; align-items:flex-start; line-height:1.65;
       `;
-        const iconColor = icon === "✓" ? "#16a34a" : "#888";
-        li.innerHTML = `<span style="color:${iconColor};flex-shrink:0;margin-top:2px;font-size:16px;">${icon}</span><span>${item}</span>`;
+        li.innerHTML = vacancyListItemHtml(item, icon);
         ul.appendChild(li);
       });
       wrap2.appendChild(ul);
@@ -4329,7 +4335,7 @@
       padding:20px 24px; font-size:15px; color:#555;
       z-index:9999999; font-family:inherit; box-sizing:border-box;
     `;
-      panel.innerHTML = `<div style="font-weight:800;color:#1e3a8a;margin-bottom:10px;font-size:16px;">${jobTitle || "Stellenanzeige"}</div><div>⏳ Wird geladen...</div>`;
+      panel.innerHTML = vacancyLoadingHtml(jobTitle);
       document.body.appendChild(panel);
     }
     async function handleQuestionnaireButtonClick(e) {

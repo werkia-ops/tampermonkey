@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.33.491
+// @version      1.33.521
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -16338,44 +16338,26 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
 
   // ../../shared/js/wa-templates/employee-gender.js
   var EMPLOYEE_GENDER = {
-    // CEM (Stand 2026-10-09, Angaben Eno)
+    // CEM (Stand 2026-10-09, Nachtrag 2026-10-29)
     "cb5406bc-2ede-4b38-acb4-127fb46c3d05": "f",
-    // Carolin Gröne
     "6db18ab4-8bc6-4068-9ccf-b7e5d5e26ce8": "f",
-    // Henriette Kienz
     "bbddc4ce-81a8-4ff3-b247-3593404f81e6": "f",
-    // Isabel Sobetzki
     "a30b0c6d-02f9-4744-8c2d-b389e040cf2b": "m",
-    // Leo Knau
     "c748b17f-3401-4ade-ad3d-aab8ce165481": "m",
-    // Max Gladisch
     "9b180b4f-eace-4238-8d56-db08a2648e73": "f",
-    // Melina Pérez Prada
     "398cc16b-6054-4a67-acea-4e76d92efd9a": "f",
-    // Milena Miedeck
     "abcdc1b1-f27c-4653-8a21-effa267cbf7b": "f",
-    // Sarah Buse
     "25544016-ecbe-4736-abf5-c8c69e209753": "f",
-    // Vivian Kruse
     "c9149b79-5a96-4265-b5ca-477a56bdd1b5": "m",
-    // Steven-Landu Geese (2026-10-29, Angabe Willy)
     "2a6af863-1c13-4cac-aa49-0ef41b371585": "m",
-    // Eno Lika (OPS, nutzt die Vorlagen)
-    // OBC (Stand 2026-10-09, Angaben Eno)
+    // OBC (Stand 2026-10-09)
     "d90dec0c-bfcf-4d68-8b3f-b92045d4bdb0": "f",
-    // Angelina Land
     "1f01b45a-73a7-48c9-8ec3-7c2c6b189b55": "f",
-    // Annika Lorenz
     "f9eda588-e0a3-419f-917d-8823b3ef4e3a": "m",
-    // Jan Silbe
     "b6c81c15-60ba-4380-99f3-d70261b6e7ba": "m",
-    // Jonas Güssefeld
     "83ac48c8-b582-4995-9cf6-d12c774bf058": "m",
-    // Jonathan Köhler
     "76edb298-3be5-42c2-8cad-902dcace82a2": "m",
-    // Nico Schmolke
     "f910ea81-7e8d-405d-b95d-250eb2e92799": "f"
-    // Madeleine Marondel (ehemals OBC, noch an Kandidaten)
   };
 
   // ../../shared/js/wa-templates/core.js

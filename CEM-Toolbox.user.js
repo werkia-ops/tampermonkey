@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.33.521
+// @version      1.33.523
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -1333,6 +1333,8 @@
     });
     return {
       request,
+      // Für eigene n8n-Webhooks (werkia-graphql/webhook-headers.js).
+      getAuth: authStore.getAuth,
       matchProvider: createMatchProvider({ request }),
       addressProvider: createAddressProvider({ request })
     };
@@ -6189,6 +6191,23 @@
     schedule();
   }
 
+  // ../../shared/js/werkia-graphql/webhook-headers.js
+  function authHeaders(getAuth, base = { "Content-Type": "application/json" }) {
+    const headers = { ...base };
+    let auth = null;
+    try {
+      auth = typeof getAuth === "function" ? getAuth() : null;
+    } catch {
+      auth = null;
+    }
+    const bearer = String(auth?.bearer || "").replace(/^Bearer\s+/i, "").trim();
+    if (!bearer) return headers;
+    headers.Authorization = `Bearer ${bearer}`;
+    const fingerprint = String(auth?.fingerprint || "").trim();
+    if (fingerprint) headers["x-fingerprint"] = fingerprint;
+    return headers;
+  }
+
   // ../../shared/js/vta-notizen/core.js
   var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
   var REQUEST_TIMEOUT_MS3 = 15e3;
@@ -6209,12 +6228,12 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Notizen: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createNotizenClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createNotizenClient({ request, getAuth, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(getAuth),
         data: JSON.stringify(payload),
         timeout: timeoutMs,
         onload(response) {
@@ -6352,7 +6371,8 @@ ${add}` : add;
     const post = createNotizenClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
+      }),
+      getAuth: () => getGraphqlAdapter().getAuth?.()
     });
     let myId = "";
     let cache = null;
@@ -14694,12 +14714,12 @@ ${add}` : add;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Sperrliste: unerwartete Antwort (HTTP ${status2}).`);
   }
-  function createSperreClient({ request, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
+  function createSperreClient({ request, getAuth, url = WEBHOOK_URL5, timeoutMs = REQUEST_TIMEOUT_MS5 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(getAuth),
         data: JSON.stringify(payload),
         timeout: timeoutMs,
         onload(response) {
@@ -14803,7 +14823,8 @@ ${add}` : add;
     const post = createSperreClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
+      }),
+      getAuth: () => getGraphqlAdapter().getAuth?.()
     });
     let myId = "";
     let cache = null;
@@ -16113,7 +16134,8 @@ ${add}` : add;
     const post = createSperreClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
+      }),
+      getAuth: () => getGraphqlAdapter().getAuth?.()
     });
     let myId = "";
     let cache = null;

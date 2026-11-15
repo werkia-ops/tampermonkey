@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.515
+// @version      1.33.523
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1337,6 +1337,8 @@
     });
     return {
       request,
+      // Für eigene n8n-Webhooks (werkia-graphql/webhook-headers.js).
+      getAuth: authStore.getAuth,
       matchProvider: createMatchProvider({ request }),
       addressProvider: createAddressProvider({ request })
     };
@@ -6108,6 +6110,23 @@
     schedule();
   }
 
+  // ../../shared/js/werkia-graphql/webhook-headers.js
+  function authHeaders(getAuth, base = { "Content-Type": "application/json" }) {
+    const headers = { ...base };
+    let auth = null;
+    try {
+      auth = typeof getAuth === "function" ? getAuth() : null;
+    } catch {
+      auth = null;
+    }
+    const bearer = String(auth?.bearer || "").replace(/^Bearer\s+/i, "").trim();
+    if (!bearer) return headers;
+    headers.Authorization = `Bearer ${bearer}`;
+    const fingerprint = String(auth?.fingerprint || "").trim();
+    if (fingerprint) headers["x-fingerprint"] = fingerprint;
+    return headers;
+  }
+
   // ../../shared/js/vta-notizen/core.js
   var WEBHOOK_URL3 = "https://hooks.werkia-ops.de/webhook/vta-notizen/bc9ebb75-4551-4041-8983-6b6f86928212";
   var REQUEST_TIMEOUT_MS3 = 15e3;
@@ -6128,12 +6147,12 @@
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`VTA-Notizen: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createNotizenClient({ request, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
+  function createNotizenClient({ request, getAuth, url = WEBHOOK_URL3, timeoutMs = REQUEST_TIMEOUT_MS3 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(getAuth),
         data: JSON.stringify(payload),
         timeout: timeoutMs,
         onload(response) {
@@ -6271,7 +6290,8 @@ ${add}` : add;
     const post = createNotizenClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
+      }),
+      getAuth: () => getGraphqlAdapter().getAuth?.()
     });
     let myId = "";
     let cache = null;
@@ -18558,12 +18578,12 @@ ${buildCbreBody(current)}`;
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Toolbox-Daten: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createToolboxDatenRequest({ request, url = WEBHOOK_URL8, timeoutMs = REQUEST_TIMEOUT_MS8 }) {
+  function createToolboxDatenRequest({ request, getAuth, url = WEBHOOK_URL8, timeoutMs = REQUEST_TIMEOUT_MS8 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(getAuth),
         data: JSON.stringify(payload),
         timeout: timeoutMs,
         onload(response) {
@@ -18594,8 +18614,8 @@ ${buildCbreBody(current)}`;
       return pending;
     };
   }
-  function createToolboxDatenClient({ request, getEmployeeId, url = WEBHOOK_URL8 }) {
-    const post = createToolboxDatenRequest({ request, url });
+  function createToolboxDatenClient({ request, getEmployeeId, getAuth, url = WEBHOOK_URL8 }) {
+    const post = createToolboxDatenRequest({ request, getAuth, url });
     const call = async (action, extra = {}) => post({ action, employeeId: await getEmployeeId(), ...extra });
     return {
       async ich() {
@@ -18623,7 +18643,8 @@ ${buildCbreBody(current)}`;
         request: request || (() => {
           throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
         }),
-        getEmployeeId: createEmployeeIdSource(graphqlAdapter.request)
+        getEmployeeId: createEmployeeIdSource(graphqlAdapter.request),
+        getAuth: () => typeof graphqlAdapter.getAuth === "function" ? graphqlAdapter.getAuth() : null
       }));
     }
     return clients.get(graphqlAdapter);
@@ -22275,12 +22296,12 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     if (data && data.fehler) throw new Error(data.fehler);
     throw new Error(`Arbeitgeber-Pause: unerwartete Antwort (HTTP ${status}).`);
   }
-  function createPauseClient({ request, url = WEBHOOK_URL9 }) {
+  function createPauseClient({ request, getAuth, url = WEBHOOK_URL9 }) {
     return (payload) => new Promise((resolve, reject) => {
       request({
         method: "POST",
         url,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(getAuth),
         data: JSON.stringify(payload),
         timeout: WRITE_ACTIONS.has(payload.action) ? WRITE_TIMEOUT_MS : REQUEST_TIMEOUT_MS9,
         onload(response) {
@@ -22365,7 +22386,8 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     const post = createPauseClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
-      })
+      }),
+      getAuth: () => getGraphqlAdapter().getAuth?.()
     });
     let myId = "";
     let cache = null;

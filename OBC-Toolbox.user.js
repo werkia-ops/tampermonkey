@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.17.521
+// @version      1.17.523
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -1210,6 +1210,8 @@
     });
     return {
       request,
+      // Für eigene n8n-Webhooks (werkia-graphql/webhook-headers.js).
+      getAuth: authStore.getAuth,
       matchProvider: createMatchProvider({ request }),
       addressProvider: createAddressProvider({ request })
     };

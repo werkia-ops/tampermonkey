@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.33.523
+// @version      1.34.534
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -305,8 +305,8 @@
       });
     });
   }
-  function el(tag, styles, text) {
-    const node = document.createElement(tag);
+  function el(tag2, styles, text) {
+    const node = document.createElement(tag2);
     Object.assign(node.style, styles);
     if (text !== void 0) node.textContent = text;
     return node;
@@ -1066,9 +1066,10 @@
   var REVISION_PARALLEL = 20;
   function createMatchProvider({ request }) {
     const candidateMatches = /* @__PURE__ */ new Map();
-    const sentAtByMatch = /* @__PURE__ */ new Map();
-    function loadMatchSentAt(matchId) {
-      const cached = sentAtByMatch.get(matchId);
+    const revisionsByMatch = /* @__PURE__ */ new Map();
+    const revisionsByCandidate = /* @__PURE__ */ new Map();
+    function loadMatchRevisions(matchId) {
+      const cached = revisionsByMatch.get(matchId);
       if (cached && cached.expiresAt > Date.now()) return cached.promise;
       const promise = request(MATCH_REVISIONS_QUERY, {
         filter: { resource: "Match", recordId: matchId },
@@ -1076,9 +1077,23 @@
         perPage: 100,
         sortField: "date",
         sortOrder: "ASC"
-      }).then((result) => sentAtFromRevisions(result?.items));
-      sentAtByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
-      promise.catch(() => sentAtByMatch.delete(matchId));
+      }).then((result) => result?.items || []);
+      revisionsByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
+      promise.catch(() => revisionsByMatch.delete(matchId));
+      return promise;
+    }
+    function loadCandidateRevisions(candidateId) {
+      const cached = revisionsByCandidate.get(candidateId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
+      const promise = request(MATCH_REVISIONS_QUERY, {
+        filter: { resource: "Candidate", recordId: candidateId },
+        page: 0,
+        perPage: 100,
+        sortField: "date",
+        sortOrder: "DESC"
+      }).then((result) => result?.items || []);
+      revisionsByCandidate.set(candidateId, { promise, expiresAt: Date.now() + CANDIDATE_MATCHES_TTL_MS });
+      promise.catch(() => revisionsByCandidate.delete(candidateId));
       return promise;
     }
     async function loadEmployerIdsForJobPositions(jobPositionIds) {
@@ -1161,23 +1176,31 @@
         const employerIds = new Set(matches.filter((item) => item.employerId && isSentOnlineMatchStatus(item.onlineMatchStatus)).map((item) => item.employerId));
         return { employerIds, employerIdByJobPositionId, sentAtByEmployerId: /* @__PURE__ */ new Map() };
       },
+      loadCandidateRevisions,
       // Wirklich gesendete Matches samt Zeitpunkt: auch solche, deren Status
       // sich nach dem Senden geaendert hat. Dafuer die Versionshistorie je
       // Match, aber nur fuer die Arbeitgeber in `employerIds` (die sichtbaren
       // Zeilen), nicht fuer alle Matches des Kandidaten. Ohne `employerIds`
-      // fuer alle.
+      // fuer alle. `matches` sind diese Matches mit ihrer Versionshistorie
+      // (`revisions`, leer wenn nicht ladbar) fuer die Doppelmatch-Wartezeit.
       async loadSentMatchEmployers(candidateId, { employerIds: onlyEmployerIds } = {}) {
         const { matches, employerIdByJobPositionId } = await loadCandidateMatches(candidateId);
         const only = onlyEmployerIds ? new Set(onlyEmployerIds) : null;
         const relevant = matches.filter((item) => item.employerId && (!only || only.has(item.employerId)));
         const sentAtByMatchId = /* @__PURE__ */ new Map();
+        const withRevisions = [];
         for (let index = 0; index < relevant.length; index += REVISION_PARALLEL) {
           const batch = relevant.slice(index, index + REVISION_PARALLEL);
-          const results = await Promise.allSettled(batch.map((item) => loadMatchSentAt(item.id)));
+          const results = await Promise.allSettled(batch.map((item) => loadMatchRevisions(item.id)));
           batch.forEach((item, batchIndex) => {
             const result = results[batchIndex];
-            if (result.status === "fulfilled") sentAtByMatchId.set(item.id, result.value);
-            else console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+            if (result.status === "fulfilled") {
+              sentAtByMatchId.set(item.id, sentAtFromRevisions(result.value));
+              withRevisions.push({ ...item, revisions: result.value });
+            } else {
+              console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+              withRevisions.push({ ...item, revisions: [] });
+            }
           });
         }
         const employerIds = /* @__PURE__ */ new Set();
@@ -1192,7 +1215,7 @@
             sentAtByEmployerId.set(item.employerId, sentAt);
           }
         }
-        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId, matches: withRevisions };
       }
     };
   }
@@ -1797,8 +1820,8 @@
     Object.assign(node.style, styles);
     return node;
   }
-  function el2(tag, styles, text) {
-    const node = document.createElement(tag);
+  function el2(tag2, styles, text) {
+    const node = document.createElement(tag2);
     if (styles) styled(node, styles);
     if (text !== void 0) node.textContent = text;
     return node;
@@ -2577,10 +2600,13 @@
       page: PAGES.potentialMatches,
       routes: [ROUTES.potentialMatches],
       kind: "view",
-      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“, „Reverse Match senden“ oder „Portal Uploaded“ hat oder hatte.",
+      summary: "Markiert Vorschläge, wenn der Kandidat bei diesem Arbeitgeber schon einen Match mit Status „Senden“, „Reverse Match senden“ oder „Portal Uploaded“ hat oder hatte, oder dort noch ein Match offen ist (Doublecheck, WVL, Warten auf CV oder Unterlagen).",
       notes: [
-        "Bis 90 Tage nach der Statusänderung ist die Zeile rot gefüllt, danach nur noch rot umrandet.",
-        "Der Hinweis in der Zeile nennt das Datum der Statusänderung.",
+        "Rot gefüllt, solange die Wartezeit für doppelte Matches läuft: „Gesperrt bis …“ mit dem Grund. Danach nur noch rot umrandet mit „Wieder frei“.",
+        "Die Wartezeit hängt am KAM-Status des alten Matches und zählt ab dem Tag, an dem er gesetzt wurde: Hired nie wieder, Hot Case und Hot Hot Case 6 Monate, andere Status 4 Monate, Reverse Match mit „MM gesendet“ 1 Monat.",
+        "Bei Out zählt der Grund: 1 Monat BEW kein Interesse am AG; 2 Monate Privat etwas gefunden, Konditionen, Stelle besetzt; 3 Monate nicht responsive, bleibt beim AG, Technischer Fehler, Montagebereitschaft, Kein Führerschein, zu weit in Zukunft; 4 Monate Hired bei Partner; 6 Monate AG kein Interesse, Entfernung, bereits bekannt, Erfahrung, Qualifikation, Sprachkenntnisse; 5 Monate bei anderem oder keinem Grund.",
+        "Kürzer, wenn sich das Profil nach dem Out verbessert hat: Montagebereitschaft erhöht 1 Monat, Deutsch eine Stufe besser 2 Monate, Führerschein B/C nachgetragen 1 Monat.",
+        "Ohne KAM-Status gelten 5 Monate ab dem Senden. Der Hinweis in der Zeile zeigt beim Drüberfahren Sendedatum, Grund und Wartezeit.",
         extra
       ].filter(Boolean)
     };
@@ -2714,8 +2740,8 @@
     const before = $from?.parent?.textBetween ? $from.parent.textBetween(0, $from.parentOffset, null, "￼") : "";
     return editor.chain().focus().insertContent(mentionContent(before, person)).run() !== false;
   }
-  function el3(tag, props = {}, ...children) {
-    const node = document.createElement(tag);
+  function el3(tag2, props = {}, ...children) {
+    const node = document.createElement(tag2);
     for (const [key, value] of Object.entries(props)) {
       if (value === void 0 || value === null || value === false) continue;
       if (key === "class") node.className = value;
@@ -3304,7 +3330,7 @@
       return dialogs[dialogs.length - 1] || null;
     }
     const timers2 = /* @__PURE__ */ new Set();
-    function later2(ms, matchId) {
+    function later(ms, matchId) {
       const key = `${matchId}:${ms}`;
       if (timers2.has(key)) return;
       timers2.add(key);
@@ -3324,7 +3350,7 @@
       const entry = cache.get(matchId);
       if (entry && entry.at && boxes > entry.boxes) {
         entry.boxes = boxes;
-        for (const ms of AFTER_NEW_MS) later2(ms, matchId);
+        for (const ms of AFTER_NEW_MS) later(ms, matchId);
       }
       const stale = !entry || !entry.at || now() - entry.at > CACHE_MS2;
       const blocked = failedAt && now() - failedAt < ERROR_RETRY_MS;
@@ -3360,7 +3386,7 @@
     { id: "Vakanzen", label: "Vakanzen", hint: "im Vakanz-Panel" },
     { id: "Prozess", label: "Prozess", hint: "am Arbeitgeber in Meine Matches und an der Prio-Liste" }
   ];
-  var TAG_BY_LOWER = new Map(NOTE_TAGS.map((tag) => [tag.id.toLowerCase(), tag.id]));
+  var TAG_BY_LOWER = new Map(NOTE_TAGS.map((tag2) => [tag2.id.toLowerCase(), tag2.id]));
   var EMPLOYER_COMMENTS_QUERY = `query WerkiaEmployerNotes($filter: EmployerCommentFilter!, $perPage: Int) {
   items: allEmployerComments(filter: $filter, perPage: $perPage) { id comment employerId employeeId createdAt }
 }`;
@@ -3393,16 +3419,16 @@
     const tags = [];
     for (; ; ) {
       const match = /^\[([^\]\n]{1,30})\]\s*/.exec(rest);
-      const tag = match && TAG_BY_LOWER.get(match[1].trim().toLowerCase());
-      if (!tag) break;
-      if (!tags.includes(tag)) tags.push(tag);
+      const tag2 = match && TAG_BY_LOWER.get(match[1].trim().toLowerCase());
+      if (!tag2) break;
+      if (!tags.includes(tag2)) tags.push(tag2);
       rest = rest.slice(match[0].length);
     }
     return { tags, text: rest.trim() };
   }
   function formatNoteText(tags, text) {
-    const known = NOTE_TAGS.map((tag) => tag.id).filter((id) => (tags || []).includes(id));
-    return `${known.map((tag) => `[${tag}]`).join("")}${known.length ? " " : ""}${String(text || "").trim()}`;
+    const known = NOTE_TAGS.map((tag2) => tag2.id).filter((id) => (tags || []).includes(id));
+    return `${known.map((tag2) => `[${tag2}]`).join("")}${known.length ? " " : ""}${String(text || "").trim()}`;
   }
   function noteToHtml(tags, text) {
     return textToHtml(formatNoteText(tags, text));
@@ -3424,8 +3450,8 @@
   function sortNotes(notes) {
     return [...notes].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   }
-  function notesWithTag(notes, tag) {
-    return (notes || []).filter((note) => note.tags.includes(tag));
+  function notesWithTag(notes, tag2) {
+    return (notes || []).filter((note) => note.tags.includes(tag2));
   }
   function formatNoteDate(iso) {
     const date = new Date(iso);
@@ -3717,8 +3743,8 @@
     style.textContent = STYLE;
     (doc.head || doc.documentElement).appendChild(style);
   }
-  function element(doc, tag, className) {
-    const node = doc.createElement(tag);
+  function element(doc, tag2, className) {
+    const node = doc.createElement(tag2);
     node.className = className;
     return node;
   }
@@ -3829,8 +3855,8 @@
   function matchIdFromRow(row2) {
     return matchIdFromHref3(row2?.querySelector(MATCH_LINK_SELECTOR3)?.getAttribute("href"));
   }
-  function element2(doc, tag, className, text) {
-    const node = doc.createElement(tag);
+  function element2(doc, tag2, className, text) {
+    const node = doc.createElement(tag2);
     if (className) node.className = className;
     if (text !== void 0) node.textContent = text;
     return node;
@@ -3839,7 +3865,7 @@
     const item = element2(doc, "li", "werkia-agn-note");
     const meta = element2(doc, "div", "werkia-agn-meta");
     meta.append([formatNoteDate(note.createdAt), note.author].filter(Boolean).join(" · "));
-    for (const tag of note.tags.filter((tag2) => tag2 !== currentTag)) meta.append(element2(doc, "span", "werkia-agn-tag", tag));
+    for (const tag2 of note.tags.filter((tag3) => tag3 !== currentTag)) meta.append(element2(doc, "span", "werkia-agn-tag", tag2));
     item.append(meta, element2(doc, "div", "werkia-agn-text", note.text));
     return item;
   }
@@ -3853,11 +3879,11 @@
       if (employerId === getEmployerId()) reload({ fresh: true });
     });
   }
-  function createEmployerNotesList({ provider, employerId = "", tag = null, limit = 3, document: doc = document, title, helpTip = null, hideWhenEmpty = false, expandable = false }) {
+  function createEmployerNotesList({ provider, employerId = "", tag: tag2 = null, limit = 3, document: doc = document, title, helpTip = null, hideWhenEmpty = false, expandable = false }) {
     ensureEmployerNotesStyle(doc);
     const root = element2(doc, "section", "werkia-agn");
     const head = element2(doc, "div", "werkia-agn-head");
-    const heading = element2(doc, "span", "", title || (tag ? `AG-Notizen · ${tag}` : "AG-Kommentare"));
+    const heading = element2(doc, "span", "", title || (tag2 ? `AG-Notizen · ${tag2}` : "AG-Kommentare"));
     const count = element2(doc, "small");
     head.append(...[heading, count, helpTip].filter(Boolean));
     const list = element2(doc, "ol", "werkia-agn-list");
@@ -3871,7 +3897,7 @@
     let expanded = false;
     let all = [];
     function show(notes, message = "") {
-      list.replaceChildren(...notes.map((note) => renderNote(doc, note, tag)));
+      list.replaceChildren(...notes.map((note) => renderNote(doc, note, tag2)));
       empty2.textContent = message;
       empty2.hidden = !message;
       root.hidden = hideWhenEmpty && !notes.length;
@@ -3886,22 +3912,22 @@
       try {
         const notes = await provider.list(current, { fresh });
         if (mine !== generation) return;
-        all = tag ? notesWithTag(notes, tag) : notes;
+        all = tag2 ? notesWithTag(notes, tag2) : notes;
         showLoaded();
       } catch (error) {
         if (mine !== generation) return;
         console.warn("[AG-Notizen]", error);
         all = [];
         more.hidden = true;
-        show([], tag ? "AG-Notizen konnten nicht geladen werden." : "AG-Kommentare konnten nicht geladen werden.");
+        show([], tag2 ? "AG-Notizen konnten nicht geladen werden." : "AG-Kommentare konnten nicht geladen werden.");
       }
     }
     function showLoaded() {
       const shown = expanded ? all : all.slice(0, limit);
-      count.textContent = all.length > shown.length ? `${shown.length} von ${all.length}` : tag || !all.length ? "" : String(all.length);
+      count.textContent = all.length > shown.length ? `${shown.length} von ${all.length}` : tag2 || !all.length ? "" : String(all.length);
       more.hidden = !expandable || all.length <= limit;
       more.textContent = expanded ? "Weniger zeigen" : `Alle ${all.length} zeigen`;
-      show(shown, shown.length ? "" : tag ? `Keine Notiz mit Tag ${tag}.` : "Keine Arbeitgeberkommentare.");
+      show(shown, shown.length ? "" : tag2 ? `Keine Notiz mit Tag ${tag2}.` : "Keine Arbeitgeberkommentare.");
     }
     more.addEventListener("click", (event) => {
       event.preventDefault();
@@ -4178,11 +4204,11 @@
       const head = element2(document, "div", "werkia-agn-head", "Als AG-Notiz speichern");
       head.appendChild(element2(document, "span", "werkia-agn-pc-slot"));
       const tags = element2(document, "div", "werkia-agn-tags");
-      for (const tag of NOTE_TAGS) {
-        const toggle = element2(document, "button", "werkia-agn-toggle", tag.label);
+      for (const tag2 of NOTE_TAGS) {
+        const toggle = element2(document, "button", "werkia-agn-toggle", tag2.label);
         toggle.type = "button";
-        toggle.dataset.tag = tag.id;
-        toggle.title = `Erscheint ${tag.hint}`;
+        toggle.dataset.tag = tag2.id;
+        toggle.title = `Erscheint ${tag2.hint}`;
         toggle.setAttribute("aria-pressed", "false");
         toggle.addEventListener("click", (event) => {
           event.preventDefault();
@@ -4315,8 +4341,8 @@
     style.textContent = STYLE3;
     (doc.head || doc.documentElement).appendChild(style);
   }
-  function element3(doc, tag, className, text) {
-    const node = doc.createElement(tag);
+  function element3(doc, tag2, className, text) {
+    const node = doc.createElement(tag2);
     if (className) node.className = className;
     if (text !== void 0) node.textContent = text;
     return node;
@@ -4349,7 +4375,7 @@
       return ok;
     }
   }
-  function createContactPersonBlock({ document: doc = document, helpTip = null, later: later2 = (fn, ms) => setTimeout(fn, ms) } = {}) {
+  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms) => setTimeout(fn, ms) } = {}) {
     ensureMatchDialogTopStyle(doc);
     const root = element3(doc, "section", "werkia-mdt-ap");
     const head = element3(doc, "div", "werkia-mdt-head");
@@ -4363,7 +4389,7 @@
     root.append(head, fields, msg);
     function flash(button2) {
       button2.dataset.copied = "true";
-      later2(() => {
+      later(() => {
         delete button2.dataset.copied;
       }, 1500);
     }
@@ -4747,23 +4773,23 @@
   function getOmNoteTags(value) {
     const rawTags = [...String(value || "").matchAll(/\[([^\]]+)\]/g)].map((match) => collapseWhitespace(match[1])).filter(Boolean);
     const normalizedTags = rawTags.map(foldForTagMatching);
-    const cvInstructions = rawTags.filter((tag, index) => /^cv(?:\s*,|\s*$)/i.test(tag) || normalizedTags[index].startsWith("cv,"));
+    const cvInstructions = rawTags.filter((tag2, index) => /^cv(?:\s*,|\s*$)/i.test(tag2) || normalizedTags[index].startsWith("cv,"));
     return {
       rawTags,
       cvInstructions,
-      openOnly: normalizedTags.some((tag) => tag === "nur offen"),
-      noRvm: normalizedTags.some((tag) => /^kein\s+rvm$/.test(tag)),
+      openOnly: normalizedTags.some((tag2) => tag2 === "nur offen"),
+      noRvm: normalizedTags.some((tag2) => /^kein\s+rvm$/.test(tag2)),
       // Beide Schreibweisen: die Flag-Leiste (shared/js/om-notes-templates)
       // und docs/reference/om_flags.md schreiben [RVM:100%], aeltere Notizen
       // [RVM: NUR 100%]. Bis 2026-09-24 erkannte der Parser nur die zweite -
       // bei 9 von 14 Arbeitgebern mit dem Flag blieb es dadurch wirkungslos.
-      strictRvm: normalizedTags.some((tag) => /^rvm\s*:\s*(?:nur\s*)?100\s*%$/.test(tag))
+      strictRvm: normalizedTags.some((tag2) => /^rvm\s*:\s*(?:nur\s*)?100\s*%$/.test(tag2))
     };
   }
   function describeOmNoteTags(tags) {
     const parts = [];
     if (tags.openOnly) parts.push("[NUR OFFEN] nur offene Profile senden, bevorzugt vor normalen offenen Matches.");
-    if (tags.cvInstructions.length) parts.push(`CV-Hinweis: ${tags.cvInstructions.map((tag) => `[${tag}]`).join(", ")}`);
+    if (tags.cvInstructions.length) parts.push(`CV-Hinweis: ${tags.cvInstructions.map((tag2) => `[${tag2}]`).join(", ")}`);
     if (tags.strictRvm) parts.push("[RVM: NUR 100%] nur bei sehr sicherem Match senden.");
     if (tags.noRvm) parts.push("[KEIN RVM] nicht als Reverse Match senden.");
     return parts.join(" ");
@@ -5068,8 +5094,8 @@
     style.textContent = STYLE4;
     (doc.head || doc.documentElement).appendChild(style);
   }
-  function element4(doc, tag, className, text) {
-    const node = doc.createElement(tag);
+  function element4(doc, tag2, className, text) {
+    const node = doc.createElement(tag2);
     if (className) node.className = className;
     if (text !== void 0) node.textContent = text;
     return node;
@@ -5910,8 +5936,8 @@
     `;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       Object.assign(element5, props);
       element5.append(...children.filter((child) => child !== null && child !== void 0));
       return element5;
@@ -6442,8 +6468,8 @@ ${add}` : add;
     `;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       Object.assign(element5, props);
       element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element5;
@@ -8349,29 +8375,6 @@ ${add}` : add;
   function isOnePerGroup(group) {
     return Boolean(group && group.id && group.sentMatchMode === ONE_PER_GROUP);
   }
-  function later(left, right) {
-    if (!left) return right || "";
-    if (!right) return left;
-    return Date.parse(right) > Date.parse(left) ? right : left;
-  }
-  function findGroupSentMatch(employer, sentEmployerIds, groupOf2, sentAtOf = () => "") {
-    const group = employerGroupOf(employer);
-    if (!isOnePerGroup(group)) return null;
-    let hit = null;
-    for (const sentId of sentEmployerIds || []) {
-      if (!sentId || sentId === employer.id) continue;
-      const other = groupOf2(sentId);
-      if (!other || other.id !== group.id) continue;
-      const sentAt = sentAtOf(sentId) || "";
-      if (!hit) {
-        hit = { group, employerId: sentId, sentAt };
-        continue;
-      }
-      const best = later(hit.sentAt, sentAt);
-      if (best !== hit.sentAt) hit = { group, employerId: sentId, sentAt };
-    }
-    return hit;
-  }
   function employersSharingGroup(shownEmployerIds, candidateEmployerIds, groupOf2) {
     const result = new Set((shownEmployerIds || []).filter(Boolean));
     const groupIds = /* @__PURE__ */ new Set();
@@ -8387,16 +8390,247 @@ ${add}` : add;
     }
     return result;
   }
-  function groupSentLabel(hit, formatDate) {
-    const name = hit && hit.group && hit.group.name || "ohne Namen";
-    const when = hit && hit.sentAt ? formatDate(hit.sentAt) : "";
-    return when ? `Match in Gruppe ${name} gesendet: ${when}` : `Match in Gruppe ${name} bereits gesendet`;
+
+  // ../../shared/js/admin-interface/features/revisions.js
+  function parseRevisionValue(raw) {
+    const text = String(raw ?? "").trim();
+    if (text === "null" || text === "<unknown>" || text === "") return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
   }
-  function groupSentTitle(hit, formatDate, otherName = "") {
-    const name = hit && hit.group && hit.group.name || "ohne Namen";
-    const when = hit && hit.sentAt ? formatDate(hit.sentAt) : "";
-    const at = otherName ? ` an ${otherName}` : " an einen anderen Arbeitgeber der Gruppe";
-    return `Die Arbeitgebergruppe "${name}" steht auf "Ein Match pro Gruppe". Der Kandidat wurde${when ? ` am ${when}` : " bereits"}${at} gesendet. Diesen Vorschlag ignorieren.`;
+  function parseRevisionDescription(description) {
+    const out = [];
+    for (const line of String(description || "").split("\n")) {
+      const m = line.match(/^\s*-?\s*([A-Za-z0-9_]+):\s*(.*?)\s*->\s*(.*)$/);
+      if (m) out.push({ field: m[1], from: parseRevisionValue(m[2]), to: parseRevisionValue(m[3]) });
+    }
+    return out;
+  }
+
+  // ../../shared/js/no-go-check/doppelmatch.js
+  var FALLBACK_MONATE = 5;
+  var OUT_STANDARD_MONATE = 5;
+  var RVM_MAIL_MONATE = 1;
+  var KAM_STATUS_MONATE = Object.freeze({
+    pending: 4,
+    with_cem: 4,
+    match_mail_sent: 4,
+    interview_request: 4,
+    interview_feedback: 4,
+    interview_conducted: 4,
+    hot_case: 6,
+    hot_hot_case: 6
+  });
+  var OUT_GRUND_MONATE = Object.freeze({
+    "bew nicht responsive": 3,
+    "bew hat kein interesse am ag": 1,
+    "ag hat kein interesse am bew": 6,
+    "bew bleibt beim aktuellen ag": 3,
+    "privat etwas gefunden": 2,
+    "hired bei partner": 4,
+    "entfernung zu weit": 6,
+    "technischer fehler": 3,
+    "bew bereits bekannt": 6,
+    montagebereitschaft: 3,
+    konditionen: 2,
+    erfahrung: 6,
+    "stelle besetzt": 2,
+    qualifikation: 6,
+    sprachkenntnisse: 6,
+    "kein führerschein": 3,
+    "zu weit in zukunft": 3
+  });
+  var PROFIL_MONATE = Object.freeze({
+    montagebereitschaft: 1,
+    sprachkenntnisse: 2,
+    "kein führerschein": 1
+  });
+  var OFFENE_STATUS = Object.freeze({
+    doublecheck: "Doublecheck",
+    follow_up: "WVL",
+    wait_for_documents: "Warten auf Unterlagen",
+    wait_for_cv: "Warten auf CV",
+    wait_for_document_review: "Unterlagen prüfen"
+  });
+  var TRAVEL_RANG = { none: 0, low: 1, regular: 2, unrestricted: 3 };
+  var SPRACHE_RANG = { low: 0, mid: 1, high: 2 };
+  var FUEHRERSCHEIN_OK = /* @__PURE__ */ new Set(["klass_b", "klass_c"]);
+  function zeit(value) {
+    const t = Date.parse(value || "");
+    return Number.isFinite(t) ? t : NaN;
+  }
+  function plusMonate(iso, monate) {
+    const t = zeit(iso);
+    if (!Number.isFinite(t)) return "";
+    const d = new Date(t);
+    const tag2 = d.getUTCDate();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + monate);
+    const letzter = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(tag2, letzter));
+    return d.toISOString();
+  }
+  function aenderungen(revisions) {
+    const out = [];
+    for (const revision of revisions || []) {
+      if (!revision || !revision.date) continue;
+      for (const change of parseRevisionDescription(revision.description)) out.push({ at: revision.date, ...change });
+    }
+    return out.sort((a, b) => zeit(a.at) - zeit(b.at));
+  }
+  function matchZeiten(revisions, kamStatus = "") {
+    let sentAt = "";
+    let lastSentAt = "";
+    let kamStatusSetAt = "";
+    for (const change of aenderungen(revisions)) {
+      if (change.field === "onlineMatchStatus" && SENT_ONLINE_MATCH_STATUSES.includes(change.to)) {
+        if (!sentAt) sentAt = change.at;
+        lastSentAt = change.at;
+      }
+      if (kamStatus && change.field === "kamStatus" && change.to === kamStatus) kamStatusSetAt = change.at;
+    }
+    return { sentAt, lastSentAt, kamStatusSetAt };
+  }
+  function profilVerbesserung(candidateRevisions, seit) {
+    const ab = zeit(seit);
+    const result = { montagebereitschaft: false, sprachkenntnisse: false, "kein führerschein": false };
+    if (!Number.isFinite(ab)) return result;
+    const danach = aenderungen(candidateRevisions).filter((change) => zeit(change.at) > ab);
+    const stufe = (field, rang, key) => {
+      const changes = danach.filter((change) => change.field === field);
+      if (!changes.length) return;
+      const vorher = rang[changes[0].from];
+      const jetzt = rang[changes.at(-1).to];
+      if (vorher !== void 0 && jetzt !== void 0 && jetzt >= vorher + 1) result[key] = true;
+    };
+    stufe("desiredTravel", TRAVEL_RANG, "montagebereitschaft");
+    stufe("germanSpeakingLevel", SPRACHE_RANG, "sprachkenntnisse");
+    const fs = danach.filter((change) => change.field === "driversLicense");
+    if (fs.length && fs.some((change) => FUEHRERSCHEIN_OK.has(change.to) && !FUEHRERSCHEIN_OK.has(change.from)) && FUEHRERSCHEIN_OK.has(fs.at(-1).to)) {
+      result["kein führerschein"] = true;
+    }
+    return result;
+  }
+  function outGrundText(feedback) {
+    const raw = String(feedback || "").trim();
+    if (!raw) return "";
+    return String(feedbackLabel(raw) || raw).trim();
+  }
+  var MONATS_TEXT = (monate) => `${monate} ${monate === 1 ? "Monat" : "Monate"}`;
+  function matchSperre(match, { candidateRevisions = [], now = Date.now() } = {}) {
+    if (!match) return null;
+    const status2 = String(match.onlineMatchStatus || "");
+    const base = { matchId: match.id || "", employerId: match.employerId || "" };
+    if (OFFENE_STATUS[status2]) {
+      return { ...base, art: "offen", grund: `Offener Match: ${OFFENE_STATUS[status2]}`, monate: null, ab: "", bis: "", sentAt: "" };
+    }
+    const kamStatus = String(match.kamStatus || "").trim().toLowerCase();
+    const zeiten = matchZeiten(match.revisions, match.kamStatus || "");
+    const gesendet = Boolean(zeiten.sentAt) || SENT_ONLINE_MATCH_STATUSES.includes(status2);
+    if (!gesendet) return null;
+    const sentAt = zeiten.sentAt;
+    const kamLabel = KAM_STATUS_LABELS[kamStatus] || kamStatus;
+    if (kamStatus === "hired") {
+      return { ...base, art: "dauerhaft", grund: "KAM: Hired", monate: null, ab: zeiten.kamStatusSetAt, bis: "", sentAt };
+    }
+    let monate = FALLBACK_MONATE;
+    let grund = kamStatus ? `KAM: ${kamLabel}` : "ohne KAM-Status";
+    let ab = zeiten.lastSentAt || sentAt;
+    if (kamStatus && zeiten.kamStatusSetAt && (kamStatus === "out" || KAM_STATUS_MONATE[kamStatus])) {
+      ab = zeiten.kamStatusSetAt;
+      if (kamStatus === "out") {
+        const text = outGrundText(match.kamFeedback);
+        const key = text.toLowerCase();
+        monate = OUT_GRUND_MONATE[key] ?? OUT_STANDARD_MONATE;
+        grund = text ? `Out: ${text}` : "Out ohne Grund";
+        if (PROFIL_MONATE[key] && profilVerbesserung(candidateRevisions, ab)[key]) {
+          monate = PROFIL_MONATE[key];
+          grund += ", Profil verbessert";
+        }
+      } else if (status2 === "reverse_match_send" && kamStatus === "match_mail_sent") {
+        monate = RVM_MAIL_MONATE;
+        grund = "RVM, MM gesendet";
+      } else {
+        monate = KAM_STATUS_MONATE[kamStatus];
+      }
+    }
+    if (!ab) return { ...base, art: "unbekannt", grund, monate, ab: "", bis: "", sentAt };
+    const bis = plusMonate(ab, monate);
+    return { ...base, art: zeit(bis) > now ? "gesperrt" : "frei", grund, monate, ab, bis, sentAt };
+  }
+  var RANG = { dauerhaft: 5, offen: 4, unbekannt: 3, gesperrt: 2, frei: 1 };
+  function staerksteSperre(sperren) {
+    let best = null;
+    for (const s of sperren || []) {
+      if (!s) continue;
+      if (!best || RANG[s.art] > RANG[best.art] || RANG[s.art] === RANG[best.art] && zeit(s.bis) > zeit(best.bis)) best = s;
+    }
+    return best;
+  }
+  function arbeitgeberSperre(matches, { employerId, excludeJobPositionId = "", candidateRevisions = [], now = Date.now() } = {}) {
+    return staerksteSperre((matches || []).filter((m) => m && m.employerId === employerId).filter((m) => !(excludeJobPositionId && m.jobPositionId === excludeJobPositionId && OFFENE_STATUS[m.onlineMatchStatus])).map((m) => matchSperre(m, { candidateRevisions, now })));
+  }
+  function gruppenSperre(employer, matches, groupOf2, opts = {}) {
+    const group = employerGroupOf(employer);
+    if (!employer || !isOnePerGroup(group)) return null;
+    const andere = /* @__PURE__ */ new Set();
+    for (const m of matches || []) {
+      if (!m || !m.employerId || m.employerId === employer.id) continue;
+      const other = groupOf2(m.employerId);
+      if (other && other.id === group.id) andere.add(m.employerId);
+    }
+    const best = staerksteSperre([...andere].map((employerId) => arbeitgeberSperre(matches, { ...opts, employerId, excludeJobPositionId: "" })));
+    return best ? { ...best, gruppe: group } : null;
+  }
+  function zeilenSperre(direkt, gruppe) {
+    if (!direkt) return gruppe || null;
+    if (!gruppe) return direkt;
+    return RANG[gruppe.art] > RANG[direkt.art] ? gruppe : direkt;
+  }
+  function istGesperrt(sperre) {
+    return Boolean(sperre && sperre.art !== "frei");
+  }
+  var tag = (formatDate, iso) => iso ? formatDate(iso) : "";
+  var gruppenName = (sperre) => sperre.gruppe ? sperre.gruppe.name || "ohne Namen" : "";
+  function sperreLabel(sperre, formatDate) {
+    if (!sperre) return "";
+    const vor = sperre.gruppe ? `Gruppe ${gruppenName(sperre)}: ` : "";
+    switch (sperre.art) {
+      case "dauerhaft":
+        return `${vor}Gesperrt (Hired)`;
+      case "offen":
+        return `${vor}${sperre.grund}`;
+      case "unbekannt":
+        return `${vor}Match gesendet, gesperrt`;
+      case "gesperrt":
+        return `${vor}Gesperrt bis ${tag(formatDate, sperre.bis)} (${sperre.grund})`;
+      case "frei":
+        return `${vor}Wieder frei (${sperre.grund})`;
+      default:
+        return "";
+    }
+  }
+  function sperreTitle(sperre, formatDate, otherName = "") {
+    if (!sperre) return "";
+    const wo = sperre.gruppe ? `Die Arbeitgebergruppe "${gruppenName(sperre)}" steht auf "Ein Match pro Gruppe"; der Match liegt bei ${otherName || "einem anderen Arbeitgeber der Gruppe"}. ` : "";
+    const gesendet = sperre.sentAt ? `Match gesendet am ${formatDate(sperre.sentAt)}. ` : "";
+    switch (sperre.art) {
+      case "dauerhaft":
+        return `${wo}${gesendet}KAM-Status Hired: nie wieder an diesen Arbeitgeber senden.`;
+      case "offen":
+        return `${wo}Beim Arbeitgeber liegt noch ein offener Match (${sperre.grund.replace("Offener Match: ", "")}). Diesen Vorschlag ignorieren.`;
+      case "unbekannt":
+        return `${wo}${gesendet}Zeitpunkt für die Wartezeit unbekannt (${sperre.grund}), deshalb gesperrt.`;
+      case "gesperrt":
+        return `${wo}${gesendet}${sperre.grund} seit ${formatDate(sperre.ab)}, Wartezeit ${MONATS_TEXT(sperre.monate)}: bis ${formatDate(sperre.bis)} nicht erneut senden.`;
+      case "frei":
+        return `${wo}${gesendet}${sperre.grund} seit ${formatDate(sperre.ab)}, Wartezeit ${MONATS_TEXT(sperre.monate)} am ${formatDate(sperre.bis)} abgelaufen. Erneut senden erlaubt.`;
+      default:
+        return "";
+    }
   }
 
   // src/features/cem-ofm/reverse-match-kam-status.js
@@ -8407,7 +8641,6 @@ ${add}` : add;
   var MATCH_PRESENT_OLD_ROW_CLASS = "werkia-cem-old-match-present-row";
   var MATCH_PRESENT_STYLE_ID = "werkia-cem-match-present-style";
   var CACHE_TTL_MS2 = 30 * 60 * 1e3;
-  var MATCH_HIGHLIGHT_DAYS = 90;
   var POTENTIAL_MATCHES_ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   function getResourceIdFromRow(row2, resource) {
     const link = row2?.querySelector(`a[href*="#/${resource}/"][href*="/show"]`);
@@ -8419,15 +8652,12 @@ ${add}` : add;
   function getMatchTypeChip(row2) {
     return row2?.querySelector(".MuiChip-root") || null;
   }
-  function isOlderSentMatch(sentAt, now = Date.now()) {
-    const timestamp = Date.parse(sentAt);
-    return Number.isFinite(timestamp) && now - timestamp >= MATCH_HIGHLIGHT_DAYS * 24 * 60 * 60 * 1e3;
-  }
-  function formatSentAt(sentAt) {
-    const timestamp = Date.parse(sentAt);
+  function formatDay3(value) {
+    const timestamp = Date.parse(value);
     if (!Number.isFinite(timestamp)) return "unbekannt";
-    return new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(timestamp);
+    return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }).format(timestamp);
   }
+  var SPERRE_LAEDT = Object.freeze({ art: "unbekannt", grund: "Wartezeit wird geladen", monate: null, ab: "", bis: "", sentAt: "" });
   function executeReverseMatchKamStatus(runtime) {
     runtime.registerSource("cem/toolbox/src/features/cem-ofm/reverse-match-kam-status.js");
     const statusCache = /* @__PURE__ */ new Map();
@@ -8455,15 +8685,15 @@ ${add}` : add;
     `;
       document.head.appendChild(style);
     }
-    function updateTag(tag, status2, matchType) {
+    function updateTag(tag2, status2, matchType) {
       const out = status2?.value === "out";
       const loading = status2?.value === "loading";
       const feedback = out ? status2?.feedback : "";
-      tag.dataset.kamStatus = status2?.value || "";
+      tag2.dataset.kamStatus = status2?.value || "";
       const text = feedback ? `KAM Status: ${status2.label} (${feedback})` : `KAM Status: ${status2.label}`;
-      if (tag.textContent !== text) tag.textContent = text;
-      tag.title = loading ? `KAM Status des ${matchType} wird im Hintergrund geladen` : `KAM Status des ${matchType}: ${status2.label}${feedback ? ` – Grund: ${feedback}` : ""}`;
-      tag.style.cssText = `display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:0;padding:5px 9px;border:${out ? "2px solid #c92a2a" : "1px solid rgba(0,0,0,0.26)"};border-radius:999px;background:${out ? "#fa5252" : "rgba(255,255,255,0.16)"};color:${out ? "#fff" : "rgba(0,0,0,0.64)"};font-size:12px;font-weight:400;line-height:1.2;white-space:nowrap;vertical-align:middle;box-shadow:${out ? "0 2px 5px rgba(201,42,42,0.28)" : "none"};opacity:${loading && !out ? "0.72" : "1"};`;
+      if (tag2.textContent !== text) tag2.textContent = text;
+      tag2.title = loading ? `KAM Status des ${matchType} wird im Hintergrund geladen` : `KAM Status des ${matchType}: ${status2.label}${feedback ? ` – Grund: ${feedback}` : ""}`;
+      tag2.style.cssText = `display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:0;padding:5px 9px;border:${out ? "2px solid #c92a2a" : "1px solid rgba(0,0,0,0.26)"};border-radius:999px;background:${out ? "#fa5252" : "rgba(255,255,255,0.16)"};color:${out ? "#fff" : "rgba(0,0,0,0.64)"};font-size:12px;font-weight:400;line-height:1.2;white-space:nowrap;vertical-align:middle;box-shadow:${out ? "0 2px 5px rgba(201,42,42,0.28)" : "none"};opacity:${loading && !out ? "0.72" : "1"};`;
     }
     function setTag(row2, status2, chip = getMatchTypeChip(row2)) {
       const existing = row2.querySelector(`.${TAG_CLASS}`);
@@ -8477,15 +8707,15 @@ ${add}` : add;
         if (chip && chip.nextElementSibling !== existing) chip.insertAdjacentElement("afterend", existing);
         return;
       }
-      const tag = document.createElement("span");
-      tag.className = TAG_CLASS;
-      updateTag(tag, status2, matchType);
-      if (chip) chip.insertAdjacentElement("afterend", tag);
-      else row2.querySelector("td.column-connection, td.column-reverse")?.appendChild(tag);
+      const tag2 = document.createElement("span");
+      tag2.className = TAG_CLASS;
+      updateTag(tag2, status2, matchType);
+      if (chip) chip.insertAdjacentElement("afterend", tag2);
+      else row2.querySelector("td.column-connection, td.column-reverse")?.appendChild(tag2);
     }
-    function setSentMatchTag(row2, hasSentMatch, sentAt, chip = getMatchTypeChip(row2), groupHit = null) {
+    function setSentMatchTag(row2, sperre, chip = getMatchTypeChip(row2)) {
       const existing = row2.querySelector(`.${SENT_MATCH_TAG_CLASS}`);
-      if (!hasSentMatch) {
+      if (!sperre) {
         row2.classList.remove(MATCH_PRESENT_ROW_CLASS);
         row2.classList.remove(MATCH_PRESENT_OLD_ROW_CLASS);
         delete row2.dataset.werkiaMatchPresent;
@@ -8493,22 +8723,24 @@ ${add}` : add;
         return;
       }
       ensureMatchPresentStyles();
-      const isOldMatch = isOlderSentMatch(sentAt);
+      const isOldMatch = !istGesperrt(sperre);
       row2.classList.toggle(MATCH_PRESENT_ROW_CLASS, !isOldMatch);
       row2.classList.toggle(MATCH_PRESENT_OLD_ROW_CLASS, isOldMatch);
       row2.dataset.werkiaMatchPresent = "true";
       row2.classList.remove("werkia-urgent-vacancy-row");
       row2.querySelectorAll(".werkia-urgent-vacancy-badge").forEach((badge) => badge.remove());
-      const tag = existing || document.createElement("span");
-      tag.className = SENT_MATCH_TAG_CLASS;
-      const text = groupHit ? groupSentLabel(groupHit, formatSentAt) : sentAt ? `Match gesendet: ${formatSentAt(sentAt)}` : "Match bereits gesendet";
-      if (tag.textContent !== text) tag.textContent = text;
-      const title = groupHit ? groupSentTitle(groupHit, formatSentAt, employerGroups.get(groupHit.employerId)?.name || "") : sentAt ? `Für diesen Arbeitgeber wurde am ${formatSentAt(sentAt)} bereits ein Match gesendet. Diesen Vorschlag ignorieren.` : "Für diesen Arbeitgeber wurde bereits ein Match gesendet. Der genaue Zeitpunkt wird im Hintergrund geladen.";
-      if (tag.title !== title) tag.title = title;
-      tag.style.cssText = "display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:6px 0 2px 8px;padding:5px 9px;border:1px solid #8f2e2e;border-radius:999px;background:#a83232;color:#fff;font:800 12px/1.2 Arial,sans-serif;letter-spacing:.15px;vertical-align:middle;white-space:nowrap;";
+      const tag2 = existing || document.createElement("span");
+      tag2.className = SENT_MATCH_TAG_CLASS;
+      const text = sperre === SPERRE_LAEDT ? "Match bereits gesendet" : sperreLabel(sperre, formatDay3);
+      if (tag2.textContent !== text) tag2.textContent = text;
+      const title = sperre === SPERRE_LAEDT ? "Für diesen Arbeitgeber wurde bereits ein Match gesendet. Die Wartezeit wird im Hintergrund geladen." : sperreTitle(sperre, formatDay3, sperre.gruppe ? employerGroups.get(sperre.employerId)?.name || "" : "");
+      if (tag2.title !== title) tag2.title = title;
+      tag2.dataset.werkiaSperre = sperre.art;
+      const style = isOldMatch ? "display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:6px 0 2px 8px;padding:5px 9px;border:1px solid #8f2e2e;border-radius:999px;background:#fff;color:#8f2e2e;font:700 12px/1.2 Arial,sans-serif;letter-spacing:.15px;vertical-align:middle;white-space:nowrap;" : "display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;margin:6px 0 2px 8px;padding:5px 9px;border:1px solid #8f2e2e;border-radius:999px;background:#a83232;color:#fff;font:800 12px/1.2 Arial,sans-serif;letter-spacing:.15px;vertical-align:middle;white-space:nowrap;";
+      if (tag2.style.cssText !== style) tag2.style.cssText = style;
       if (!existing) {
-        if (chip) chip.insertAdjacentElement("afterend", tag);
-        else row2.querySelector("td.column-connection, td.column-reverse")?.appendChild(tag);
+        if (chip) chip.insertAdjacentElement("afterend", tag2);
+        else row2.querySelector("td.column-connection, td.column-reverse")?.appendChild(tag2);
       }
     }
     function cachedStatus(key) {
@@ -8605,7 +8837,13 @@ ${add}` : add;
       const fullKey = `${candidateId}|${historyEmployerIds.join(",")}`;
       const full = groupsReady ? cachedSentEmployers(fullKey) : void 0;
       if (full === void 0 && groupsReady && historyEmployerIds.length) {
-        loadSentEmployers(fullKey, candidateId, () => provider.loadSentMatchEmployers(candidateId, { employerIds: historyEmployerIds }));
+        loadSentEmployers(fullKey, candidateId, () => Promise.all([
+          provider.loadSentMatchEmployers(candidateId, { employerIds: historyEmployerIds }),
+          Promise.resolve().then(() => provider.loadCandidateRevisions(candidateId)).catch((error) => {
+            console.warn("[CEM Match] Kandidaten-Historie nicht ladbar:", error);
+            return [];
+          })
+        ]).then(([sent, candidateRevisions]) => ({ ...sent, candidateRevisions })));
       }
       const sentEmployers = full ?? current;
       rows.forEach((row2) => {
@@ -8614,17 +8852,23 @@ ${add}` : add;
         const jobId = getResourceIdFromRow(row2, "JobPosition");
         const employerId = getResourceIdFromRow(row2, "Employer") || sentEmployers?.employerIdByJobPositionId.get(jobId);
         if (!jobId || !employerId) return;
-        const directSent = sentEmployers?.employerIds.has(employerId) || false;
-        const groupHit = !directSent && sentEmployers ? findGroupSentMatch({ id: employerId, group: groupOf2(employerId) }, sentEmployers.employerIds, groupOf2, (id) => sentEmployers.sentAtByEmployerId.get(id) || "") : null;
-        const hasSentMatch = directSent || Boolean(groupHit);
-        const sentAt = groupHit ? groupHit.sentAt : sentEmployers?.sentAtByEmployerId.get(employerId);
-        if (sentEmployers !== void 0) setSentMatchTag(row2, hasSentMatch, sentAt, chip, groupHit);
+        let sperre = null;
+        if (full) {
+          const opts = { candidateRevisions: full.candidateRevisions || [], now: Date.now() };
+          sperre = zeilenSperre(
+            arbeitgeberSperre(full.matches || [], { ...opts, employerId, excludeJobPositionId: jobId }),
+            gruppenSperre({ id: employerId, group: groupOf2(employerId) }, full.matches || [], groupOf2, opts)
+          );
+        } else if (sentEmployers?.employerIds.has(employerId)) {
+          sperre = SPERRE_LAEDT;
+        }
+        if (sentEmployers !== void 0) setSentMatchTag(row2, sperre, chip);
         const statuses = cachedStatus(`${candidateId}|${employerId}`);
         if (statuses !== void 0) {
           setTag(row2, statuses?.get(jobId) || null, chip);
           return;
         }
-        if (sentEmployers === void 0) setSentMatchTag(row2, false, "", chip);
+        if (sentEmployers === void 0) setSentMatchTag(row2, null, chip);
         setTag(row2, { value: "loading", label: "lädt…" }, chip);
         enqueue(candidateId, employerId, jobId);
       });
@@ -10715,19 +10959,19 @@ ${add}` : add;
     function decorateOrigin(chip, interview) {
       const label2 = originLabel(interview);
       const host = chip.querySelector(".MuiChip-label") || chip;
-      let tag = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
+      let tag2 = chip.querySelector(`[${ORIGIN_ATTRIBUTE}]`);
       if (!label2) {
-        tag?.remove();
+        tag2?.remove();
         host.classList.remove("werkia-cem-vta-host");
-      } else if (!tag || tag.textContent !== label2) {
-        tag?.remove();
-        tag = document.createElement("span");
-        tag.className = "werkia-cem-vta-origin";
-        tag.setAttribute(ORIGIN_ATTRIBUTE, "");
-        tag.title = label2 === "AG" ? "Termine vom Arbeitgeber (KAM-VTA)" : "Termine vom Kandidaten (CEM-VTA)";
-        tag.textContent = label2;
+      } else if (!tag2 || tag2.textContent !== label2) {
+        tag2?.remove();
+        tag2 = document.createElement("span");
+        tag2.className = "werkia-cem-vta-origin";
+        tag2.setAttribute(ORIGIN_ATTRIBUTE, "");
+        tag2.title = label2 === "AG" ? "Termine vom Arbeitgeber (KAM-VTA)" : "Termine vom Kandidaten (CEM-VTA)";
+        tag2.textContent = label2;
         host.classList.add("werkia-cem-vta-host");
-        host.appendChild(tag);
+        host.appendChild(tag2);
       }
       if (needsBorder(interview)) chip.setAttribute(MARK2, "");
       else chip.removeAttribute(MARK2);
@@ -10735,24 +10979,24 @@ ${add}` : add;
     function decorateType(chip, interview, text) {
       const label2 = hasTypePrefix(text) ? "" : typeLabel(interview);
       const wanted = label2 ? `${label2} - ` : "";
-      let tag = chip.querySelector(`[${TYPE_ATTRIBUTE}]`);
+      let tag2 = chip.querySelector(`[${TYPE_ATTRIBUTE}]`);
       if (!wanted) {
-        tag?.remove();
+        tag2?.remove();
         return;
       }
-      if (tag?.textContent === wanted) return;
-      tag?.remove();
+      if (tag2?.textContent === wanted) return;
+      tag2?.remove();
       const host = chip.querySelector(".MuiChip-label") || chip;
       const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, {
         acceptNode: (node) => /\S/.test(node.nodeValue) && !node.parentElement?.closest(OWN_SELECTOR2) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
       });
       const first = walker.nextNode();
-      tag = document.createElement("span");
-      tag.className = "werkia-interview-type";
-      tag.setAttribute(TYPE_ATTRIBUTE, "");
-      tag.textContent = wanted;
-      if (first) first.parentNode.insertBefore(tag, first);
-      else host.insertBefore(tag, host.firstChild);
+      tag2 = document.createElement("span");
+      tag2.className = "werkia-interview-type";
+      tag2.setAttribute(TYPE_ATTRIBUTE, "");
+      tag2.textContent = wanted;
+      if (first) first.parentNode.insertBefore(tag2, first);
+      else host.insertBefore(tag2, host.firstChild);
     }
     async function load2(ids) {
       ids.forEach((id) => pending.add(id));
@@ -14888,8 +15132,8 @@ ${add}` : add;
     `;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       Object.assign(element5, props);
       element5.append(...children.filter((child) => child !== null && child !== void 0));
       return element5;
@@ -15486,8 +15730,8 @@ ${add}` : add;
     `;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       Object.assign(element5, props);
       element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element5;
@@ -16165,8 +16409,8 @@ ${add}` : add;
     `;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       Object.assign(element5, props);
       element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
       return element5;
@@ -16425,7 +16669,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     }).formatToParts(new Date(date));
     return Object.fromEntries(parts.map((part) => [part.type, part.value]));
   }
-  function formatDay3(date) {
+  function formatDay4(date) {
     const p = berlinParts(date);
     return `${p.weekday.replace(/\.?$/, ".")}, ${p.day}.${p.month}.`;
   }
@@ -16444,7 +16688,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     const key = berlinDayKey(date);
     if (key === berlinDayKey(now)) return "heute";
     if (key === berlinDayKey(new Date(new Date(now).getTime() + 24 * 60 * 60 * 1e3))) return "morgen";
-    return `am ${formatDay3(date)}`;
+    return `am ${formatDay4(date)}`;
   }
   var newestFirst = (a, b) => String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
   function pickInterview(interviews, purpose) {
@@ -16573,7 +16817,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         `🛜 ${slot("Link zur Stelle", ctx.jobLink)}`,
         "",
         `📆 *${several ? "Terminvorschläge" : "Terminvorschlag"}*:`,
-        ...dates.length ? dates.map((date) => `# ${formatDay3(date)} um ${formatTime(date)}`) : [`# ${slot("Terminvorschlag", "")}`],
+        ...dates.length ? dates.map((date) => `# ${formatDay4(date)} um ${formatTime(date)}`) : [`# ${slot("Terminvorschlag", "")}`],
         "",
         `Kannst und möchtest Du ${appointmentPhrase(ctx.mode, several)} wahrnehmen?`
       ];
@@ -16595,7 +16839,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         `🛠️ ${slot("Jobtitel", ctx.jobTitle)}`,
         `🛜 ${slot("Link zur Stelle", ctx.jobLink)}`,
         "",
-        `📆 *${date ? `${formatDay3(date)} um ${formatTime(date)}` : slot("Termin", "")}*`,
+        `📆 *${date ? `${formatDay4(date)} um ${formatTime(date)}` : slot("Termin", "")}*`,
         "",
         closing
       ];
@@ -16909,9 +17153,9 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     { key: "Raum", scope: "match", value: (ctx) => ctx.region },
     { key: "Adresse", scope: "match", value: (ctx) => ctx.address },
     { key: "Gesprächsart", scope: "match", value: (ctx) => MODE_ADJECTIVE[ctx.mode] },
-    { key: "Termin", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? `${formatDay3(ctx.interview.dates[0])} um ${formatTime(ctx.interview.dates[0])}` : "" },
+    { key: "Termin", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? `${formatDay4(ctx.interview.dates[0])} um ${formatTime(ctx.interview.dates[0])}` : "" },
     { key: "Termin Tag", scope: "match", value: (ctx) => ctx.interview?.dates?.[0] ? relativeDay(ctx.interview.dates[0], ctx.now) : "" },
-    { key: "Terminvorschläge", scope: "match", value: (ctx) => [...ctx.suggestion?.dates || []].sort().map((date) => `# ${formatDay3(date)} um ${formatTime(date)}`).join("\n") },
+    { key: "Terminvorschläge", scope: "match", value: (ctx) => [...ctx.suggestion?.dates || []].sort().map((date) => `# ${formatDay4(date)} um ${formatTime(date)}`).join("\n") },
     { key: "Ansprechpartner", scope: "match", value: (ctx) => contactName2(ctx.contact) },
     { key: "Telefon Ansprechpartner", scope: "match", value: (ctx) => ctx.contact?.phoneNumbers?.[0] }
   ];
@@ -17383,8 +17627,8 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         place();
       });
     }
-    function element5(tag, props = {}, children = []) {
-      const node = document.createElement(tag);
+    function element5(tag2, props = {}, children = []) {
+      const node = document.createElement(tag2);
       Object.assign(node, props);
       children.forEach((child) => node.append(child));
       return node;
@@ -18364,8 +18608,8 @@ Trotzdem speichern?`)) return void 0;
       style.textContent = CSS2;
       document.head.appendChild(style);
     }
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       for (const [key, value] of Object.entries(props)) {
         if (key === "className") element5.className = value;
         else if (key === "text") element5.textContent = value;
@@ -18705,8 +18949,8 @@ Trotzdem speichern?`)) return void 0;
     let resizeObserver = null;
     const waitForAdminpanel = options.skipLoadingGate ? () => false : createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleSync() });
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "") || ROUTES.cemMyCandidates.test(location.hash || "");
-    function el4(tag, props = {}, children = []) {
-      const element5 = document.createElement(tag);
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
       for (const [key, value] of Object.entries(props)) {
         if (key === "className") element5.className = value;
         else if (key === "text") element5.textContent = value;
@@ -18940,8 +19184,8 @@ Trotzdem speichern?`)) return void 0;
       svg.setAttribute("height", String(height));
       svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
       const points = map.points.map((point) => point.join(",")).join(" ");
-      const shape = (tag, attrs) => {
-        const node = document.createElementNS(svgNs, tag);
+      const shape = (tag2, attrs) => {
+        const node = document.createElementNS(svgNs, tag2);
         for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
         svg.append(node);
       };

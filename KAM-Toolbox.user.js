@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.523
+// @version      1.33.534
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -1070,9 +1070,10 @@
   var REVISION_PARALLEL = 20;
   function createMatchProvider({ request }) {
     const candidateMatches = /* @__PURE__ */ new Map();
-    const sentAtByMatch = /* @__PURE__ */ new Map();
-    function loadMatchSentAt(matchId) {
-      const cached = sentAtByMatch.get(matchId);
+    const revisionsByMatch = /* @__PURE__ */ new Map();
+    const revisionsByCandidate = /* @__PURE__ */ new Map();
+    function loadMatchRevisions(matchId) {
+      const cached = revisionsByMatch.get(matchId);
       if (cached && cached.expiresAt > Date.now()) return cached.promise;
       const promise = request(MATCH_REVISIONS_QUERY, {
         filter: { resource: "Match", recordId: matchId },
@@ -1080,9 +1081,23 @@
         perPage: 100,
         sortField: "date",
         sortOrder: "ASC"
-      }).then((result) => sentAtFromRevisions(result?.items));
-      sentAtByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
-      promise.catch(() => sentAtByMatch.delete(matchId));
+      }).then((result) => result?.items || []);
+      revisionsByMatch.set(matchId, { promise, expiresAt: Date.now() + SENT_AT_TTL_MS });
+      promise.catch(() => revisionsByMatch.delete(matchId));
+      return promise;
+    }
+    function loadCandidateRevisions(candidateId) {
+      const cached = revisionsByCandidate.get(candidateId);
+      if (cached && cached.expiresAt > Date.now()) return cached.promise;
+      const promise = request(MATCH_REVISIONS_QUERY, {
+        filter: { resource: "Candidate", recordId: candidateId },
+        page: 0,
+        perPage: 100,
+        sortField: "date",
+        sortOrder: "DESC"
+      }).then((result) => result?.items || []);
+      revisionsByCandidate.set(candidateId, { promise, expiresAt: Date.now() + CANDIDATE_MATCHES_TTL_MS });
+      promise.catch(() => revisionsByCandidate.delete(candidateId));
       return promise;
     }
     async function loadEmployerIdsForJobPositions(jobPositionIds) {
@@ -1165,23 +1180,31 @@
         const employerIds = new Set(matches.filter((item) => item.employerId && isSentOnlineMatchStatus(item.onlineMatchStatus)).map((item) => item.employerId));
         return { employerIds, employerIdByJobPositionId, sentAtByEmployerId: /* @__PURE__ */ new Map() };
       },
+      loadCandidateRevisions,
       // Wirklich gesendete Matches samt Zeitpunkt: auch solche, deren Status
       // sich nach dem Senden geaendert hat. Dafuer die Versionshistorie je
       // Match, aber nur fuer die Arbeitgeber in `employerIds` (die sichtbaren
       // Zeilen), nicht fuer alle Matches des Kandidaten. Ohne `employerIds`
-      // fuer alle.
+      // fuer alle. `matches` sind diese Matches mit ihrer Versionshistorie
+      // (`revisions`, leer wenn nicht ladbar) fuer die Doppelmatch-Wartezeit.
       async loadSentMatchEmployers(candidateId, { employerIds: onlyEmployerIds } = {}) {
         const { matches, employerIdByJobPositionId } = await loadCandidateMatches(candidateId);
         const only = onlyEmployerIds ? new Set(onlyEmployerIds) : null;
         const relevant = matches.filter((item) => item.employerId && (!only || only.has(item.employerId)));
         const sentAtByMatchId = /* @__PURE__ */ new Map();
+        const withRevisions = [];
         for (let index = 0; index < relevant.length; index += REVISION_PARALLEL) {
           const batch = relevant.slice(index, index + REVISION_PARALLEL);
-          const results = await Promise.allSettled(batch.map((item) => loadMatchSentAt(item.id)));
+          const results = await Promise.allSettled(batch.map((item) => loadMatchRevisions(item.id)));
           batch.forEach((item, batchIndex) => {
             const result = results[batchIndex];
-            if (result.status === "fulfilled") sentAtByMatchId.set(item.id, result.value);
-            else console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+            if (result.status === "fulfilled") {
+              sentAtByMatchId.set(item.id, sentAtFromRevisions(result.value));
+              withRevisions.push({ ...item, revisions: result.value });
+            } else {
+              console.warn(`[Werkia GraphQL] Sendezeit fuer Match ${item.id} konnte nicht geladen werden:`, result.reason);
+              withRevisions.push({ ...item, revisions: [] });
+            }
           });
         }
         const employerIds = /* @__PURE__ */ new Set();
@@ -1196,7 +1219,7 @@
             sentAtByEmployerId.set(item.employerId, sentAt);
           }
         }
-        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId };
+        return { employerIds, employerIdByJobPositionId, sentAtByEmployerId, matches: withRevisions };
       }
     };
   }

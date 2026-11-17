@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.34.554
+// @version      1.34.559
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -3680,7 +3680,7 @@
       salaryExpectation
       yearsOfExperience
       noGoEmployers { id __typename }
-      jobTitles { education jobTitle { id title __typename } __typename }
+      jobTitles { id education jobTitle { id title __typename } __typename }
       __typename
     }
     jobPosition {
@@ -14920,7 +14920,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   items: allCandidates(filter: $filter, page: $page, perPage: $perPage) {
     id
     germanSpeakingLevel
-    jobTitles { education jobTitle { id title } }
+    jobTitles { id education jobTitle { id title } }
   }
 }`;
   var CBRE_CANDIDATE_QUERY = `query CbreCandidate($id: UUID!) {

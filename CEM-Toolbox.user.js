@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.34.534
+// @version      1.34.559
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -4589,7 +4589,7 @@
       salaryExpectation
       yearsOfExperience
       noGoEmployers { id __typename }
-      jobTitles { education jobTitle { id title __typename } __typename }
+      jobTitles { id education jobTitle { id title __typename } __typename }
       __typename
     }
     jobPosition {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.33.534
+// @version      1.34.554
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -7635,7 +7635,7 @@ ${add}` : add;
       summary: "Bei einer geöffneten Bewerbungsmail erscheint in Outlook unten rechts ein runder „KAM“-Knopf. Er klappt eine Karte mit Kandidat, Arbeitgeber und „Match outen“ auf. Damit setzt du den passenden Match auf KAM Status „Out“, ohne das Adminpanel zu öffnen.",
       steps: [
         "Die Bewerbungsmail oder eine Antwort darauf öffnen. Der Button erscheint, wenn „Bewerbung“ im Betreff steht oder unsere Bewerbungsmail mit Kurzprofil im Text zitiert ist.",
-        "Den „KAM“-Knopf und dann „Match outen“ klicken. Die Toolbox sucht Arbeitgeber und Match. Gibt es mehrere Treffer, wählst du den richtigen aus. „im AP prüfen“ öffnet ihn zur Kontrolle.",
+        "Den „KAM“-Knopf und dann „Match outen“ klicken. Die Toolbox sucht Arbeitgeber und Match. Gibt es mehrere Treffer, wählst du den richtigen aus. „im AP prüfen“ öffnet ihn zur Kontrolle. Hat der Mail-Assistent zur Mail schon Out vorgeschlagen, geht es mit seinem Match direkt zum Grund, der Grund ist vorbelegt.",
         "Den Grund wählen. Darunter steht die Antwort des Arbeitgebers ohne den zitierten Verlauf: Sie geht als Matchkommentar mit, damit das CEM den Grund nachlesen kann. Text ändern oder Haken entfernen geht vorher.",
         "Die Rückfrage bestätigen."
       ],
@@ -14788,6 +14788,22 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     });
   }
 
+  // src/features/outlook-assistent/aktuell.js
+  var aktuell = { betreff: "", vorschlag: null };
+  var norm = (value) => String(value || "").replace(/^\s*((?:aw|wg|re|fw|fwd|antw)\s*:\s*)+/i, "").replace(/\s+/g, " ").trim().toLowerCase();
+  function setAktuellerVorschlag(betreff, vorschlag) {
+    aktuell = { betreff: norm(betreff), vorschlag: vorschlag || null };
+  }
+  function outVorschlagFuer(subjects) {
+    if (!aktuell.vorschlag || !aktuell.betreff) return null;
+    if (!(subjects || []).some((subject) => norm(subject) === aktuell.betreff)) return null;
+    const outs = (aktuell.vorschlag.matches || []).filter((entry2) => entry2.kam_status === "out" && entry2.matchId);
+    if (outs.length !== 1) return null;
+    const [entry] = outs;
+    if ((entry.kamStatusAktuell ?? entry.kamStatusBisher) === "out") return null;
+    return { matchId: entry.matchId, employerId: entry.employerId || "", outGrund: entry.out_grund || "", kandidat: entry.kandidat || "" };
+  }
+
   // src/features/kam-suite/cbre-softgarden.js
   var CBRE_RECIPIENT = "proposal@cbre-industries.softgarden.io";
   var CBRE_BCC = "matchmail-backup@werkia.de";
@@ -15189,6 +15205,12 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       sort: "kamStatus"
     });
     return `${ADMIN_PANEL_BASE_URL}/#/KAM/MyMatches?${params.toString()}`;
+  }
+  function eindeutigerArbeitgeber(employers, employerName, assistentEmployerId = "") {
+    const vomAssistenten = assistentEmployerId ? (employers || []).find((employer) => employer.id === assistentEmployerId) : null;
+    if (vomAssistenten) return vomAssistenten;
+    const exakt = (employers || []).filter((employer) => normalise(employer.name) === normalise(employerName));
+    return exakt.length === 1 ? exakt[0] : null;
   }
   function rankEmployers(employers, term) {
     const wanted = normalise(term);
@@ -15739,6 +15761,12 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       state.matches = matches;
       const wantedName = state.parsed.source === "manual" ? state.parsed.candidateName : state.profile?.candidateName || state.parsed.candidateName;
       state.wantedName = wantedName;
+      const vomAssistenten = state.assistent?.matchId ? matches.find((match) => match.id === state.assistent.matchId) : null;
+      if (vomAssistenten) {
+        state.matchId = vomAssistenten.id;
+        renderMatchStep(dialog, state, vomAssistenten);
+        return;
+      }
       const { matches: byName, strong: strongName } = rankMatchesByName(matches, wantedName);
       if (byName.length === 1 && strongName) {
         state.matchId = byName[0].id;
@@ -15910,8 +15938,10 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       const commentBox = document.createElement("div");
       styled2(commentBox, { display: "grid", gap: "5px" });
       commentBox.append(commentToggleLabel, commentText);
+      const vorschlagGrund = state.assistent?.matchId === match.id && OUT_FEEDBACK_OPTIONS.some((option) => option.value === state.assistent.outGrund) ? state.assistent.outGrund : "";
+      if (vorschlagGrund) select.value = vorschlagGrund;
       const statusEl = document.createElement("div");
-      statusEl.textContent = "Bitte einen Grund auswählen.";
+      statusEl.textContent = vorschlagGrund ? "Grund vom Mail-Assistenten vorgeschlagen, bitte prüfen." : "Bitte einen Grund auswählen.";
       const setStatus = (text, tone = "") => {
         statusEl.textContent = text;
         const color = tone === "ok" ? "#18752b" : tone === "error" ? "#b3261e" : tone === "busy" ? "#995000" : "#222";
@@ -16389,8 +16419,9 @@ ${buildCbreBody(current)}`;
           ]);
           return;
         }
-        if (employers.length === 1 && normalise(employers[0].name) === normalise(employerName)) {
-          state.employer = employers[0];
+        const eindeutig = eindeutigerArbeitgeber(employers, employerName, state.assistent?.employerId);
+        if (eindeutig) {
+          state.employer = eindeutig;
           return loadMatches2(dialog, state);
         }
         renderEmployerPicker(dialog, state, employers);
@@ -16403,7 +16434,7 @@ ${buildCbreBody(current)}`;
       styleDialogFrame(dialog);
       document.body.appendChild(dialog);
       const resolved = resolveApplicationSubject(context);
-      const state = { mode, mailBodyText: context.bodyText, parsed: resolved?.parsed || null, profile: parseProfileFromMailBody(context.bodyText), employer: null, matchId: null, matches: [] };
+      const state = { mode, mailBodyText: context.bodyText, parsed: resolved?.parsed || null, profile: parseProfileFromMailBody(context.bodyText), employer: null, matchId: null, matches: [], assistent: outVorschlagFuer(context.subjects) };
       dialog.addEventListener("cancel", (event) => {
         if (dialog.dataset.busy === "true") event.preventDefault();
       });
@@ -17478,6 +17509,7 @@ ${buildCbreBody(current)}`;
       const owaId = owaIdFromUrl(location.href);
       if (!betreff && !owaId) {
         current = { key: "", result: null };
+        setAktuellerVorschlag("", null);
         removePill();
         closePanel();
         return;
@@ -17486,6 +17518,7 @@ ${buildCbreBody(current)}`;
       const key = `${owaId}#${betreff}`;
       if (key === current.key) return;
       current = { key, result: null };
+      setAktuellerVorschlag("", null);
       if (disabled) return;
       if (!cache.has(key)) {
         cache.set(key, client.holen({ owaId, betreff, absender: "" }).catch((error) => {
@@ -17501,6 +17534,7 @@ ${buildCbreBody(current)}`;
       const result = await cache.get(key);
       if (current.key !== key) return;
       current.result = result;
+      setAktuellerVorschlag(betreff, result?.vorschlag);
       renderPill(result);
       autoOpen(result, key);
     }

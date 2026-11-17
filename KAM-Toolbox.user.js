@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.34.559
+// @version      1.35.574
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -181,21 +181,21 @@
         no_school_certificate: "Kein Schulabschluss"
       });
       var NO_REASON2 = "ohne Grund";
-      function clean8(value) {
+      function clean10(value) {
         return String(value ?? "").replace(/\s+/g, " ").trim();
       }
       function feedbackLabel2(value) {
-        const text = clean8(value);
+        const text = clean10(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(FEEDBACK_LABELS2, text) ? FEEDBACK_LABELS2[text] : text;
       }
       function declineLabel2(value) {
-        const text = clean8(value);
+        const text = clean10(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
       }
       function omFeedbackLabel2(value) {
-        const text = clean8(value);
+        const text = clean10(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(OM_FEEDBACK_LABELS2, text) ? OM_FEEDBACK_LABELS2[text] : text;
       }
@@ -567,7 +567,7 @@
     const symbol = Symbol();
     const timerId = generateUniqueNumber3(scheduledIntervalsState2);
     scheduledIntervalsState2.set(timerId, symbol);
-    const schedule = () => set(delay, timerId).then(() => {
+    const schedule2 = () => set(delay, timerId).then(() => {
       const state = scheduledIntervalsState2.get(timerId);
       if (state === void 0) {
         throw new Error("The timer is in an undefined state.");
@@ -575,11 +575,11 @@
       if (state === symbol) {
         func(...args);
         if (scheduledIntervalsState2.get(timerId) === symbol) {
-          schedule();
+          schedule2();
         }
       }
     });
-    schedule();
+    schedule2();
     return timerId;
   };
 
@@ -1788,7 +1788,7 @@
     let current = null;
     let showTimer = null;
     let hideTimer = null;
-    let timers2 = { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (handle) => window.clearTimeout(handle) };
+    let timers2 = { setTimeout: (fn, ms2) => window.setTimeout(fn, ms2), clearTimeout: (handle) => window.clearTimeout(handle) };
     const findTopic = (topicId) => {
       const topic = topicsById.get(topicId);
       if (!topic) console.warn(`[${toolboxName} Hilfe] Unbekanntes Hilfethema: ${topicId}`);
@@ -2078,7 +2078,7 @@
     }
     function install(runtime, { dock = true, menu = true, dockHostPattern } = {}) {
       if (dockHostPattern) dockHosts = dockHostPattern;
-      timers2 = { setTimeout: (fn, ms) => runtime.setTimeout(fn, ms), clearTimeout: (handle) => runtime.clearTimeout(handle) };
+      timers2 = { setTimeout: (fn, ms2) => runtime.setTimeout(fn, ms2), clearTimeout: (handle) => runtime.clearTimeout(handle) };
       ensureExtraStyles();
       const swallow = (event) => {
         const target = event.target;
@@ -2380,6 +2380,7 @@
       notes: [
         "Grün: Nichts spricht dagegen. Gelb: Mindestens ein Punkt ist unklar, bitte selbst prüfen. Rot: Mindestens eine Anforderung ist nicht erfüllt.",
         "Verglichen werden Montagebereitschaft, Sprachkenntnisse, Berufserfahrung, Anerkennung, Führerschein, Gehalt und Position. Die betroffenen Felder im Fragebogen werden mit derselben Farbe markiert, die Gründe stehen im Banner.",
+        "Der Score in der Liste rechnet das Adminpanel selbst aus, nach eigenen Regeln. Ein hoher Score und ein rotes Banner schließen sich deshalb nicht aus; der Grund steht immer im Banner.",
         "Das Banner ist nur eine Empfehlung. Es sendet nichts und ändert keinen Status."
       ]
     };
@@ -3378,7 +3379,7 @@
       placePanel(state.panel, dialog);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -3391,11 +3392,11 @@
       if (!button3) return;
       const row2 = button3.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("resize", schedule);
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("resize", schedule2);
+    schedule2();
   }
 
   // ../../shared/js/match-dialog-top/index.js
@@ -3466,7 +3467,7 @@
       return ok;
     }
   }
-  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms) => setTimeout(fn, ms) } = {}) {
+  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms2) => setTimeout(fn, ms2) } = {}) {
     ensureMatchDialogTopStyle(doc);
     const root = element3(doc, "section", "werkia-mdt-ap");
     const head = element3(doc, "div", "werkia-mdt-head");
@@ -3621,7 +3622,7 @@
           provider = null;
         }
         if (!provider) return;
-        const block = createContactPersonBlock({ document, helpTip: helpTip(), later: (fn, ms) => runtime.setTimeout(fn, ms) });
+        const block = createContactPersonBlock({ document, helpTip: helpTip(), later: (fn, ms2) => runtime.setTimeout(fn, ms2) });
         block.element.setAttribute(BLOCK_ATTRIBUTE, owner);
         const current = { block, dialog, provider, matchId: target.matchId };
         state = current;
@@ -3642,7 +3643,7 @@
       if (state.block.element.parentElement !== slot) slot.appendChild(state.block.element);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -3655,10 +3656,10 @@
       if (!button3) return;
       const row2 = button3.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    schedule2();
   }
 
   // ../../shared/js/werkia-graphql/questionnaire-provider.js
@@ -4462,7 +4463,7 @@
       if (native.column.nextElementSibling !== current.column.element) native.column.after(current.column.element);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -4474,10 +4475,10 @@
       const button3 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR);
       if (!button3) return;
       clickedMatchId = matchIdFromRow(button3.closest("tr"));
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    schedule2();
   }
 
   // ../../shared/js/match-mention/core.js
@@ -5184,8 +5185,8 @@
       return dialogs[dialogs.length - 1] || null;
     }
     const timers2 = /* @__PURE__ */ new Set();
-    function later(ms, matchId) {
-      const key = `${matchId}:${ms}`;
+    function later(ms2, matchId) {
+      const key = `${matchId}:${ms2}`;
       if (timers2.has(key)) return;
       timers2.add(key);
       runtime.setTimeout(() => {
@@ -5193,7 +5194,7 @@
         const entry = cache.get(matchId);
         if (entry) entry.at = 0;
         scheduleSync();
-      }, ms);
+      }, ms2);
     }
     function sync() {
       const dialog = findDialog();
@@ -5204,7 +5205,7 @@
       const entry = cache.get(matchId);
       if (entry && entry.at && boxes > entry.boxes) {
         entry.boxes = boxes;
-        for (const ms of AFTER_NEW_MS) later(ms, matchId);
+        for (const ms2 of AFTER_NEW_MS) later(ms2, matchId);
       }
       const stale = !entry || !entry.at || now() - entry.at > CACHE_MS5;
       const blocked = failedAt && now() - failedAt < ERROR_RETRY_MS;
@@ -5333,9 +5334,9 @@
     const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
     if (!parsed || typeof parsed !== "object") return emptyStore();
     const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean8 = {};
+    const clean10 = {};
     Object.keys(routes).forEach((route) => {
-      clean8[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+      clean10[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
         id: String(preset.id || createPresetId()),
         name: String(preset.name),
         filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
@@ -5344,7 +5345,7 @@
         perPage: Number.parseInt(preset.perPage, 10) || 0
       }));
     });
-    return { version: STORE_VERSION, routes: clean8 };
+    return { version: STORE_VERSION, routes: clean10 };
   }
   function presetsForRoute(store, route) {
     return store?.routes?.[route] ? [...store.routes[route]] : [];
@@ -6115,7 +6116,7 @@
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -6123,14 +6124,14 @@
         placeButton();
       }, 200);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
     runtime.addCleanup?.(() => {
       owned(IDS2.button)?.remove();
       owned(IDS2.bar)?.remove();
       closeDialog();
     });
-    schedule();
+    schedule2();
   }
 
   // ../../shared/js/werkia-graphql/webhook-headers.js
@@ -6934,6 +6935,244 @@ ${add}` : add;
     onHashChange();
   }
 
+  // ../../shared/js/vtv-hot-warnung/core.js
+  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var HOT_HOT_KAM_STATUS = "hot_hot_case";
+  var VTV_STATUSES = ["confirmed", "conducted"];
+  var VTV_LABEL_RE = /^(bestätigt|stattgefunden)$/i;
+  var OTHER_LABEL_RE = /^(vorschlag|weitergeleitet|kandidat|arbeitgeber|nicht )/i;
+  var HOT_JOB_POSITIONS_QUERY = `query allJobPositions($filter: JobPositionFilter, $page: Int, $perPage: Int) {
+  items: allJobPositions(filter: $filter, page: $page, perPage: $perPage) {
+    id
+    mainTitle
+    employer {
+      id
+      name
+      __typename
+    }
+    __typename
+  }
+}`;
+  function idFrom2(hash, kind) {
+    const id = String(hash || "").match(new RegExp(`^#\\/${kind}\\/([^/?#]+)`, "i"))?.[1] || "";
+    return UUID_RE3.test(id) ? id.toLowerCase() : "";
+  }
+  function matchIdFromHash(hash) {
+    return idFrom2(hash, "Match") || idFrom2(hash, "Chat");
+  }
+  function candidateIdFromHash(hash) {
+    return idFrom2(hash, "Candidate");
+  }
+  function dialogStatus(dialog) {
+    if (!dialog?.querySelector) return { known: false, vtv: false };
+    const raw = String(dialog.querySelector('input[name="status"]')?.value || "").trim();
+    if (raw) return { known: true, vtv: VTV_STATUSES.includes(raw), value: raw };
+    const label = [...dialog.querySelectorAll("label")].find((element6) => (element6.textContent || "").replace(/\*/g, "").trim() === "Status");
+    const select = label?.closest(".MuiFormControl-root")?.querySelector(".MuiSelect-select") || dialog.querySelector(".MuiSelect-select");
+    const text = String(select?.textContent || "").trim();
+    if (VTV_LABEL_RE.test(text)) return { known: true, vtv: true, value: text };
+    if (OTHER_LABEL_RE.test(text)) return { known: true, vtv: false, value: text };
+    return { known: false, vtv: false, value: text };
+  }
+  function shouldWarn(status) {
+    return !status?.known || Boolean(status.vtv);
+  }
+  function hotHotOthers(matches, currentMatchId) {
+    const current = String(currentMatchId || "").toLowerCase();
+    return (matches || []).filter((match) => match?.id && match.kamStatus === HOT_HOT_KAM_STATUS && String(match.id).toLowerCase() !== current);
+  }
+  function matchLabel(match, jobPositions) {
+    const job = jobPositions?.get?.(match.jobPositionId) || null;
+    const employer = String(job?.employer?.name || "").trim();
+    const title = String(job?.mainTitle || "").trim();
+    return [employer, title].filter(Boolean).join(" · ") || "Match ohne Vakanzdaten";
+  }
+  function warningTitle(count) {
+    return count > 1 ? `Achtung: Kandidat ist in ${count} anderen Matches Hot Hot Case` : "Achtung: Kandidat ist in einem anderen Match Hot Hot Case";
+  }
+  async function fetchJobPositions(request, jobPositionIds) {
+    const ids = [...new Set((jobPositionIds || []).filter(Boolean))];
+    const index = /* @__PURE__ */ new Map();
+    if (!ids.length) return index;
+    const result = await request(HOT_JOB_POSITIONS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
+    for (const item of result?.items || []) {
+      if (item?.id) index.set(item.id, item);
+    }
+    return index;
+  }
+
+  // ../../shared/js/vtv-hot-warnung/index.js
+  var OWNER_KEY2 = "werkiaVtvHotWarnungOwner";
+  var BOX_CLASS2 = "werkia-vtv-hot-warnung";
+  var STYLE_ID7 = "werkia-vtv-hot-warnung-style";
+  var ROW_SELECTOR2 = "tr, .MuiTableRow-root";
+  var CLICK_MAX_AGE_MS2 = 10 * 60 * 1e3;
+  var T2 = {
+    ink: "#09090b",
+    ink2: "#52525b",
+    surface: "#ffffff",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec"
+  };
+  var FONT7 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  function executeVtvHotWarnung(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    let clicked = { matchId: "", at: 0 };
+    let guard = null;
+    function ensureStyle8() {
+      if (document.getElementById(STYLE_ID7)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID7;
+      const b = `.${BOX_CLASS2}`;
+      style.textContent = `
+      ${b} { box-sizing:border-box; margin:0 0 12px; padding:10px 12px; border:1px solid ${T2.bad}; border-left-width:6px; border-radius:8px; background:${T2.badSoft}; color:${T2.ink}; font:400 13px/1.45 ${FONT7}; }
+      ${b} .wvhw-title { font-weight:700; color:${T2.badInk}; }
+      ${b} .wvhw-text { margin-top:4px; color:${T2.ink2}; }
+      ${b} ul { margin:6px 0 0; padding-left:18px; }
+      ${b} li { overflow-wrap:anywhere; }
+      ${b} a { color:${T2.badInk}; font-weight:600; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el7(tag, props = {}, children = []) {
+      const element6 = document.createElement(tag);
+      Object.assign(element6, props);
+      element6.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element6;
+    }
+    function currentTarget() {
+      const hash = location.hash || "";
+      const matchId = clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS2 && clicked.matchId ? clicked.matchId : matchIdFromHash(hash);
+      return { matchId, candidateId: matchId ? "" : candidateIdFromHash(hash) };
+    }
+    async function start(current) {
+      try {
+        const adapter2 = getGraphqlAdapter();
+        const provider = adapter2.matchProvider;
+        const { matchId } = current.target;
+        const candidateId = matchId ? (await provider.loadMatch(matchId))?.candidateId : current.target.candidateId;
+        if (guard !== current) return;
+        if (!candidateId) {
+          current.state = "ok";
+          render(current);
+          return;
+        }
+        const { matches } = await provider.loadCandidateMatches(candidateId);
+        if (guard !== current) return;
+        const others = hotHotOthers(matches, matchId);
+        if (!others.length) {
+          current.state = "ok";
+          render(current);
+          return;
+        }
+        let jobs = /* @__PURE__ */ new Map();
+        try {
+          jobs = await fetchJobPositions(adapter2.request, others.map((match) => match.jobPositionId));
+        } catch (error) {
+          console.warn("[VTV Hot Hot] Vakanzen nicht geladen:", error?.message || error);
+        }
+        if (guard !== current) return;
+        current.hits = others.map((match) => ({ id: match.id, label: matchLabel(match, jobs) }));
+        current.state = "hot";
+      } catch (error) {
+        if (guard !== current) return;
+        console.warn("[VTV Hot Hot] Matches des Kandidaten nicht geladen:", error?.message || error);
+        current.state = "error";
+      }
+      render(current);
+    }
+    function render(current) {
+      const box = current.element;
+      const visible = current.state === "hot" && shouldWarn(dialogStatus(current.dialog));
+      box.hidden = !visible;
+      if (!visible || box.dataset.rendered === "hot") return;
+      box.dataset.rendered = "hot";
+      box.replaceChildren(
+        el7("div", { className: "wvhw-title", textContent: warningTitle(current.hits.length) }),
+        el7("div", { className: "wvhw-text", textContent: "Bitte vor dem VTV prüfen, ob dieser Termin noch sinnvoll ist (KAM-Status Hot Hot Case):" }),
+        el7("ul", {}, current.hits.map((hit) => el7("li", {}, [
+          el7("a", { href: `/#/Match/${hit.id}/show`, target: "_blank", rel: "noopener", textContent: hit.label })
+        ])))
+      );
+    }
+    function place(current) {
+      const content = current.dialog.querySelector(".MuiDialogContent-root") || current.dialog;
+      if (!content.contains(current.element)) content.prepend(current.element);
+    }
+    function teardown() {
+      if (!guard) return;
+      guard.element.remove();
+      if (guard.dialog.dataset[OWNER_KEY2] === sourcePath) delete guard.dialog.dataset[OWNER_KEY2];
+      guard = null;
+    }
+    function sync() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (guard) {
+          teardown();
+          clicked = { matchId: "", at: 0 };
+        }
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY2];
+      if (claimedBy && claimedBy !== sourcePath) return;
+      if (guard && guard.dialog !== dialog) teardown();
+      if (guard) {
+        place(guard);
+        render(guard);
+        return;
+      }
+      ensureStyle8();
+      dialog.dataset[OWNER_KEY2] = sourcePath;
+      const element6 = el7("div", { className: BOX_CLASS2, hidden: true });
+      element6.setAttribute("role", "alert");
+      guard = { dialog, element: element6, target: currentTarget(), state: "loading", hits: [] };
+      place(guard);
+      start(guard);
+    }
+    let scheduled = false;
+    function schedule2() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    }
+    runtime.addDocumentListener("click", (event) => {
+      if (guard) schedule2();
+      const row2 = event.target?.closest?.(ROW_SELECTOR2);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const { matchId } = targetFromRow(row2);
+      if (matchId) clicked = { matchId, at: now() };
+    }, true);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
+    runtime.addCleanup?.(teardown);
+    schedule2();
+  }
+  function vtvHotWarnungTopic({ page, routes }) {
+    return {
+      id: "vtv-hot-warnung",
+      title: "Warnung beim VTV: Hot Hot Case in einem anderen Match",
+      page,
+      routes,
+      kind: "view",
+      summary: "Trägst du im Termin-Dialog einen VTV ein (Status „Bestätigt“ oder „Stattgefunden“) und steht der Kandidat in einem anderen Match schon auf Hot Hot Case, steht oben im Dialog ein roter Hinweis mit Firma und Position dieses Matches.",
+      notes: [
+        "Nur ein Hinweis: Speichern geht wie immer.",
+        "Es zählt der KAM-Status der anderen Matches, nicht der CEM-Status.",
+        "Ein Klick auf Firma und Position öffnet das andere Match in einem neuen Tab.",
+        "Erkannt wird das Match über die Zeile, in der du den Dialog geöffnet hast, sonst über die Seite (Match oder Chat). Auf der Kandidatenseite ohne Match-Zeile zählen alle Hot-Hot-Matches des Kandidaten."
+      ]
+    };
+  }
+
   // ../../shared/js/out-gruende/core.js
   var import_labels = __toESM(require_labels(), 1);
   var {
@@ -6993,7 +7232,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/out-gruende/index.js
-  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var BATCH_SIZE2 = 25;
   var CACHE_TTL_MS = 5 * 60 * 1e3;
@@ -7022,7 +7261,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS2 = `werkia-${namespace}-out-grund`;
-    const STYLE_ID20 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID21 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -7030,9 +7269,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID20)) return;
+      if (document.getElementById(STYLE_ID21)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID20;
+      style.id = STYLE_ID21;
       style.textContent = `
       .${LINE_CLASS2} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS2}__label { font-weight: 600; color: #b42318; }
@@ -7041,7 +7280,7 @@ ${add}` : add;
       document.head.appendChild(style);
     }
     function rows(view) {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(view.cellSelector));
+      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(view.cellSelector));
     }
     function fresh(matchId) {
       const entry = cache.get(matchId);
@@ -7182,7 +7421,7 @@ ${add}` : add;
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -7195,13 +7434,772 @@ ${add}` : add;
         if (!changed) load2().catch((error) => console.warn("[Werkia Out-Gründe]", error));
       }, 150);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    runtime.addWindowListener("hashchange", schedule2);
     runtime.setInterval?.(() => {
       if (currentView()) load2({ force: true }).catch((error) => console.warn("[Werkia Out-Gründe]", error));
     }, CACHE_TTL_MS);
-    schedule();
+    schedule2();
     return { load: load2, render };
+  }
+
+  // ../../shared/js/comment-shortcuts/core.js
+  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
+  var GROUPS = [
+    { id: "haeufig", label: "Häufig" },
+    { id: "kontakt", label: "Kontakt" },
+    { id: "termine", label: "Termine" },
+    { id: "unterlagen", label: "Unterlagen" },
+    // Ohne Ziel: keine Knöpfe, nur Tooltip.
+    { id: "profil", label: "Personen und Profil" }
+  ];
+  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
+  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
+  var RAW = [
+    // Kontakt und Erreichbarkeit
+    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
+    ["kontakt", "te", "AP telefonisch erreicht", "AG"],
+    ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
+    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
+    ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
+    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
+    ["kontakt", "WA", "WhatsApp", "AG/M"],
+    ["kontakt", "VC", "Videocall", "AG/M"],
+    ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
+    ["kontakt", "RM", "Rückmeldung", "AG/M"],
+    ["kontakt", "FB", "Feedback", "M"],
+    ["kontakt", "JF", "Jour fixe", "AG"],
+    ["kontakt", "FYI", "zur Info", "AG/M", { varianten: ["FMI"] }],
+    ["kontakt", "Sek", "Sekretariat", "AG"],
+    // Termine und Prozess
+    ["termine", "VT", "Vorstellungstermin", "M"],
+    ["termine", "VTA", "VT-Anfrage (Anfrage Vorstellungstermin)", "M"],
+    ["termine", "VTV", "Vorstellungstermin vereinbart", "M", { unbestaetigt: true }],
+    ["termine", "VTS", "Vorstellungstermin stattgefunden", "M", { unbestaetigt: true, hinweis: "auch Mehrzahl von VT" }],
+    ["termine", "VG", "Vorstellungsgespräch", "M", { varianten: ["VSG"] }],
+    ["termine", "HT", "Hospitation/Probetag", "M", { unbestaetigt: true }],
+    ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
+    ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
+    ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
+    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
+    // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
+    ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
+    ["termine", "digi", "digitaler Termin", "M"],
+    ["termine", "HC", "Hot Case", "M"],
+    ["termine", "HHC", "Hot Hot Case", "M"],
+    ["termine", "out", "Absage", "M"],
+    ["termine", "on hold", "pausiert", "AG/M"],
+    ["termine", "ABS", "Absage", "M"],
+    ["termine", "WVL", "Wiedervorlage", "M"],
+    // Unterlagen und Vertrag
+    ["unterlagen", "UL", "Unterlagen", "M"],
+    ["unterlagen", "CV", "Lebenslauf", "M"],
+    ["unterlagen", "GB", "Gesellenbrief", "M"],
+    ["unterlagen", "AZ", "Arbeitszeugnis", "M"],
+    ["unterlagen", "PFB", "Personalfragebogen", "M"],
+    ["unterlagen", "AV", "Arbeitsvertrag", "M"],
+    ["unterlagen", "AVU", "Unterschrift Arbeitsvertrag", "M"],
+    ["unterlagen", "SD", "Startdatum", "M"],
+    ["unterlagen", "PZ", "Probezeit", "M"],
+    // Eindeutig: "KD-Dienst" (Kundendienst) bleibt unberührt, ein Bindestrich
+    // gilt beim Vorschlag als Teil des Wortes.
+    ["unterlagen", "KD", "Kontaktdaten", "AG/M", { hinweis: "nicht in „KD-Dienst“ (Kundendienst)" }],
+    // Personen und Profil: kein Ziel, keine Knöpfe, nur Tooltip.
+    ["profil", "AP", "Ansprechpartner", null],
+    ["profil", "BEW", "Bewerber", null],
+    ["profil", "AG", "Arbeitgeber", null],
+    ["profil", "GF", "Geschäftsführung", null],
+    ["profil", "FA", "Fachabteilung", null],
+    ["profil", "SV", "Stellvertreter des AP", null, { unbestaetigt: true }],
+    ["profil", "BE", "Berufserfahrung", null],
+    ["profil", "FS", "Führerschein", null],
+    ["profil", "RB", "Reisebereitschaft", null],
+    ["profil", "MB", "Montagebereitschaft", null, { unbestaetigt: true }],
+    ["profil", "TZ", "Teilzeit", null],
+    ["profil", "VZ", "Vollzeit", null],
+    ["profil", "FW", "Firmenwagen", null],
+    ["profil", "HO", "Homeoffice", null],
+    ["profil", "PV", "Photovoltaik", null, { unbestaetigt: true }],
+    ["profil", "WP", "Wärmepumpe", null, { unbestaetigt: true }],
+    ["profil", "SHK", "Sanitär-Heizung-Klima", null, { unbestaetigt: true }],
+    ["profil", "ZS", "Zählerschrank", null, { unbestaetigt: true }],
+    ["profil", "PL", "Projektleiter", null]
+  ];
+  var SHORTCUTS = Object.freeze(RAW.map(([gruppe, kuerzel, text, ziel, extra = {}]) => Object.freeze({
+    id: `${gruppe}:${kuerzel}`,
+    gruppe,
+    kuerzel,
+    text,
+    ziel,
+    label: extra.label || kuerzel,
+    einfuegen: extra.einfuegen || extra.label || kuerzel,
+    optionen: Object.freeze([...extra.optionen || []]),
+    varianten: Object.freeze([...extra.varianten || []]),
+    unbestaetigt: Boolean(extra.unbestaetigt),
+    hinweis: extra.hinweis || ""
+  })));
+  var PHRASE_RAW = [
+    ["AP tne, SA raus", TNE_OPTIONS],
+    ["Mail raus", MAIL_OPTIONS],
+    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
+    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
+    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
+    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
+    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
+  ];
+  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
+    id: `haeufig:${text}`,
+    gruppe: "haeufig",
+    kuerzel: text,
+    text,
+    ziel: TARGETS.M,
+    label: text,
+    einfuegen: text,
+    optionen: Object.freeze([...optionen]),
+    varianten: Object.freeze([]),
+    unbestaetigt: false,
+    hinweis: "",
+    satz: true
+  })));
+  function buttonGroups(shortcuts = SHORTCUTS, phrases = PHRASES) {
+    const items = [...phrases, ...shortcuts];
+    return GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.gruppe === group.id && item.ziel) })).filter((group) => group.items.length);
+  }
+  function buttonTitle2(item) {
+    const parts = [item.satz ? "In den Matchkommentar schreiben" : `${item.label}: ${item.text}`];
+    if (!item.satz && item.einfuegen !== item.label) parts.push(`schreibt „${item.einfuegen}“`);
+    if (item.hinweis) parts.push(item.hinweis);
+    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    if (item.optionen.length) parts.push("Rechtsklick: weitere Varianten");
+    return parts.join(" · ");
+  }
+  function menuOptions(item) {
+    return [.../* @__PURE__ */ new Set([item.einfuegen, ...item.optionen])];
+  }
+  function explainTitle(item, token = item.kuerzel) {
+    const parts = [`${token}: ${item.text}`];
+    if (item.hinweis) parts.push(item.hinweis);
+    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    return parts.join(" · ");
+  }
+  var WORD_CHAR = /[\p{L}\p{N}_-]/u;
+  function explainTokens(shortcuts = SHORTCUTS) {
+    const tokens = [];
+    for (const item of shortcuts) {
+      for (const token of /* @__PURE__ */ new Set([item.kuerzel, ...item.varianten])) tokens.push({ token, item });
+    }
+    return tokens.sort((a, b) => b.token.length - a.token.length);
+  }
+  var DEFAULT_TOKENS = explainTokens();
+  function shortcutAtOffset(text, offset, tokens = DEFAULT_TOKENS) {
+    const value = String(text || "");
+    const at = Number(offset);
+    if (!Number.isInteger(at) || at < 0 || at > value.length) return null;
+    for (const { token, item } of tokens) {
+      let start = value.lastIndexOf(token, at);
+      while (start >= 0 && start + token.length >= at) {
+        const end = start + token.length;
+        const prev = value.charAt(start - 1);
+        const next = value.charAt(end);
+        if (at < end && (!prev || !WORD_CHAR.test(prev)) && (!next || !WORD_CHAR.test(next))) return { item, token, start, end };
+        start = start > 0 ? value.lastIndexOf(token, start - 1) : -1;
+      }
+    }
+    return null;
+  }
+  function insertionText(before, text) {
+    const prev = String(before || "").slice(-1);
+    return `${prev && !/\s/.test(prev) ? " " : ""}${text}`;
+  }
+  var TEMPLATE_AREA = "vorlage";
+  var TEMPLATE_TITLE_MAX = 60;
+  var TEMPLATE_TEXT_MAX = 4e3;
+  function toTemplate(eintrag) {
+    const daten = eintrag?.daten || {};
+    return {
+      id: String(eintrag?.id || ""),
+      titel: String(daten.titel || "").trim(),
+      text: String(daten.text || ""),
+      eigen: eintrag?.eigen !== false
+    };
+  }
+  function sortTemplates(templates) {
+    return [...templates].sort((a, b) => a.titel.localeCompare(b.titel, "de", { sensitivity: "base" }));
+  }
+  function validateTemplate({ titel, text }) {
+    const title = String(titel || "").trim();
+    const body = String(text || "").trim();
+    if (!title) return "Bitte einen Titel eingeben.";
+    if (title.length > TEMPLATE_TITLE_MAX) return `Der Titel darf höchstens ${TEMPLATE_TITLE_MAX} Zeichen haben.`;
+    if (!body) return "Bitte einen Text eingeben.";
+    if (body.length > TEMPLATE_TEXT_MAX) return `Der Text darf höchstens ${TEMPLATE_TEXT_MAX} Zeichen haben.`;
+    return "";
+  }
+  function templateEntry({ id, titel, text }) {
+    return { ...id ? { id } : {}, daten: { titel: String(titel).trim(), text: String(text).replace(/\s+$/, "") } };
+  }
+
+  // ../../shared/js/admin-interface/features/comment-actions.js
+  var ms = (value) => {
+    const t = new Date(value ?? NaN).getTime();
+    return Number.isNaN(t) ? null : t;
+  };
+  function isCommentRead(comment, readAt) {
+    const r = ms(readAt);
+    const at = ms(comment?.updatedAt) ?? ms(comment?.createdAt);
+    return r !== null && at !== null && at < r;
+  }
+  function readToggleValue(comment, read) {
+    const at = ms(comment?.updatedAt) ?? ms(comment?.createdAt);
+    if (at === null) return null;
+    return new Date(read ? at + 1 : at - 1).toISOString();
+  }
+  function mentionIds(html) {
+    const out = [];
+    const re = /<a\b[^>]*>/gi;
+    let m;
+    while (m = re.exec(String(html || ""))) {
+      const tag = m[0];
+      if (!/data-type\s*=\s*["']mention["']/i.test(tag)) continue;
+      const id = /data-id\s*=\s*["']([^"']+)["']/i.exec(tag);
+      if (id && !out.includes(id[1])) out.push(id[1]);
+    }
+    return out;
+  }
+  function mentionsPerson(comment, personId) {
+    return Boolean(personId) && mentionIds(comment?.text).includes(String(personId));
+  }
+
+  // ../../shared/js/tags-dialog/core.js
+  var RA_PREFIX = "RaStore";
+  var STORE_ITEM = "UnreadMatchCommentMentionMatches.listParams";
+  var STORE_KEY = `${RA_PREFIX}.${STORE_ITEM}`;
+  var MIN_SEARCH_LENGTH = 3;
+  var SEARCH_PER_PAGE = 100;
+  var SEARCH_QUERY = `query WerkiaTagsSearch($q: CandidateFilter, $reverse: CandidateFilter, $phone: CandidateFilter, $withReverse: Boolean!, $withPhone: Boolean!, $perPage: Int) {
+  byName: allCandidates(filter: $q, page: 0, perPage: $perPage) { id }
+  byReverse: allCandidates(filter: $reverse, page: 0, perPage: $perPage) @include(if: $withReverse) { id }
+  byPhone: allCandidates(filter: $phone, page: 0, perPage: $perPage) @include(if: $withPhone) { id }
+}`;
+  var READ_STATE_QUERY = `query WerkiaTagsReadState($filter: MatchFilter, $perPage: Int) {
+  me: currentEmployee { id }
+  items: allMatches(filter: $filter, page: 0, perPage: $perPage) { id commentsReadAt matchComments { id text createdAt updatedAt } }
+}`;
+  var MARK_UNREAD_MUTATION = `mutation WerkiaTagsMarkUnread($id: UUID!, $commentsReadAt: DateTime!) {
+  data: toggleMatchCommentReadStatus(id: $id, commentsReadAt: $commentsReadAt) { id commentsReadAt }
+}`;
+  var clean3 = (text) => String(text ?? "").replace(/\s+/g, " ").trim();
+  function matchIdFromHref5(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function parse(raw) {
+    try {
+      const value = JSON.parse(raw);
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  function phoneNeedle(text) {
+    return String(text ?? "").replace(/[\s/()-]+/g, "").replace(/^(?:\+49|0049|0)/, "");
+  }
+  function searchVariables(text, perPage = SEARCH_PER_PAGE) {
+    const q = clean3(text);
+    if (q.length < MIN_SEARCH_LENGTH) return null;
+    const words = q.split(" ");
+    const withReverse = words.length >= 2 && !/\d/.test(q) && !q.includes("@");
+    const needle = phoneNeedle(q);
+    const withPhone = /\d/.test(q) && /^\+?[\d\s/()-]+$/.test(q) && needle.length >= MIN_SEARCH_LENGTH;
+    return {
+      q: { q },
+      reverse: { q: withReverse ? [...words.slice(1), words[0]].join(" ") : q },
+      phone: { phoneNumber: withPhone ? needle : q },
+      withReverse,
+      withPhone,
+      perPage
+    };
+  }
+  function candidateIdsFrom(data) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const row2 of [...data?.byPhone || [], ...data?.byName || [], ...data?.byReverse || []]) {
+      if (row2?.id) seen.add(String(row2.id));
+    }
+    return [...seen];
+  }
+  function withCandidateFilter(raw, candidateIds) {
+    const params = parse(raw) || {};
+    return JSON.stringify({ ...params, filter: { ...params.filter || {}, candidateIds: [...candidateIds] }, page: 1 });
+  }
+  function withoutCandidateFilter(raw) {
+    const params = parse(raw);
+    if (!params) return null;
+    const filter = { ...params.filter || {} };
+    delete filter.candidateIds;
+    const next = { ...params, filter, page: 1 };
+    const onlyOurs = Object.keys(filter).length === 0 && Object.keys(params).every((key) => key === "filter" || key === "page");
+    return onlyOurs ? null : JSON.stringify(next);
+  }
+  function hasCandidateFilter(raw) {
+    return Array.isArray(parse(raw)?.filter?.candidateIds);
+  }
+  function latestMention(match, personId) {
+    let best = null;
+    for (const comment of match?.matchComments || []) {
+      if (!mentionsPerson(comment, personId)) continue;
+      const at = comment.updatedAt || comment.createdAt || "";
+      if (!best || at > (best.updatedAt || best.createdAt || "")) best = comment;
+    }
+    return best;
+  }
+  function tagReadState(match, personId) {
+    const mention = latestMention(match, personId);
+    const readAt = match?.commentsReadAt || null;
+    if (!mention) return { state: "none", unreadAt: null, readAt };
+    const read = isCommentRead(mention, readAt);
+    return { state: read ? "read" : "unread", unreadAt: read ? readToggleValue(mention, false) : null, readAt };
+  }
+
+  // ../../shared/js/tags-dialog/index.js
+  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  function isTagsDialog(element6) {
+    const title = element6?.querySelector(".MuiDialogTitle-root, h2");
+    return clean4(title?.textContent) === "Tags";
+  }
+  function tagsDialogs(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog);
+  }
+  function tagRows(dialog) {
+    return [...dialog.querySelectorAll("tbody tr")].filter((row2) => {
+      if (row2.parentElement?.closest("td")) return false;
+      return Boolean(row2.querySelector(":scope > td.column-matchComments") && rowMatchId(row2));
+    });
+  }
+  var EXPAND_ID = /^Match-(.+)-expand$/;
+  function rowMatchId(row2) {
+    const href = matchIdFromHref5(row2.querySelector('a[href*="#/Match/"]')?.getAttribute("href"));
+    if (href) return href;
+    const next = row2.nextElementSibling;
+    const fromExpand = EXPAND_ID.exec(next?.id || "")?.[1];
+    if (fromExpand) return fromExpand;
+    const controls = row2.querySelector('[aria-controls^="Match-"]')?.getAttribute("aria-controls");
+    return EXPAND_ID.exec(controls || "")?.[1] || "";
+  }
+  function stopEvents(element6, types = ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+    types.forEach((type) => element6.addEventListener(type, (event) => event.stopPropagation()));
+  }
+  function schedule(runtime, fn, ms2) {
+    let scheduled = false;
+    return () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        fn();
+      }, ms2);
+    };
+  }
+  var FONT8 = 'font: 400 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;';
+  var UNREAD_STYLE_ID = "werkia-tags-unread-style";
+  var UNREAD_CLASS = "werkia-tags-unread";
+  function tagsUnreadTopic({ page, routes, id = "tags-unread" }) {
+    return {
+      id,
+      title: "Tags wieder auf ungelesen stellen",
+      page,
+      routes,
+      kind: "local",
+      summary: "In der Tags-Ansicht (Knopf „TAGS“) steht in jeder Zeile unter den Matchkommentaren, ob das Tag gelesen ist. Bei gelesenen Tags stellt „Als ungelesen markieren“ es mit einem Klick wieder auf ungelesen.",
+      steps: [
+        "„TAGS“ öffnen und den Schalter „Ungelesene Tags“ ausschalten, damit auch gelesene Tags in der Liste stehen.",
+        "In der Zeile auf „Als ungelesen markieren“ klicken. Danach steht dort „wieder ungelesen“ und das Tag zählt wieder bei „TAGS“.",
+        "Versehen? „Rückgängig“ stellt den vorigen Lesestand her."
+      ],
+      notes: [
+        "Ungelesen gilt ab dem Kommentar mit deinem Tag: Neuere Kommentare an diesem Match gelten dann auch wieder als ungelesen, wie beim kleinen Kreis am Kommentar im Kommentar-Dialog.",
+        "Wer die Matchkommentare öffnet, liest das Match wieder (wie bisher)."
+      ]
+    };
+  }
+  function executeTagsUnread(runtime, {
+    sourcePath,
+    getRequest: getRequest2,
+    helpTip
+  } = {}) {
+    runtime.registerSource?.(sourcePath);
+    const cache = /* @__PURE__ */ new Map();
+    let myId = "";
+    const pending = /* @__PURE__ */ new Set();
+    let loading = false;
+    let dialogSeen = false;
+    function injectStyle() {
+      if (document.getElementById(UNREAD_STYLE_ID)) return;
+      const style = document.createElement("style");
+      style.id = UNREAD_STYLE_ID;
+      style.textContent = `
+      .${UNREAD_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; ${FONT8} }
+      .${UNREAD_CLASS} [data-label] { color: #5a6178; white-space: nowrap; }
+      .${UNREAD_CLASS} [data-label][data-state="unread"] { color: #b3261e; font-weight: 600; }
+      .${UNREAD_CLASS} [data-label][data-state="done"] { color: #18752b; font-weight: 600; }
+      .${UNREAD_CLASS} [data-label][data-state="error"] { color: #b3261e; white-space: normal; }
+      .${UNREAD_CLASS} button { min-height: 24px; padding: 3px 8px; border: 1px solid #c8ccdd; border-radius: 12px; background: #fff; color: #1f2933; cursor: pointer; white-space: nowrap; ${FONT8} }
+      .${UNREAD_CLASS} button:hover { border-color: #1976d2; color: #1976d2; }
+      .${UNREAD_CLASS} button:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
+      .${UNREAD_CLASS} button:disabled { opacity: .6; cursor: wait; }
+      .${UNREAD_CLASS} button[data-act="undo"] { border-color: transparent; background: transparent; color: #3643c7; text-decoration: underline; padding: 3px 2px; }
+    `;
+      document.head.appendChild(style);
+    }
+    function wrapFor(row2) {
+      const cell = row2.querySelector(":scope > td.column-matchComments");
+      if (!cell) return null;
+      let wrap2 = cell.querySelector(`:scope > .${UNREAD_CLASS}`);
+      if (!wrap2) {
+        wrap2 = document.createElement("div");
+        wrap2.className = UNREAD_CLASS;
+        stopEvents(wrap2);
+        wrap2.addEventListener("click", onClick);
+        cell.appendChild(wrap2);
+      }
+      return wrap2;
+    }
+    function renderRow(row2) {
+      const matchId = rowMatchId(row2);
+      const wrap2 = wrapFor(row2);
+      if (!wrap2 || !matchId) return;
+      const entry = cache.get(matchId);
+      const key = entry ? [entry.state, entry.done ? 1 : 0, entry.busy ? 1 : 0, entry.error || "", entry.before ? 1 : 0].join("|") : "loading";
+      if (wrap2.dataset.matchId === matchId && wrap2.dataset.key === key) return;
+      wrap2.dataset.matchId = matchId;
+      wrap2.dataset.key = key;
+      wrap2.replaceChildren();
+      const label = document.createElement("span");
+      label.dataset.label = "";
+      const button3 = (act, text, title) => {
+        const el7 = document.createElement("button");
+        el7.type = "button";
+        el7.dataset.act = act;
+        el7.textContent = text;
+        if (title) el7.title = title;
+        el7.disabled = Boolean(entry?.busy);
+        return el7;
+      };
+      if (!entry) {
+        label.textContent = "Lesestand lädt …";
+        wrap2.append(label);
+        return;
+      }
+      if (entry.error) {
+        label.dataset.state = "error";
+        label.textContent = entry.error;
+        wrap2.append(label);
+        if (entry.state === "read") wrap2.append(button3("unread", "Erneut versuchen"));
+        return;
+      }
+      if (entry.done) {
+        label.dataset.state = "done";
+        label.textContent = "wieder ungelesen";
+        wrap2.append(label);
+        if (entry.before) wrap2.append(button3("undo", "Rückgängig", "Vorigen Lesestand wiederherstellen"));
+        return;
+      }
+      if (entry.state === "unread") {
+        label.dataset.state = "unread";
+        label.textContent = "ungelesen";
+        wrap2.append(label);
+        return;
+      }
+      if (entry.state === "read") {
+        label.textContent = "gelesen";
+        wrap2.append(label, button3("unread", entry.busy ? "Speichert …" : "Als ungelesen markieren", "Stellt dieses Tag wieder auf ungelesen"));
+        const tip = helpTip?.();
+        if (tip) wrap2.append(tip);
+        return;
+      }
+      label.textContent = "kein Tag für dich gefunden";
+      wrap2.append(label);
+    }
+    async function markUnread(matchId, undo = false) {
+      const entry = cache.get(matchId);
+      if (!entry || entry.busy) return;
+      const value = undo ? entry.before : entry.unreadAt;
+      if (!value) return;
+      entry.busy = true;
+      entry.error = "";
+      rerender();
+      try {
+        const data = await getRequest2()(MARK_UNREAD_MUTATION, { id: matchId, commentsReadAt: value });
+        if (data?.data?.id !== matchId) throw new Error("Das Adminpanel hat die Änderung nicht bestätigt");
+        if (undo) {
+          entry.done = false;
+          entry.state = "read";
+          entry.readAt = data.data.commentsReadAt || value;
+          entry.before = null;
+        } else {
+          entry.done = true;
+          entry.before = entry.readAt;
+          entry.readAt = data.data.commentsReadAt || value;
+        }
+      } catch (error) {
+        entry.error = `Nicht gespeichert: ${error?.message || error}`;
+      } finally {
+        entry.busy = false;
+        rerender();
+      }
+    }
+    function onClick(event) {
+      const button3 = event.target instanceof Element ? event.target.closest("button[data-act]") : null;
+      if (!button3) return;
+      event.preventDefault();
+      const matchId = button3.closest(`.${UNREAD_CLASS}`)?.dataset.matchId;
+      if (!matchId) return;
+      markUnread(matchId, button3.dataset.act === "undo");
+    }
+    async function load2() {
+      if (loading || !pending.size) return;
+      loading = true;
+      const ids = [...pending];
+      pending.clear();
+      try {
+        const data = await getRequest2()(READ_STATE_QUERY, { filter: { ids }, perPage: ids.length });
+        myId = String(data?.me?.id || myId || "");
+        if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden");
+        const byId2 = new Map((data?.items || []).map((match) => [String(match.id), match]));
+        ids.forEach((id) => {
+          const match = byId2.get(id);
+          cache.set(id, match ? { ...tagReadState(match, myId) } : { state: "none" });
+        });
+      } catch (error) {
+        ids.forEach((id) => cache.set(id, { state: "none", error: `Lesestand nicht geladen: ${error?.message || error}` }));
+      } finally {
+        loading = false;
+        rerender();
+        if (pending.size) load2();
+      }
+    }
+    function rerender() {
+      tagsDialogs().forEach((dialog) => tagRows(dialog).forEach(renderRow));
+    }
+    function scan() {
+      const dialogs = tagsDialogs();
+      if (!dialogs.length) {
+        if (dialogSeen) {
+          dialogSeen = false;
+          cache.clear();
+        }
+        return;
+      }
+      dialogSeen = true;
+      injectStyle();
+      dialogs.forEach((dialog) => tagRows(dialog).forEach((row2) => {
+        const matchId = rowMatchId(row2);
+        if (matchId && !cache.has(matchId)) pending.add(matchId);
+        renderRow(row2);
+      }));
+      load2();
+    }
+    const scheduleScan = schedule(runtime, scan, 200);
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleScan();
+  }
+  var SEARCH_STYLE_ID = "werkia-tags-search-style";
+  var SEARCH_CLASS = "werkia-tags-search";
+  function tagsSearchTopic({ page, routes, id = "tags-search" }) {
+    return {
+      id,
+      title: "Tags nach Bewerber suchen",
+      page,
+      routes,
+      kind: "view",
+      summary: "In der Tags-Ansicht (Knopf „TAGS“) steht neben „Ungelesene Tags“ ein Suchfeld. Name, E-Mail oder Telefonnummer des Bewerbers eingeben und Enter drücken: Die Liste zeigt nur noch die Tags dieser Bewerber.",
+      steps: [
+        "Mindestens 3 Zeichen eingeben, z. B. „Müller“, „max.mueller@…“ oder „0176 123…“, dann Enter oder „Suchen“.",
+        "Die Suche schaltet „Ungelesene Tags“ aus, damit auch gelesene Tags gefunden werden. Wer nur ungelesene sehen will, schaltet ihn wieder ein.",
+        "„×“ hebt die Suche auf. Beim Schließen der Tags-Ansicht ist sie ebenfalls weg."
+      ],
+      notes: [
+        "Gesucht wird wie im Filter „Kandidat“ der Liste: Vorname Nachname (auch umgedreht) oder E-Mail, Ziffern zusätzlich in der Telefonnummer.",
+        "Passen sehr viele Bewerber (z. B. nur „Ali“), zählen die ersten 100 je Suchart."
+      ]
+    };
+  }
+  function executeTagsSearch(runtime, {
+    sourcePath,
+    getRequest: getRequest2,
+    storage = () => window.localStorage,
+    pageWindow = () => typeof unsafeWindow === "undefined" ? window : unsafeWindow,
+    helpTip
+  } = {}) {
+    runtime.registerSource?.(sourcePath);
+    let active = null;
+    let status = { state: "", text: "" };
+    let busy = false;
+    let dialogSeen = false;
+    function store() {
+      try {
+        return storage();
+      } catch {
+        return null;
+      }
+    }
+    function writeStore(value) {
+      const ls = store();
+      if (!ls) return false;
+      const oldValue = ls.getItem(STORE_KEY);
+      if (value === null) ls.removeItem(STORE_KEY);
+      else ls.setItem(STORE_KEY, value);
+      try {
+        const win = pageWindow();
+        const Ctor = win.StorageEvent || StorageEvent;
+        win.dispatchEvent(new Ctor("storage", { key: `${RA_PREFIX}.${STORE_ITEM}`, oldValue, newValue: value, url: String(win.location?.href || "") }));
+      } catch {
+      }
+      return true;
+    }
+    function clearStore({ notify = true } = {}) {
+      const ls = store();
+      if (!ls || !hasCandidateFilter(ls.getItem(STORE_KEY))) return;
+      const next = withoutCandidateFilter(ls.getItem(STORE_KEY));
+      if (notify) writeStore(next);
+      else if (next === null) ls.removeItem(STORE_KEY);
+      else ls.setItem(STORE_KEY, next);
+    }
+    function injectStyle() {
+      if (document.getElementById(SEARCH_STYLE_ID)) return;
+      const style = document.createElement("style");
+      style.id = SEARCH_STYLE_ID;
+      style.textContent = `
+      .${SEARCH_CLASS} { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 4px 16px; vertical-align: middle; ${FONT8} }
+      .${SEARCH_CLASS} input { box-sizing: border-box; width: 300px; max-width: 100%; padding: 7px 10px; border: 1px solid #c4c4c4; border-radius: 4px; background: #fff; color: #1c1a22; font: 400 14px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${SEARCH_CLASS} input:hover { border-color: #1c1a22; }
+      .${SEARCH_CLASS} input:focus-visible { outline: 2px solid #1976d2; outline-offset: -1px; }
+      .${SEARCH_CLASS} button { min-height: 30px; padding: 4px 12px; border: 1px solid #1976d2; border-radius: 4px; background: #fff; color: #1976d2; cursor: pointer; font: 500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${SEARCH_CLASS} button:hover { background: #e3f0fc; }
+      .${SEARCH_CLASS} button:disabled { opacity: .6; cursor: wait; }
+      .${SEARCH_CLASS} [data-chip] { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 14px; background: #e3f0fc; color: #0d3c61; font-weight: 600; }
+      .${SEARCH_CLASS} [data-chip] button { min-height: 22px; padding: 0 7px; border: 0; border-radius: 11px; background: transparent; color: inherit; font-size: 15px; }
+      .${SEARCH_CLASS} [data-chip] button:hover { background: rgba(13,60,97,.12); }
+      .${SEARCH_CLASS} [data-status] { color: #5a6178; }
+      .${SEARCH_CLASS} [data-status][data-state="error"] { color: #b3261e; font-weight: 600; }
+    `;
+      document.head.appendChild(style);
+    }
+    function unreadSwitch(dialog) {
+      return [...dialog.querySelectorAll("label")].find((label) => clean4(label.textContent) === "Ungelesene Tags") || null;
+    }
+    function showAllTags(dialog) {
+      const input = unreadSwitch(dialog)?.querySelector('input[type="checkbox"]');
+      if (input?.checked) input.click();
+    }
+    function render(root) {
+      const input = root.querySelector("input");
+      const go = root.querySelector('button[data-act="search"]');
+      if (go) go.disabled = busy;
+      if (input) input.disabled = busy;
+      const chip = root.querySelector("[data-chip]");
+      if (active) {
+        chip.hidden = false;
+        chip.querySelector("[data-chip-text]").textContent = `Suche: ${active.text} · ${active.count} Bewerber`;
+      } else {
+        chip.hidden = true;
+      }
+      const line = root.querySelector("[data-status]");
+      line.dataset.state = status.state;
+      line.textContent = status.text;
+      line.hidden = !status.text;
+    }
+    function renderAll() {
+      document.querySelectorAll(`.${SEARCH_CLASS}`).forEach(render);
+    }
+    async function search(root) {
+      const dialog = root.closest('[role="dialog"]');
+      const text = clean4(root.querySelector("input")?.value);
+      const variables = searchVariables(text);
+      if (!variables) {
+        status = { state: "error", text: `Mindestens ${MIN_SEARCH_LENGTH} Zeichen eingeben.` };
+        renderAll();
+        return;
+      }
+      busy = true;
+      status = { state: "", text: "Sucht …" };
+      renderAll();
+      try {
+        const data = await getRequest2()(SEARCH_QUERY, variables);
+        const ids = candidateIdsFrom(data);
+        if (!ids.length) {
+          status = { state: "error", text: `Kein Bewerber zu „${text}“ gefunden.` };
+          return;
+        }
+        if (!writeStore(withCandidateFilter(store()?.getItem(STORE_KEY), ids))) throw new Error("Speicher des Browsers nicht erreichbar");
+        active = { text, count: ids.length };
+        status = { state: "", text: "" };
+        if (dialog) showAllTags(dialog);
+      } catch (error) {
+        status = { state: "error", text: `Suche fehlgeschlagen: ${error?.message || error}` };
+      } finally {
+        busy = false;
+        renderAll();
+      }
+    }
+    function reset() {
+      active = null;
+      status = { state: "", text: "" };
+      clearStore();
+      document.querySelectorAll(`.${SEARCH_CLASS} input`).forEach((input) => {
+        input.value = "";
+      });
+      renderAll();
+    }
+    function build() {
+      const root = document.createElement("span");
+      root.className = SEARCH_CLASS;
+      root.innerHTML = '<input type="search" aria-label="Tags nach Bewerber suchen" placeholder="Bewerber: Name, E-Mail oder Telefon" autocomplete="off"><button type="button" data-act="search">Suchen</button><span data-chip hidden><span data-chip-text></span><button type="button" data-act="reset" title="Suche aufheben" aria-label="Suche aufheben">×</button></span><span data-status hidden></span>';
+      stopEvents(root);
+      root.querySelector("input").addEventListener("keydown", (event) => {
+        if (event.key === "Escape") return;
+        event.stopPropagation();
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (!busy) search(root);
+        }
+      });
+      root.addEventListener("click", (event) => {
+        const button3 = event.target instanceof Element ? event.target.closest("button[data-act]") : null;
+        if (!button3) return;
+        event.preventDefault();
+        if (button3.dataset.act === "search" && !busy) search(root);
+        if (button3.dataset.act === "reset") reset();
+      });
+      const tip = helpTip?.();
+      if (tip) root.insertBefore(tip, root.querySelector("[data-chip]"));
+      return root;
+    }
+    function install(dialog) {
+      if (dialog.querySelector(`.${SEARCH_CLASS}`)) return;
+      const label = unreadSwitch(dialog);
+      if (!label) return;
+      const root = build();
+      label.insertAdjacentElement("afterend", root);
+      render(root);
+    }
+    function scan() {
+      const dialogs = tagsDialogs();
+      if (!dialogs.length) {
+        if (dialogSeen) {
+          dialogSeen = false;
+          active = null;
+          status = { state: "", text: "" };
+          clearStore({ notify: false });
+        }
+        return;
+      }
+      dialogSeen = true;
+      injectStyle();
+      dialogs.forEach(install);
+    }
+    if (!tagsDialogs().length) clearStore({ notify: false });
+    const scheduleScan = schedule(runtime, scan, 150);
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleScan();
   }
 
   // src/help.js
@@ -7245,6 +8243,7 @@ ${add}` : add;
     },
     appointmentPrioTopic({ team: "KAM", page: "Terminvorschlag-Dialog", routes: onMyMatches }),
     vtaNotizenTopic({ page: "Terminvorschlag-Dialog und Arbeitgeber", routes: [...onMyMatches, ROUTES.employer] }),
+    vtvHotWarnungTopic({ page: "Termin-Dialog", routes: onMyMatches }),
     {
       id: "match-slack-actions",
       title: "Dringend und Push an Slack",
@@ -7607,6 +8606,8 @@ ${add}` : add;
         "Nach dem Schließen der Tags-Ansicht lädt die Liste neu und zeigt das neue Datum."
       ]
     },
+    tagsUnreadTopic({ page: `${MY_MATCHES} › TAGS`, routes: onMyMatches }),
+    tagsSearchTopic({ page: `${MY_MATCHES} › TAGS`, routes: onMyMatches }),
     {
       id: "tags-hc",
       title: "Tags in Hot Cases und Hot Hot Cases",
@@ -8240,7 +9241,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/bulk-match-actions/index.js
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
@@ -8252,7 +9253,7 @@ ${add}` : add;
     const {
       team,
       isTargetPage: isTargetPage9,
-      getRequest,
+      getRequest: getRequest2,
       ids: IDS11,
       fields,
       columns,
@@ -8271,7 +9272,7 @@ ${add}` : add;
     const WVL_MUTATION = buildFollowUpMutation(fields.followUp);
     const COUNTERPART_QUERY = counterpartOut ? buildCounterpartOutQuery(counterpartOut.status, counterpartOut.feedback) : "";
     const COUNTERPART_OPTION = counterpartOut ? { value: COUNTERPART_OUT_VALUE, label: `Grund wie ${counterpartOut.team} (je Match)` } : null;
-    const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
+    const sleep2 = (ms2) => new Promise((resolve) => runtime.setTimeout(resolve, ms2));
     async function waitFor(find, timeoutMs = 3e3, intervalMs = 50) {
       const started = Date.now();
       while (Date.now() - started < timeoutMs) {
@@ -8303,12 +9304,12 @@ ${add}` : add;
       return row2.querySelector(MATCH_LINK_SELECTOR5) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
     }
     function activeScope() {
-      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR3)].some(isMatchRow));
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR4)].some(isMatchRow));
       return dialogs.at(-1) || null;
     }
     function getRows() {
       const scope = activeScope();
-      return [...(scope || document).querySelectorAll(ROW_SELECTOR3)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
+      return [...(scope || document).querySelectorAll(ROW_SELECTOR4)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
     }
     function shownOnPage(element6) {
       if (!element6.isConnected || element6.closest("[hidden]")) return false;
@@ -8515,7 +9516,7 @@ ${add}` : add;
       });
     }
     async function updateMatchStatus(matchId, targetStatus, feedback) {
-      const request = getRequest();
+      const request = getRequest2();
       const value = statusMutationValue(targetStatus.value);
       const mutation = feedback ? STATUS_WITH_FEEDBACK_MUTATION : STATUS_MUTATION;
       const variables = feedback ? { id: matchId, [fields.status]: value, [fields.feedback]: feedback } : { id: matchId, [fields.status]: value };
@@ -8526,7 +9527,7 @@ ${add}` : add;
       }
     }
     async function updateMatchFollowUpDate(matchId, isoDateOrNull) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(WVL_MUTATION, { id: matchId, [fields.followUp]: isoDateOrNull });
       const match = result?.data;
       if (match?.id !== matchId || match[fields.followUp] !== isoDateOrNull) {
@@ -8534,7 +9535,7 @@ ${add}` : add;
       }
     }
     async function openInterviewIdsForMatch(matchId) {
-      const request = getRequest();
+      const request = getRequest2();
       const perPage = 100;
       const interviewIds = [];
       let page = 0;
@@ -8564,7 +9565,7 @@ ${add}` : add;
       }));
     }
     async function declineInterview(matchId, interviewId) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(UPDATE_INTERVIEW_MUTATION, { id: interviewId, status: "declined" });
       const interview = result?.data;
       if (interview?.id !== interviewId || interview.status !== "declined" || interview.matchId !== matchId) {
@@ -8572,7 +9573,7 @@ ${add}` : add;
       }
     }
     async function interviewsForMatch(matchId, statuses) {
-      const request = getRequest();
+      const request = getRequest2();
       const perPage = 100;
       const interviews = [];
       let page = 0;
@@ -8599,7 +9600,7 @@ ${add}` : add;
       getRows().filter((row2) => matchIdFromRow2(row2) === matchId).forEach((row2) => markCell(row2.querySelector(INTERVIEW_CELL_SELECTOR2)));
     }
     async function forwardInterview(matchId, interview) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(FORWARD_INTERVIEW_MUTATION, { id: interview.id, status: "forwarded", dates: interview.dates });
       const updated = result?.data;
       if (updated?.id !== interview.id || updated.status !== "forwarded" || updated.matchId !== matchId) {
@@ -8715,7 +9716,7 @@ ${add}` : add;
       if (isOut && outFeedback === COUNTERPART_OPTION) {
         setStatus(`Lese ${counterpartOut.team}-Out-Gründe …`, "busy");
         const read = await runParallel(selection, async (match) => {
-          const data = await getRequest()(COUNTERPART_QUERY, { id: match.matchId });
+          const data = await getRequest2()(COUNTERPART_QUERY, { id: match.matchId });
           const feedback2 = counterpartOutFeedback(data?.data?.[counterpartOut.status], data?.data?.[counterpartOut.feedback]);
           if (feedback2) counterpartFeedback.set(match.matchId, feedback2);
         });
@@ -9060,10 +10061,10 @@ ${add}` : add;
   }
 
   // src/features/kam-suite/contact-badges.js
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR = "td.column-kamFollowUpDate";
   var EMPLOYER_LINK_SELECTOR3 = 'a[href*="#/Employer/"]';
-  var STYLE_ID7 = "werkia-kam-contact-style";
+  var STYLE_ID8 = "werkia-kam-contact-style";
   var REFRESH_INTERVAL_MS = 5 * 60 * 1e3;
   var VORSCHLAG_RETRY_MS = 60 * 1e3;
   var CONTACT_OPTIONS = {
@@ -9108,7 +10109,7 @@ ${add}` : add;
     let vorschlagFailedAt = 0;
     let myId = "";
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR4)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR));
     }
     function employerFromRow(row2) {
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR3);
@@ -9136,9 +10137,9 @@ ${add}` : add;
       return { status: "error", message: `Unbekannter Kontakt-Wert: ${value}` };
     }
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID7)) return;
+      if (document.getElementById(STYLE_ID8)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID7;
+      style.id = STYLE_ID8;
       style.textContent = `
       .werkia-kam-contact { display: inline-flex; align-items: center; gap: 4px; margin: 5px 0 3px 8px; vertical-align: middle; }
       .werkia-kam-contact select { appearance: auto; padding: 5px 8px; border: 2px solid #aaa; border-radius: 999px; font: 800 13px/1.2 Arial,sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); cursor: pointer; }
@@ -9413,13 +10414,13 @@ ${rr.zahlen}` : view.title;
 
   // src/features/tags-wvl.js
   var SOURCE_PATH = "kam/toolbox/src/features/tags-wvl.js";
-  var STYLE_ID8 = "werkia-kam-tags-wvl-style";
+  var STYLE_ID9 = "werkia-kam-tags-wvl-style";
   var CELL_ATTR = "data-werkia-tags-wvl";
   var WRAP_CLASS = "werkia-kam-tags-wvl";
   var WVL_CELL_SELECTOR2 = "td.column-kamFollowUpDate";
   var MATCH_LINK_SELECTOR6 = 'a[href*="#/Match/"]';
   var SAVE_DELAY_MS = 900;
-  var clean3 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean5 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function germanDateToIso(text) {
     const match = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(String(text || ""));
     if (!match) return "";
@@ -9429,26 +10430,26 @@ ${rr.zahlen}` : view.title;
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
     return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
   }
-  function matchIdFromHref5(href) {
+  function matchIdFromHref6(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
-  function isTagsDialog(element6) {
+  function isTagsDialog2(element6) {
     if (!element6) return false;
     const title = element6.querySelector(".MuiDialogTitle-root, h2");
-    return clean3(title?.textContent) === "Tags" && Boolean(element6.querySelector(WVL_CELL_SELECTOR2));
+    return clean5(title?.textContent) === "Tags" && Boolean(element6.querySelector(WVL_CELL_SELECTOR2));
   }
-  function tagsDialogs(root = document) {
-    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog);
+  function tagsDialogs2(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog2);
   }
-  function executeTagsWvl(runtime, { getRequest = () => getKamGraphqlAdapter().request } = {}) {
+  function executeTagsWvl(runtime, { getRequest: getRequest2 = () => getKamGraphqlAdapter().request } = {}) {
     runtime.registerSource?.(SOURCE_PATH);
     const written = /* @__PURE__ */ new Map();
     let wroteSinceOpen = false;
     let dialogWasOpen = false;
     function injectStyle() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID9;
       style.textContent = `
       td[${CELL_ATTR}] > :not(.${WRAP_CLASS}) { display: none !important; }
       .${WRAP_CLASS} { display: inline-flex; flex-direction: column; gap: 2px; font: 400 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -9464,7 +10465,7 @@ ${rr.zahlen}` : view.title;
       document.head.appendChild(style);
     }
     function cellText(cell) {
-      return clean3([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
+      return clean5([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS))).map((node) => node.textContent).join(" "));
     }
     function currentIso(matchId, cell) {
       const text = cellText(cell);
@@ -9495,7 +10496,7 @@ ${rr.zahlen}` : view.title;
       input.disabled = true;
       setState(wrap2, "busy", "Speichert …");
       try {
-        const result = await getRequest()(UPDATE_MATCH_WVL_MUTATION, { id: matchId, kamFollowUpDate: next || null });
+        const result = await getRequest2()(UPDATE_MATCH_WVL_MUTATION, { id: matchId, kamFollowUpDate: next || null });
         const saved = result?.data;
         if (saved?.id !== matchId || (saved.kamFollowUpDate || "") !== next) {
           throw new Error("Das Adminpanel hat das neue Datum nicht bestätigt");
@@ -9546,7 +10547,7 @@ ${rr.zahlen}` : view.title;
     }
     function installCell(cell) {
       const row2 = cell.closest("tr");
-      const matchId = matchIdFromHref5(row2?.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
+      const matchId = matchIdFromHref6(row2?.querySelector(MATCH_LINK_SELECTOR6)?.getAttribute("href"));
       if (!matchId) return;
       let wrap2 = cell.querySelector(`:scope > .${WRAP_CLASS}`);
       if (wrap2 && wrap2.dataset.matchId !== matchId) {
@@ -9566,7 +10567,7 @@ ${rr.zahlen}` : view.title;
       input.value = value;
     }
     function scan() {
-      const dialogs = tagsDialogs();
+      const dialogs = tagsDialogs2();
       if (dialogs.length) {
         injectStyle();
         dialogWasOpen = true;
@@ -9597,10 +10598,10 @@ ${rr.zahlen}` : view.title;
 
   // src/features/tags-hc.js
   var SOURCE_PATH2 = "kam/toolbox/src/features/tags-hc.js";
-  var STYLE_ID9 = "werkia-kam-tags-hc-style";
+  var STYLE_ID10 = "werkia-kam-tags-hc-style";
   var ROOT_CLASS = "werkia-kam-tags-hc";
   var DIALOG_ATTR = "data-werkia-tags-hc";
-  var STORE_KEY = "RaStore.UnreadMatchCommentMentionMatches.listParams";
+  var STORE_KEY2 = "RaStore.UnreadMatchCommentMentionMatches.listParams";
   var PENDING_KEY = "werkia_kam_tags_hc_pending_v1";
   var HOT_STATUSES = ["hot_case", "hot_hot_case"];
   var REFRESH_MS = 2 * 60 * 1e3;
@@ -9611,7 +10612,7 @@ ${rr.zahlen}` : view.title;
   var COUNT_QUERY = `query WerkiaKamTagsHcCount($filter: MatchFilter) {
   total: _allMatchesMeta(filter: $filter) { count }
 }`;
-  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean6 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function countFilter(employeeId) {
     return {
       hasUnreadMatchCommentMention: true,
@@ -9619,7 +10620,7 @@ ${rr.zahlen}` : view.title;
       kamStatuses: [...HOT_STATUSES]
     };
   }
-  function parse(raw) {
+  function parse2(raw) {
     try {
       const value = JSON.parse(raw);
       return value && typeof value === "object" && !Array.isArray(value) ? value : null;
@@ -9628,13 +10629,13 @@ ${rr.zahlen}` : view.title;
     }
   }
   function addHotFilter(raw) {
-    const params = parse(raw) || {};
+    const params = parse2(raw) || {};
     const page = Number.isInteger(params.page) ? params.page : null;
     const next = { ...params, filter: { ...params.filter || {}, kamStatuses: [...HOT_STATUSES] }, page: 1 };
     return { value: JSON.stringify(next), page };
   }
   function removeHotFilter(raw, { page = null } = {}) {
-    const params = parse(raw);
+    const params = parse2(raw);
     if (!params) return null;
     const filter = { ...params.filter || {} };
     delete filter.kamStatuses;
@@ -9645,27 +10646,27 @@ ${rr.zahlen}` : view.title;
     return onlyDefaults ? null : JSON.stringify(next);
   }
   function hasHotFilter(raw) {
-    return Array.isArray(parse(raw)?.filter?.kamStatuses);
+    return Array.isArray(parse2(raw)?.filter?.kamStatuses);
   }
   function findTagsButton(root = document) {
     return [...root.querySelectorAll("button")].find((button3) => {
       if (button3.closest(`.${ROOT_CLASS}`) || button3.closest('[role="dialog"]')) return false;
       const own = [...button3.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join(" ");
-      return clean4(own) === "Tags" && Boolean(button3.querySelector(".MuiChip-root, .MuiButton-endIcon"));
+      return clean6(own) === "Tags" && Boolean(button3.querySelector(".MuiChip-root, .MuiButton-endIcon"));
     }) || null;
   }
-  function isTagsDialog2(element6) {
+  function isTagsDialog3(element6) {
     const title = element6?.querySelector(".MuiDialogTitle-root, h2");
-    return clean4(title?.textContent) === "Tags";
+    return clean6(title?.textContent) === "Tags";
   }
-  function tagsDialogs2(root = document) {
-    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog2);
+  function tagsDialogs3(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog3);
   }
   function isTargetPage3(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
   }
   function executeTagsHc(runtime, {
-    getRequest = () => getKamGraphqlAdapter().request,
+    getRequest: getRequest2 = () => getKamGraphqlAdapter().request,
     storage = () => window.localStorage,
     helpTip = () => kamHelp.tip("tags-hc")
   } = {}) {
@@ -9689,19 +10690,19 @@ ${rr.zahlen}` : view.title;
     function restoreStore() {
       const ls = store();
       if (!ls) return;
-      const pending = parse(ls.getItem(PENDING_KEY));
-      const raw = ls.getItem(STORE_KEY);
+      const pending = parse2(ls.getItem(PENDING_KEY));
+      const raw = ls.getItem(STORE_KEY2);
       if (pending || hasHotFilter(raw)) {
         const next = removeHotFilter(raw, { page: pending && Number.isInteger(pending.page) ? pending.page : null });
-        if (next === null) ls.removeItem(STORE_KEY);
-        else ls.setItem(STORE_KEY, next);
+        if (next === null) ls.removeItem(STORE_KEY2);
+        else ls.setItem(STORE_KEY2, next);
       }
       ls.removeItem(PENDING_KEY);
     }
     function injectStyle() {
-      if (document.getElementById(STYLE_ID9)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID9;
+      style.id = STYLE_ID10;
       style.textContent = `
       .${ROOT_CLASS} { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; flex-shrink: 0; }
       .${ROOT_CLASS} > button { white-space: nowrap; }
@@ -9731,7 +10732,7 @@ ${rr.zahlen}` : view.title;
       loading = true;
       lastLoad = Date.now();
       try {
-        const request = getRequest();
+        const request = getRequest2();
         if (!myId) {
           const data2 = await request(CURRENT_EMPLOYEE_QUERY5, {});
           myId = String(data2?.me?.id || "");
@@ -9753,16 +10754,16 @@ ${rr.zahlen}` : view.title;
       const ls = store();
       if (!ls) return;
       restoreStore();
-      const { value, page } = addHotFilter(ls.getItem(STORE_KEY));
+      const { value, page } = addHotFilter(ls.getItem(STORE_KEY2));
       ls.setItem(PENDING_KEY, JSON.stringify({ page, at: Date.now() }));
-      ls.setItem(STORE_KEY, value);
+      ls.setItem(STORE_KEY2, value);
       opening = true;
       tagsButton.click();
       opening = false;
       runtime.clearTimeout?.(openTimer);
       openTimer = runtime.setTimeout(() => {
         openTimer = null;
-        if (!tagsDialogs2().length) restoreStore();
+        if (!tagsDialogs3().length) restoreStore();
       }, OPEN_TIMEOUT_MS);
     }
     function install(tagsButton) {
@@ -9791,7 +10792,7 @@ ${rr.zahlen}` : view.title;
       render();
     }
     function scan() {
-      const dialogs = tagsDialogs2();
+      const dialogs = tagsDialogs3();
       const ls = store();
       if (dialogs.length) {
         const filtered = Boolean(ls?.getItem(PENDING_KEY));
@@ -9808,7 +10809,7 @@ ${rr.zahlen}` : view.title;
       if (!tagsButton) return;
       injectStyle();
       install(tagsButton);
-      const text = clean4(tagsButton.querySelector(".MuiChip-label")?.textContent);
+      const text = clean6(tagsButton.querySelector(".MuiChip-label")?.textContent);
       if (text !== nativeCountText) {
         const first = nativeCountText === "";
         nativeCountText = text;
@@ -9840,10 +10841,20 @@ ${rr.zahlen}` : view.title;
     scheduleScan();
   }
 
+  // src/features/tags-dialog.js
+  var SOURCE_PATH3 = "kam/toolbox/src/features/tags-dialog.js";
+  var getRequest = () => getKamGraphqlAdapter().request;
+  function executeKamTagsUnread(runtime) {
+    executeTagsUnread(runtime, { sourcePath: SOURCE_PATH3, getRequest, helpTip: () => kamHelp.tip("tags-unread") });
+  }
+  function executeKamTagsSearch(runtime) {
+    executeTagsSearch(runtime, { sourcePath: SOURCE_PATH3, getRequest, helpTip: () => kamHelp.tip("tags-search") });
+  }
+
   // src/features/kam-suite/employer-notes.js
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR4 = 'a[href*="#/Employer/"]';
-  var BOX_CLASS2 = "werkia-kam-employer-notes";
+  var BOX_CLASS3 = "werkia-kam-employer-notes";
   var ROW_TAGS = ["AP", "Prozess"];
   function getKamEmployerNotesProvider() {
     return employerNotesProviderFor(getKamGraphqlAdapter());
@@ -9858,7 +10869,7 @@ ${rr.zahlen}` : view.title;
     function syncRow(row2, provider) {
       const employerId = employerIdFromRow(row2);
       const link = row2.querySelector(EMPLOYER_LINK_SELECTOR4);
-      let box = row2.querySelector(`.${BOX_CLASS2}`);
+      let box = row2.querySelector(`.${BOX_CLASS3}`);
       if (!employerId || !link) {
         box?.remove();
         return;
@@ -9869,7 +10880,7 @@ ${rr.zahlen}` : view.title;
       }
       if (!box) {
         box = document.createElement("span");
-        box.className = BOX_CLASS2;
+        box.className = BOX_CLASS3;
         box.dataset.employerId = employerId;
         for (const tag of ROW_TAGS) box.appendChild(createEmployerNoteBadge({ provider, employerId, tag, document }));
         box.appendChild(createProzessCheckBadge({ provider, employerId, document }));
@@ -9885,10 +10896,10 @@ ${rr.zahlen}` : view.title;
       } catch {
         return;
       }
-      document.querySelectorAll(ROW_SELECTOR5).forEach((row2) => syncRow(row2, provider));
+      document.querySelectorAll(ROW_SELECTOR6).forEach((row2) => syncRow(row2, provider));
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -9896,9 +10907,9 @@ ${rr.zahlen}` : view.title;
         render();
       }, 250);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
+    schedule2();
   }
 
   // src/features/kam-suite/match-contact-person.js
@@ -9943,9 +10954,9 @@ ${rr.zahlen}` : view.title;
   }
 
   // src/features/kam-suite/vacancy-city-badges.js
-  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR = '.column-jobPositionId a[href*="#/JobPosition/"]';
-  var STYLE_ID10 = "werkia-kam-vacancy-city-style";
+  var STYLE_ID11 = "werkia-kam-vacancy-city-style";
   var REFRESH_INTERVAL_MS2 = 5 * 60 * 1e3;
   function isTargetPage4(hash = location.hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(hash);
@@ -9959,7 +10970,7 @@ ${rr.zahlen}` : view.title;
     const cityIndex = /* @__PURE__ */ new Map();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR6)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR));
     }
     function jobPositionFromRow(row2) {
       const link = row2.querySelector(JOB_TITLE_LINK_SELECTOR);
@@ -9976,9 +10987,9 @@ ${rr.zahlen}` : view.title;
       return [...ids];
     }
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID11)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID11;
       style.textContent = `
       .werkia-kam-vacancy-city { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; font: 700 11px/1.2 Arial,sans-serif; white-space: nowrap; vertical-align: middle; color: #374151; background: #f3f4f6; }
       .werkia-kam-vacancy-city[data-tone="loading"] { color: #6b7280; border-color: #cbd5e1; background: #f8fafc; }
@@ -10136,11 +11147,11 @@ ${rr.zahlen}` : view.title;
   }
 
   // src/features/kam-suite/cem-status-line.js
-  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
   var KAM_STATUS_CELL_SELECTOR = "td.column-kamStatus";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var LINE_CLASS = "werkia-kam-cem-line";
-  var STYLE_ID11 = "werkia-kam-cem-line-style";
+  var STYLE_ID12 = "werkia-kam-cem-line-style";
   var REFRESH_INTERVAL_MS3 = 5 * 60 * 1e3;
   var COPIED_FEEDBACK_MS = 1200;
   var COPY_ICON_PATH2 = "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2m0 16H8V7h11z";
@@ -10163,15 +11174,15 @@ ${rr.zahlen}` : view.title;
     const failedMatchIds = /* @__PURE__ */ new Set();
     let loadPromise = null;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
+      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(KAM_STATUS_CELL_SELECTOR));
     }
     function matchIdFromRow2(row2) {
       return getMatchId2(row2.querySelector(MATCH_LINK_SELECTOR7)?.getAttribute("href"));
     }
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID11)) return;
+      if (document.getElementById(STYLE_ID12)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID11;
+      style.id = STYLE_ID12;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 10px; font-family: inherit; font-size: 0.75rem; line-height: 1.66; letter-spacing: 0.03333em; color: rgba(0, 0, 0, 0.6); }
       .${LINE_CLASS}__label { font-weight: 500; }
@@ -10363,8 +11374,8 @@ ${rr.zahlen}` : view.title;
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean8 = [...new Set(statuses)].filter(Boolean);
-    if (clean8.length) next[field] = clean8;
+    const clean10 = [...new Set(statuses)].filter(Boolean);
+    if (clean10.length) next[field] = clean10;
     else delete next[field];
     return next;
   }
@@ -10377,7 +11388,7 @@ ${rr.zahlen}` : view.title;
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID12 = "werkia-match-status-filter-style";
+  var STYLE_ID13 = "werkia-match-status-filter-style";
   var BAR_CLASS = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
@@ -10395,9 +11406,9 @@ ${rr.zahlen}` : view.title;
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage9 = () => route.test(location.hash);
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID12)) return;
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID13;
       style.textContent = `
       .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
       .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
@@ -10581,7 +11592,7 @@ ${rr.zahlen}` : view.title;
     const context = getQuestionnaireContext();
     const vacancyCache = /* @__PURE__ */ new Map();
     let clickCounter = 0;
-    const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
+    const sleep2 = (ms2) => new Promise((resolve) => runtime.setTimeout(resolve, ms2));
     async function waitFor(find, timeoutMs = 3e3, intervalMs = 50) {
       const started = Date.now();
       while (Date.now() - started < timeoutMs) {
@@ -11746,8 +12757,8 @@ ${rr.zahlen}` : view.title;
   }
 
   // ../../shared/js/admin-dom/timing.js
-  function sleep(ms) {
-    return new Promise((resolve) => wSetTimeout(resolve, ms));
+  function sleep(ms2) {
+    return new Promise((resolve) => wSetTimeout(resolve, ms2));
   }
 
   // ../../shared/js/route-commute/routing.js
@@ -12156,7 +13167,7 @@ ${rr.zahlen}` : view.title;
   }
 
   // src/features/kam-suite/candidate-file-popup.js
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
   var WVL_CELL_SELECTOR3 = "td.column-kamFollowUpDate";
   var CANDIDATE_CELL_SELECTOR = "td.column-candidateId";
   var CANDIDATE_ACTIONS_CELL_SELECTOR = "td.column-candidateActions";
@@ -12169,7 +13180,7 @@ ${rr.zahlen}` : view.title;
     let pendingCandidateId = "";
     let pendingCandidateAt = 0;
     function getRows() {
-      return [...document.querySelectorAll(ROW_SELECTOR8)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR3));
+      return [...document.querySelectorAll(ROW_SELECTOR9)].filter((row2) => row2.querySelector(WVL_CELL_SELECTOR3));
     }
     function visibleOverlay(element6) {
       if (!element6) return false;
@@ -12521,9 +13532,9 @@ ${rr.zahlen}` : view.title;
   var BANNER_CACHE_MAX_ENTRIES = 300;
   var BANNER_REFRESH_INTERVAL = 30 * 1e3;
   var isBannerCacheEntryExpired = (entry, now = Date.now()) => !entry || typeof entry !== "object" || !(now - Number(entry.time) < BANNER_CACHE_TTL);
-  var clean5 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
+  var clean7 = (v) => (v || "").trim().toLowerCase().replace(/\s+/g, " ");
   function badgeColor(value) {
-    const v = clean5(value);
+    const v = clean7(value);
     if (!v || v === "-" || v === "–" || v.includes("lädt")) return "#e9ecef";
     if (v.includes("out") || v.includes("absage") || v.includes("abgelehnt") || v.includes("nicht passend") || v.includes("entfernung")) return "#ff6b6b";
     if (v.includes("senden") || v.includes("send") || v.includes("wvl") || v.includes("akzeptiert") || v.includes("terminbestätigung")) return "#d8f5d0";
@@ -12702,7 +13713,7 @@ ${rr.zahlen}` : view.title;
 
   // src/features/kam-suite/chat-icon-redirect.js
   var CHAT_LINK_SELECTOR = 'a[aria-label="Chat"][href*="#/Chat/?filter"]';
-  var ROW_SELECTOR9 = "tr.RaDataTable-row";
+  var ROW_SELECTOR10 = "tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var EMPLOYER_LINK_SELECTOR5 = 'a[href*="#/Employer/"]';
   function getMatchIdFromChatRow(row2) {
@@ -12733,7 +13744,7 @@ ${rr.zahlen}` : view.title;
       if (!isTargetPage()) return;
       const link = event.target.closest(CHAT_LINK_SELECTOR);
       if (!link) return;
-      const row2 = link.closest(ROW_SELECTOR9);
+      const row2 = link.closest(ROW_SELECTOR10);
       const matchId = getMatchIdFromChatRow(row2);
       if (!matchId) return;
       event.preventDefault();
@@ -13237,7 +14248,7 @@ ${rr.zahlen}` : view.title;
   var MARK = "data-werkia-cem-vta-pill";
   var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
   var TYPE_ATTRIBUTE = "data-werkia-interview-type";
-  var STYLE_ID13 = "werkia-interview-pill-style";
+  var STYLE_ID14 = "werkia-interview-pill-style";
   var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
   var CACHE_MS7 = 60 * 1e3;
   var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
@@ -13311,9 +14322,9 @@ ${rr.zahlen}` : view.title;
     const cache = /* @__PURE__ */ new Map();
     const pending = /* @__PURE__ */ new Set();
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID13)) return;
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
+      style.id = STYLE_ID14;
       style.textContent = `.MuiChip-root[${MARK}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
 .werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
 .werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -13378,7 +14389,7 @@ ${rr.zahlen}` : view.title;
         console.warn(logLabel, error);
       } finally {
         ids.forEach((id) => pending.delete(id));
-        schedule();
+        schedule2();
       }
     }
     function render() {
@@ -13410,7 +14421,7 @@ ${rr.zahlen}` : view.title;
       for (let i = 0; i < missing.length; i += 100) load2(missing.slice(i, i + 100));
     }
     let scheduled = false;
-    function schedule() {
+    function schedule2() {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -13418,9 +14429,9 @@ ${rr.zahlen}` : view.title;
         render();
       }, 150);
     }
-    runtime.addWindowListener?.("hashchange", schedule);
-    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
-    schedule();
+    runtime.addWindowListener?.("hashchange", schedule2);
+    runtime.createMutationObserver(schedule2).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
+    schedule2();
   }
 
   // src/features/termin-typ.js
@@ -13440,6 +14451,14 @@ ${rr.zahlen}` : view.title;
       toolboxName: "KAM-Toolbox",
       helpTip: () => kamHelp.tip("vta-notizen"),
       sourcePath: "kam/toolbox/src/features/vta-notizen.js"
+    });
+  }
+
+  // src/features/vtv-hot-warnung.js
+  function executeVtvHotWarnung2(runtime) {
+    executeVtvHotWarnung(runtime, {
+      getGraphqlAdapter: getKamGraphqlAdapter,
+      sourcePath: "kam/toolbox/src/features/vtv-hot-warnung.js"
     });
   }
 
@@ -14063,8 +15082,8 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       request,
       getMyId: async () => (await getGraphqlAdapter().request(CURRENT_EMPLOYEE_QUERY6, {}))?.me?.id,
       timers: {
-        setTimeout: (fn, ms) => runtime.setTimeout(fn, ms),
-        setInterval: (fn, ms) => runtime.setInterval(fn, ms),
+        setTimeout: (fn, ms2) => runtime.setTimeout(fn, ms2),
+        setInterval: (fn, ms2) => runtime.setInterval(fn, ms2),
         clearInterval: (handle) => runtime.clearInterval(handle)
       }
     });
@@ -14142,14 +15161,14 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
 
   // src/features/kam-suite/match-slack-actions.js
   var defaultWebhookUrl = true ? "https://hooks.werkia-ops.de/webhook/ops-bot/kam-match/b41e7c2a-9d35-4f08-a6c1-3e8f5d2b7a94" : "";
-  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
   var JOB_TITLE_LINK_SELECTOR2 = '.column-jobPositionId a[href*="#/JobPosition/"]';
   var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BAR_CLASS2 = "werkia-kam-match-actions";
   var FALLBACK_BLOCK_CLASS = "werkia-kam-match-actions-block";
   var INTERVIEW_CELL_SELECTOR = "td.column-interview";
-  var STYLE_ID14 = "werkia-kam-match-actions-style";
-  var STORE_KEY2 = "werkia_kam_match_actions_v1";
+  var STYLE_ID15 = "werkia-kam-match-actions-style";
+  var STORE_KEY3 = "werkia_kam_match_actions_v1";
   var REFRESH_INTERVAL_MS4 = 5 * 60 * 1e3;
   var PENDING_POLL_MS = 8e3;
   function isTargetPage8(hash = location.hash) {
@@ -14158,7 +15177,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   function jobPositionIdFromHref(href) {
     return String(href || "").match(/#\/JobPosition\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
   }
-  function matchIdFromHref6(href) {
+  function matchIdFromHref7(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function gmPost(url, payload) {
@@ -14187,7 +15206,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     let pollTimer = null;
     function loadStore() {
       try {
-        const store = JSON.parse(localStorage.getItem(STORE_KEY2) || "{}");
+        const store = JSON.parse(localStorage.getItem(STORE_KEY3) || "{}");
         return { pending: store.pending || {}, pushSent: store.pushSent || {} };
       } catch {
         return { pending: {}, pushSent: {} };
@@ -14195,7 +15214,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     }
     function saveStore(store) {
       try {
-        localStorage.setItem(STORE_KEY2, JSON.stringify(store));
+        localStorage.setItem(STORE_KEY3, JSON.stringify(store));
       } catch {
       }
     }
@@ -14205,21 +15224,21 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       saveStore(store);
     }
     function rows() {
-      return [...document.querySelectorAll(ROW_SELECTOR10)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR2));
+      return [...document.querySelectorAll(ROW_SELECTOR11)].filter((row2) => row2.querySelector(JOB_TITLE_LINK_SELECTOR2));
     }
     function rowIds(row2) {
       return {
         jobPositionId: jobPositionIdFromHref(row2.querySelector(JOB_TITLE_LINK_SELECTOR2)?.href),
-        matchId: matchIdFromHref6(row2.querySelector(MATCH_LINK_SELECTOR9)?.href)
+        matchId: matchIdFromHref7(row2.querySelector(MATCH_LINK_SELECTOR9)?.href)
       };
     }
     function visibleJobPositionIds() {
       return [...new Set(rows().map((row2) => rowIds(row2).jobPositionId).filter(Boolean))];
     }
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID14)) return;
+      if (document.getElementById(STYLE_ID15)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID14;
+      style.id = STYLE_ID15;
       style.textContent = `
       .${FALLBACK_BLOCK_CLASS} { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
       .${BAR_CLASS2} { display:contents; }
@@ -14407,7 +15426,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       if (syncTimer !== null) runtime.clearTimeout(syncTimer);
       if (pollTimer !== null) runtime.clearTimeout(pollTimer);
       removeBars();
-      document.getElementById(STYLE_ID14)?.remove();
+      document.getElementById(STYLE_ID15)?.remove();
     });
     scheduleSync();
   }
@@ -14439,10 +15458,10 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     if (!slackId) return false;
     return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref7(href) {
+  var UUID_RE4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref8(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE3.test(id) ? id : "";
+    return UUID_RE4.test(id) ? id : "";
   }
   function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
@@ -14522,21 +15541,21 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR12 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS = "werkia-slack-dm-button";
   var IDS5 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT7 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT9 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS = `
-  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT7}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT9}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT7}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS5.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT9}; color:#09090b; -webkit-font-smoothing:antialiased; }
   #${IDS5.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
   #${IDS5.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
   #${IDS5.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS5.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT7}; }
+  #${IDS5.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT9}; }
   #${IDS5.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS5.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
   #${IDS5.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
@@ -14546,14 +15565,14 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   #${IDS5.dialog} .sd-muted { color:#8b8b94; }
   #${IDS5.dialog} .sd-warn { color:#8a6700; }
   #${IDS5.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS5.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT7}; resize:vertical; }
+  #${IDS5.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT9}; resize:vertical; }
   #${IDS5.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
   #${IDS5.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
   #${IDS5.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
   #${IDS5.dialog} .sd-status.sd-error { color:#b52f2f; }
   #${IDS5.dialog} .sd-status.sd-ok { color:#0a7c0a; }
   #${IDS5.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS5.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT7}; }
+  #${IDS5.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT9}; }
   #${IDS5.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
   #${IDS5.dialog} .sd-secondary:hover { background:#f4f4f5; }
   #${IDS5.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
@@ -14607,7 +15626,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
       const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR10)).find(Boolean);
-      const matchId = matchIdFromHref7(link?.getAttribute("href"));
+      const matchId = matchIdFromHref8(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function addButtons(row2) {
@@ -14736,7 +15755,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
         return;
       }
       ensureStyle8();
-      document.querySelectorAll(ROW_SELECTOR11).forEach(addButtons);
+      document.querySelectorAll(ROW_SELECTOR12).forEach(addButtons);
     }
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
@@ -14981,9 +16000,12 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
     /^[ \t]*-{2,}[ \t]*(?:Original Message|Ursprüngliche Nachricht|Originalnachricht|Weitergeleitete Nachricht|Forwarded message)[ \t]*-{2,}/im,
     /^[ \t]*(?:Von|From):[ \t].*\n(?:.*\n){0,3}?[ \t]*(?:Gesendet|Sent|Datum|Date):/im,
     /^[ \t]*Am\b.{4,160}\bschrieb\b.{0,200}:[ \t]*$/im,
-    /^[ \t]*On\b.{4,160}\bwrote:[ \t]*$/im
+    /^[ \t]*On\b.{4,160}\bwrote:[ \t]*$/im,
+    // Outlook setzt vor den zitierten Kopf eine Linie aus Unterstrichen.
+    /^[ \t]*_{10,}[ \t]*$/m
   ];
   var OUT_MAIL_COMMENT_MAX_CHARS = 5e3;
+  var OUT_MAIL_COMMENT_FALLBACK_CHARS = 1500;
   function replyTextFromMailBody(bodyText) {
     const text = String(bodyText || "").replace(/\r\n?/g, "\n").replace(/ /g, " ");
     let end = text.length;
@@ -14991,13 +16013,19 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       const match = re.exec(text);
       if (match && match.index < end) end = match.index;
     }
-    return text.slice(0, end).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    return text.slice(0, end).split("\n").filter((line) => !/^[ \t]*>/.test(line)).join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   }
   var CLOSING_RE = /^[ \t]*(?:(?:mit[ \t]+)?(?:(?:freundliche|freundlichen|beste|besten|herzliche|herzlichen|liebe|lieben|schöne|schönen|viele|sonnige|sonnigen)[ \t]+)*(?:grüße|grüßen|gruß|grüsse|grüssen|gruss)|mfg|vg|lg|bg|(?:best|kind|warm)[ \t]+regards|regards|cheers)(?![\p{L}])([^\n:;?]{0,60})$/iu;
-  function cutAfterSignatureName(text) {
-    const lines = String(text || "").split("\n");
+  var SIGNATURE_BLOCK_RE = new RegExp("^[ \\t]*(?:--[ \\t]*$|(?:Geschäftsführ(?:er|erin|ung|ende[rn]?)|Vorstand|Aufsichtsrat(?:svorsitz\\S*)?|Sitz(?: der Gesellschaft)?|USt\\.?[ \\t-]*Id\\S*|Steuer-?Nr\\.?|Steuernummer|Handelsregister|Registergericht)[ \\t]*:|(?:Amtsgericht|Registergericht)[ \\t]+\\p{Lu}|HR[AB][ \\t]*\\d|(?:Diese (?:E-?Mail|Nachricht)|Der Inhalt dieser (?:E-?Mail|Nachricht)) (?:enthält|kann vertrauliche|ist vertraulich|ist ausschließlich)|(?:Vertraulichkeitshinweis|Datenschutzhinweis|Disclaimer)\\b|This (?:e-?mail|message) (?:and any|is confidential|may contain|contains confidential)|The information (?:contained|in this))", "imu");
+  function cutMailSignature(text) {
+    const source = String(text || "");
+    const lines = source.split("\n");
     const index = lines.findIndex((line) => CLOSING_RE.test(line));
-    if (index < 0) return String(text || "");
+    if (index < 0) {
+      const block = lines.findIndex((line, i) => i > 0 && SIGNATURE_BLOCK_RE.test(line));
+      if (block < 0) return { text: source, recognized: false };
+      return { text: lines.slice(0, block).join("\n").trim(), recognized: true };
+    }
     const rest = CLOSING_RE.exec(lines[index])[1];
     let end = index;
     if (!new RegExp("^[ \\t]*(?:[,–-][ \\t]*)?\\p{Lu}", "u").test(rest)) {
@@ -15005,13 +16033,14 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
       while (next < lines.length && !lines[next].trim()) next += 1;
       if (next - index <= 2 && next < lines.length && lines[next].trim().length <= 60) end = next;
     }
-    return lines.slice(0, end + 1).join("\n").trim();
+    return { text: lines.slice(0, end + 1).join("\n").trim(), recognized: true };
   }
   function outMailCommentDraft(bodyText) {
     const replyText = replyTextFromMailBody(bodyText);
     if (!replyText || hasApplicationProfile(parseProfileFromMailBody(replyText))) return "";
-    const reply = cutAfterSignatureName(replyText);
-    return reply.length > OUT_MAIL_COMMENT_MAX_CHARS ? `${reply.slice(0, OUT_MAIL_COMMENT_MAX_CHARS).trimEnd()} …` : reply;
+    const { text: reply, recognized } = cutMailSignature(replyText);
+    const max = recognized ? OUT_MAIL_COMMENT_MAX_CHARS : OUT_MAIL_COMMENT_FALLBACK_CHARS;
+    return reply.length > max ? `${reply.slice(0, max).trimEnd()} …` : reply;
   }
   function outMailCommentHtml({ reasonLabel = "", mailText = "" } = {}) {
     const head = `Out aus Outlook${reasonLabel ? ` (Grund: ${escapeHtml(reasonLabel)})` : ""}. Mail des Arbeitgebers:`;
@@ -15272,7 +16301,7 @@ ${list === null ? `<div class="empty">${state.searching ? "Suche läuft …" : "
   function executeOutlookMatchOuten(runtime) {
     runtime.registerSource("kam/toolbox/src/features/kam-suite/outlook-match-outen.js");
     if (!SUPPORTED_OUTLOOK_HOSTNAMES.includes(location.hostname)) return;
-    const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
+    const sleep2 = (ms2) => new Promise((resolve) => runtime.setTimeout(resolve, ms2));
     async function ensureAuthViaPopup() {
       const before = getKamBearerSnapshot();
       let popup;
@@ -16518,11 +17547,11 @@ ${buildCbreBody(current)}`;
     const p = Object.fromEntries(BERLIN_PARTS.formatToParts(date).map((x) => [x.type, x.value]));
     return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
   }
-  function offsetMinutes(ms) {
-    const p = berlinParts(ms);
+  function offsetMinutes(ms2) {
+    const p = berlinParts(ms2);
     const [y, m, d] = p.date.split("-").map(Number);
     const [h, mi] = p.time.split(":").map(Number);
-    return (Date.UTC(y, m - 1, d, h, mi) - Math.floor(ms / 6e4) * 6e4) / 6e4;
+    return (Date.UTC(y, m - 1, d, h, mi) - Math.floor(ms2 / 6e4) * 6e4) / 6e4;
   }
   function berlinToIso(day, time) {
     const dm = String(day || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -16532,9 +17561,9 @@ ${buildCbreBody(current)}`;
     if (m < 1 || m > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return "";
     const guess = Date.UTC(y, m - 1, d, h, mi);
     if (new Date(guess).getUTCDate() !== d) return "";
-    let ms = guess - offsetMinutes(guess) * 6e4;
-    ms = guess - offsetMinutes(ms) * 6e4;
-    return new Date(ms).toISOString();
+    let ms2 = guess - offsetMinutes(guess) * 6e4;
+    ms2 = guess - offsetMinutes(ms2) * 6e4;
+    return new Date(ms2).toISOString();
   }
   var DAY_FMT = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" });
 
@@ -17636,9 +18665,9 @@ ${buildCbreBody(current)}`;
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
       return scope;
     }
-    function applyModeToState2(mode, currentState, scope = pickScope2(currentState?.filter)) {
+    function applyModeToState2(mode, currentState, scope = pickScope2(currentState?.filter), setFilter = {}) {
       let filter;
-      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter };
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...setFilter, ...mode.filter };
       else if (mode.builtIn) filter = { ...scope, ...mode.filter };
       else filter = { ...mode.filter || {} };
       return {
@@ -17649,9 +18678,9 @@ ${buildCbreBody(current)}`;
         perPage: mode.perPage || currentState?.perPage || 0
       };
     }
-    function modeHash2(mode, hash, scope) {
+    function modeHash2(mode, hash, scope, setFilter = {}) {
       const state = parseListState(hash);
-      return buildListHash(applyModeToState2(mode, state, scope));
+      return buildListHash(applyModeToState2(mode, state, scope, setFilter));
     }
     function modeMatchesState2(mode, state) {
       if (!mode || !state) return false;
@@ -17662,10 +18691,10 @@ ${buildCbreBody(current)}`;
       if (mode.builtIn) return filterKey(withoutScope2(state.filter)) === filterKey(mode.filter);
       return filterKey(state.filter) === filterKey(mode.filter);
     }
-    function leaveHash2(previousHash, currentHash, mode = null) {
+    function leaveHash2(previousHash, currentHash, mode = null, setFilter = {}) {
       const state = parseListState(currentHash);
       if (mode?.keepFilter && isRoute(state.route)) {
-        const filter = { ...state.filter };
+        const filter = withoutSetFilter(state.filter, setFilter);
         Object.keys(mode.filter).forEach((key) => {
           delete filter[key];
         });
@@ -17675,6 +18704,18 @@ ${buildCbreBody(current)}`;
       return buildListHash({ ...state, route: isRoute(state.route) ? state.route : routes[0], filter: pickScope2(state.filter) });
     }
     return { routes, isRoute, pickScope: pickScope2, withoutScope: withoutScope2, defaultScope: defaultScope2, applyModeToState: applyModeToState2, modeHash: modeHash2, modeMatchesState: modeMatchesState2, leaveHash: leaveHash2 };
+  }
+  function withoutSetFilter(filter, setFilter = {}) {
+    const rest = { ...filter || {} };
+    Object.keys(setFilter || {}).forEach((key) => {
+      if (JSON.stringify(rest[key]) === JSON.stringify(setFilter[key])) delete rest[key];
+    });
+    return rest;
+  }
+  function modeSetFilter(mode) {
+    if (!mode?.keepFilter || typeof mode.setOnEnter !== "function") return {};
+    const value = mode.setOnEnter();
+    return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
   }
   function cleanColumn(value) {
     return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(String(value || "")) ? String(value) : "";
@@ -17732,7 +18773,11 @@ ${buildCbreBody(current)}`;
   function parseActive(raw) {
     try {
       const parsed = JSON.parse(raw || "null");
-      return parsed && typeof parsed.id === "string" ? { id: parsed.id, previousHash: String(parsed.previousHash || "") } : null;
+      if (!parsed || typeof parsed.id !== "string") return null;
+      const active = { id: parsed.id, previousHash: String(parsed.previousHash || "") };
+      const set = parsed.setFilter;
+      if (set && typeof set === "object" && !Array.isArray(set) && Object.keys(set).length) active.setFilter = set;
+      return active;
     } catch {
       return null;
     }
@@ -18070,7 +19115,11 @@ ${buildCbreBody(current)}`;
       document.head.appendChild(style);
     }
     async function activate(mode) {
-      const before = location.hash;
+      const previous = readActive();
+      const before = previous?.setFilter && previous.id !== mode.id ? (() => {
+        const state = parseListState(location.hash);
+        return buildListHash({ ...state, filter: withoutSetFilter(state.filter, previous.setFilter) });
+      })() : location.hash;
       let scope;
       if (hashHasFilter(before)) {
         scope = pickScope2(parseListState(before).filter);
@@ -18083,9 +19132,9 @@ ${buildCbreBody(current)}`;
           return;
         }
       }
-      const previous = readActive();
-      writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
-      location.hash = modeHash2(mode, before, scope);
+      const setFilter = modeSetFilter(mode);
+      writeActive({ id: mode.id, previousHash: previous?.previousHash || before, ...Object.keys(setFilter).length ? { setFilter } : {} });
+      location.hash = modeHash2(mode, before, scope, setFilter);
       render();
     }
     function leave() {
@@ -18093,7 +19142,7 @@ ${buildCbreBody(current)}`;
       const mode = active ? allModes().find((entry) => entry.id === active.id) : null;
       writeActive(null);
       clearColumnFocus(document);
-      location.hash = leaveHash2(active?.previousHash, location.hash, mode);
+      location.hash = leaveHash2(active?.previousHash, location.hash, mode, active?.setFilter);
       render();
     }
     function removeOwn(mode) {
@@ -18466,14 +19515,14 @@ ${buildCbreBody(current)}`;
   } = KAM_FOCUS_CORE;
 
   // src/features/focus-modes/index.js
-  var SOURCE_PATH3 = "kam/toolbox/src/features/focus-modes/index.js";
+  var SOURCE_PATH4 = "kam/toolbox/src/features/focus-modes/index.js";
   function executeFocusModes2(runtime, {
     request = (...args) => getKamGraphqlAdapter().request(...args),
     helpTip = () => kamHelp.tip("focus-modes"),
     ...options
   } = {}) {
     executeFocusModes(runtime, {
-      sourcePath: SOURCE_PATH3,
+      sourcePath: SOURCE_PATH4,
       core: KAM_FOCUS_CORE,
       builtInModes: BUILT_IN_MODES,
       storageKey: STORAGE_KEY2,
@@ -18793,7 +19842,7 @@ ${buildCbreBody(current)}`;
     prioFirst: "werkia-prio-zuerst",
     reviewDay: "werkia-prio-popup-tag"
   };
-  var ROW_SELECTOR12 = "tr.RaDataTable-row";
+  var ROW_SELECTOR13 = "tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR6 = 'a[href*="#/Employer/"]';
   var STAR_CLASS = "werkia-prio-star";
   function employerEntries(raw) {
@@ -18802,7 +19851,7 @@ ${buildCbreBody(current)}`;
   var REFRESH_MS3 = 5 * 60 * 1e3;
   var REVIEW_CHECK_MS = 60 * 1e3;
   var STAR_PATH = "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
-  var T2 = {
+  var T3 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -18823,7 +19872,7 @@ ${buildCbreBody(current)}`;
   function rowGroups(tbody) {
     const groups = [];
     for (const child of [...tbody.children]) {
-      if (child.matches(ROW_SELECTOR12)) groups.push([child]);
+      if (child.matches(ROW_SELECTOR13)) groups.push([child]);
       else if (groups.length) groups[groups.length - 1].push(child);
     }
     return groups;
@@ -18918,66 +19967,66 @@ ${buildCbreBody(current)}`;
       #${IDS8.button}.wp-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS8.button}.wp-native:hover { background:rgba(0,0,0,.04); }
       #${IDS8.button}.wp-native svg { flex:none; fill:currentColor; }
-      #${IDS8.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T2.line}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS8.button}[data-active="1"] { color:${T2.accentInk} !important; }
-      ${P}, ${R} .wp-card { box-sizing:border-box; color:${T2.ink}; background:${T2.surface}; border:1px solid ${T2.line}; border-radius:10px; box-shadow:${T2.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
-      #${IDS8.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T2.line}; border-radius:999px; background:${T2.surface}; color:${T2.accentInk}; box-shadow:${T2.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      #${IDS8.tab}:hover { border-color:${T2.accent}; }
+      #${IDS8.button}.wp-own { min-height:30px; padding:5px 10px; border:1px solid ${T3.line}; border-radius:6px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.button}[data-active="1"] { color:${T3.accentInk} !important; }
+      ${P}, ${R} .wp-card { box-sizing:border-box; color:${T3.ink}; background:${T3.surface}; border:1px solid ${T3.line}; border-radius:10px; box-shadow:${T3.shadow}; font:400 13px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; }
+      #${IDS8.tab} { position:fixed; right:16px; top:64px; z-index:1200; display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:5px 12px; border:1px solid ${T3.line}; border-radius:999px; background:${T3.surface}; color:${T3.accentInk}; box-shadow:${T3.shadow}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      #${IDS8.tab}:hover { border-color:${T3.accent}; }
       #${IDS8.tab} svg { width:14px; height:14px; fill:currentColor; }
       ${P} { position:fixed; right:16px; top:64px; z-index:1200; width:340px; max-height:calc(100vh - 90px); display:flex; flex-direction:column; }
-      ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T2.line}; }
+      ${P} .wp-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid ${T3.line}; }
       ${P} .wp-title { font-weight:650; font-size:13px; }
       ${P} .wp-head select { flex:1; min-width:0; }
       ${P} .wp-body { overflow:auto; padding:6px 12px 10px; }
-      ${P} .wp-switch { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid ${T2.line}; color:${T2.ink2}; font-size:12px; cursor:pointer; }
-      ${P} .wp-switch input { accent-color:${T2.accent}; margin:0; }
+      ${P} .wp-switch { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid ${T3.line}; color:${T3.ink2}; font-size:12px; cursor:pointer; }
+      ${P} .wp-switch input { accent-color:${T3.accent}; margin:0; }
       ${P} ul { margin:0; padding:0; list-style:none; }
-      ${P} li { display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:start; padding:8px 0; border-bottom:1px solid ${T2.line}; }
+      ${P} li { display:grid; grid-template-columns:auto 1fr auto; gap:2px 8px; align-items:start; padding:8px 0; border-bottom:1px solid ${T3.line}; }
       ${P} li:last-child { border-bottom:0; }
-      ${P} li input[type=checkbox] { margin:2px 0 0; accent-color:${T2.accent}; }
-      ${P} li .wp-name { color:${T2.ink}; font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
-      ${P} li .wp-name:hover { color:${T2.accentInk}; text-decoration:underline; }
-      ${P} li.wp-done .wp-name { color:${T2.muted}; text-decoration:line-through; }
+      ${P} li input[type=checkbox] { margin:2px 0 0; accent-color:${T3.accent}; }
+      ${P} li .wp-name { color:${T3.ink}; font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
+      ${P} li .wp-name:hover { color:${T3.accentInk}; text-decoration:underline; }
+      ${P} li.wp-done .wp-name { color:${T3.muted}; text-decoration:line-through; }
       ${P} li .wp-notiz, ${P} li .wp-extra, ${P} li .wp-edit { grid-column:2 / 4; }
-      ${P} li .wp-notiz { color:${T2.ink2}; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+      ${P} li .wp-notiz { color:${T3.ink2}; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
       ${P} li .wp-edit { display:flex; gap:4px; }
       ${P} li .wp-edit input { flex:1; min-width:0; }
-      ${P} .wp-tag { margin-left:6px; padding:1px 6px; border-radius:999px; background:${T2.accentSoft}; color:${T2.accentInk}; font-size:11px; font-weight:600; white-space:nowrap; }
+      ${P} .wp-tag { margin-left:6px; padding:1px 6px; border-radius:999px; background:${T3.accentSoft}; color:${T3.accentInk}; font-size:11px; font-weight:600; white-space:nowrap; }
       ${P} .wp-actions { display:flex; gap:2px; }
-      ${P} .wp-icon { min-width:24px; height:24px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:${T2.muted}; cursor:pointer; font:400 14px/24px system-ui,Arial,sans-serif; }
-      ${P} .wp-icon:hover { background:${T2.sunken}; color:${T2.ink}; }
+      ${P} .wp-icon { min-width:24px; height:24px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:${T3.muted}; cursor:pointer; font:400 14px/24px system-ui,Arial,sans-serif; }
+      ${P} .wp-icon:hover { background:${T3.sunken}; color:${T3.ink}; }
       ${P} .wp-add { display:flex; gap:6px; margin-top:10px; }
       ${P} .wp-add select { flex:1; min-width:0; }
-      ${P} select, ${P} input[type=text], ${R} select { height:28px; box-sizing:border-box; padding:3px 6px; border:1px solid ${T2.lineStrong}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; font:400 12px/1.2 system-ui,Arial,sans-serif; }
-      ${P} .wp-btn, ${R} .wp-btn { height:28px; padding:0 10px; border:1px solid ${T2.lineStrong}; border-radius:6px; background:${T2.surface}; color:${T2.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      ${P} .wp-btn:hover, ${R} .wp-btn:hover { background:${T2.sunken}; }
-      ${P} .wp-primary, ${R} .wp-primary { border-color:${T2.accent}; background:${T2.accent}; color:#fff; }
-      ${P} .wp-primary:hover, ${R} .wp-primary:hover { background:${T2.accentInk}; }
+      ${P} select, ${P} input[type=text], ${R} select { height:28px; box-sizing:border-box; padding:3px 6px; border:1px solid ${T3.lineStrong}; border-radius:6px; background:${T3.surface}; color:${T3.ink}; font:400 12px/1.2 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn, ${R} .wp-btn { height:28px; padding:0 10px; border:1px solid ${T3.lineStrong}; border-radius:6px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${P} .wp-btn:hover, ${R} .wp-btn:hover { background:${T3.sunken}; }
+      ${P} .wp-primary, ${R} .wp-primary { border-color:${T3.accent}; background:${T3.accent}; color:#fff; }
+      ${P} .wp-primary:hover, ${R} .wp-primary:hover { background:${T3.accentInk}; }
       ${P} button:disabled, ${R} button:disabled { cursor:wait; opacity:.6; }
-      ${P} .wp-hint { margin:8px 0 0; color:${T2.muted}; font-size:12px; }
-      ${P} .wp-link { border:0; padding:0; background:none; color:${T2.accentInk}; cursor:pointer; font:inherit; font-size:12px; text-decoration:underline; }
-      ${P} .wp-status, ${R} .wp-status { min-height:0; font-size:12px; color:${T2.ink2}; }
+      ${P} .wp-hint { margin:8px 0 0; color:${T3.muted}; font-size:12px; }
+      ${P} .wp-link { border:0; padding:0; background:none; color:${T3.accentInk}; cursor:pointer; font:inherit; font-size:12px; text-decoration:underline; }
+      ${P} .wp-status, ${R} .wp-status { min-height:0; font-size:12px; color:${T3.ink2}; }
       ${P} .wp-status:not(:empty) { margin-top:8px; }
-      ${P} .wp-status.wp-error, ${R} .wp-status.wp-error { color:${T2.bad}; }
+      ${P} .wp-status.wp-error, ${R} .wp-status.wp-error { color:${T3.bad}; }
       ${R} { position:fixed; inset:0; z-index:2147482000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.4); }
       ${R} .wp-card { width:min(560px,94vw); max-height:86vh; overflow:auto; padding:18px 20px; }
       ${R} h2 { margin:0 0 4px; font-size:15px; font-weight:650; }
-      ${R} p { margin:0 0 12px; color:${T2.ink2}; font-size:12px; }
+      ${R} p { margin:0 0 12px; color:${T3.ink2}; font-size:12px; }
       ${R} ul { margin:0 0 12px; padding:0; list-style:none; }
-      ${R} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T2.line}; }
+      ${R} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T3.line}; }
       ${R} .wp-who { flex:1; min-width:0; }
       ${R} .wp-who b { display:block; font-weight:600; }
-      ${R} .wp-who span { color:${T2.ink2}; font-size:12px; }
-      ${R} .wp-seg { display:inline-flex; border:1px solid ${T2.lineStrong}; border-radius:6px; overflow:hidden; }
-      ${R} .wp-seg button { height:26px; padding:0 10px; border:0; background:${T2.surface}; color:${T2.ink2}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
-      ${R} .wp-seg button + button { border-left:1px solid ${T2.lineStrong}; }
-      ${R} .wp-seg button[aria-pressed="true"] { background:${T2.accentSoft}; color:${T2.accentInk}; }
+      ${R} .wp-who span { color:${T3.ink2}; font-size:12px; }
+      ${R} .wp-seg { display:inline-flex; border:1px solid ${T3.lineStrong}; border-radius:6px; overflow:hidden; }
+      ${R} .wp-seg button { height:26px; padding:0 10px; border:0; background:${T3.surface}; color:${T3.ink2}; cursor:pointer; font:600 12px/1 system-ui,Arial,sans-serif; }
+      ${R} .wp-seg button + button { border-left:1px solid ${T3.lineStrong}; }
+      ${R} .wp-seg button[aria-pressed="true"] { background:${T3.accentSoft}; color:${T3.accentInk}; }
       ${R} .wp-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-      .${STAR_CLASS} { display:inline-flex; vertical-align:-3px; width:18px; height:18px; margin-right:3px; padding:0; border:0; background:transparent; cursor:pointer; color:${T2.lineStrong}; }
-      .${STAR_CLASS}:hover { color:${T2.accent}; }
-      .${STAR_CLASS}[data-on="1"] { color:${T2.accent}; }
+      .${STAR_CLASS} { display:inline-flex; vertical-align:-3px; width:18px; height:18px; margin-right:3px; padding:0; border:0; background:transparent; cursor:pointer; color:${T3.lineStrong}; }
+      .${STAR_CLASS}:hover { color:${T3.accent}; }
+      .${STAR_CLASS}[data-on="1"] { color:${T3.accent}; }
       .${STAR_CLASS} svg { width:18px; height:18px; fill:currentColor; }
-      tr[data-werkia-prio="1"] > td:first-child { box-shadow:inset 3px 0 0 ${T2.accent}; }
+      tr[data-werkia-prio="1"] > td:first-child { box-shadow:inset 3px 0 0 ${T3.accent}; }
     `;
       document.head.appendChild(style);
     }
@@ -19241,7 +20290,7 @@ ${buildCbreBody(current)}`;
     function pageEmployers() {
       const onList = prioEmployerIds(entries, today());
       const found = /* @__PURE__ */ new Map();
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR12)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
         const employer = employerOfRow(row2);
         if (employer && !onList.has(employer.id) && !found.has(employer.id)) found.set(employer.id, employer.name || "Unbekannter Arbeitgeber");
       }
@@ -19327,7 +20376,7 @@ ${buildCbreBody(current)}`;
       const day = today();
       const ids = prioEmployerIds(entries, day);
       const ready = loaded || Boolean(error);
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR12)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
         const employer = employerOfRow(row2);
         if (!employer) continue;
         const flag = ids.has(employer.id) ? "1" : "";
@@ -19373,7 +20422,7 @@ ${buildCbreBody(current)}`;
     function applyOrder(ids) {
       const on = prioFirst();
       if (!on && !wasSorted) return;
-      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR12)].map((row2) => row2.parentElement))) {
+      for (const tbody of new Set([...document.querySelectorAll(ROW_SELECTOR13)].map((row2) => row2.parentElement))) {
         const groups = rowGroups(tbody);
         if (groups.some((group) => !natural.has(group[0]))) {
           epoch += 1;
@@ -19489,7 +20538,7 @@ ${buildCbreBody(current)}`;
       loadAbsentOnce();
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -19504,9 +20553,9 @@ ${buildCbreBody(current)}`;
     }, true);
     runtime.addWindowListener("hashchange", () => {
       if (isTargetPage9()) load2();
-      schedule();
+      schedule2();
     });
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
     runtime.setInterval(() => {
       checkReview().catch((failure2) => console.warn("[Prio-Liste] Popup:", failure2));
     }, REVIEW_CHECK_MS);
@@ -19520,7 +20569,7 @@ ${buildCbreBody(current)}`;
         if (star.dataset.werkiaPrioOwner === sourcePath) star.remove();
       });
     });
-    schedule();
+    schedule2();
     runtime.setTimeout(() => {
       checkReview().catch((failure2) => console.warn("[Prio-Liste] Popup:", failure2));
     }, 3e3);
@@ -19614,9 +20663,9 @@ ${buildCbreBody(current)}`;
     if (runtime.MutationObserver) return new runtime.MutationObserver(callback);
     return new MutationObserver(callback);
   }
-  var clean6 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  var clean8 = (text) => String(text || "").replace(/\s+/g, " ").trim();
   function executeVacancyStatus(runtime, config) {
-    const { sourcePath, getRequest, namespace, runLock = null, lockId = "vacancy-status" } = config;
+    const { sourcePath, getRequest: getRequest2, namespace, runLock = null, lockId = "vacancy-status" } = config;
     const inMatchList = config.placement === "match-list";
     const bulk = inMatchList ? null : config.bulk || null;
     const isRoute = inMatchList ? config.isRoute : isVacancyListRoute;
@@ -19654,7 +20703,7 @@ ${buildCbreBody(current)}`;
       document.head.appendChild(style);
     }
     function cellText(cell) {
-      return clean6([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS2))).map((node) => node.textContent).join(" "));
+      return clean8([...cell.childNodes].filter((node) => !(node.nodeType === 1 && node.classList.contains(WRAP_CLASS2))).map((node) => node.textContent).join(" "));
     }
     function vacancyIdFromRow(row2) {
       for (const link of row2.querySelectorAll('a[href*="#/JobPosition/"]')) {
@@ -19691,7 +20740,7 @@ ${buildCbreBody(current)}`;
       missing.forEach((id) => loading.add(id));
       try {
         for (const group of chunk(missing)) {
-          const result = await getRequest()(VACANCY_STATUSES_QUERY, { filter: { ids: group } });
+          const result = await getRequest2()(VACANCY_STATUSES_QUERY, { filter: { ids: group } });
           (result?.items || []).forEach((item) => {
             if (item?.id) loaded.set(item.id, item.status || "");
           });
@@ -19731,7 +20780,7 @@ ${buildCbreBody(current)}`;
       return Promise.resolve().then(operation).finally(() => runLock.release(lockId));
     }
     async function writeStatus(id, value) {
-      const result = await getRequest()(UPDATE_VACANCY_STATUS_MUTATION, { id, status: value });
+      const result = await getRequest2()(UPDATE_VACANCY_STATUS_MUTATION, { id, status: value });
       const vacancy = result?.data;
       if (vacancy?.id !== id || vacancy.status !== value) {
         throw new Error(`Status wurde nicht auf „${statusLabel(value)}“ bestätigt`);
@@ -19815,9 +20864,9 @@ ${buildCbreBody(current)}`;
     function bulkEntries() {
       const seen = /* @__PURE__ */ new Set();
       return visibleRows().filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => {
-        const title = clean6(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
-        const place = clean6(entry.row.querySelector(".column-location\\.name")?.textContent);
-        const employer = clean6(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
+        const title = clean8(entry.row.querySelector(".column-mainTitle")?.textContent) || "Ohne Titel";
+        const place = clean8(entry.row.querySelector(".column-location\\.name")?.textContent);
+        const employer = clean8(entry.row.querySelector(".column-employerId")?.textContent) || "Ohne Arbeitgeber";
         const status = currentStatus(entry);
         const label = [title, place].filter(Boolean).join(" · ");
         return { ...entry, employer, status, label: `${label.length > 80 ? `${label.slice(0, 79)}…` : label} (${statusLabel(status)})` };
@@ -19930,21 +20979,21 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/vacancy-status.js
-  var SOURCE_PATH4 = "kam/toolbox/src/features/vacancy-status.js";
+  var SOURCE_PATH5 = "kam/toolbox/src/features/vacancy-status.js";
   function isKamMyMatchesRoute(hash) {
     return /#\/KAM\/MyMatches(?:[/?]|$)/i.test(String(hash || ""));
   }
   function executeVacancyStatus2(runtime) {
-    const getRequest = () => getKamGraphqlAdapter().request;
+    const getRequest2 = () => getKamGraphqlAdapter().request;
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH4,
-      getRequest,
+      sourcePath: SOURCE_PATH5,
+      getRequest: getRequest2,
       namespace: "kam",
       bulk: { team: "KAM", tipHtml: () => kamHelp.tipHtml("vacancy-status-bulk", { tone: "dark" }) }
     });
     executeVacancyStatus(runtime, {
-      sourcePath: SOURCE_PATH4,
-      getRequest,
+      sourcePath: SOURCE_PATH5,
+      getRequest: getRequest2,
       namespace: "kam-matches",
       placement: "match-list",
       isRoute: isKamMyMatchesRoute
@@ -19959,12 +21008,12 @@ ${buildCbreBody(current)}`;
   var CRAWLING_QUERY = `query crawlingHerkunft($ids: [UUID!]) {
   items: allJobPositions(filter: { ids: $ids }, page: 0, perPage: ${MAX_IDS2}) { id additionalInformation createdAt }
 }`;
-  var UUID_RE4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var UUID_RE5 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var BERLIN_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
   function normalizeId(value) {
     const id = String(value || "").trim().toLowerCase();
-    return UUID_RE4.test(id) ? id : "";
+    return UUID_RE5.test(id) ? id : "";
   }
   function normalizeIds(values) {
     return [...new Set((values || []).map(normalizeId).filter(Boolean))];
@@ -20005,7 +21054,7 @@ ${buildCbreBody(current)}`;
     fetchCrawled,
     onChange = () => {
     },
-    schedule = (callback) => setTimeout(callback, 0),
+    schedule: schedule2 = (callback) => setTimeout(callback, 0),
     now = () => Date.now(),
     retryMs = RETRY_MS5,
     onError = (error) => console.warn("[Crawling-Herkunft]", error)
@@ -20050,7 +21099,7 @@ ${buildCbreBody(current)}`;
       missing.forEach((id) => pending.add(id));
       if (!scheduled) {
         scheduled = true;
-        schedule(() => {
+        schedule2(() => {
           flush();
         });
       }
@@ -20082,16 +21131,16 @@ ${buildCbreBody(current)}`;
       console.warn("[Crawling-Herkunft] Kein GraphQL-Zugang.");
       return;
     }
-    const STYLE_ID20 = `werkia-${namespace}-crawl-badge-style`;
+    const STYLE_ID21 = `werkia-${namespace}-crawl-badge-style`;
     const provider = createCrawlingProvider({
       fetchCrawled: createCrawlingClient({ request }),
       onChange: () => scheduleInstall(),
       schedule: (callback) => runtime.setTimeout(callback, 0)
     });
     function injectStyle() {
-      if (document.getElementById(STYLE_ID20)) return;
+      if (document.getElementById(STYLE_ID21)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID20;
+      style.id = STYLE_ID21;
       style.textContent = `
       .${BADGE_CLASS} { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid #0f7d7a; border-radius: 999px; background: #e7f4f3; color: #0b5f5d; font: 700 11px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; white-space: nowrap; vertical-align: middle; cursor: default; }
     `;
@@ -20167,7 +21216,7 @@ ${buildCbreBody(current)}`;
     runtime.addWindowListener("hashchange", scheduleInstall);
     runtime.addCleanup?.(() => {
       teardown();
-      document.getElementById(STYLE_ID20)?.remove();
+      document.getElementById(STYLE_ID21)?.remove();
     });
     scheduleInstall();
   }
@@ -20182,206 +21231,10 @@ ${buildCbreBody(current)}`;
     });
   }
 
-  // ../../shared/js/comment-shortcuts/core.js
-  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
-  var GROUPS = [
-    { id: "haeufig", label: "Häufig" },
-    { id: "kontakt", label: "Kontakt" },
-    { id: "termine", label: "Termine" },
-    { id: "unterlagen", label: "Unterlagen" },
-    // Ohne Ziel: keine Knöpfe, nur Tooltip.
-    { id: "profil", label: "Personen und Profil" }
-  ];
-  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
-  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
-  var RAW = [
-    // Kontakt und Erreichbarkeit
-    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
-    ["kontakt", "te", "AP telefonisch erreicht", "AG"],
-    ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
-    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
-    ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
-    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
-    ["kontakt", "WA", "WhatsApp", "AG/M"],
-    ["kontakt", "VC", "Videocall", "AG/M"],
-    ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
-    ["kontakt", "RM", "Rückmeldung", "AG/M"],
-    ["kontakt", "FB", "Feedback", "M"],
-    ["kontakt", "JF", "Jour fixe", "AG"],
-    ["kontakt", "FYI", "zur Info", "AG/M", { varianten: ["FMI"] }],
-    ["kontakt", "Sek", "Sekretariat", "AG"],
-    // Termine und Prozess
-    ["termine", "VT", "Vorstellungstermin", "M"],
-    ["termine", "VTA", "VT-Anfrage (Anfrage Vorstellungstermin)", "M"],
-    ["termine", "VTV", "Vorstellungstermin vereinbart", "M", { unbestaetigt: true }],
-    ["termine", "VTS", "Vorstellungstermin stattgefunden", "M", { unbestaetigt: true, hinweis: "auch Mehrzahl von VT" }],
-    ["termine", "VG", "Vorstellungsgespräch", "M", { varianten: ["VSG"] }],
-    ["termine", "HT", "Hospitation/Probetag", "M", { unbestaetigt: true }],
-    ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
-    ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
-    ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
-    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
-    // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
-    ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
-    ["termine", "digi", "digitaler Termin", "M"],
-    ["termine", "HC", "Hot Case", "M"],
-    ["termine", "HHC", "Hot Hot Case", "M"],
-    ["termine", "out", "Absage", "M"],
-    ["termine", "on hold", "pausiert", "AG/M"],
-    ["termine", "ABS", "Absage", "M"],
-    ["termine", "WVL", "Wiedervorlage", "M"],
-    // Unterlagen und Vertrag
-    ["unterlagen", "UL", "Unterlagen", "M"],
-    ["unterlagen", "CV", "Lebenslauf", "M"],
-    ["unterlagen", "GB", "Gesellenbrief", "M"],
-    ["unterlagen", "AZ", "Arbeitszeugnis", "M"],
-    ["unterlagen", "PFB", "Personalfragebogen", "M"],
-    ["unterlagen", "AV", "Arbeitsvertrag", "M"],
-    ["unterlagen", "AVU", "Unterschrift Arbeitsvertrag", "M"],
-    ["unterlagen", "SD", "Startdatum", "M"],
-    ["unterlagen", "PZ", "Probezeit", "M"],
-    // Eindeutig: "KD-Dienst" (Kundendienst) bleibt unberührt, ein Bindestrich
-    // gilt beim Vorschlag als Teil des Wortes.
-    ["unterlagen", "KD", "Kontaktdaten", "AG/M", { hinweis: "nicht in „KD-Dienst“ (Kundendienst)" }],
-    // Personen und Profil: kein Ziel, keine Knöpfe, nur Tooltip.
-    ["profil", "AP", "Ansprechpartner", null],
-    ["profil", "BEW", "Bewerber", null],
-    ["profil", "AG", "Arbeitgeber", null],
-    ["profil", "GF", "Geschäftsführung", null],
-    ["profil", "FA", "Fachabteilung", null],
-    ["profil", "SV", "Stellvertreter des AP", null, { unbestaetigt: true }],
-    ["profil", "BE", "Berufserfahrung", null],
-    ["profil", "FS", "Führerschein", null],
-    ["profil", "RB", "Reisebereitschaft", null],
-    ["profil", "MB", "Montagebereitschaft", null, { unbestaetigt: true }],
-    ["profil", "TZ", "Teilzeit", null],
-    ["profil", "VZ", "Vollzeit", null],
-    ["profil", "FW", "Firmenwagen", null],
-    ["profil", "HO", "Homeoffice", null],
-    ["profil", "PV", "Photovoltaik", null, { unbestaetigt: true }],
-    ["profil", "WP", "Wärmepumpe", null, { unbestaetigt: true }],
-    ["profil", "SHK", "Sanitär-Heizung-Klima", null, { unbestaetigt: true }],
-    ["profil", "ZS", "Zählerschrank", null, { unbestaetigt: true }],
-    ["profil", "PL", "Projektleiter", null]
-  ];
-  var SHORTCUTS = Object.freeze(RAW.map(([gruppe, kuerzel, text, ziel, extra = {}]) => Object.freeze({
-    id: `${gruppe}:${kuerzel}`,
-    gruppe,
-    kuerzel,
-    text,
-    ziel,
-    label: extra.label || kuerzel,
-    einfuegen: extra.einfuegen || extra.label || kuerzel,
-    optionen: Object.freeze([...extra.optionen || []]),
-    varianten: Object.freeze([...extra.varianten || []]),
-    unbestaetigt: Boolean(extra.unbestaetigt),
-    hinweis: extra.hinweis || ""
-  })));
-  var PHRASE_RAW = [
-    ["AP tne, SA raus", TNE_OPTIONS],
-    ["Mail raus", MAIL_OPTIONS],
-    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
-    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
-    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
-    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
-    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
-  ];
-  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
-    id: `haeufig:${text}`,
-    gruppe: "haeufig",
-    kuerzel: text,
-    text,
-    ziel: TARGETS.M,
-    label: text,
-    einfuegen: text,
-    optionen: Object.freeze([...optionen]),
-    varianten: Object.freeze([]),
-    unbestaetigt: false,
-    hinweis: "",
-    satz: true
-  })));
-  function buttonGroups(shortcuts = SHORTCUTS, phrases = PHRASES) {
-    const items = [...phrases, ...shortcuts];
-    return GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.gruppe === group.id && item.ziel) })).filter((group) => group.items.length);
-  }
-  function buttonTitle2(item) {
-    const parts = [item.satz ? "In den Matchkommentar schreiben" : `${item.label}: ${item.text}`];
-    if (!item.satz && item.einfuegen !== item.label) parts.push(`schreibt „${item.einfuegen}“`);
-    if (item.hinweis) parts.push(item.hinweis);
-    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
-    if (item.optionen.length) parts.push("Rechtsklick: weitere Varianten");
-    return parts.join(" · ");
-  }
-  function menuOptions(item) {
-    return [.../* @__PURE__ */ new Set([item.einfuegen, ...item.optionen])];
-  }
-  function explainTitle(item, token = item.kuerzel) {
-    const parts = [`${token}: ${item.text}`];
-    if (item.hinweis) parts.push(item.hinweis);
-    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
-    return parts.join(" · ");
-  }
-  var WORD_CHAR = /[\p{L}\p{N}_-]/u;
-  function explainTokens(shortcuts = SHORTCUTS) {
-    const tokens = [];
-    for (const item of shortcuts) {
-      for (const token of /* @__PURE__ */ new Set([item.kuerzel, ...item.varianten])) tokens.push({ token, item });
-    }
-    return tokens.sort((a, b) => b.token.length - a.token.length);
-  }
-  var DEFAULT_TOKENS = explainTokens();
-  function shortcutAtOffset(text, offset, tokens = DEFAULT_TOKENS) {
-    const value = String(text || "");
-    const at = Number(offset);
-    if (!Number.isInteger(at) || at < 0 || at > value.length) return null;
-    for (const { token, item } of tokens) {
-      let start = value.lastIndexOf(token, at);
-      while (start >= 0 && start + token.length >= at) {
-        const end = start + token.length;
-        const prev = value.charAt(start - 1);
-        const next = value.charAt(end);
-        if (at < end && (!prev || !WORD_CHAR.test(prev)) && (!next || !WORD_CHAR.test(next))) return { item, token, start, end };
-        start = start > 0 ? value.lastIndexOf(token, start - 1) : -1;
-      }
-    }
-    return null;
-  }
-  function insertionText(before, text) {
-    const prev = String(before || "").slice(-1);
-    return `${prev && !/\s/.test(prev) ? " " : ""}${text}`;
-  }
-  var TEMPLATE_AREA = "vorlage";
-  var TEMPLATE_TITLE_MAX = 60;
-  var TEMPLATE_TEXT_MAX = 4e3;
-  function toTemplate(eintrag) {
-    const daten = eintrag?.daten || {};
-    return {
-      id: String(eintrag?.id || ""),
-      titel: String(daten.titel || "").trim(),
-      text: String(daten.text || ""),
-      eigen: eintrag?.eigen !== false
-    };
-  }
-  function sortTemplates(templates) {
-    return [...templates].sort((a, b) => a.titel.localeCompare(b.titel, "de", { sensitivity: "base" }));
-  }
-  function validateTemplate({ titel, text }) {
-    const title = String(titel || "").trim();
-    const body = String(text || "").trim();
-    if (!title) return "Bitte einen Titel eingeben.";
-    if (title.length > TEMPLATE_TITLE_MAX) return `Der Titel darf höchstens ${TEMPLATE_TITLE_MAX} Zeichen haben.`;
-    if (!body) return "Bitte einen Text eingeben.";
-    if (body.length > TEMPLATE_TEXT_MAX) return `Der Text darf höchstens ${TEMPLATE_TEXT_MAX} Zeichen haben.`;
-    return "";
-  }
-  function templateEntry({ id, titel, text }) {
-    return { ...id ? { id } : {}, daten: { titel: String(titel).trim(), text: String(text).replace(/\s+$/, "") } };
-  }
-
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR2 = "data-werkia-shortcut-explain";
-  var STYLE_ID15 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID16 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -20417,9 +21270,9 @@ ${buildCbreBody(current)}`;
     }
   }
   function ensureStyle5(doc) {
-    if (doc.getElementById(STYLE_ID15)) return;
+    if (doc.getElementById(STYLE_ID16)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID15;
+    style.id = STYLE_ID16;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -20494,7 +21347,7 @@ ${buildCbreBody(current)}`;
 
   // ../../shared/js/comment-shortcuts/index.js
   var PREFIX3 = "werkia-shortcuts";
-  var STYLE_ID16 = `${PREFIX3}-style`;
+  var STYLE_ID17 = `${PREFIX3}-style`;
   var BAR_CLASS3 = `${PREFIX3}-bar`;
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
   var DIALOG_SELECTOR3 = 'div[role="dialog"], .MuiDialog-paper';
@@ -20571,9 +21424,9 @@ ${buildCbreBody(current)}`;
     return Boolean(document.execCommand?.("insertText", false, multiline ? text : insertionText(before, text)));
   }
   function ensureStyle6() {
-    if (document.getElementById(STYLE_ID16)) return;
+    if (document.getElementById(STYLE_ID17)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID16;
+    style.id = STYLE_ID17;
     style.textContent = `
     .${BAR_CLASS3} {
       --ws-surface:#ffffff; --ws-sunken:#f4f4f5; --ws-ink:#09090b; --ws-ink2:#52525b; --ws-muted:#8b8b94;
@@ -21062,7 +21915,7 @@ ${buildCbreBody(current)}`;
     }
     return names;
   }
-  function matchLabel(name) {
+  function matchLabel2(name) {
     if (!name) return "";
     return [name.kandidat, name.arbeitgeber].filter(Boolean).join(" – ");
   }
@@ -21102,7 +21955,7 @@ ${buildCbreBody(current)}`;
       const at = new Date(termin.at).getTime();
       const key = popupKey("termin", termin.id);
       if (at - TERMIN_VORLAUF_MS <= time && time < at && !gesehen[key]) {
-        items.push({ key, art: "termin", zeit: termin.uhrzeit, titel: `${termin.typ} um ${termin.uhrzeit}`, text: matchLabel(termin), matchId: termin.matchId });
+        items.push({ key, art: "termin", zeit: termin.uhrzeit, titel: `${termin.typ} um ${termin.uhrzeit}`, text: matchLabel2(termin), matchId: termin.matchId });
       }
     }
     const wvlKey = popupKey("wvl", day);
@@ -21288,7 +22141,7 @@ ${buildCbreBody(current)}`;
     dialog: "werkia-tagesplan-reminder-dialog"
   };
   var ROW_BUTTON_CLASS = "werkia-tagesplan-row-button";
-  var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR14 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR11 = 'a[href*="#/Match/"]';
   var TICK_MS2 = 30 * 1e3;
   var CLOCK_MS = 1e3;
@@ -21667,7 +22520,7 @@ ${buildCbreBody(current)}`;
           try {
             let label = "";
             try {
-              label = matchLabel((await resolveNames([matchId])).get(matchId));
+              label = matchLabel2((await resolveNames([matchId])).get(matchId));
             } catch {
             }
             const saved = await client().speichern("reminder", reminderEintrag(draft, { matchId, label }));
@@ -21697,7 +22550,7 @@ ${buildCbreBody(current)}`;
     }
     function decorateRows() {
       if (!isTargetPage9()) return;
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR13)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR14)) {
         const link = row2.querySelector(MATCH_LINK_SELECTOR11);
         const matchId = link?.getAttribute("href")?.match(/#\/Match\/([^/?]+)/i)?.[1] || "";
         if (!matchId) continue;
@@ -21999,7 +22852,7 @@ ${buildCbreBody(current)}`;
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -22008,8 +22861,8 @@ ${buildCbreBody(current)}`;
         decorateRows();
       }, 250);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
     let lastSlot = tickSlot(now().getTime());
     runtime.setInterval(() => {
       const slot = tickSlot(now().getTime());
@@ -22028,7 +22881,7 @@ ${buildCbreBody(current)}`;
         if (element6.dataset.werkiaTagesplanOwner === sourcePath) element6.remove();
       });
     });
-    schedule();
+    schedule2();
     tick().catch(() => {
     });
     return { tick, openPanel, openReminderDialog, state: { werkia, daten, team } };
@@ -22171,9 +23024,9 @@ ${buildCbreBody(current)}`;
   }
 
   // src/features/day-phases/index.js
-  var SOURCE_PATH5 = "kam/toolbox/src/features/day-phases/index.js";
+  var SOURCE_PATH6 = "kam/toolbox/src/features/day-phases/index.js";
   var ROOT_ID = "werkia-kam-day-phase";
-  var STYLE_ID17 = "werkia-kam-day-phase-style";
+  var STYLE_ID18 = "werkia-kam-day-phase-style";
   var MY_MATCHES2 = "#/KAM/MyMatches";
   var FOCUS_SELECT_ID = "werkia-focus-select";
   var TAGESPLAN_BUTTON_ID = "werkia-tagesplan-button";
@@ -22215,7 +23068,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     phases = toolboxPhases(),
     helpTip = () => kamHelp.tip("day-phases")
   } = {}) {
-    runtime.registerSource(SOURCE_PATH5);
+    runtime.registerSource(SOURCE_PATH6);
     const loadPrefs = () => readPrefs((() => {
       try {
         return storage?.getItem(PREFS_KEY);
@@ -22232,9 +23085,9 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       render(true);
     };
     function ensureStyle8() {
-      if (document.getElementById(STYLE_ID17)) return;
+      if (document.getElementById(STYLE_ID18)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID17;
+      style.id = STYLE_ID18;
       style.textContent = CSS4;
       document.head.appendChild(style);
     }
@@ -22326,7 +23179,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     runtime.setInterval(() => render(), REFRESH_MS4);
     runtime.addCleanup?.(() => {
       document.getElementById(ROOT_ID)?.remove();
-      document.getElementById(STYLE_ID17)?.remove();
+      document.getElementById(STYLE_ID18)?.remove();
     });
     render();
     return { render };
@@ -22413,10 +23266,10 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     dialog: "werkia-arbeitgeber-pause-dialog",
     style: "werkia-arbeitgeber-pause-style"
   };
-  var OWNER_KEY2 = "werkiaArbeitgeberPauseOwner";
+  var OWNER_KEY3 = "werkiaArbeitgeberPauseOwner";
   var CACHE_MS8 = 5 * 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
-  var T3 = {
+  var T4 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -22452,7 +23305,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     let state = { entries: [], heute: "", hits: null, query: "", selected: null, editing: "" };
     const owned = (id) => {
       const element6 = document.getElementById(id);
-      return element6?.dataset[OWNER_KEY2] === sourcePath ? element6 : null;
+      return element6?.dataset[OWNER_KEY3] === sourcePath ? element6 : null;
     };
     const currentEmployerId = () => employerIdFromHash(location.hash || "");
     const isButtonPage = () => ROUTES.kamMyMatches.test(location.hash || "") || Boolean(currentEmployerId());
@@ -22465,39 +23318,39 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       #${IDS10.button}.wap-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS10.button}.wap-native:hover { background:rgba(0,0,0,.04); }
       #${IDS10.button}.wap-native svg { flex:none; fill:currentColor; }
-      #${IDS10.button}.wap-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T3.line}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      #${IDS10.button}.wap-paused { color:${T3.accentInk} !important; background:${T3.accentSoft} !important; }
+      #${IDS10.button}.wap-own { min-height:30px; margin:0 8px 10px 0; padding:5px 10px; border:1px solid ${T4.line}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS10.button}.wap-paused { color:${T4.accentInk} !important; background:${T4.accentSoft} !important; }
       ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-      ${d} .wap-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T3.line}; border-radius:12px; background:${T3.surface}; color:${T3.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      ${d} .wap-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T3.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
-      ${d} .wap-close:hover { background:${T3.sunken}; }
+      ${d} .wap-card { position:relative; width:min(680px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T4.line}; border-radius:12px; background:${T4.surface}; color:${T4.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wap-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T4.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wap-close:hover { background:${T4.sunken}; }
       ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
-      ${d} h3 { margin:18px 0 8px; color:${T3.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
-      ${d} p { margin:0 0 10px; color:${T3.ink2}; font-size:12px; }
-      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T3.line}; }
-      ${d} li { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:8px 0; border-bottom:1px solid ${T3.line}; }
+      ${d} h3 { margin:18px 0 8px; color:${T4.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T4.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T4.line}; }
+      ${d} li { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:8px 0; border-bottom:1px solid ${T4.line}; }
       ${d} .wap-who { flex:1; min-width:200px; }
       ${d} .wap-name { font-weight:600; }
       ${d} .wap-name a { color:inherit; text-decoration:none; }
       ${d} .wap-name a:hover { text-decoration:underline; }
-      ${d} .wap-meta { color:${T3.muted}; font-size:11px; }
-      ${d} .wap-chip { padding:2px 8px; border-radius:999px; background:${T3.accentSoft}; color:${T3.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wap-meta { color:${T4.muted}; font-size:11px; }
+      ${d} .wap-chip { padding:2px 8px; border-radius:999px; background:${T4.accentSoft}; color:${T4.accentInk}; font-size:11px; font-weight:650; white-space:nowrap; }
       ${d} .wap-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-      ${d} .wap-form { margin-top:10px; padding:12px; border:1px solid ${T3.line}; border-radius:10px; background:${T3.sunken}; }
-      ${d} .wap-form label { display:flex; flex-direction:column; gap:4px; color:${T3.ink2}; font-size:11px; font-weight:600; }
+      ${d} .wap-form { margin-top:10px; padding:12px; border:1px solid ${T4.line}; border-radius:10px; background:${T4.sunken}; }
+      ${d} .wap-form label { display:flex; flex-direction:column; gap:4px; color:${T4.ink2}; font-size:11px; font-weight:600; }
       ${d} .wap-form .wap-grow { flex:1; min-width:200px; }
-      ${d} input { min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T3.lineStrong}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} input { min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T4.lineStrong}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
       ${d} .wap-row > input[type="search"] { flex:1; }
-      ${d} input:focus { outline:2px solid ${T3.accent}; outline-offset:-1px; }
-      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T3.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} input:focus { outline:2px solid ${T4.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T4.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
       ${d} button:disabled { cursor:default; opacity:.6; }
-      ${d} button.wap-secondary { border:1px solid ${T3.line}; background:${T3.surface}; color:${T3.ink}; }
-      ${d} button.wap-secondary:hover { background:${T3.sunken}; }
-      ${d} button.wap-danger { background:${T3.badSoft}; color:${T3.badInk}; }
-      ${d} button.wap-danger:hover { background:${T3.badHover}; }
+      ${d} button.wap-secondary { border:1px solid ${T4.line}; background:${T4.surface}; color:${T4.ink}; }
+      ${d} button.wap-secondary:hover { background:${T4.sunken}; }
+      ${d} button.wap-danger { background:${T4.badSoft}; color:${T4.badInk}; }
+      ${d} button.wap-danger:hover { background:${T4.badHover}; }
       ${d} .wap-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-      ${d} .wap-status { min-height:18px; margin-top:10px; color:${T3.ink2}; font-size:12px; }
-      ${d} .wap-status.wap-error { color:${T3.badInk}; }
+      ${d} .wap-status { min-height:18px; margin-top:10px; color:${T4.ink2}; font-size:12px; }
+      ${d} .wap-status.wap-error { color:${T4.badInk}; }
     `;
       document.head.appendChild(style);
     }
@@ -22751,7 +23604,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       ensureStyle8();
       state = { entries: cache?.entries || [], heute: cache?.heute || "", hits: null, query: "", selected: null, editing: "" };
       const overlay = el7("div", { id: IDS10.dialog });
-      overlay.dataset[OWNER_KEY2] = sourcePath;
+      overlay.dataset[OWNER_KEY3] = sourcePath;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeDialog();
       });
@@ -22801,7 +23654,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       const pauseButton = button3(label.text, () => openDialog({ employerId: currentEmployerId() }));
       pauseButton.id = IDS10.button;
       pauseButton.title = label.title;
-      pauseButton.dataset[OWNER_KEY2] = sourcePath;
+      pauseButton.dataset[OWNER_KEY3] = sourcePath;
       pauseButton.dataset.employerId = employerId;
       pauseButton.dataset.label = label.text;
       const look = nativeLookFrom(target.sample);
@@ -22883,12 +23736,12 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   function isOpenKamStatus(status) {
     return !CLOSED_KAM_STATUSES.includes(String(status || "").trim().toLowerCase());
   }
-  function clean7(value) {
+  function clean9(value) {
     return String(value ?? "").replace(/\s+/g, " ").trim();
   }
   function openApplicants(matches = [], candidates = [], jobs = []) {
-    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean7([c.firstName, c.lastName].filter(Boolean).join(" "))]));
-    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean7(j.mainTitle)]));
+    const candidateNames = new Map(candidates.map((c) => [String(c.id), clean9([c.firstName, c.lastName].filter(Boolean).join(" "))]));
+    const jobTitles = new Map(jobs.map((j) => [String(j.id), clean9(j.mainTitle)]));
     const seen = /* @__PURE__ */ new Set();
     const list = [];
     for (const match of matches) {
@@ -22972,7 +23825,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   }
 
   // src/features/match-mail/index.js
-  var STYLE_ID18 = "werkia-kam-match-mail-style-v1";
+  var STYLE_ID19 = "werkia-kam-match-mail-style-v1";
   var OPEN_ATTRIBUTE = "data-werkia-kam-mail-open";
   var BAR_ATTRIBUTE = "data-werkia-kam-mail-bar";
   var LIST_DIALOG_ATTRIBUTE = "data-werkia-kam-applicants-dialog";
@@ -22980,35 +23833,35 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
   var MAIL_DIALOG_TIMEOUT_MS = 2e3;
   var EMAIL_ICON_SELECTOR = 'svg[data-testid="EmailIcon"]';
   var BODY_SELECTOR = 'textarea[name="bodyPreview"]';
-  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT10 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var STYLE5 = `
-.werkia-kmm-open { display: inline-flex; align-items: center; gap: 4px; height: 24px; margin-left: 10px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; vertical-align: middle; cursor: pointer; }
+.werkia-kmm-open { display: inline-flex; align-items: center; gap: 4px; height: 24px; margin-left: 10px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT10}; vertical-align: middle; cursor: pointer; }
 .werkia-kmm-open:hover { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
 .werkia-kmm-open svg { width: 14px; height: 14px; fill: currentColor; }
-.werkia-kmm-open-msg { margin-left: 8px; font: 400 12px/1.4 ${FONT8}; color: #b52f2f; vertical-align: middle; }
+.werkia-kmm-open-msg { margin-left: 8px; font: 400 12px/1.4 ${FONT10}; color: #b52f2f; vertical-align: middle; }
 .werkia-kmm-open-msg:empty { display: none; }
-.werkia-kmm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0; padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0; padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa; font: 400 13px/1.45 ${FONT10}; color: #09090b; }
 .werkia-kmm-bar b { font-weight: 650; }
 .werkia-kmm-bar small { color: #8b8b94; }
 .werkia-kmm-bar small[data-tone="error"] { color: #b52f2f; }
-.werkia-kmm-btn { height: 24px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; cursor: pointer; }
+.werkia-kmm-btn { height: 24px; padding: 0 10px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT10}; cursor: pointer; }
 .werkia-kmm-btn:hover:not(:disabled), .werkia-kmm-btn[data-done="true"] { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
 .werkia-kmm-btn:disabled { opacity: .5; cursor: default; }
 .werkia-kmm-overlay { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center; background: rgba(9, 9, 11, .35); }
-.werkia-kmm-card { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 10px; background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-card { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 10px; background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); font: 400 13px/1.45 ${FONT10}; color: #09090b; }
 .werkia-kmm-card-head { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 14px; }
 .werkia-kmm-card-head small { font-weight: 500; color: #8b8b94; font-size: 12px; }
 .werkia-kmm-card-head small[data-tone="error"] { color: #b52f2f; }
-.werkia-kmm-card textarea { flex: 1 1 auto; min-height: 240px; resize: vertical; padding: 8px; border: 1px solid #e4e4e7; border-radius: 8px; font: 400 13px/1.45 ${FONT8}; color: #09090b; }
+.werkia-kmm-card textarea { flex: 1 1 auto; min-height: 240px; resize: vertical; padding: 8px; border: 1px solid #e4e4e7; border-radius: 8px; font: 400 13px/1.45 ${FONT10}; color: #09090b; }
 .werkia-kmm-card-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.werkia-kmm-employer { position: fixed; right: 16px; bottom: 16px; z-index: 1200; height: 30px; padding: 0 14px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT8}; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); cursor: pointer; }
+.werkia-kmm-employer { position: fixed; right: 16px; bottom: 16px; z-index: 1200; height: 30px; padding: 0 14px; border: 1px solid #d4d4d8; border-radius: 999px; background: #fff; color: #52525b; font: 600 12px/1 ${FONT10}; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); cursor: pointer; }
 .werkia-kmm-employer:hover { border-color: #ef6c00; color: #b85400; background: #fff3e8; }
 `;
   var MAIL_ICON_PATH = "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2m0 4-8 5-8-5V6l8 5 8-5z";
   function ensureStyle7(doc) {
-    if (doc.getElementById(STYLE_ID18)) return;
+    if (doc.getElementById(STYLE_ID19)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID18;
+    style.id = STYLE_ID19;
     style.textContent = STYLE5;
     (doc.head || doc.documentElement).appendChild(style);
   }
@@ -23205,7 +24058,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       }
       mailContext = { matchId: matchIdFromRow(row2) || matchId, employerId: employerIdFromRow(row2) };
       button3.click();
-      schedule();
+      schedule2();
       runtime.setTimeout(() => {
         if (!message.isConnected || findSendMailDialogs(document).length) return;
         message.textContent = "Der Mail-Dialog hat sich nicht geöffnet. Hat dein Account die Rolle für KAM-Mails?";
@@ -23340,7 +24193,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -23354,7 +24207,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       if (comments) {
         commentsRow = comments.closest("tr");
         commentsMatchId = matchIdFromRow(commentsRow);
-        schedule();
+        schedule2();
         return;
       }
       const button3 = target?.closest?.("button");
@@ -23362,10 +24215,10 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       const matchId = matchIdFromRow(row2);
       if (matchId) {
         mailContext = { matchId, employerId: employerIdFromRow(row2) };
-        schedule();
+        schedule2();
       }
     }, true);
-    runtime.addWindowListener?.("hashchange", schedule);
+    runtime.addWindowListener?.("hashchange", schedule2);
     try {
       if (typeof GM_registerMenuCommand === "function") {
         GM_registerMenuCommand("KAM-Toolbox: Offene Bewerber des Arbeitgebers", () => {
@@ -23377,8 +24230,8 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
       }
     } catch {
     }
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    schedule2();
   }
 
   // ../../shared/js/om-notes-templates/index.js
@@ -23409,7 +24262,7 @@ ${scopeCss(DAY_PHASES_CSS, `#${ROOT_ID}`)}
     { label: "Freitext", prefix: "" }
   ];
   var TOOLBAR_ID = "werkia-om-notes-template-toolbar";
-  var STYLE_ID19 = "werkia-om-notes-template-style";
+  var STYLE_ID20 = "werkia-om-notes-template-style";
   var TARGET_SELECTOR = 'textarea[name="omNotes"], input[name="omNotes"]';
   var CEM_TARGET_SELECTOR = 'textarea[name="cemNotes"], input[name="cemNotes"]';
   var EMPLOYER_ROUTE = /^#\/Employer\/[^/?]+/i;
@@ -23478,11 +24331,11 @@ ${next}`;
     }
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID19)) {
+    if (document.getElementById(STYLE_ID20)) {
       return;
     }
     const style = document.createElement("style");
-    style.id = STYLE_ID19;
+    style.id = STYLE_ID20;
     style.textContent = `
     [${LAYOUT_ROOT_ATTR}="left"] { --om-flags-panel-width:min(620px, max(500px, 35%)); --om-flags-gap:16px; position:relative !important; }
     [${LAYOUT_ROOT_ATTR}="left"] [${OM_ANCHOR_ATTR}], [${LAYOUT_ROOT_ATTR}="left"] [${CEM_ANCHOR_ATTR}] { width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; max-width:calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; margin-left:calc(var(--om-flags-panel-width) + var(--om-flags-gap)) !important; flex:0 0 calc(100% - var(--om-flags-panel-width) - var(--om-flags-gap)) !important; }
@@ -23732,8 +24585,8 @@ ${next}`;
       if (refreshTimer !== null) {
         return;
       }
-      const schedule = runtime?.setTimeout ? runtime.setTimeout.bind(runtime) : window.setTimeout.bind(window);
-      refreshTimer = schedule(() => {
+      const schedule2 = runtime?.setTimeout ? runtime.setTimeout.bind(runtime) : window.setTimeout.bind(window);
+      refreshTimer = schedule2(() => {
         refreshTimer = null;
         renderToolbar();
       }, 80);
@@ -23749,7 +24602,7 @@ ${next}`;
       }
       observer.disconnect();
       removeToolbar();
-      document.getElementById(STYLE_ID19)?.remove();
+      document.getElementById(STYLE_ID20)?.remove();
     });
     renderToolbar();
   }
@@ -23769,7 +24622,7 @@ ${next}`;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE2 = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID20 = "werkia-urgent-vacancy-style";
+      const STYLE_ID21 = "werkia-urgent-vacancy-style";
       const ROW_CLASS = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
@@ -23914,9 +24767,9 @@ ${next}`;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID20)) return;
+        if (document.getElementById(STYLE_ID21)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID20;
+        style.id = STYLE_ID21;
         style.textContent = `
       .${ROW_CLASS} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS} > td, .${ROW_CLASS} > th { background: #fff3cd !important; }
@@ -24021,6 +24874,8 @@ ${next}`;
     { id: "kam-suite-bulk-match-actions", execute: executeBulkMatchActions2 },
     { id: "tags-wvl", execute: executeTagsWvl },
     { id: "tags-hc", execute: executeTagsHc },
+    { id: "tags-unread", execute: executeKamTagsUnread },
+    { id: "tags-search", execute: executeKamTagsSearch },
     { id: "kam-suite-contact-badges", execute: executeContactBadges },
     { id: "kam-suite-match-contact-person", execute: executeKamMatchContactPerson },
     { id: "kam-suite-employer-notes", execute: executeKamEmployerNotes },
@@ -24045,6 +24900,7 @@ ${next}`;
     { id: "kam-suite-appointment-prio", execute: executeAppointmentPrio2 },
     { id: "termin-typ", execute: executeTerminTyp },
     { id: "vta-notizen", execute: executeVtaNotizen2 },
+    { id: "vtv-hot-warnung", execute: executeVtvHotWarnung2 },
     { id: "hiring-ruf", execute: executeHiringRuf2 },
     { id: "kam-suite-match-slack-actions", execute: executeMatchSlackActions },
     { id: "kam-suite-slack-dm", execute: executeSlackDm2 },

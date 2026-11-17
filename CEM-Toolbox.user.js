@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.34.559
+// @version      1.35.574
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -145,7 +145,7 @@
         few_career_opportunities: "Wenig Aufstiegschancen",
         already_worked_for_this_organisation: "War schon bei diesem AG"
       });
-      var OM_FEEDBACK_LABELS2 = Object.freeze({
+      var OM_FEEDBACK_LABELS3 = Object.freeze({
         too_far: "Distanz / zu weiter Arbeitsweg",
         willingness_to_travel: "Montagebereitschaft",
         no_driver_license: "Kein Führerschein",
@@ -177,23 +177,23 @@
         no_school_certificate: "Kein Schulabschluss"
       });
       var NO_REASON2 = "ohne Grund";
-      function clean4(value) {
+      function clean6(value) {
         return String(value ?? "").replace(/\s+/g, " ").trim();
       }
       function feedbackLabel2(value) {
-        const text = clean4(value);
+        const text = clean6(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(FEEDBACK_LABELS2, text) ? FEEDBACK_LABELS2[text] : text;
       }
       function declineLabel2(value) {
-        const text = clean4(value);
+        const text = clean6(value);
         if (!text) return "";
         return Object.prototype.hasOwnProperty.call(DECLINE_LABELS2, text) ? DECLINE_LABELS2[text] : text;
       }
       function omFeedbackLabel2(value) {
-        const text = clean4(value);
+        const text = clean6(value);
         if (!text) return "";
-        return Object.prototype.hasOwnProperty.call(OM_FEEDBACK_LABELS2, text) ? OM_FEEDBACK_LABELS2[text] : text;
+        return Object.prototype.hasOwnProperty.call(OM_FEEDBACK_LABELS3, text) ? OM_FEEDBACK_LABELS3[text] : text;
       }
       function joinLabels(values, labelOf) {
         const list = Array.isArray(values) ? values : [];
@@ -223,7 +223,7 @@
       module.exports = {
         FEEDBACK_LABELS: FEEDBACK_LABELS2,
         DECLINE_LABELS: DECLINE_LABELS2,
-        OM_FEEDBACK_LABELS: OM_FEEDBACK_LABELS2,
+        OM_FEEDBACK_LABELS: OM_FEEDBACK_LABELS3,
         NO_REASON: NO_REASON2,
         feedbackLabel: feedbackLabel2,
         declineLabel: declineLabel2,
@@ -563,7 +563,7 @@
     const symbol = Symbol();
     const timerId = generateUniqueNumber3(scheduledIntervalsState2);
     scheduledIntervalsState2.set(timerId, symbol);
-    const schedule = () => set(delay, timerId).then(() => {
+    const schedule2 = () => set(delay, timerId).then(() => {
       const state = scheduledIntervalsState2.get(timerId);
       if (state === void 0) {
         throw new Error("The timer is in an undefined state.");
@@ -571,11 +571,11 @@
       if (state === symbol) {
         func(...args);
         if (scheduledIntervalsState2.get(timerId) === symbol) {
-          schedule();
+          schedule2();
         }
       }
     });
-    schedule();
+    schedule2();
     return timerId;
   };
 
@@ -1893,7 +1893,7 @@
     let current = null;
     let showTimer = null;
     let hideTimer = null;
-    let timers2 = { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (handle) => window.clearTimeout(handle) };
+    let timers2 = { setTimeout: (fn, ms2) => window.setTimeout(fn, ms2), clearTimeout: (handle) => window.clearTimeout(handle) };
     const findTopic = (topicId) => {
       const topic = topicsById.get(topicId);
       if (!topic) console.warn(`[${toolboxName} Hilfe] Unbekanntes Hilfethema: ${topicId}`);
@@ -2183,7 +2183,7 @@
     }
     function install(runtime, { dock = true, menu = true, dockHostPattern } = {}) {
       if (dockHostPattern) dockHosts = dockHostPattern;
-      timers2 = { setTimeout: (fn, ms) => runtime.setTimeout(fn, ms), clearTimeout: (handle) => runtime.clearTimeout(handle) };
+      timers2 = { setTimeout: (fn, ms2) => runtime.setTimeout(fn, ms2), clearTimeout: (handle) => runtime.clearTimeout(handle) };
       ensureExtraStyles();
       const swallow = (event) => {
         const target = event.target;
@@ -2524,6 +2524,7 @@
       notes: [
         "Grün: Nichts spricht dagegen. Gelb: Mindestens ein Punkt ist unklar, bitte selbst prüfen. Rot: Mindestens eine Anforderung ist nicht erfüllt.",
         "Verglichen werden Montagebereitschaft, Sprachkenntnisse, Berufserfahrung, Anerkennung, Führerschein, Gehalt und Position. Die betroffenen Felder im Fragebogen werden mit derselben Farbe markiert, die Gründe stehen im Banner.",
+        "Der Score in der Liste rechnet das Adminpanel selbst aus, nach eigenen Regeln. Ein hoher Score und ein rotes Banner schließen sich deshalb nicht aus; der Grund steht immer im Banner.",
         "Das Banner ist nur eine Empfehlung. Es sendet nichts und ändert keinen Status."
       ]
     };
@@ -2579,6 +2580,22 @@
         "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet. Dann gibt es keinen 💀.",
         "Die Liste kommt seitenweise vom Server, der die Fahrzeit nicht kennt. Eine Seite zeigt deshalb weniger Zeilen, wenn welche ausgeblendet sind. Umsortiert wird nichts.",
         "Konnte nicht geprüft werden, ob die Vakanz landes- oder bundesweit ist, bleibt die Zeile mit 💀 ausgegraut sichtbar."
+      ]
+    };
+  }
+  function employerGroupsTopic() {
+    return {
+      id: "employer-groups",
+      title: "Mehrere Stellen eines Arbeitgebers zusammengeklappt",
+      page: PAGES.potentialMatches,
+      routes: [ROUTES.potentialMatches],
+      kind: "view",
+      summary: "Hat ein Arbeitgeber mehrere Vorschläge auf der Seite, bleibt nur der erste (höchster Score) sichtbar. Der Knopf „+n weitere Stellen bei …“ klappt die übrigen auf und wieder zu.",
+      notes: [
+        "Aufgeklappte Zeilen stehen an ihrem Platz in der Liste und haben links einen blauen Rand. Umsortiert wird nichts.",
+        "Standard ist zugeklappt. Auf- und Zuklappen gilt bis zum Wechsel auf einen anderen Kandidaten oder bis zum Neuladen.",
+        "Zeilen, die schon die Fahrzeit (💀) oder ein Filter ausgeblendet hat, zählen nicht mit. Holt „Anzeigen“ solche Zeilen zurück, stehen sie einzeln da und werden nicht zugeklappt.",
+        "Gezählt wird nur, was auf der aktuellen Seite der Liste steht."
       ]
     };
   }
@@ -3330,8 +3347,8 @@
       return dialogs[dialogs.length - 1] || null;
     }
     const timers2 = /* @__PURE__ */ new Set();
-    function later(ms, matchId) {
-      const key = `${matchId}:${ms}`;
+    function later(ms2, matchId) {
+      const key = `${matchId}:${ms2}`;
       if (timers2.has(key)) return;
       timers2.add(key);
       runtime.setTimeout(() => {
@@ -3339,7 +3356,7 @@
         const entry = cache.get(matchId);
         if (entry) entry.at = 0;
         scheduleSync();
-      }, ms);
+      }, ms2);
     }
     function sync() {
       const dialog = findDialog();
@@ -3350,7 +3367,7 @@
       const entry = cache.get(matchId);
       if (entry && entry.at && boxes > entry.boxes) {
         entry.boxes = boxes;
-        for (const ms of AFTER_NEW_MS) later(ms, matchId);
+        for (const ms2 of AFTER_NEW_MS) later(ms2, matchId);
       }
       const stale = !entry || !entry.at || now() - entry.at > CACHE_MS2;
       const blocked = failedAt && now() - failedAt < ERROR_RETRY_MS;
@@ -4287,7 +4304,7 @@
       placePanel(state.panel, dialog);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -4300,11 +4317,11 @@
       if (!button2) return;
       const row2 = button2.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("resize", schedule);
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("resize", schedule2);
+    schedule2();
   }
 
   // ../../shared/js/match-dialog-top/index.js
@@ -4375,7 +4392,7 @@
       return ok;
     }
   }
-  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms) => setTimeout(fn, ms) } = {}) {
+  function createContactPersonBlock({ document: doc = document, helpTip = null, later = (fn, ms2) => setTimeout(fn, ms2) } = {}) {
     ensureMatchDialogTopStyle(doc);
     const root = element3(doc, "section", "werkia-mdt-ap");
     const head = element3(doc, "div", "werkia-mdt-head");
@@ -4530,7 +4547,7 @@
           provider = null;
         }
         if (!provider) return;
-        const block = createContactPersonBlock({ document, helpTip: helpTip(), later: (fn, ms) => runtime.setTimeout(fn, ms) });
+        const block = createContactPersonBlock({ document, helpTip: helpTip(), later: (fn, ms2) => runtime.setTimeout(fn, ms2) });
         block.element.setAttribute(BLOCK_ATTRIBUTE, owner);
         const current = { block, dialog, provider, matchId: target.matchId };
         state = current;
@@ -4551,7 +4568,7 @@
       if (state.block.element.parentElement !== slot) slot.appendChild(state.block.element);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -4564,10 +4581,10 @@
       if (!button2) return;
       const row2 = button2.closest("tr");
       clicked = { matchId: matchIdFromRow(row2), employerId: employerIdFromRow(row2) };
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    schedule2();
   }
 
   // ../../shared/js/werkia-graphql/questionnaire-provider.js
@@ -4685,6 +4702,64 @@
   }
   function asciiFold(value) {
     return String(value || "").replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/[ßẞ]/g, "ss");
+  }
+  function foldIfNeeded(value, fold) {
+    return fold ? asciiFold(value) : value;
+  }
+  function isEmptyValue(value) {
+    const v = clean2(value);
+    return !v || v === "-" || v === "–" || v === "nicht angegeben" || v === "keine angabe";
+  }
+  function travelRank(value, { fold = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold));
+    if (has2("keine reisebereitschaft")) return 0;
+    if (has2("gering")) return 1;
+    if (has2("regelmäßig")) return 2;
+    if (has2("uneingeschränkt")) return 3;
+    return null;
+  }
+  function languageRank(value) {
+    const v = clean2(value);
+    if (v.includes("grundkenntnisse")) return 0;
+    if (v.includes("verhandlungssicher")) return 1;
+    if (v.includes("muttersprachlich")) return 2;
+    return null;
+  }
+  function experienceRank(value) {
+    const v = clean2(value);
+    if (v.includes("mehr als 10")) return 4;
+    if (v.includes("6 bis 10")) return 3;
+    if (v.includes("3 bis 5")) return 2;
+    if (v.includes("1 bis 2")) return 1;
+    if (v === "0 jahre" || v.includes("0 jahre (")) return 0;
+    return null;
+  }
+  function isLicenseRequired(value, { fold = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold));
+    if (isEmptyValue(value)) return null;
+    if (v === "nein" || has2("nicht erforderlich") || has2("kein führerschein erforderlich")) return false;
+    if (has2("ja") || has2("führerschein") || has2("klasse") || /\bb\b/.test(v)) return true;
+    return null;
+  }
+  function licenseStatus(value, { fold = false } = {}) {
+    const v = foldIfNeeded(clean2(value), fold);
+    const has2 = (literal) => v.includes(foldIfNeeded(literal, fold));
+    if (isEmptyValue(value)) return "empty";
+    if (has2("fahrschule") || has2("wird gemacht") || has2("in ausbildung")) return "driving-school";
+    if (has2("kein") || has2("nein") || has2("nicht vorhanden") || has2("ohne führerschein")) return "no-license";
+    if (has2("ja") || has2("klasse") || /\bb\b/.test(v) || has2("vorhanden")) return "has-license";
+    return "empty";
+  }
+  function parseSalaryNumbers(text) {
+    const matches = String(text || "").match(/\d[\d.,]*/g);
+    if (!matches) return [];
+    return matches.map((num) => Number(num.replace(/\./g, "").replace(",", "."))).filter((num) => !Number.isNaN(num) && num > 100);
+  }
+  function salaryMax(text) {
+    const numbers = parseSalaryNumbers(text);
+    return numbers.length ? Math.max(...numbers) : null;
   }
   function normalizePosition(value, { fold = false } = {}) {
     let v = clean2(value).replace(/&/g, "und").replace(/anlagemechaniker/g, "anlagenmechaniker").replace(/\s+/g, " ").trim();
@@ -5299,7 +5374,7 @@
       if (native.column.nextElementSibling !== current.column.element) native.column.after(current.column.element);
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -5311,10 +5386,10 @@
       const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR3);
       if (!button2) return;
       clickedMatchId = matchIdFromRow(button2.closest("tr"));
-      schedule();
+      schedule2();
     }, true);
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    schedule();
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    schedule2();
   }
 
   // ../../shared/js/list-filter-presets/core.js
@@ -5417,9 +5492,9 @@
     const parsed = typeof raw === "string" ? parseJsonObject(raw, null) : raw;
     if (!parsed || typeof parsed !== "object") return emptyStore();
     const routes = parsed.routes && typeof parsed.routes === "object" ? parsed.routes : {};
-    const clean4 = {};
+    const clean6 = {};
     Object.keys(routes).forEach((route) => {
-      clean4[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
+      clean6[route] = (Array.isArray(routes[route]) ? routes[route] : []).filter((preset) => preset && typeof preset === "object" && preset.name).map((preset) => ({
         id: String(preset.id || createPresetId()),
         name: String(preset.name),
         filter: preset.filter && typeof preset.filter === "object" ? preset.filter : {},
@@ -5428,7 +5503,7 @@
         perPage: Number.parseInt(preset.perPage, 10) || 0
       }));
     });
-    return { version: STORE_VERSION, routes: clean4 };
+    return { version: STORE_VERSION, routes: clean6 };
   }
   function presetsForRoute(store, route) {
     return store?.routes?.[route] ? [...store.routes[route]] : [];
@@ -6199,7 +6274,7 @@
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -6207,14 +6282,14 @@
         placeButton();
       }, 200);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
     runtime.addCleanup?.(() => {
       owned(IDS2.button)?.remove();
       owned(IDS2.bar)?.remove();
       closeDialog();
     });
-    schedule();
+    schedule2();
   }
 
   // ../../shared/js/werkia-graphql/webhook-headers.js
@@ -7018,6 +7093,244 @@ ${add}` : add;
     onHashChange();
   }
 
+  // ../../shared/js/vtv-hot-warnung/core.js
+  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var HOT_HOT_KAM_STATUS = "hot_hot_case";
+  var VTV_STATUSES = ["confirmed", "conducted"];
+  var VTV_LABEL_RE = /^(bestätigt|stattgefunden)$/i;
+  var OTHER_LABEL_RE = /^(vorschlag|weitergeleitet|kandidat|arbeitgeber|nicht )/i;
+  var HOT_JOB_POSITIONS_QUERY = `query allJobPositions($filter: JobPositionFilter, $page: Int, $perPage: Int) {
+  items: allJobPositions(filter: $filter, page: $page, perPage: $perPage) {
+    id
+    mainTitle
+    employer {
+      id
+      name
+      __typename
+    }
+    __typename
+  }
+}`;
+  function idFrom2(hash, kind) {
+    const id = String(hash || "").match(new RegExp(`^#\\/${kind}\\/([^/?#]+)`, "i"))?.[1] || "";
+    return UUID_RE3.test(id) ? id.toLowerCase() : "";
+  }
+  function matchIdFromHash(hash) {
+    return idFrom2(hash, "Match") || idFrom2(hash, "Chat");
+  }
+  function candidateIdFromHash(hash) {
+    return idFrom2(hash, "Candidate");
+  }
+  function dialogStatus(dialog) {
+    if (!dialog?.querySelector) return { known: false, vtv: false };
+    const raw = String(dialog.querySelector('input[name="status"]')?.value || "").trim();
+    if (raw) return { known: true, vtv: VTV_STATUSES.includes(raw), value: raw };
+    const label2 = [...dialog.querySelectorAll("label")].find((element5) => (element5.textContent || "").replace(/\*/g, "").trim() === "Status");
+    const select = label2?.closest(".MuiFormControl-root")?.querySelector(".MuiSelect-select") || dialog.querySelector(".MuiSelect-select");
+    const text = String(select?.textContent || "").trim();
+    if (VTV_LABEL_RE.test(text)) return { known: true, vtv: true, value: text };
+    if (OTHER_LABEL_RE.test(text)) return { known: true, vtv: false, value: text };
+    return { known: false, vtv: false, value: text };
+  }
+  function shouldWarn(status2) {
+    return !status2?.known || Boolean(status2.vtv);
+  }
+  function hotHotOthers(matches, currentMatchId) {
+    const current = String(currentMatchId || "").toLowerCase();
+    return (matches || []).filter((match) => match?.id && match.kamStatus === HOT_HOT_KAM_STATUS && String(match.id).toLowerCase() !== current);
+  }
+  function matchLabel(match, jobPositions) {
+    const job = jobPositions?.get?.(match.jobPositionId) || null;
+    const employer = String(job?.employer?.name || "").trim();
+    const title = String(job?.mainTitle || "").trim();
+    return [employer, title].filter(Boolean).join(" · ") || "Match ohne Vakanzdaten";
+  }
+  function warningTitle(count) {
+    return count > 1 ? `Achtung: Kandidat ist in ${count} anderen Matches Hot Hot Case` : "Achtung: Kandidat ist in einem anderen Match Hot Hot Case";
+  }
+  async function fetchJobPositions(request, jobPositionIds) {
+    const ids = [...new Set((jobPositionIds || []).filter(Boolean))];
+    const index = /* @__PURE__ */ new Map();
+    if (!ids.length) return index;
+    const result = await request(HOT_JOB_POSITIONS_QUERY, { filter: { ids }, page: 0, perPage: ids.length });
+    for (const item of result?.items || []) {
+      if (item?.id) index.set(item.id, item);
+    }
+    return index;
+  }
+
+  // ../../shared/js/vtv-hot-warnung/index.js
+  var OWNER_KEY2 = "werkiaVtvHotWarnungOwner";
+  var BOX_CLASS2 = "werkia-vtv-hot-warnung";
+  var STYLE_ID7 = "werkia-vtv-hot-warnung-style";
+  var ROW_SELECTOR2 = "tr, .MuiTableRow-root";
+  var CLICK_MAX_AGE_MS2 = 10 * 60 * 1e3;
+  var T2 = {
+    ink: "#09090b",
+    ink2: "#52525b",
+    surface: "#ffffff",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec"
+  };
+  var FONT7 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  function executeVtvHotWarnung(runtime, {
+    getGraphqlAdapter,
+    sourcePath,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    let clicked = { matchId: "", at: 0 };
+    let guard = null;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID7)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID7;
+      const b = `.${BOX_CLASS2}`;
+      style.textContent = `
+      ${b} { box-sizing:border-box; margin:0 0 12px; padding:10px 12px; border:1px solid ${T2.bad}; border-left-width:6px; border-radius:8px; background:${T2.badSoft}; color:${T2.ink}; font:400 13px/1.45 ${FONT7}; }
+      ${b} .wvhw-title { font-weight:700; color:${T2.badInk}; }
+      ${b} .wvhw-text { margin-top:4px; color:${T2.ink2}; }
+      ${b} ul { margin:6px 0 0; padding-left:18px; }
+      ${b} li { overflow-wrap:anywhere; }
+      ${b} a { color:${T2.badInk}; font-weight:600; }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false));
+      return element5;
+    }
+    function currentTarget() {
+      const hash = location.hash || "";
+      const matchId = clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS2 && clicked.matchId ? clicked.matchId : matchIdFromHash(hash);
+      return { matchId, candidateId: matchId ? "" : candidateIdFromHash(hash) };
+    }
+    async function start(current) {
+      try {
+        const adapter2 = getGraphqlAdapter();
+        const provider = adapter2.matchProvider;
+        const { matchId } = current.target;
+        const candidateId = matchId ? (await provider.loadMatch(matchId))?.candidateId : current.target.candidateId;
+        if (guard !== current) return;
+        if (!candidateId) {
+          current.state = "ok";
+          render(current);
+          return;
+        }
+        const { matches } = await provider.loadCandidateMatches(candidateId);
+        if (guard !== current) return;
+        const others = hotHotOthers(matches, matchId);
+        if (!others.length) {
+          current.state = "ok";
+          render(current);
+          return;
+        }
+        let jobs = /* @__PURE__ */ new Map();
+        try {
+          jobs = await fetchJobPositions(adapter2.request, others.map((match) => match.jobPositionId));
+        } catch (error) {
+          console.warn("[VTV Hot Hot] Vakanzen nicht geladen:", error?.message || error);
+        }
+        if (guard !== current) return;
+        current.hits = others.map((match) => ({ id: match.id, label: matchLabel(match, jobs) }));
+        current.state = "hot";
+      } catch (error) {
+        if (guard !== current) return;
+        console.warn("[VTV Hot Hot] Matches des Kandidaten nicht geladen:", error?.message || error);
+        current.state = "error";
+      }
+      render(current);
+    }
+    function render(current) {
+      const box = current.element;
+      const visible = current.state === "hot" && shouldWarn(dialogStatus(current.dialog));
+      box.hidden = !visible;
+      if (!visible || box.dataset.rendered === "hot") return;
+      box.dataset.rendered = "hot";
+      box.replaceChildren(
+        el4("div", { className: "wvhw-title", textContent: warningTitle(current.hits.length) }),
+        el4("div", { className: "wvhw-text", textContent: "Bitte vor dem VTV prüfen, ob dieser Termin noch sinnvoll ist (KAM-Status Hot Hot Case):" }),
+        el4("ul", {}, current.hits.map((hit) => el4("li", {}, [
+          el4("a", { href: `/#/Match/${hit.id}/show`, target: "_blank", rel: "noopener", textContent: hit.label })
+        ])))
+      );
+    }
+    function place(current) {
+      const content = current.dialog.querySelector(".MuiDialogContent-root") || current.dialog;
+      if (!content.contains(current.element)) content.prepend(current.element);
+    }
+    function teardown() {
+      if (!guard) return;
+      guard.element.remove();
+      if (guard.dialog.dataset[OWNER_KEY2] === sourcePath) delete guard.dialog.dataset[OWNER_KEY2];
+      guard = null;
+    }
+    function sync() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (guard) {
+          teardown();
+          clicked = { matchId: "", at: 0 };
+        }
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY2];
+      if (claimedBy && claimedBy !== sourcePath) return;
+      if (guard && guard.dialog !== dialog) teardown();
+      if (guard) {
+        place(guard);
+        render(guard);
+        return;
+      }
+      ensureStyle5();
+      dialog.dataset[OWNER_KEY2] = sourcePath;
+      const element5 = el4("div", { className: BOX_CLASS2, hidden: true });
+      element5.setAttribute("role", "alert");
+      guard = { dialog, element: element5, target: currentTarget(), state: "loading", hits: [] };
+      place(guard);
+      start(guard);
+    }
+    let scheduled = false;
+    function schedule2() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    }
+    runtime.addDocumentListener("click", (event) => {
+      if (guard) schedule2();
+      const row2 = event.target?.closest?.(ROW_SELECTOR2);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const { matchId } = targetFromRow(row2);
+      if (matchId) clicked = { matchId, at: now() };
+    }, true);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
+    runtime.addCleanup?.(teardown);
+    schedule2();
+  }
+  function vtvHotWarnungTopic({ page, routes }) {
+    return {
+      id: "vtv-hot-warnung",
+      title: "Warnung beim VTV: Hot Hot Case in einem anderen Match",
+      page,
+      routes,
+      kind: "view",
+      summary: "Trägst du im Termin-Dialog einen VTV ein (Status „Bestätigt“ oder „Stattgefunden“) und steht der Kandidat in einem anderen Match schon auf Hot Hot Case, steht oben im Dialog ein roter Hinweis mit Firma und Position dieses Matches.",
+      notes: [
+        "Nur ein Hinweis: Speichern geht wie immer.",
+        "Es zählt der KAM-Status der anderen Matches, nicht der CEM-Status.",
+        "Ein Klick auf Firma und Position öffnet das andere Match in einem neuen Tab.",
+        "Erkannt wird das Match über die Zeile, in der du den Dialog geöffnet hast, sonst über die Seite (Match oder Chat). Auf der Kandidatenseite ohne Match-Zeile zählen alle Hot-Hot-Matches des Kandidaten."
+      ]
+    };
+  }
+
   // ../../shared/js/out-gruende/core.js
   var import_labels = __toESM(require_labels(), 1);
   var {
@@ -7077,7 +7390,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/out-gruende/index.js
-  var ROW_SELECTOR2 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var MATCH_LINK_SELECTOR4 = 'a[href*="#/Match/"]';
   var BATCH_SIZE2 = 25;
   var CACHE_TTL_MS = 5 * 60 * 1e3;
@@ -7106,7 +7419,7 @@ ${add}` : add;
     const views = options.views || [];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const LINE_CLASS = `werkia-${namespace}-out-grund`;
-    const STYLE_ID16 = `werkia-${namespace}-out-grund-style`;
+    const STYLE_ID19 = `werkia-${namespace}-out-grund-style`;
     const cache = /* @__PURE__ */ new Map();
     const failed = /* @__PURE__ */ new Set();
     const lastStatus = /* @__PURE__ */ new Map();
@@ -7114,9 +7427,9 @@ ${add}` : add;
     let reloadQueued = false;
     const currentView = () => views.find((view) => view.route.test(location.hash || ""));
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID16)) return;
+      if (document.getElementById(STYLE_ID19)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID19;
       style.textContent = `
       .${LINE_CLASS} { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-width: 220px; font-family: inherit; font-size: 0.7rem; line-height: 1.35; color: rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
       .${LINE_CLASS}__label { font-weight: 600; color: #b42318; }
@@ -7125,7 +7438,7 @@ ${add}` : add;
       document.head.appendChild(style);
     }
     function rows(view) {
-      return [...document.querySelectorAll(ROW_SELECTOR2)].filter((row2) => row2.querySelector(view.cellSelector));
+      return [...document.querySelectorAll(ROW_SELECTOR3)].filter((row2) => row2.querySelector(view.cellSelector));
     }
     function fresh(matchId) {
       const entry = cache.get(matchId);
@@ -7266,7 +7579,7 @@ ${add}` : add;
       }
     }
     let scheduled = false;
-    const schedule = () => {
+    const schedule2 = () => {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -7279,13 +7592,898 @@ ${add}` : add;
         if (!changed) load2().catch((error) => console.warn("[Werkia Out-Gründe]", error));
       }, 150);
     };
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    runtime.addWindowListener("hashchange", schedule2);
     runtime.setInterval?.(() => {
       if (currentView()) load2({ force: true }).catch((error) => console.warn("[Werkia Out-Gründe]", error));
     }, CACHE_TTL_MS);
-    schedule();
+    schedule2();
     return { load: load2, render };
+  }
+
+  // ../../shared/js/comment-shortcuts/core.js
+  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
+  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
+  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
+  var RAW = [
+    // Kontakt und Erreichbarkeit
+    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
+    ["kontakt", "te", "AP telefonisch erreicht", "AG"],
+    ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
+    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
+    ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
+    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
+    ["kontakt", "WA", "WhatsApp", "AG/M"],
+    ["kontakt", "VC", "Videocall", "AG/M"],
+    ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
+    ["kontakt", "RM", "Rückmeldung", "AG/M"],
+    ["kontakt", "FB", "Feedback", "M"],
+    ["kontakt", "JF", "Jour fixe", "AG"],
+    ["kontakt", "FYI", "zur Info", "AG/M", { varianten: ["FMI"] }],
+    ["kontakt", "Sek", "Sekretariat", "AG"],
+    // Termine und Prozess
+    ["termine", "VT", "Vorstellungstermin", "M"],
+    ["termine", "VTA", "VT-Anfrage (Anfrage Vorstellungstermin)", "M"],
+    ["termine", "VTV", "Vorstellungstermin vereinbart", "M", { unbestaetigt: true }],
+    ["termine", "VTS", "Vorstellungstermin stattgefunden", "M", { unbestaetigt: true, hinweis: "auch Mehrzahl von VT" }],
+    ["termine", "VG", "Vorstellungsgespräch", "M", { varianten: ["VSG"] }],
+    ["termine", "HT", "Hospitation/Probetag", "M", { unbestaetigt: true }],
+    ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
+    ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
+    ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
+    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
+    // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
+    ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
+    ["termine", "digi", "digitaler Termin", "M"],
+    ["termine", "HC", "Hot Case", "M"],
+    ["termine", "HHC", "Hot Hot Case", "M"],
+    ["termine", "out", "Absage", "M"],
+    ["termine", "on hold", "pausiert", "AG/M"],
+    ["termine", "ABS", "Absage", "M"],
+    ["termine", "WVL", "Wiedervorlage", "M"],
+    // Unterlagen und Vertrag
+    ["unterlagen", "UL", "Unterlagen", "M"],
+    ["unterlagen", "CV", "Lebenslauf", "M"],
+    ["unterlagen", "GB", "Gesellenbrief", "M"],
+    ["unterlagen", "AZ", "Arbeitszeugnis", "M"],
+    ["unterlagen", "PFB", "Personalfragebogen", "M"],
+    ["unterlagen", "AV", "Arbeitsvertrag", "M"],
+    ["unterlagen", "AVU", "Unterschrift Arbeitsvertrag", "M"],
+    ["unterlagen", "SD", "Startdatum", "M"],
+    ["unterlagen", "PZ", "Probezeit", "M"],
+    // Eindeutig: "KD-Dienst" (Kundendienst) bleibt unberührt, ein Bindestrich
+    // gilt beim Vorschlag als Teil des Wortes.
+    ["unterlagen", "KD", "Kontaktdaten", "AG/M", { hinweis: "nicht in „KD-Dienst“ (Kundendienst)" }],
+    // Personen und Profil: kein Ziel, keine Knöpfe, nur Tooltip.
+    ["profil", "AP", "Ansprechpartner", null],
+    ["profil", "BEW", "Bewerber", null],
+    ["profil", "AG", "Arbeitgeber", null],
+    ["profil", "GF", "Geschäftsführung", null],
+    ["profil", "FA", "Fachabteilung", null],
+    ["profil", "SV", "Stellvertreter des AP", null, { unbestaetigt: true }],
+    ["profil", "BE", "Berufserfahrung", null],
+    ["profil", "FS", "Führerschein", null],
+    ["profil", "RB", "Reisebereitschaft", null],
+    ["profil", "MB", "Montagebereitschaft", null, { unbestaetigt: true }],
+    ["profil", "TZ", "Teilzeit", null],
+    ["profil", "VZ", "Vollzeit", null],
+    ["profil", "FW", "Firmenwagen", null],
+    ["profil", "HO", "Homeoffice", null],
+    ["profil", "PV", "Photovoltaik", null, { unbestaetigt: true }],
+    ["profil", "WP", "Wärmepumpe", null, { unbestaetigt: true }],
+    ["profil", "SHK", "Sanitär-Heizung-Klima", null, { unbestaetigt: true }],
+    ["profil", "ZS", "Zählerschrank", null, { unbestaetigt: true }],
+    ["profil", "PL", "Projektleiter", null]
+  ];
+  var SHORTCUTS = Object.freeze(RAW.map(([gruppe, kuerzel, text, ziel, extra = {}]) => Object.freeze({
+    id: `${gruppe}:${kuerzel}`,
+    gruppe,
+    kuerzel,
+    text,
+    ziel,
+    label: extra.label || kuerzel,
+    einfuegen: extra.einfuegen || extra.label || kuerzel,
+    optionen: Object.freeze([...extra.optionen || []]),
+    varianten: Object.freeze([...extra.varianten || []]),
+    unbestaetigt: Boolean(extra.unbestaetigt),
+    hinweis: extra.hinweis || ""
+  })));
+  var PHRASE_RAW = [
+    ["AP tne, SA raus", TNE_OPTIONS],
+    ["Mail raus", MAIL_OPTIONS],
+    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
+    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
+    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
+    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
+    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
+  ];
+  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
+    id: `haeufig:${text}`,
+    gruppe: "haeufig",
+    kuerzel: text,
+    text,
+    ziel: TARGETS.M,
+    label: text,
+    einfuegen: text,
+    optionen: Object.freeze([...optionen]),
+    varianten: Object.freeze([]),
+    unbestaetigt: false,
+    hinweis: "",
+    satz: true
+  })));
+  function explainTitle(item, token = item.kuerzel) {
+    const parts = [`${token}: ${item.text}`];
+    if (item.hinweis) parts.push(item.hinweis);
+    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
+    return parts.join(" · ");
+  }
+  var WORD_CHAR = /[\p{L}\p{N}_-]/u;
+  function explainTokens(shortcuts = SHORTCUTS) {
+    const tokens = [];
+    for (const item of shortcuts) {
+      for (const token of /* @__PURE__ */ new Set([item.kuerzel, ...item.varianten])) tokens.push({ token, item });
+    }
+    return tokens.sort((a, b) => b.token.length - a.token.length);
+  }
+  var DEFAULT_TOKENS = explainTokens();
+  function shortcutAtOffset(text, offset, tokens = DEFAULT_TOKENS) {
+    const value = String(text || "");
+    const at = Number(offset);
+    if (!Number.isInteger(at) || at < 0 || at > value.length) return null;
+    for (const { token, item } of tokens) {
+      let start = value.lastIndexOf(token, at);
+      while (start >= 0 && start + token.length >= at) {
+        const end = start + token.length;
+        const prev = value.charAt(start - 1);
+        const next = value.charAt(end);
+        if (at < end && (!prev || !WORD_CHAR.test(prev)) && (!next || !WORD_CHAR.test(next))) return { item, token, start, end };
+        start = start > 0 ? value.lastIndexOf(token, start - 1) : -1;
+      }
+    }
+    return null;
+  }
+
+  // ../../shared/js/admin-interface/features/comment-actions.js
+  var ms = (value) => {
+    const t = new Date(value ?? NaN).getTime();
+    return Number.isNaN(t) ? null : t;
+  };
+  function isCommentRead(comment, readAt) {
+    const r = ms(readAt);
+    const at = ms(comment?.updatedAt) ?? ms(comment?.createdAt);
+    return r !== null && at !== null && at < r;
+  }
+  function readToggleValue(comment, read) {
+    const at = ms(comment?.updatedAt) ?? ms(comment?.createdAt);
+    if (at === null) return null;
+    return new Date(read ? at + 1 : at - 1).toISOString();
+  }
+  function mentionIds(html) {
+    const out = [];
+    const re = /<a\b[^>]*>/gi;
+    let m;
+    while (m = re.exec(String(html || ""))) {
+      const tag2 = m[0];
+      if (!/data-type\s*=\s*["']mention["']/i.test(tag2)) continue;
+      const id = /data-id\s*=\s*["']([^"']+)["']/i.exec(tag2);
+      if (id && !out.includes(id[1])) out.push(id[1]);
+    }
+    return out;
+  }
+  function mentionsPerson(comment, personId) {
+    return Boolean(personId) && mentionIds(comment?.text).includes(String(personId));
+  }
+
+  // ../../shared/js/tags-dialog/core.js
+  var RA_PREFIX = "RaStore";
+  var STORE_ITEM = "UnreadMatchCommentMentionMatches.listParams";
+  var STORE_KEY = `${RA_PREFIX}.${STORE_ITEM}`;
+  var MIN_SEARCH_LENGTH = 3;
+  var SEARCH_PER_PAGE = 100;
+  var SEARCH_QUERY = `query WerkiaTagsSearch($q: CandidateFilter, $reverse: CandidateFilter, $phone: CandidateFilter, $withReverse: Boolean!, $withPhone: Boolean!, $perPage: Int) {
+  byName: allCandidates(filter: $q, page: 0, perPage: $perPage) { id }
+  byReverse: allCandidates(filter: $reverse, page: 0, perPage: $perPage) @include(if: $withReverse) { id }
+  byPhone: allCandidates(filter: $phone, page: 0, perPage: $perPage) @include(if: $withPhone) { id }
+}`;
+  var READ_STATE_QUERY = `query WerkiaTagsReadState($filter: MatchFilter, $perPage: Int) {
+  me: currentEmployee { id }
+  items: allMatches(filter: $filter, page: 0, perPage: $perPage) { id commentsReadAt matchComments { id text createdAt updatedAt } }
+}`;
+  var MARK_UNREAD_MUTATION = `mutation WerkiaTagsMarkUnread($id: UUID!, $commentsReadAt: DateTime!) {
+  data: toggleMatchCommentReadStatus(id: $id, commentsReadAt: $commentsReadAt) { id commentsReadAt }
+}`;
+  var clean3 = (text) => String(text ?? "").replace(/\s+/g, " ").trim();
+  function matchIdFromHref5(href) {
+    return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
+  }
+  function parse(raw) {
+    try {
+      const value = JSON.parse(raw);
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  function phoneNeedle(text) {
+    return String(text ?? "").replace(/[\s/()-]+/g, "").replace(/^(?:\+49|0049|0)/, "");
+  }
+  function searchVariables(text, perPage = SEARCH_PER_PAGE) {
+    const q = clean3(text);
+    if (q.length < MIN_SEARCH_LENGTH) return null;
+    const words = q.split(" ");
+    const withReverse = words.length >= 2 && !/\d/.test(q) && !q.includes("@");
+    const needle = phoneNeedle(q);
+    const withPhone = /\d/.test(q) && /^\+?[\d\s/()-]+$/.test(q) && needle.length >= MIN_SEARCH_LENGTH;
+    return {
+      q: { q },
+      reverse: { q: withReverse ? [...words.slice(1), words[0]].join(" ") : q },
+      phone: { phoneNumber: withPhone ? needle : q },
+      withReverse,
+      withPhone,
+      perPage
+    };
+  }
+  function candidateIdsFrom(data) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const row2 of [...data?.byPhone || [], ...data?.byName || [], ...data?.byReverse || []]) {
+      if (row2?.id) seen.add(String(row2.id));
+    }
+    return [...seen];
+  }
+  function withCandidateFilter(raw, candidateIds) {
+    const params = parse(raw) || {};
+    return JSON.stringify({ ...params, filter: { ...params.filter || {}, candidateIds: [...candidateIds] }, page: 1 });
+  }
+  function withoutCandidateFilter(raw) {
+    const params = parse(raw);
+    if (!params) return null;
+    const filter = { ...params.filter || {} };
+    delete filter.candidateIds;
+    const next = { ...params, filter, page: 1 };
+    const onlyOurs = Object.keys(filter).length === 0 && Object.keys(params).every((key) => key === "filter" || key === "page");
+    return onlyOurs ? null : JSON.stringify(next);
+  }
+  function hasCandidateFilter(raw) {
+    return Array.isArray(parse(raw)?.filter?.candidateIds);
+  }
+  function latestMention(match, personId) {
+    let best = null;
+    for (const comment of match?.matchComments || []) {
+      if (!mentionsPerson(comment, personId)) continue;
+      const at = comment.updatedAt || comment.createdAt || "";
+      if (!best || at > (best.updatedAt || best.createdAt || "")) best = comment;
+    }
+    return best;
+  }
+  function tagReadState(match, personId) {
+    const mention = latestMention(match, personId);
+    const readAt = match?.commentsReadAt || null;
+    if (!mention) return { state: "none", unreadAt: null, readAt };
+    const read = isCommentRead(mention, readAt);
+    return { state: read ? "read" : "unread", unreadAt: read ? readToggleValue(mention, false) : null, readAt };
+  }
+
+  // ../../shared/js/tags-dialog/index.js
+  var clean4 = (text) => String(text || "").replace(/\s+/g, " ").trim();
+  function isTagsDialog(element5) {
+    const title = element5?.querySelector(".MuiDialogTitle-root, h2");
+    return clean4(title?.textContent) === "Tags";
+  }
+  function tagsDialogs(root = document) {
+    return [...root.querySelectorAll('[role="dialog"]')].filter(isTagsDialog);
+  }
+  function tagRows(dialog) {
+    return [...dialog.querySelectorAll("tbody tr")].filter((row2) => {
+      if (row2.parentElement?.closest("td")) return false;
+      return Boolean(row2.querySelector(":scope > td.column-matchComments") && rowMatchId(row2));
+    });
+  }
+  var EXPAND_ID = /^Match-(.+)-expand$/;
+  function rowMatchId(row2) {
+    const href = matchIdFromHref5(row2.querySelector('a[href*="#/Match/"]')?.getAttribute("href"));
+    if (href) return href;
+    const next = row2.nextElementSibling;
+    const fromExpand = EXPAND_ID.exec(next?.id || "")?.[1];
+    if (fromExpand) return fromExpand;
+    const controls = row2.querySelector('[aria-controls^="Match-"]')?.getAttribute("aria-controls");
+    return EXPAND_ID.exec(controls || "")?.[1] || "";
+  }
+  function stopEvents(element5, types = ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+    types.forEach((type) => element5.addEventListener(type, (event) => event.stopPropagation()));
+  }
+  function schedule(runtime, fn, ms2) {
+    let scheduled = false;
+    return () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        fn();
+      }, ms2);
+    };
+  }
+  var FONT8 = 'font: 400 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;';
+  var UNREAD_STYLE_ID = "werkia-tags-unread-style";
+  var UNREAD_CLASS = "werkia-tags-unread";
+  function tagsUnreadTopic({ page, routes, id = "tags-unread" }) {
+    return {
+      id,
+      title: "Tags wieder auf ungelesen stellen",
+      page,
+      routes,
+      kind: "local",
+      summary: "In der Tags-Ansicht (Knopf „TAGS“) steht in jeder Zeile unter den Matchkommentaren, ob das Tag gelesen ist. Bei gelesenen Tags stellt „Als ungelesen markieren“ es mit einem Klick wieder auf ungelesen.",
+      steps: [
+        "„TAGS“ öffnen und den Schalter „Ungelesene Tags“ ausschalten, damit auch gelesene Tags in der Liste stehen.",
+        "In der Zeile auf „Als ungelesen markieren“ klicken. Danach steht dort „wieder ungelesen“ und das Tag zählt wieder bei „TAGS“.",
+        "Versehen? „Rückgängig“ stellt den vorigen Lesestand her."
+      ],
+      notes: [
+        "Ungelesen gilt ab dem Kommentar mit deinem Tag: Neuere Kommentare an diesem Match gelten dann auch wieder als ungelesen, wie beim kleinen Kreis am Kommentar im Kommentar-Dialog.",
+        "Wer die Matchkommentare öffnet, liest das Match wieder (wie bisher)."
+      ]
+    };
+  }
+  function executeTagsUnread(runtime, {
+    sourcePath,
+    getRequest: getRequest2,
+    helpTip
+  } = {}) {
+    runtime.registerSource?.(sourcePath);
+    const cache = /* @__PURE__ */ new Map();
+    let myId = "";
+    const pending = /* @__PURE__ */ new Set();
+    let loading = false;
+    let dialogSeen = false;
+    function injectStyle() {
+      if (document.getElementById(UNREAD_STYLE_ID)) return;
+      const style = document.createElement("style");
+      style.id = UNREAD_STYLE_ID;
+      style.textContent = `
+      .${UNREAD_CLASS} { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; ${FONT8} }
+      .${UNREAD_CLASS} [data-label] { color: #5a6178; white-space: nowrap; }
+      .${UNREAD_CLASS} [data-label][data-state="unread"] { color: #b3261e; font-weight: 600; }
+      .${UNREAD_CLASS} [data-label][data-state="done"] { color: #18752b; font-weight: 600; }
+      .${UNREAD_CLASS} [data-label][data-state="error"] { color: #b3261e; white-space: normal; }
+      .${UNREAD_CLASS} button { min-height: 24px; padding: 3px 8px; border: 1px solid #c8ccdd; border-radius: 12px; background: #fff; color: #1f2933; cursor: pointer; white-space: nowrap; ${FONT8} }
+      .${UNREAD_CLASS} button:hover { border-color: #1976d2; color: #1976d2; }
+      .${UNREAD_CLASS} button:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
+      .${UNREAD_CLASS} button:disabled { opacity: .6; cursor: wait; }
+      .${UNREAD_CLASS} button[data-act="undo"] { border-color: transparent; background: transparent; color: #3643c7; text-decoration: underline; padding: 3px 2px; }
+    `;
+      document.head.appendChild(style);
+    }
+    function wrapFor(row2) {
+      const cell = row2.querySelector(":scope > td.column-matchComments");
+      if (!cell) return null;
+      let wrap2 = cell.querySelector(`:scope > .${UNREAD_CLASS}`);
+      if (!wrap2) {
+        wrap2 = document.createElement("div");
+        wrap2.className = UNREAD_CLASS;
+        stopEvents(wrap2);
+        wrap2.addEventListener("click", onClick);
+        cell.appendChild(wrap2);
+      }
+      return wrap2;
+    }
+    function renderRow(row2) {
+      const matchId = rowMatchId(row2);
+      const wrap2 = wrapFor(row2);
+      if (!wrap2 || !matchId) return;
+      const entry = cache.get(matchId);
+      const key = entry ? [entry.state, entry.done ? 1 : 0, entry.busy ? 1 : 0, entry.error || "", entry.before ? 1 : 0].join("|") : "loading";
+      if (wrap2.dataset.matchId === matchId && wrap2.dataset.key === key) return;
+      wrap2.dataset.matchId = matchId;
+      wrap2.dataset.key = key;
+      wrap2.replaceChildren();
+      const label2 = document.createElement("span");
+      label2.dataset.label = "";
+      const button2 = (act, text, title) => {
+        const el4 = document.createElement("button");
+        el4.type = "button";
+        el4.dataset.act = act;
+        el4.textContent = text;
+        if (title) el4.title = title;
+        el4.disabled = Boolean(entry?.busy);
+        return el4;
+      };
+      if (!entry) {
+        label2.textContent = "Lesestand lädt …";
+        wrap2.append(label2);
+        return;
+      }
+      if (entry.error) {
+        label2.dataset.state = "error";
+        label2.textContent = entry.error;
+        wrap2.append(label2);
+        if (entry.state === "read") wrap2.append(button2("unread", "Erneut versuchen"));
+        return;
+      }
+      if (entry.done) {
+        label2.dataset.state = "done";
+        label2.textContent = "wieder ungelesen";
+        wrap2.append(label2);
+        if (entry.before) wrap2.append(button2("undo", "Rückgängig", "Vorigen Lesestand wiederherstellen"));
+        return;
+      }
+      if (entry.state === "unread") {
+        label2.dataset.state = "unread";
+        label2.textContent = "ungelesen";
+        wrap2.append(label2);
+        return;
+      }
+      if (entry.state === "read") {
+        label2.textContent = "gelesen";
+        wrap2.append(label2, button2("unread", entry.busy ? "Speichert …" : "Als ungelesen markieren", "Stellt dieses Tag wieder auf ungelesen"));
+        const tip = helpTip?.();
+        if (tip) wrap2.append(tip);
+        return;
+      }
+      label2.textContent = "kein Tag für dich gefunden";
+      wrap2.append(label2);
+    }
+    async function markUnread(matchId, undo = false) {
+      const entry = cache.get(matchId);
+      if (!entry || entry.busy) return;
+      const value = undo ? entry.before : entry.unreadAt;
+      if (!value) return;
+      entry.busy = true;
+      entry.error = "";
+      rerender();
+      try {
+        const data = await getRequest2()(MARK_UNREAD_MUTATION, { id: matchId, commentsReadAt: value });
+        if (data?.data?.id !== matchId) throw new Error("Das Adminpanel hat die Änderung nicht bestätigt");
+        if (undo) {
+          entry.done = false;
+          entry.state = "read";
+          entry.readAt = data.data.commentsReadAt || value;
+          entry.before = null;
+        } else {
+          entry.done = true;
+          entry.before = entry.readAt;
+          entry.readAt = data.data.commentsReadAt || value;
+        }
+      } catch (error) {
+        entry.error = `Nicht gespeichert: ${error?.message || error}`;
+      } finally {
+        entry.busy = false;
+        rerender();
+      }
+    }
+    function onClick(event) {
+      const button2 = event.target instanceof Element ? event.target.closest("button[data-act]") : null;
+      if (!button2) return;
+      event.preventDefault();
+      const matchId = button2.closest(`.${UNREAD_CLASS}`)?.dataset.matchId;
+      if (!matchId) return;
+      markUnread(matchId, button2.dataset.act === "undo");
+    }
+    async function load2() {
+      if (loading || !pending.size) return;
+      loading = true;
+      const ids = [...pending];
+      pending.clear();
+      try {
+        const data = await getRequest2()(READ_STATE_QUERY, { filter: { ids }, perPage: ids.length });
+        myId = String(data?.me?.id || myId || "");
+        if (!myId) throw new Error("Eigene Mitarbeiter-ID nicht gefunden");
+        const byId2 = new Map((data?.items || []).map((match) => [String(match.id), match]));
+        ids.forEach((id) => {
+          const match = byId2.get(id);
+          cache.set(id, match ? { ...tagReadState(match, myId) } : { state: "none" });
+        });
+      } catch (error) {
+        ids.forEach((id) => cache.set(id, { state: "none", error: `Lesestand nicht geladen: ${error?.message || error}` }));
+      } finally {
+        loading = false;
+        rerender();
+        if (pending.size) load2();
+      }
+    }
+    function rerender() {
+      tagsDialogs().forEach((dialog) => tagRows(dialog).forEach(renderRow));
+    }
+    function scan() {
+      const dialogs = tagsDialogs();
+      if (!dialogs.length) {
+        if (dialogSeen) {
+          dialogSeen = false;
+          cache.clear();
+        }
+        return;
+      }
+      dialogSeen = true;
+      injectStyle();
+      dialogs.forEach((dialog) => tagRows(dialog).forEach((row2) => {
+        const matchId = rowMatchId(row2);
+        if (matchId && !cache.has(matchId)) pending.add(matchId);
+        renderRow(row2);
+      }));
+      load2();
+    }
+    const scheduleScan = schedule(runtime, scan, 200);
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleScan();
+  }
+  var SEARCH_STYLE_ID = "werkia-tags-search-style";
+  var SEARCH_CLASS = "werkia-tags-search";
+  function tagsSearchTopic({ page, routes, id = "tags-search" }) {
+    return {
+      id,
+      title: "Tags nach Bewerber suchen",
+      page,
+      routes,
+      kind: "view",
+      summary: "In der Tags-Ansicht (Knopf „TAGS“) steht neben „Ungelesene Tags“ ein Suchfeld. Name, E-Mail oder Telefonnummer des Bewerbers eingeben und Enter drücken: Die Liste zeigt nur noch die Tags dieser Bewerber.",
+      steps: [
+        "Mindestens 3 Zeichen eingeben, z. B. „Müller“, „max.mueller@…“ oder „0176 123…“, dann Enter oder „Suchen“.",
+        "Die Suche schaltet „Ungelesene Tags“ aus, damit auch gelesene Tags gefunden werden. Wer nur ungelesene sehen will, schaltet ihn wieder ein.",
+        "„×“ hebt die Suche auf. Beim Schließen der Tags-Ansicht ist sie ebenfalls weg."
+      ],
+      notes: [
+        "Gesucht wird wie im Filter „Kandidat“ der Liste: Vorname Nachname (auch umgedreht) oder E-Mail, Ziffern zusätzlich in der Telefonnummer.",
+        "Passen sehr viele Bewerber (z. B. nur „Ali“), zählen die ersten 100 je Suchart."
+      ]
+    };
+  }
+  function executeTagsSearch(runtime, {
+    sourcePath,
+    getRequest: getRequest2,
+    storage = () => window.localStorage,
+    pageWindow = () => typeof unsafeWindow === "undefined" ? window : unsafeWindow,
+    helpTip
+  } = {}) {
+    runtime.registerSource?.(sourcePath);
+    let active = null;
+    let status2 = { state: "", text: "" };
+    let busy = false;
+    let dialogSeen = false;
+    function store() {
+      try {
+        return storage();
+      } catch {
+        return null;
+      }
+    }
+    function writeStore(value) {
+      const ls = store();
+      if (!ls) return false;
+      const oldValue = ls.getItem(STORE_KEY);
+      if (value === null) ls.removeItem(STORE_KEY);
+      else ls.setItem(STORE_KEY, value);
+      try {
+        const win = pageWindow();
+        const Ctor = win.StorageEvent || StorageEvent;
+        win.dispatchEvent(new Ctor("storage", { key: `${RA_PREFIX}.${STORE_ITEM}`, oldValue, newValue: value, url: String(win.location?.href || "") }));
+      } catch {
+      }
+      return true;
+    }
+    function clearStore({ notify = true } = {}) {
+      const ls = store();
+      if (!ls || !hasCandidateFilter(ls.getItem(STORE_KEY))) return;
+      const next = withoutCandidateFilter(ls.getItem(STORE_KEY));
+      if (notify) writeStore(next);
+      else if (next === null) ls.removeItem(STORE_KEY);
+      else ls.setItem(STORE_KEY, next);
+    }
+    function injectStyle() {
+      if (document.getElementById(SEARCH_STYLE_ID)) return;
+      const style = document.createElement("style");
+      style.id = SEARCH_STYLE_ID;
+      style.textContent = `
+      .${SEARCH_CLASS} { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 4px 16px; vertical-align: middle; ${FONT8} }
+      .${SEARCH_CLASS} input { box-sizing: border-box; width: 300px; max-width: 100%; padding: 7px 10px; border: 1px solid #c4c4c4; border-radius: 4px; background: #fff; color: #1c1a22; font: 400 14px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${SEARCH_CLASS} input:hover { border-color: #1c1a22; }
+      .${SEARCH_CLASS} input:focus-visible { outline: 2px solid #1976d2; outline-offset: -1px; }
+      .${SEARCH_CLASS} button { min-height: 30px; padding: 4px 12px; border: 1px solid #1976d2; border-radius: 4px; background: #fff; color: #1976d2; cursor: pointer; font: 500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${SEARCH_CLASS} button:hover { background: #e3f0fc; }
+      .${SEARCH_CLASS} button:disabled { opacity: .6; cursor: wait; }
+      .${SEARCH_CLASS} [data-chip] { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 14px; background: #e3f0fc; color: #0d3c61; font-weight: 600; }
+      .${SEARCH_CLASS} [data-chip] button { min-height: 22px; padding: 0 7px; border: 0; border-radius: 11px; background: transparent; color: inherit; font-size: 15px; }
+      .${SEARCH_CLASS} [data-chip] button:hover { background: rgba(13,60,97,.12); }
+      .${SEARCH_CLASS} [data-status] { color: #5a6178; }
+      .${SEARCH_CLASS} [data-status][data-state="error"] { color: #b3261e; font-weight: 600; }
+    `;
+      document.head.appendChild(style);
+    }
+    function unreadSwitch(dialog) {
+      return [...dialog.querySelectorAll("label")].find((label2) => clean4(label2.textContent) === "Ungelesene Tags") || null;
+    }
+    function showAllTags(dialog) {
+      const input = unreadSwitch(dialog)?.querySelector('input[type="checkbox"]');
+      if (input?.checked) input.click();
+    }
+    function render(root) {
+      const input = root.querySelector("input");
+      const go = root.querySelector('button[data-act="search"]');
+      if (go) go.disabled = busy;
+      if (input) input.disabled = busy;
+      const chip = root.querySelector("[data-chip]");
+      if (active) {
+        chip.hidden = false;
+        chip.querySelector("[data-chip-text]").textContent = `Suche: ${active.text} · ${active.count} Bewerber`;
+      } else {
+        chip.hidden = true;
+      }
+      const line = root.querySelector("[data-status]");
+      line.dataset.state = status2.state;
+      line.textContent = status2.text;
+      line.hidden = !status2.text;
+    }
+    function renderAll() {
+      document.querySelectorAll(`.${SEARCH_CLASS}`).forEach(render);
+    }
+    async function search(root) {
+      const dialog = root.closest('[role="dialog"]');
+      const text = clean4(root.querySelector("input")?.value);
+      const variables = searchVariables(text);
+      if (!variables) {
+        status2 = { state: "error", text: `Mindestens ${MIN_SEARCH_LENGTH} Zeichen eingeben.` };
+        renderAll();
+        return;
+      }
+      busy = true;
+      status2 = { state: "", text: "Sucht …" };
+      renderAll();
+      try {
+        const data = await getRequest2()(SEARCH_QUERY, variables);
+        const ids = candidateIdsFrom(data);
+        if (!ids.length) {
+          status2 = { state: "error", text: `Kein Bewerber zu „${text}“ gefunden.` };
+          return;
+        }
+        if (!writeStore(withCandidateFilter(store()?.getItem(STORE_KEY), ids))) throw new Error("Speicher des Browsers nicht erreichbar");
+        active = { text, count: ids.length };
+        status2 = { state: "", text: "" };
+        if (dialog) showAllTags(dialog);
+      } catch (error) {
+        status2 = { state: "error", text: `Suche fehlgeschlagen: ${error?.message || error}` };
+      } finally {
+        busy = false;
+        renderAll();
+      }
+    }
+    function reset() {
+      active = null;
+      status2 = { state: "", text: "" };
+      clearStore();
+      document.querySelectorAll(`.${SEARCH_CLASS} input`).forEach((input) => {
+        input.value = "";
+      });
+      renderAll();
+    }
+    function build() {
+      const root = document.createElement("span");
+      root.className = SEARCH_CLASS;
+      root.innerHTML = '<input type="search" aria-label="Tags nach Bewerber suchen" placeholder="Bewerber: Name, E-Mail oder Telefon" autocomplete="off"><button type="button" data-act="search">Suchen</button><span data-chip hidden><span data-chip-text></span><button type="button" data-act="reset" title="Suche aufheben" aria-label="Suche aufheben">×</button></span><span data-status hidden></span>';
+      stopEvents(root);
+      root.querySelector("input").addEventListener("keydown", (event) => {
+        if (event.key === "Escape") return;
+        event.stopPropagation();
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (!busy) search(root);
+        }
+      });
+      root.addEventListener("click", (event) => {
+        const button2 = event.target instanceof Element ? event.target.closest("button[data-act]") : null;
+        if (!button2) return;
+        event.preventDefault();
+        if (button2.dataset.act === "search" && !busy) search(root);
+        if (button2.dataset.act === "reset") reset();
+      });
+      const tip = helpTip?.();
+      if (tip) root.insertBefore(tip, root.querySelector("[data-chip]"));
+      return root;
+    }
+    function install(dialog) {
+      if (dialog.querySelector(`.${SEARCH_CLASS}`)) return;
+      const label2 = unreadSwitch(dialog);
+      if (!label2) return;
+      const root = build();
+      label2.insertAdjacentElement("afterend", root);
+      render(root);
+    }
+    function scan() {
+      const dialogs = tagsDialogs();
+      if (!dialogs.length) {
+        if (dialogSeen) {
+          dialogSeen = false;
+          active = null;
+          status2 = { state: "", text: "" };
+          clearStore({ notify: false });
+        }
+        return;
+      }
+      dialogSeen = true;
+      injectStyle();
+      dialogs.forEach(install);
+    }
+    if (!tagsDialogs().length) clearStore({ notify: false });
+    const scheduleScan = schedule(runtime, scan, 150);
+    runtime.createMutationObserver(scheduleScan).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleScan();
+  }
+
+  // ../../shared/js/match-employee-filter/core.js
+  function hashHasFilter(hash = "") {
+    return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
+  }
+  function selectedEmployeeIds(filter, field) {
+    const value = filter?.[field];
+    return Array.isArray(value) ? value.filter(Boolean).map(String) : [];
+  }
+  function withEmployee(filter, field, employeeId) {
+    const next = { ...filter || {} };
+    if (employeeId) next[field] = [String(employeeId)];
+    else delete next[field];
+    return next;
+  }
+  function hashWithEmployee(hash, field, employeeId, defaults = {}) {
+    const state = parseListState(hash);
+    const base = hashHasFilter(hash) ? state.filter : { ...defaults || {} };
+    return buildListHash({ ...state, filter: withEmployee(base, field, employeeId) });
+  }
+
+  // ../../shared/js/match-employee-filter/index.js
+  var STYLE_ID8 = "werkia-match-employee-filter-style";
+  var BAR_CLASS = "werkia-match-employee-filter";
+  function matchEmployeeFilterTopic({ id, team, page, routes }) {
+    return {
+      id,
+      title: `Nach ${team} filtern`,
+      page,
+      routes,
+      kind: "view",
+      summary: `Über der Liste steht das Auswahlfeld „${team}“. Wer dort eine Person wählt, sieht nur noch die Matches, die sie als ${team} betreut. Die Status-Filter lassen sich dazu kombinieren, z. B. ${team} wählen und dann „Hot Case“ im KAM-Status.`,
+      notes: [
+        "Der Filter gilt für die ganze Liste, nicht nur für die sichtbare Seite, und bleibt neben deinen übrigen Filtern stehen.",
+        `„alle“ nimmt den ${team}-Filter wieder heraus.`,
+        `Filtervorlagen und eigene Focus-Modes speichern die ${team}-Auswahl mit. Die festen Focus-Modes (z. B. „Nur AG mit Kontakt“) setzen den Filter neu, danach die ${team}-Auswahl bei Bedarf wieder wählen.`
+      ]
+    };
+  }
+  function executeMatchEmployeeFilter(runtime, {
+    sourcePath,
+    // RegExp auf location.hash
+    route,
+    // Listenfeld in MatchFilter, z. B. 'kamEmployeeIds'
+    field,
+    label: label2 = "Mitarbeiter",
+    // async () => [{ id, label }], sortiert
+    loadPeople: loadPeople2,
+    // async () => Standardfilter der Liste, wenn der Hash keinen Filter traegt
+    defaultFilter = async () => ({}),
+    // CSS-Selektor einer Leiste, hinter die die Auswahl soll (sonst ueber die Liste)
+    after = "",
+    helpTip
+  } = {}) {
+    runtime.registerSource(sourcePath);
+    const barId = `werkia-match-employee-filter-${field}`;
+    const isTargetPage3 = () => route.test(location.hash);
+    let people = null;
+    let loadError = "";
+    let loading = false;
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID8)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID8;
+      style.textContent = `
+      .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS} > strong { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      .${BAR_CLASS} select { min-height:28px; min-width:200px; padding:3px 8px; border:1px solid #c8ccdd; border-radius:6px; background:#fff; color:#1f2933; font:400 13px/1.2 Arial,sans-serif; cursor:pointer; }
+      .${BAR_CLASS} select:hover { border-color:#4956df; }
+      .${BAR_CLASS} select:focus-visible { outline:2px solid #4956df; outline-offset:1px; }
+      .${BAR_CLASS}[data-active="true"] select { border-color:#4956df; background:#eef0ff; font-weight:700; }
+      .${BAR_CLASS} [data-status] { color:#5a6178; }
+      .${BAR_CLASS} [data-status][data-state="error"] { color:#b3261e; font-weight:600; }
+    `;
+      document.head.appendChild(style);
+    }
+    const currentFilter = () => parseListState(location.hash).filter;
+    async function apply(employeeId) {
+      const defaults = hashHasFilter(location.hash) ? {} : await defaultFilter();
+      location.hash = hashWithEmployee(location.hash, field, employeeId, defaults);
+    }
+    function buildBar() {
+      const bar = document.createElement("div");
+      bar.id = barId;
+      bar.className = BAR_CLASS;
+      const title = document.createElement("strong");
+      title.textContent = label2;
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", `${label2} wählen`);
+      select.addEventListener("change", () => {
+        apply(select.value).catch((error) => {
+          loadError = `Filter nicht gesetzt: ${error?.message || error}`;
+          syncBar(bar);
+        });
+      });
+      const status2 = document.createElement("span");
+      status2.dataset.status = "";
+      bar.append(...[title, helpTip?.(), select, status2].filter(Boolean));
+      return bar;
+    }
+    function syncBar(bar) {
+      const select = bar.querySelector("select");
+      const selected = selectedEmployeeIds(currentFilter(), field);
+      const value = selected.length === 1 ? selected[0] : selected.length ? "__many" : "";
+      const known = new Map((people || []).map((person) => [person.id, person.label]));
+      const options = [["", `alle ${label2}`], ...(people || []).map((person) => [person.id, person.label])];
+      if (selected.length === 1 && !known.has(value)) options.push([value, "andere Person"]);
+      if (selected.length > 1) options.push(["__many", `${selected.length} Personen`]);
+      const key = JSON.stringify([options, value]);
+      if (select.dataset.key !== key) {
+        select.dataset.key = key;
+        select.replaceChildren(...options.map(([id, text2]) => {
+          const option = document.createElement("option");
+          option.value = id;
+          option.textContent = text2;
+          if (id === "__many") option.disabled = true;
+          return option;
+        }));
+        select.value = value;
+      }
+      const active = String(Boolean(selected.length));
+      if (bar.dataset.active !== active) bar.dataset.active = active;
+      const status2 = bar.querySelector("[data-status]");
+      const text = loadError || (people === null ? "Lädt …" : "");
+      if (status2.textContent !== text) status2.textContent = text;
+      const state = loadError ? "error" : "";
+      if (status2.dataset.state !== state) status2.dataset.state = state;
+    }
+    async function ensurePeople() {
+      if (people !== null || loading) return;
+      loading = true;
+      try {
+        people = await loadPeople2();
+        loadError = "";
+      } catch (error) {
+        people = [];
+        loadError = `${label2}-Liste nicht geladen: ${error?.message || error}`;
+      } finally {
+        loading = false;
+        const bar = document.getElementById(barId);
+        if (bar) syncBar(bar);
+      }
+    }
+    function place(bar) {
+      const before = after ? document.querySelector(after) : null;
+      if (before?.parentElement) {
+        if (before.nextElementSibling !== bar) before.insertAdjacentElement("afterend", bar);
+        return true;
+      }
+      if (bar.isConnected) return true;
+      const anchor = findListAnchor(document);
+      if (!anchor?.parentElement) return false;
+      anchor.parentElement.insertBefore(bar, anchor);
+      return true;
+    }
+    function render() {
+      let bar = document.getElementById(barId);
+      if (!isTargetPage3()) {
+        bar?.remove();
+        return;
+      }
+      ensureStyle5();
+      if (!bar) bar = buildBar();
+      if (!place(bar)) return;
+      syncBar(bar);
+      ensurePeople();
+    }
+    let scheduled = false;
+    const scheduleRender = () => {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 150);
+    };
+    runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
   }
 
   // src/help.js
@@ -7323,6 +8521,20 @@ ${add}` : add;
     bulkStatusTopic({ team: "CEM", page: BULK_PAGES, routes: onBulkPages, declinesInterviews: true, freeTextReason: true, extraNotes: bulkPageNotes }),
     bulkForwardTopic({ page: BULK_PAGES, routes: onBulkPages, extraNotes: bulkPageNotes }),
     bulkDeclinePastTopic({ page: BULK_PAGES, routes: onBulkPages, extraNotes: bulkPageNotes }),
+    {
+      id: "out-feedback",
+      title: "Feste CEM-Out-Gründe",
+      page: "CEM › Meine Matches und Meine Kandidaten › Out-Dialog",
+      routes: onBulkPages,
+      kind: "form",
+      summary: "Im Out-Dialog des Adminpanels gibt es zusätzlich das Dropdown „CEM-Feedback“ mit festen Gründen: Reisebereitschaft, Qualifikation, Stelle besetzt, Konditionen und Erfahrung.",
+      notes: [
+        "Die Auswahl wählt „Anderes“ und trägt den Text ein. Gespeichert wird erst mit dem Speichern-Knopf des Dialogs.",
+        "Dieselben Gründe stehen auch oben in „Alle ändern“ beim CEM Status.",
+        "Der Grund steht danach unter dem Status („CEM-Out: Reisebereitschaft“) und als Matchkommentar.",
+        "Die übrigen Gründe des Adminpanels bleiben wie gewohnt direkt anklickbar."
+      ]
+    },
     {
       id: "candidate-bulk-status",
       title: "Kandidat-Status gesammelt ändern",
@@ -7375,6 +8587,7 @@ ${add}` : add;
         "Terminvorschläge erscheinen mit Datum und Uhrzeit wie im Adminpanel, z. B. „Do., 08.10. um 16 Uhr“.",
         "Unterschrift und E-Mail kommen vom angemeldeten Adminpanel-Nutzer.",
         "Bei der VT Bestätigung vor Ort wird die Fahrzeit vom Kandidaten zur Terminadresse nachgeladen.",
+        "Die Vorlagen zur Einstellungsbestätigung (EB an Bew, Bew soll EB anfragen, Email-Vorlage EB für Bew) stehen unter „Kandidat“. Aus einer Matchzeile geöffnet, kommen Firma und Ansprechpartner aus dem Match; an einer Kandidatenzeile bleiben sie Lücken.",
         "Die VT Erinnerung gibt es auch für den Probetag: Gesprächsart „Probetag (HT)“. Bei HT-Terminen ist sie schon vorgewählt.",
         "Eigene Vorlagen: im WA-Menü „+ Neue Vorlage …“. Name, „Kandidat“ oder „Match“ wählen und Text schreiben; Platzhalter wie {Vorname Kandidat} oder {Arbeitgeber} per Klick einfügen, sie werden beim Verwenden gefüllt. Danach stehen sie unter „Meine Vorlagen“.",
         "Im „Match WA“-Menü sind „Kandidat“ und „Meine Vorlagen“ zugeklappt; ein Klick auf die Überschrift öffnet sie. Rechtsklick auf eine eigene Vorlage: Bearbeiten oder Löschen (mit Rückfrage).",
@@ -7395,6 +8608,39 @@ ${add}` : add;
     matchSentMarkerTopic({ extra: "Geht es um dieselbe Vakanz, zeigt der Hinweis zusätzlich den KAM Status." }),
     appointmentPrioTopic({ team: "CEM", page: "Terminvorschlag-Dialog", routes: onBulkPages }),
     vtaNotizenTopic({ page: "Terminvorschlag-Dialog und Arbeitgeber", routes: [...onBulkPages, ROUTES.employer] }),
+    {
+      id: "cem-vta-daten",
+      title: "Termine beim CEM-VTA vorbelegt",
+      page: "Terminvorschlag-Dialog",
+      routes: onBulkPages,
+      kind: "view",
+      summary: "Ein neuer Terminvorschlag mit „Von: Kandidat“ startet mit übermorgen, überübermorgen und heute in einer Woche statt mit drei Tagen hintereinander. Die Uhrzeiten bleiben wie vom Adminpanel vorgeschlagen.",
+      notes: [
+        "Fällt ein Tag auf Samstag oder Sonntag, rückt er auf Montag, und ist der schon belegt, auf den nächsten Werktag.",
+        "Nur beim Öffnen eines neuen Vorschlags. Was du danach änderst, bleibt, und bestehende Termine fasst die Toolbox nicht an."
+      ]
+    },
+    {
+      id: "vta-mehrfach",
+      title: "Terminvorschlag für mehrere Matches",
+      page: "Terminvorschlag-Dialog",
+      routes: onBulkPages,
+      kind: "write",
+      summary: "Legt denselben Terminvorschlag zusätzlich für weitere offene Matches des Kandidaten an, z. B. für vier OFMs oder Bewerbungen. So muss nicht jedes Match einzeln einen VTA bekommen.",
+      steps: [
+        "Den Terminvorschlag wie immer aus der Zeile des Matches öffnen und ausfüllen.",
+        "Unten im Dialog „Auch für weitere Matches dieses Kandidaten anlegen“ aufklappen und die Matches anhaken. Jede Zeile zeigt Arbeitgeber, Position, CEM- und OM-Status.",
+        "Speichern. Danach legt die Toolbox denselben Vorschlag für jedes gewählte Match an. Unten rechts steht je Match „angelegt“ oder der Fehler."
+      ],
+      notes: [
+        "Übernommen werden Termine, Art, Ort, Hinweise, Notizen und die Herkunft der Termine (CEM-VTA bleibt CEM-VTA). Die VTA-Notiz des Arbeitgebers (z. B. Buchungslink) wird je Arbeitgeber getauscht.",
+        "Arbeitgeber auf der VTA-Sperrliste sind rot markiert und nicht wählbar.",
+        "„hat offenen CEM-VTA“ bzw. „hat offenen KAM-VTA“ zeigt, dass am Match schon ein Vorschlag offen ist. Wählbar bleibt es trotzdem.",
+        "Überschneidet sich ein Termin mit einem anderen Termin des Kandidaten, meldet das Panel das je Match. „Trotz Überschneidung anlegen“ legt ihn dann doch an.",
+        "Nur neue Terminvorschläge. Beim Bearbeiten eines bestehenden Termins und bei bestätigten Terminen wird nichts übernommen. Rückgängig gibt es nicht: Falsch angelegte Vorschläge am Match löschen."
+      ]
+    },
+    vtvHotWarnungTopic({ page: "Termin-Dialog", routes: onBulkPages }),
     noGoCheckTopic(),
     companyFlagTopic(),
     urgentVacancyTopic(),
@@ -7404,8 +8650,12 @@ ${add}` : add;
     omNotesBoxTopic({ routes: onPotentialMatches, translatesTags: false }),
     routeCalculationTopic({ routes: onPotentialMatches, commute: true }),
     commuteBadgesTopic(),
+    employerGroupsTopic(),
     filterPresetsTopic({ page: "CEM › Meine Matches", routes: [ROUTES.cemMyMatches] }),
     matchStatusFilterTopic({ id: "kam-status-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
+    matchEmployeeFilterTopic({ id: "kam-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
+    tagsUnreadTopic({ page: "CEM › Meine Kandidaten › TAGS", routes: [ROUTES.cemMyCandidates] }),
+    tagsSearchTopic({ page: "CEM › Meine Kandidaten › TAGS", routes: [ROUTES.cemMyCandidates] }),
     {
       id: "focus-modes",
       title: "Focus-Modes",
@@ -7513,7 +8763,7 @@ ${add}` : add;
       steps: [
         "Mit der Maus auf den Kreis zeigen, um den Grund zu sehen, z. B. „Hot Case“, „Bestätigter VT am 21.10.“ oder „7 Werktage ohne Kontakt“.",
         "Auf den Kreis klicken, um die Farbe selbst zu setzen (Grün, Gelb, Rot) oder zurück auf „Automatisch“ zu stellen. Eine selbst gesetzte Farbe hat einen gestrichelten Rand.",
-        "Neben dem Focus-Mode filtern Grün, Gelb, Rot und „Nur NEW“ die gesamte Liste. „Nur NEW“ zeigt Kandidaten ohne Kontakt seit der Zuteilung. Ein zweiter Klick hebt den Filter auf. Dafür muss im Filter „CEM“ mindestens eine Person stehen."
+        "Neben dem Focus-Mode filtern Grün, Gelb, Rot und „Nur NEW“ die gesamte Liste. „Nur NEW“ zeigt Kandidaten ohne Kontakt seit der Zuteilung und stellt dazu den Filter „WVL bis“ (Kandidaten-WVL, nicht „CEM WVL bis“) auf heute. Ein zweiter Klick hebt den Filter auf und nimmt „WVL bis“ wieder heraus, solange du ihn nicht selbst geändert hast. Dafür muss im Filter „CEM“ mindestens eine Person stehen."
       ],
       notes: [
         "Grün: ein Match ist Hot Case (CEM-Status), es gibt einen bestätigten VT oder einen offenen KAM-VTA, oder der Kandidat ist in den ersten 7 Werktagen nach der Zuteilung an dich.",
@@ -7572,11 +8822,11 @@ ${add}` : add;
       if (!root || root.getAttribute(bootstrapMarker) === "true") return;
       root.setAttribute(bootstrapMarker, "true");
       const URGENT_TAG_RE = /\[\s*dringende\s+suche\s*\]/i;
-      const STYLE_ID16 = "werkia-urgent-vacancy-style";
+      const STYLE_ID19 = "werkia-urgent-vacancy-style";
       const ROW_CLASS3 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
-      const POTENTIAL_MATCHES_ROUTE8 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+      const POTENTIAL_MATCHES_ROUTE9 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
       const FINGERPRINT_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_fingerprint_v1";
       const urgentIndex = /* @__PURE__ */ new Map();
@@ -7589,7 +8839,7 @@ ${add}` : add;
       let blockedBearer = "";
       const capturedAuth = { bearer: "", fingerprint: "" };
       function isPotentialMatchesPage() {
-        return POTENTIAL_MATCHES_ROUTE8.test(location.hash || "");
+        return POTENTIAL_MATCHES_ROUTE9.test(location.hash || "");
       }
       function getHeaderValue2(headers, name) {
         if (!headers) return "";
@@ -7717,9 +8967,9 @@ ${add}` : add;
         return rowsByJobId;
       }
       function ensureStyles2() {
-        if (document.getElementById(STYLE_ID16)) return;
+        if (document.getElementById(STYLE_ID19)) return;
         const style = document.createElement("style");
-        style.id = STYLE_ID16;
+        style.id = STYLE_ID19;
         style.textContent = `
       .${ROW_CLASS3} { outline: 3px solid #d97706 !important; outline-offset: -3px; box-shadow: inset 7px 0 0 #b45309 !important; }
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background: #fff3cd !important; }
@@ -8031,7 +9281,7 @@ ${add}` : add;
     if (!owner) root.setAttribute(attr, namespace);
     return true;
   }
-  function createLoadingGate({ schedule, onRetry, maxWaitMs = LOADING_MAX_WAIT_MS, isLoading = adminpanelIsLoading }) {
+  function createLoadingGate({ schedule: schedule2, onRetry, maxWaitMs = LOADING_MAX_WAIT_MS, isLoading = adminpanelIsLoading }) {
     let since = 0;
     return function shouldWait() {
       if (!isLoading()) {
@@ -8040,7 +9290,7 @@ ${add}` : add;
       }
       if (!since) since = Date.now();
       if (Date.now() - since >= maxWaitMs) return false;
-      schedule(onRetry, 1e3);
+      schedule2(onRetry, 1e3);
       return true;
     };
   }
@@ -8634,7 +9884,7 @@ ${add}` : add;
   }
 
   // src/features/cem-ofm/reverse-match-kam-status.js
-  var OWNER_KEY2 = "kam-status-potentialMatches";
+  var OWNER_KEY3 = "kam-status-potentialMatches";
   var TAG_CLASS = "werkia-cem-kam-status-tag";
   var SENT_MATCH_TAG_CLASS = "werkia-cem-sent-match-tag";
   var MATCH_PRESENT_ROW_CLASS = "werkia-cem-match-present-row";
@@ -8665,7 +9915,7 @@ ${add}` : add;
     const sentEmployerLoads = /* @__PURE__ */ new Map();
     const employerGroups = /* @__PURE__ */ new Map();
     const employerGroupLoads = /* @__PURE__ */ new Set();
-    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms2) => runtime.setTimeout(fn, ms2), onRetry: () => scheduleRender() });
     const tasks = /* @__PURE__ */ new Map();
     const queue = [];
     let renderTimer = null;
@@ -8823,7 +10073,7 @@ ${add}` : add;
       if (!isPotentialMatchesPage()) return;
       const candidateId = getCandidateIdFromRoute();
       if (!candidateId) return;
-      if (!claimPage(OWNER_KEY2, "cem")) return;
+      if (!claimPage(OWNER_KEY3, "cem")) return;
       if (waitForAdminpanel()) return;
       const provider = getCemGraphqlAdapter().matchProvider;
       const current = cachedSentEmployers(candidateId);
@@ -8903,7 +10153,7 @@ ${add}` : add;
   // src/features/cem-ofm/company-flag.js
   var FLAG_CLASS = "werkia-cem-company-flag";
   var ROW_CLASS = "werkia-cem-flagged-company-row";
-  var STYLE_ID7 = "werkia-cem-company-style";
+  var STYLE_ID9 = "werkia-cem-company-style";
   var FLAG_TEXT = "[absprache vor ofm]";
   var POTENTIAL_MATCHES_ROUTE2 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   function getEmployerNameFromRow(row2) {
@@ -8924,12 +10174,12 @@ ${add}` : add;
     function removeFlags() {
       document.querySelectorAll(`.${FLAG_CLASS}`).forEach((flag) => flag.remove());
       document.querySelectorAll(`.${ROW_CLASS}`).forEach((row2) => row2.classList.remove(ROW_CLASS));
-      document.getElementById(STYLE_ID7)?.remove();
+      document.getElementById(STYLE_ID9)?.remove();
     }
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID7)) return;
+      if (document.getElementById(STYLE_ID9)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID7;
+      style.id = STYLE_ID9;
       style.textContent = `.${ROW_CLASS}{outline:3px solid #7950f2 !important;outline-offset:-3px;box-shadow:inset 6px 0 0 #5f3dc4 !important}.${ROW_CLASS} > td,.${ROW_CLASS} > th{background:#e5dbff !important}.${ROW_CLASS}:hover > td,.${ROW_CLASS}:hover > th{background:#d0bfff !important;}`;
       document.head.appendChild(style);
     }
@@ -9012,7 +10262,7 @@ ${add}` : add;
     let questionnaireLaunchPending = false;
     let questionnaireLaunchTimer = null;
     let clickGeneration = 0;
-    const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
+    const sleep2 = (ms2) => new Promise((resolve) => runtime.setTimeout(resolve, ms2));
     const isPotentialMatchesPage = () => POTENTIAL_MATCHES_ROUTE3.test(location.hash || "");
     const getResourceId = (row2, resource) => row2?.querySelector(`a[href*="#/${resource}/"][href*="/show"]`)?.getAttribute("href")?.match(new RegExp(`/${resource}/([a-f0-9-]{36})/show`, "i"))?.[1] || "";
     const candidateIdFromRoute = () => String(location.hash || "").match(/^#\/Candidate\/([a-f0-9-]{36})\/show\/7/i)?.[1] || "";
@@ -9305,57 +10555,24 @@ ${add}` : add;
       requestAnimationFrame(animate);
     }
     function launchTears() {
-      const canvas = document.createElement("canvas");
-      canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99999999;";
-      document.body.appendChild(canvas);
-      const context = canvas.getContext("2d");
-      if (!context) {
-        canvas.remove();
-        return;
-      }
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const faces = ["😢", "😭"];
-      const drops = Array.from({ length: 40 }, () => ({
-        x: canvas.width / 2 + (Math.random() - 0.5) * 500,
-        y: canvas.height / 2 - 120 - Math.random() * 80,
-        vx: (Math.random() - 0.5) * 6,
-        vy: -(Math.random() * 8 + 2),
-        size: Math.random() * 18 + 26,
-        face: faces[Math.floor(Math.random() * faces.length)],
-        rot: (Math.random() - 0.5) * 30,
-        rotV: (Math.random() - 0.5) * 3,
-        gravity: 0.25 + Math.random() * 0.1,
-        opacity: 1
-      }));
-      let frame = 0;
-      function animate() {
-        frame += 1;
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        let alive = false;
-        drops.forEach((drop) => {
-          drop.x += drop.vx;
-          drop.vy += drop.gravity;
-          drop.y += drop.vy;
-          drop.rot += drop.rotV;
-          drop.vx *= 0.99;
-          if (frame > 50) drop.opacity -= 0.015;
-          if (drop.opacity <= 0) return;
-          alive = true;
-          context.save();
-          context.translate(drop.x, drop.y);
-          context.rotate(drop.rot * Math.PI / 180);
-          context.globalAlpha = Math.max(0, drop.opacity);
-          context.font = `${drop.size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-          context.textAlign = "center";
-          context.textBaseline = "middle";
-          context.fillText(drop.face, 0, 0);
-          context.restore();
-        });
-        if (alive && frame < 170) requestAnimationFrame(animate);
-        else canvas.remove();
-      }
-      requestAnimationFrame(animate);
+      const face = document.createElement("div");
+      face.textContent = "😢";
+      face.setAttribute("aria-hidden", "true");
+      face.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:72px;line-height:1;pointer-events:none;z-index:99999999;opacity:0;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;';
+      document.body.appendChild(face);
+      const remove = () => face.remove();
+      const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      runtime.setTimeout(remove, 1500);
+      if (typeof face.animate !== "function") return;
+      const from = reduced ? "translate(-50%,-50%)" : "translate(-50%,-40%) scale(0.9)";
+      const to = reduced ? "translate(-50%,-50%)" : "translate(-50%,-55%)";
+      const animation = face.animate([
+        { opacity: 0, transform: from },
+        { opacity: 1, transform: "translate(-50%,-50%)", offset: 0.25 },
+        { opacity: 1, transform: "translate(-50%,-50%)", offset: 0.7 },
+        { opacity: 0, transform: to }
+      ], { duration: 1e3, easing: "ease-out" });
+      animation.onfinish = remove;
     }
     runtime.createMutationObserver(colorSelects).observe(document.body, { childList: true, subtree: true });
     runtime.addDocumentListener("click", (event) => {
@@ -9382,18 +10599,16 @@ ${add}` : add;
   var NOTES_ID = "werkia-om-notes-box";
   var COMPANY_FLAG = "[absprache vor ofm]";
   var QUESTIONNAIRE_LABELS3 = ["Reisehäufigkeit", "Montagebereitschaft", "Berufserfahrung", "Erforderliche Berufserfahrung", "Erforderliche Sprachkentnisse", "Sprachkentnisse", "Recognition status", "Mindestgehalt pro Monat", "Minimumgehalt", "Position", "Positionen", "Zusätzliche Information - OM", "Erforderliche Führerschein", "Führerschein"];
-  var clean3 = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
-  var label = (value) => clean3(value).replace(/:$/, "");
-  var empty = (value) => !clean3(value) || clean3(value) === "-" || clean3(value) === "–" || clean3(value) === "nicht angegeben";
+  var clean5 = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  var label = (value) => clean5(value).replace(/:$/, "");
+  var empty = (value) => isEmptyValue(value);
   var status = (value, detail) => detail ? { status: value, detail } : { status: value };
-  var rankIndex = (value, pairs) => pairs.findIndex((pair) => clean3(value).includes(pair));
-  function travelRank(value) {
-    const text = clean3(value);
-    if (text.includes("keine reisebereitschaft")) return 0;
-    if (text.includes("gering")) return 1;
-    if (text.includes("regelmäßig")) return 2;
-    if (text.includes("uneingeschränkt")) return 3;
-    return null;
+  function licenseDecision(requiredText, candidateText) {
+    if (isLicenseRequired(requiredText) !== true) return { status: "send", required: false };
+    const candidate = licenseStatus(candidateText);
+    if (candidate === "has-license") return { status: "send", required: true };
+    if (candidate === "no-license") return { status: "no-send", required: true };
+    return { status: "unclear", required: true };
   }
   function executeQuestionnaireEvaluation(runtime) {
     runtime.registerSource("cem/toolbox/src/features/cem-ofm/questionnaire-evaluation.js");
@@ -9413,7 +10628,7 @@ ${add}` : add;
     };
     const anyValue = (dialog, labels2, last = false) => labels2.map((fieldName) => value(dialog, fieldName, last)).find(Boolean) || null;
     const allowEmpty = (dialog, fieldName) => fields(dialog, fieldName)[0]?.querySelector("span.MuiTypography-body2") || fields(dialog, fieldName)[0] || null;
-    const positionValues = (dialog, fieldName) => fields(dialog, fieldName)[0] ? [...fields(dialog, fieldName)[0].querySelectorAll("span.MuiTypography-body2")].filter((element5) => element5.innerText?.trim() && clean3(element5.innerText) !== "berufsausbildung") : [];
+    const positionValues = (dialog, fieldName) => fields(dialog, fieldName)[0] ? [...fields(dialog, fieldName)[0].querySelectorAll("span.MuiTypography-body2")].filter((element5) => element5.innerText?.trim() && clean5(element5.innerText) !== "berufsausbildung") : [];
     const dialogIsQuestionnaire = (dialog) => {
       if (!dialog || /Matchkommentare|Kandidat Dateien/i.test(dialog.innerText || dialog.textContent || "")) return false;
       const labels2 = new Set([...dialog.querySelectorAll("span.ra-field p span, span.ra-field p, div.ra-field p span, div.ra-field p, div.MuiStack-root p span, div.MuiStack-root p")].map((element5) => label(element5.innerText || element5.textContent)));
@@ -9454,19 +10669,13 @@ ${add}` : add;
       const travelRight = value(dialog, "Montagebereitschaft");
       let travel = rankedComparison(travelLeft, travelRight, travelRank, "Montagebereitschaft");
       if (travelLeft && travelRank(travelLeft.innerText) === 0) travel = status("send");
-      const language = rankedComparison(value(dialog, "Erforderliche Sprachkentnisse"), value(dialog, "Sprachkentnisse"), (text) => {
-        const index = rankIndex(text, ["grundkenntnisse", "verhandlungssicher", "muttersprachlich"]);
-        return index < 0 ? null : index;
-      }, "Sprachkentnisse");
+      const language = rankedComparison(value(dialog, "Erforderliche Sprachkentnisse"), value(dialog, "Sprachkentnisse"), languageRank, "Sprachkentnisse");
       const experienceLeft = value(dialog, "Erforderliche Berufserfahrung") || value(dialog, "Berufserfahrung");
       const experienceRight = value(dialog, "Berufserfahrung", true);
-      const experience = experienceLeft === experienceRight ? status("send") : rankedComparison(experienceLeft, experienceRight, (text) => {
-        const index = rankIndex(text, ["0 jahre", "1 bis 2", "3 bis 5", "6 bis 10", "mehr als 10"]);
-        return index < 0 ? null : index;
-      }, "Berufserfahrung");
+      const experience = experienceLeft === experienceRight ? status("send") : rankedComparison(experienceLeft, experienceRight, experienceRank, "Berufserfahrung");
       const recognition = (() => {
         const element5 = value(dialog, "Recognition status");
-        const text = clean3(element5?.innerText);
+        const text = clean5(element5?.innerText);
         if (!element5 || text.includes("ja, ist anerkannt")) return status("send");
         if (text.includes("in anerkennung")) {
           mark(element5, YELLOW, "In Anerkennung");
@@ -9481,38 +10690,27 @@ ${add}` : add;
       const license = (() => {
         const required = anyValue(dialog, ["Erforderliche Führerschein", "Erforderlicher Führerschein", "Führerschein vorausgesetzt", "Auto muss da sein"]);
         const candidate = anyValue(dialog, ["Führerschein", "Führerschein Kandidat", "Führerschein Kandidat:in"], true);
-        const text = clean3(required?.innerText);
-        if (!required || empty(text) || text === "nein" || text.includes("nicht erforderlich")) return status("send");
-        if (!(text.includes("ja") || text.includes("führerschein") || text.includes("klasse") || text.includes("b"))) return status("send");
-        const candidateText = clean3(candidate?.innerText);
+        if (!required) return status("send");
+        const decision = licenseDecision(required.innerText, candidate?.innerText);
+        if (!decision.required) return status("send");
         const detail = `Führerschein: vorausgesetzt → ${candidate?.innerText || "leer"}`;
-        if (/ja|klasse|vorhanden/.test(candidateText)) {
-          mark(required, GREEN);
-          mark(candidate, GREEN);
-          return status("send");
-        }
-        if (!candidate || !candidateText || /fahrschule|wird gemacht/.test(candidateText)) {
-          mark(required, YELLOW);
-          if (candidate) mark(candidate, YELLOW);
-          return status("unclear", detail);
-        }
-        mark(required, RED);
-        mark(candidate, RED);
-        return status("no-send", detail);
+        const color = decision.status === "send" ? GREEN : decision.status === "no-send" ? RED : YELLOW;
+        mark(required, color, detail);
+        if (candidate) mark(candidate, color, detail);
+        return decision.status === "send" ? status("send") : status(decision.status, detail);
       })();
       const salary = (() => {
         const employer = allowEmpty(dialog, "Minimumgehalt");
         const candidate = allowEmpty(dialog, "Mindestgehalt pro Monat");
-        const numbers = (text) => (String(text || "").match(/\d[\d.,]*/g) || []).map((number) => Number(number.replace(/\./g, "").replace(",", "."))).filter((number) => number > 100);
         if (!candidate || empty(candidate.innerText)) return status("send");
         if (!employer || empty(employer.innerText)) {
           if (employer) mark(employer, GREEN);
           mark(candidate, GREEN);
           return status("send");
         }
-        const employerMax = Math.max(...numbers(employer.innerText));
-        const candidateMax = Math.max(...numbers(candidate.innerText));
-        if (!Number.isFinite(employerMax) || !Number.isFinite(candidateMax)) return status("send");
+        const employerMax = salaryMax(employer.innerText);
+        const candidateMax = salaryMax(candidate.innerText);
+        if (employerMax === null || candidateMax === null) return status("send");
         const detail = `Gehalt: AG max. ${employerMax} → Kandidat ${candidateMax}`;
         const color = candidateMax <= employerMax + 1e3 ? GREEN : RED;
         mark(employer, color, detail);
@@ -9520,8 +10718,8 @@ ${add}` : add;
         return color === RED ? status("no-send", detail) : status("send");
       })();
       const positions = (() => {
-        const employers = positionValues(dialog, "Position").map((element5) => ({ element: element5, text: clean3(element5.innerText) }));
-        const candidates = positionValues(dialog, "Positionen").map((element5) => ({ element: element5, text: clean3(element5.innerText) }));
+        const employers = positionValues(dialog, "Position").map((element5) => ({ element: element5, text: clean5(element5.innerText) }));
+        const candidates = positionValues(dialog, "Positionen").map((element5) => ({ element: element5, text: clean5(element5.innerText) }));
         if (!employers.length) return status("send");
         if (!candidates.length) return status("unclear", `Positionen: ${employers.map((item) => item.text).join(", ")} → leer`);
         let green = false;
@@ -9566,7 +10764,7 @@ ${add}` : add;
       const stored = field.querySelector("span.MuiTypography-body2")?.innerText?.trim() || "";
       const employer = [...dialog.querySelectorAll("span.ra-field")].find((item) => item.querySelector("p span")?.innerText?.trim() === "Arbeitgeber");
       const employerName = employer?.querySelector("span.MuiTypography-body2, a, .MuiChip-label")?.textContent || "";
-      const flagged = /\bga[\s-]?tec\b/i.test(employerName) || clean3(stored).includes(COMPANY_FLAG);
+      const flagged = /\bga[\s-]?tec\b/i.test(employerName) || clean5(stored).includes(COMPANY_FLAG);
       const text = stored.replace(new RegExp(COMPANY_FLAG.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), "").replace(/^[\s,;|/-]+|[\s,;|/-]+$/g, "").trim();
       if ((!text || text === "-" || text === "–") && !flagged) return;
       const rect = dialog.getBoundingClientRect();
@@ -9594,7 +10792,7 @@ ${add}` : add;
         rendering = false;
       }, 0);
     }
-    const schedule = () => {
+    const schedule2 = () => {
       runtime.clearTimeout(timer);
       timer = runtime.setTimeout(run, 200);
     };
@@ -9604,10 +10802,10 @@ ${add}` : add;
         const target = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
         return target?.closest?.('.MuiDialog-paper, div[role="dialog"]') || [...mutation.addedNodes, ...mutation.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE && (node.matches?.('.MuiDialog-paper, div[role="dialog"]') || node.querySelector?.('.MuiDialog-paper, div[role="dialog"]')));
       });
-      if (questionnaireChanged) schedule();
+      if (questionnaireChanged) schedule2();
     }).observe(document.body, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
-    schedule();
+    runtime.addWindowListener("hashchange", schedule2);
+    schedule2();
   }
 
   // ../../shared/js/route-commute/core.js
@@ -10024,8 +11222,8 @@ ${add}` : add;
   }
 
   // ../../shared/js/admin-dom/timing.js
-  function sleep(ms) {
-    return new Promise((resolve) => wSetTimeout(resolve, ms));
+  function sleep(ms2) {
+    return new Promise((resolve) => wSetTimeout(resolve, ms2));
   }
 
   // ../../shared/js/route-commute/routing.js
@@ -10536,7 +11734,7 @@ ${add}` : add;
   var REVERSE_MATCHES_ROUTE = /^#\/OnlineMatches\/ReverseMatches(?:\?|$)/i;
   var OM_MATCHES_ROUTE = /^#\/OnlineMatches\/(?:AllMatches|MyMatches)(?:[/?]|$)/i;
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
-  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
   function isInViewport(row2) {
     const rect = row2.getBoundingClientRect();
@@ -10578,7 +11776,7 @@ ${add}` : add;
       matches: (hash) => POTENTIAL_MATCHES_ROUTE5.test(hash),
       collect() {
         const candidateId = getCandidateIdFromRoute2();
-        return [...document.querySelectorAll(ROW_SELECTOR3)].map((row2) => ({
+        return [...document.querySelectorAll(ROW_SELECTOR4)].map((row2) => ({
           row: row2,
           candidateId,
           jobId: getJobIdFromRow(row2),
@@ -10592,7 +11790,7 @@ ${add}` : add;
       matches: (hash) => OM_MATCHES_ROUTE.test(hash),
       collect() {
         const items = [];
-        for (const row2 of document.querySelectorAll(ROW_SELECTOR3)) {
+        for (const row2 of document.querySelectorAll(ROW_SELECTOR4)) {
           const link = getJobLinkFromRow(row2);
           if (!link || link.closest("tr") !== row2) continue;
           items.push({ row: row2, candidateId: getCandidateIdFromOmMatchRow(row2), jobId: getJobIdFromRow(row2), host: () => link.closest("td") || row2 });
@@ -10627,13 +11825,13 @@ ${add}` : add;
     const pageKeys = options.pages || ["potentialMatches"];
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
-    const STYLE_ID16 = `werkia-${namespace}-commute-style`;
+    const STYLE_ID19 = `werkia-${namespace}-commute-style`;
     const SKULL_ATTR = `data-werkia-${namespace}-commute-skull`;
     const HIDDEN_ATTR = `data-werkia-${namespace}-commute-hidden`;
     const BIG_ATTR = `data-werkia-${namespace}-commute-big-skull`;
     const bigSkullUrl = options.bigSkullUrl || "";
-    const BAR_CLASS4 = `werkia-${namespace}-commute-hidden-bar`;
-    const OWNED_SELECTOR2 = `.${BADGE_CLASS2}, .${BAR_CLASS4}`;
+    const BAR_CLASS5 = `werkia-${namespace}-commute-hidden-bar`;
+    const OWNED_SELECTOR2 = `.${BADGE_CLASS2}, .${BAR_CLASS5}`;
     let showHidden = false;
     const queued = /* @__PURE__ */ new Set();
     const queue = [];
@@ -10642,9 +11840,9 @@ ${add}` : add;
     const RETRY_MS8 = 60 * 1e3;
     let scheduled = false;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID16)) return;
+      if (document.getElementById(STYLE_ID19)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID19;
       style.textContent = `
       .${BADGE_CLASS2} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid;border-radius:999px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;white-space:nowrap; }
       ${Object.entries(LEVEL_STYLES).map(([level, css]) => `.${BADGE_CLASS2}[data-level="${level}"] { ${css} }`).join("\n")}
@@ -10655,8 +11853,8 @@ ${add}` : add;
       tr[${BIG_ATTR}] > td:first-child { box-shadow:inset 6px 0 #c92a2a,inset 0 3px #c92a2a,inset 0 -3px #c92a2a !important; }
       tr[${BIG_ATTR}] .${BADGE_CLASS2} { gap:8px;padding:6px 14px 6px 8px;border-width:2px;border-color:#991b1b;font-size:15px;font-weight:900;white-space:normal; }
       tr[${BIG_ATTR}] .${BADGE_CLASS2}::before { content:"${bigSkullUrl ? "" : "💀"}";flex:0 0 auto;width:64px;height:64px;font-size:56px;line-height:64px;text-align:center;${bigSkullUrl ? `background:url("${bigSkullUrl}") center/contain no-repeat;` : ""} }
-      .${BAR_CLASS4} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e03131;border-radius:8px;background:#fff5f5;color:#8f1d1d;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
-      .${BAR_CLASS4} button { margin-left:auto;padding:3px 10px;border:1px solid #c92a2a;border-radius:6px;background:#fff;color:#8f1d1d;font:inherit;cursor:pointer; }
+      .${BAR_CLASS5} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e03131;border-radius:8px;background:#fff5f5;color:#8f1d1d;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${BAR_CLASS5} button { margin-left:auto;padding:3px 10px;border:1px solid #c92a2a;border-radius:6px;background:#fff;color:#8f1d1d;font:inherit;cursor:pointer; }
     `;
       document.head.appendChild(style);
     }
@@ -10665,7 +11863,7 @@ ${add}` : add;
       document.querySelectorAll(`tr[${SKULL_ATTR}]`).forEach((row2) => row2.removeAttribute(SKULL_ATTR));
       document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row2) => row2.removeAttribute(HIDDEN_ATTR));
       document.querySelectorAll(`tr[${BIG_ATTR}]`).forEach((row2) => row2.removeAttribute(BIG_ATTR));
-      document.querySelectorAll(`.${BAR_CLASS4}`).forEach((bar) => bar.remove());
+      document.querySelectorAll(`.${BAR_CLASS5}`).forEach((bar) => bar.remove());
       queue.length = 0;
       queued.clear();
     }
@@ -10689,14 +11887,14 @@ ${add}` : add;
     }
     function renderHiddenBar(items, hiddenCount) {
       const table = items[0]?.row?.closest("table") || null;
-      let bar = document.querySelector(`.${BAR_CLASS4}`);
+      let bar = document.querySelector(`.${BAR_CLASS5}`);
       if (!table || !hiddenCount) {
         bar?.remove();
         return;
       }
       if (!bar) {
         bar = document.createElement("div");
-        bar.className = BAR_CLASS4;
+        bar.className = BAR_CLASS5;
         bar.innerHTML = '<span></span><button type="button"></button>';
         bar.querySelector("button").addEventListener("click", () => {
           showHidden = !showHidden;
@@ -10726,7 +11924,7 @@ ${add}` : add;
       work();
     }
     const WORKERS2 = 8;
-    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleRender() });
+    const waitForAdminpanel = createLoadingGate({ schedule: (fn, ms2) => runtime.setTimeout(fn, ms2), onRetry: () => scheduleRender() });
     let workers = 0;
     async function computeCandidate(candidateId) {
       try {
@@ -10863,11 +12061,197 @@ ${add}` : add;
     });
   }
 
+  // ../../shared/js/employer-groups/core.js
+  function planEmployerGroups(items, expanded = /* @__PURE__ */ new Set()) {
+    const groups = /* @__PURE__ */ new Map();
+    items.forEach((item, index) => {
+      const id = String(item?.employerId || "").toLowerCase();
+      if (!id || !item.visible || item.groupable === false) return;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(index);
+    });
+    const plan = items.map((item) => ({ role: "none", employerId: String(item?.employerId || "").toLowerCase(), count: 0, hidden: false, expanded: false }));
+    for (const [id, indexes] of groups) {
+      if (indexes.length < 2) continue;
+      const isOpen = expanded.has(id);
+      indexes.forEach((index, position) => {
+        plan[index].expanded = isOpen;
+        if (position === 0) {
+          plan[index].role = "head";
+          plan[index].count = indexes.length - 1;
+        } else {
+          plan[index].role = "member";
+          plan[index].hidden = !isOpen;
+        }
+      });
+    }
+    return plan;
+  }
+  function groupToggleText(count, employerName, expanded) {
+    const name = String(employerName || "").trim() || "diesem Arbeitgeber";
+    const stellen = count === 1 ? "1 weitere Stelle" : `${count} weitere Stellen`;
+    return expanded ? `▾ ${stellen} bei ${name} zuklappen` : `▸ +${stellen} bei ${name}`;
+  }
+
+  // ../../shared/js/employer-groups/index.js
+  var POTENTIAL_MATCHES_ROUTE6 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
+  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var REVEALED_SELECTOR = [
+    "tr[data-werkia-cem-commute-skull]",
+    "tr[data-werkia-obc-commute-skull]",
+    "tr[data-werkia-cem-commute-hidden]",
+    "tr[data-werkia-obc-commute-hidden]",
+    "tr[data-werkia-om-exclusion]"
+  ].join(", ");
+  var WATCHED_ATTRIBUTES = [
+    "class",
+    "style",
+    "data-werkia-cem-commute-hidden",
+    "data-werkia-obc-commute-hidden",
+    "data-werkia-cem-commute-skull",
+    "data-werkia-obc-commute-skull",
+    "data-werkia-om-exclusion"
+  ];
+  function getCandidateIdFromRoute3(hash = location.hash || "") {
+    return String(hash).match(POTENTIAL_MATCHES_ROUTE6)?.[1]?.toLowerCase() || "";
+  }
+  function employerLinkOf(row2) {
+    const link = row2?.querySelector('td.column-jobPositionId a[href*="#/Employer/"]') || row2?.querySelector('a[href*="#/Employer/"]');
+    return link && link.closest("tr") === row2 ? link : null;
+  }
+  function getEmployerIdFromRow(row2) {
+    return employerLinkOf(row2)?.getAttribute("href")?.match(/\/Employer\/([a-f0-9-]{36})/i)?.[1]?.toLowerCase() || "";
+  }
+  function executeEmployerGroups(runtime, options = {}) {
+    const namespace = options.namespace || "werkia";
+    if (options.sourcePath) runtime.registerSource(options.sourcePath);
+    const HIDDEN_ATTR = `data-werkia-${namespace}-employer-group-hidden`;
+    const MEMBER_ATTR = `data-werkia-${namespace}-employer-group-member`;
+    const TOGGLE_CLASS = `werkia-${namespace}-employer-group-toggle`;
+    const STYLE_ID19 = `werkia-${namespace}-employer-group-style`;
+    let candidateId = "";
+    let expanded = /* @__PURE__ */ new Set();
+    let scheduled = false;
+    function ensureStyles2() {
+      if (document.getElementById(STYLE_ID19)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID19;
+      style.textContent = `
+      tr[${HIDDEN_ATTR}] { display:none !important; }
+      tr[${MEMBER_ATTR}] > td:first-child { box-shadow:inset 4px 0 #74c0fc; }
+      .${TOGGLE_CLASS} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:4px 10px;border:1px solid #74c0fc;border-radius:999px;background:transparent;color:inherit;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap;vertical-align:middle; }
+      .${TOGGLE_CLASS}:hover { background:rgba(116,192,252,.18); }
+      .${TOGGLE_CLASS}:focus-visible { outline:2px solid #339af0;outline-offset:1px; }
+    `;
+      document.head.appendChild(style);
+    }
+    function clearAll() {
+      document.querySelectorAll(`.${TOGGLE_CLASS}`).forEach((button2) => button2.remove());
+      document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row2) => row2.removeAttribute(HIDDEN_ATTR));
+      document.querySelectorAll(`tr[${MEMBER_ATTR}]`).forEach((row2) => row2.removeAttribute(MEMBER_ATTR));
+    }
+    function renderToggle(row2, link, view) {
+      let button2 = row2.querySelector(`.${TOGGLE_CLASS}`);
+      if (!button2) {
+        button2 = document.createElement("button");
+        button2.type = "button";
+        button2.className = TOGGLE_CLASS;
+        button2.dataset.werkiaOwned = "true";
+        button2.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const id = button2.dataset.employerId;
+          if (!id) return;
+          if (expanded.has(id)) expanded.delete(id);
+          else expanded.add(id);
+          render();
+        });
+        (link.closest("td") || row2).appendChild(button2);
+      }
+      if (button2.dataset.employerId !== view.employerId) button2.dataset.employerId = view.employerId;
+      if (button2.textContent !== view.text) button2.textContent = view.text;
+      const expandedText = String(view.expanded);
+      if (button2.getAttribute("aria-expanded") !== expandedText) button2.setAttribute("aria-expanded", expandedText);
+    }
+    function render() {
+      const nextCandidateId = getCandidateIdFromRoute3();
+      if (!nextCandidateId || !claimPage("employer-groups-potentialMatches", namespace)) {
+        clearAll();
+        return;
+      }
+      if (nextCandidateId !== candidateId) {
+        candidateId = nextCandidateId;
+        expanded = /* @__PURE__ */ new Set();
+      }
+      ensureStyles2();
+      const rows = [...document.querySelectorAll(ROW_SELECTOR5)];
+      rows.forEach((row2) => row2.removeAttribute(HIDDEN_ATTR));
+      const items = rows.map((row2) => {
+        const link = employerLinkOf(row2);
+        return {
+          row: row2,
+          link,
+          employerId: getEmployerIdFromRow(row2),
+          employerName: link?.textContent?.trim() || "",
+          visible: row2.isConnected && row2.getClientRects().length > 0,
+          groupable: !row2.matches(REVEALED_SELECTOR)
+        };
+      });
+      const plan = planEmployerGroups(items, expanded);
+      items.forEach((item, index) => {
+        const view = plan[index];
+        if (view.hidden) item.row.setAttribute(HIDDEN_ATTR, "");
+        const member = view.role === "member" && view.expanded;
+        if (member !== item.row.hasAttribute(MEMBER_ATTR)) item.row.toggleAttribute(MEMBER_ATTR, member);
+        if (view.role === "head" && item.link) {
+          renderToggle(item.row, item.link, {
+            employerId: view.employerId,
+            expanded: view.expanded,
+            text: groupToggleText(view.count, item.employerName, view.expanded)
+          });
+        } else {
+          item.row.querySelector(`.${TOGGLE_CLASS}`)?.remove();
+        }
+      });
+      document.querySelectorAll(`.${TOGGLE_CLASS}`).forEach((button2) => {
+        if (!rows.includes(button2.closest("tr"))) button2.remove();
+      });
+    }
+    function scheduleRender() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 250);
+    }
+    const ownSelector = `.${TOGGLE_CLASS}`;
+    runtime.createMutationObserver((mutations) => {
+      if (!POTENTIAL_MATCHES_ROUTE6.test(location.hash || "") && !document.querySelector(`.${TOGGLE_CLASS}, tr[${HIDDEN_ATTR}], tr[${MEMBER_ATTR}]`)) return;
+      const relevant = mutations.some((mutation) => {
+        if (mutation.type === "attributes") return mutation.target?.matches?.("tr");
+        if (mutation.target?.closest?.(ownSelector)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(ownSelector));
+      });
+      if (relevant) scheduleRender();
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: WATCHED_ATTRIBUTES });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // src/features/employer-groups.js
+  function executeEmployerGroups2(runtime) {
+    executeEmployerGroups(runtime, {
+      namespace: "cem",
+      sourcePath: "cem/toolbox/src/features/employer-groups.js"
+    });
+  }
+
   // ../../shared/js/interview-pills/index.js
   var MARK2 = "data-werkia-cem-vta-pill";
   var ORIGIN_ATTRIBUTE = "data-werkia-cem-vta-origin";
   var TYPE_ATTRIBUTE = "data-werkia-interview-type";
-  var STYLE_ID8 = "werkia-interview-pill-style";
+  var STYLE_ID10 = "werkia-interview-pill-style";
   var OPEN_STATUSES = /* @__PURE__ */ new Set(["suggestion", "forwarded"]);
   var CACHE_MS7 = 60 * 1e3;
   var CHIP_SELECTOR = "td.column-matchInterview .MuiChip-root, td.column-interview .MuiChip-root";
@@ -10941,9 +12325,9 @@ ${add}` : add;
     const cache = /* @__PURE__ */ new Map();
     const pending = /* @__PURE__ */ new Set();
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID8)) return;
+      if (document.getElementById(STYLE_ID10)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID8;
+      style.id = STYLE_ID10;
       style.textContent = `.MuiChip-root[${MARK2}] { box-shadow: inset 0 0 0 1.5px #3f3f46; }
 .werkia-cem-vta-host { display: flex !important; align-items: center; min-width: 0; }
 .werkia-cem-vta-host > :not([${ORIGIN_ATTRIBUTE}]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -11008,7 +12392,7 @@ ${add}` : add;
         console.warn(logLabel, error);
       } finally {
         ids.forEach((id) => pending.delete(id));
-        schedule();
+        schedule2();
       }
     }
     function render() {
@@ -11040,7 +12424,7 @@ ${add}` : add;
       for (let i = 0; i < missing.length; i += 100) load2(missing.slice(i, i + 100));
     }
     let scheduled = false;
-    function schedule() {
+    function schedule2() {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -11048,9 +12432,9 @@ ${add}` : add;
         render();
       }, 150);
     }
-    runtime.addWindowListener?.("hashchange", schedule);
-    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
-    schedule();
+    runtime.addWindowListener?.("hashchange", schedule2);
+    runtime.createMutationObserver(schedule2).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label"] });
+    schedule2();
   }
 
   // src/features/cem-vta-pills.js
@@ -11200,12 +12584,12 @@ ${add}` : add;
   }
   function createCandidateUi({ document: document2, isTargetPage: isTargetPage3, table, getState, refreshVisibleCandidates, stopLoading, clearAllCache, helpTipHtml = () => "" }) {
     const SCRIPT_ID = "werkia-vakanz-kandidateninfos";
-    const STYLE_ID16 = `${SCRIPT_ID}-style`;
-    const PANEL_ID2 = `${SCRIPT_ID}-panel`;
+    const STYLE_ID19 = `${SCRIPT_ID}-style`;
+    const PANEL_ID3 = `${SCRIPT_ID}-panel`;
     function addStyles() {
-      if (document2.getElementById(STYLE_ID16)) return;
+      if (document2.getElementById(STYLE_ID19)) return;
       const style = document2.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID19;
       style.textContent = `
       [data-werkia-candidate-info-header] { min-width:235px; width:235px; }
       [data-werkia-candidate-info-cell] { min-width:235px; width:235px; vertical-align:top; }
@@ -11229,22 +12613,22 @@ ${add}` : add;
       .werkia-candidate-info-loading { display:flex; align-items:center; gap:7px; color:#495057; font-size:12px; font-weight:700; }
       .werkia-candidate-info-spinner { width:12px; height:12px; border:2px solid #ced4da; border-top-color:#1971c2; border-radius:50%; animation:werkiaCandidateInfoSpin .8s linear infinite; flex:0 0 auto; }
       @keyframes werkiaCandidateInfoSpin { to { transform:rotate(360deg); } }
-      #${PANEL_ID2} { position:fixed; right:18px; bottom:90px; z-index:999999; width:290px; box-sizing:border-box; padding:12px; border-radius:10px; border:2px solid #74c0fc; background:#f8f9fa; color:#212529; box-shadow:0 4px 18px rgba(0,0,0,.28); font-family:Arial,sans-serif; font-size:13px; }
-      #${PANEL_ID2} .werkia-panel-title { font-weight:900; font-size:14px; margin-bottom:7px; }
-      #${PANEL_ID2} .werkia-panel-status { min-height:18px; margin-bottom:9px; color:#495057; font-weight:700; }
-      #${PANEL_ID2} .werkia-panel-actions { display:flex; gap:7px; }
-      #${PANEL_ID2} button { flex:1; border:1px solid rgba(0,0,0,.22); border-radius:7px; padding:7px 8px; cursor:pointer; font-weight:800; color:#212529; }
-      #${PANEL_ID2} .werkia-refresh-btn { background:#d0ebff; } #${PANEL_ID2} .werkia-stop-btn { background:#fff3bf; } #${PANEL_ID2} .werkia-clear-btn { background:#ffe3e3; }
-      #${PANEL_ID2} button:disabled { opacity:.55; cursor:default; }
+      #${PANEL_ID3} { position:fixed; right:18px; bottom:90px; z-index:999999; width:290px; box-sizing:border-box; padding:12px; border-radius:10px; border:2px solid #74c0fc; background:#f8f9fa; color:#212529; box-shadow:0 4px 18px rgba(0,0,0,.28); font-family:Arial,sans-serif; font-size:13px; }
+      #${PANEL_ID3} .werkia-panel-title { font-weight:900; font-size:14px; margin-bottom:7px; }
+      #${PANEL_ID3} .werkia-panel-status { min-height:18px; margin-bottom:9px; color:#495057; font-weight:700; }
+      #${PANEL_ID3} .werkia-panel-actions { display:flex; gap:7px; }
+      #${PANEL_ID3} button { flex:1; border:1px solid rgba(0,0,0,.22); border-radius:7px; padding:7px 8px; cursor:pointer; font-weight:800; color:#212529; }
+      #${PANEL_ID3} .werkia-refresh-btn { background:#d0ebff; } #${PANEL_ID3} .werkia-stop-btn { background:#fff3bf; } #${PANEL_ID3} .werkia-clear-btn { background:#ffe3e3; }
+      #${PANEL_ID3} button:disabled { opacity:.55; cursor:default; }
     `;
       document2.head.appendChild(style);
     }
     function createPanel() {
       if (!isTargetPage3()) return null;
-      let panel = document2.getElementById(PANEL_ID2);
+      let panel = document2.getElementById(PANEL_ID3);
       if (panel) return panel;
       panel = document2.createElement("div");
-      panel.id = PANEL_ID2;
+      panel.id = PANEL_ID3;
       panel.innerHTML = `<div class="werkia-panel-title" style="display:flex;align-items:center;">👤 Kandidateninfos${helpTipHtml()}</div><div class="werkia-panel-status">Bereit</div><div class="werkia-panel-actions"><button type="button" class="werkia-refresh-btn">Neu laden</button><button type="button" class="werkia-stop-btn">Stop</button><button type="button" class="werkia-clear-btn">Cache leeren</button></div>`;
       document2.body.appendChild(panel);
       panel.querySelector(".werkia-refresh-btn").addEventListener("click", refreshVisibleCandidates);
@@ -11253,7 +12637,7 @@ ${add}` : add;
       return panel;
     }
     function removePanel() {
-      document2.getElementById(PANEL_ID2)?.remove();
+      document2.getElementById(PANEL_ID3)?.remove();
     }
     function updatePanelStatus(customText = "") {
       const panel = createPanel();
@@ -11604,7 +12988,7 @@ ${add}` : add;
   var CANDIDATE_STATUS_ID = "werkia-bulk-ofm-candidate-status";
   var FORM_CONTROLS_ID = "werkia-bulk-ofm-form-controls";
   var FORM_STATUS_ID = "werkia-bulk-ofm-form-status";
-  var STYLE_ID9 = "werkia-bulk-ofm-style";
+  var STYLE_ID11 = "werkia-bulk-ofm-style";
   var DATE_REMOVE_SELECTOR = 'button.button-remove[class*="button-remove-employers."][class*=".interview.dates-"][aria-label="Entfernen"]';
   var OFFLINE_MATCH_FORM_SELECTOR = '[data-testid="create-offline-match-form"]';
   var MATCH_PRESENT_ROW_CLASS2 = "werkia-cem-match-present-row";
@@ -11612,7 +12996,7 @@ ${add}` : add;
   function isCreateOfflineMatchRoute(hash = window.location.hash) {
     return CREATE_OFFLINE_MATCH_ROUTE.test(hash || "");
   }
-  function candidateIdFromHash(hash = window.location.hash) {
+  function candidateIdFromHash2(hash = window.location.hash) {
     return CANDIDATE_POTENTIAL_MATCHES_ROUTE.exec(hash || "")?.[1] || null;
   }
   function sourceParams(href) {
@@ -11679,9 +13063,9 @@ ${add}` : add;
     return [...new Set(matches.filter((match) => match?.hasExistingSentMatch).map((match) => match.employerId))];
   }
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID9)) return;
+    if (document.getElementById(STYLE_ID11)) return;
     const style = document.createElement("style");
-    style.id = STYLE_ID9;
+    style.id = STYLE_ID11;
     style.textContent = `
     .${BULK_CHECKBOX_CLASS} { display:inline-flex; align-items:center; margin-right:var(--apt-space-2,8px); color:var(--apt-color-text-muted,#6b6775); font:600 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif; cursor:pointer; }
     .${BULK_CHECKBOX_CLASS} input { width:18px; height:18px; accent-color:var(--apt-color-primary,#6d4aff); cursor:pointer; }
@@ -11699,7 +13083,7 @@ ${add}` : add;
     document.getElementById(CANDIDATE_STATUS_ID)?.remove();
     document.getElementById(FORM_CONTROLS_ID)?.remove();
     document.getElementById(FORM_STATUS_ID)?.remove();
-    document.getElementById(STYLE_ID9)?.remove();
+    document.getElementById(STYLE_ID11)?.remove();
   }
   function showStatus(id, message, anchor) {
     let status2 = document.getElementById(id);
@@ -11874,10 +13258,10 @@ ${add}` : add;
     runtime.registerSource(sourcePath);
     const selectedMatches = /* @__PURE__ */ new Map();
     let scheduled = false;
-    let currentCandidateId = candidateIdFromHash();
+    let currentCandidateId = candidateIdFromHash2();
     const refresh = () => {
       scheduled = false;
-      const candidateId = candidateIdFromHash();
+      const candidateId = candidateIdFromHash2();
       if (candidateId !== currentCandidateId) {
         currentCandidateId = candidateId;
         selectedMatches.clear();
@@ -12514,7 +13898,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/bulk-match-actions/index.js
-  var ROW_SELECTOR4 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row";
   var EMPLOYER_LINK_SELECTOR2 = 'a[href*="#/Employer/"]';
   var CANDIDATE_LINK_SELECTOR2 = 'a[href*="#/Candidate/"]';
   var JOB_POSITION_LINK_SELECTOR = 'a[href*="#/JobPosition/"]';
@@ -12526,7 +13910,7 @@ ${add}` : add;
     const {
       team,
       isTargetPage: isTargetPage3,
-      getRequest,
+      getRequest: getRequest2,
       ids: IDS11,
       fields,
       columns,
@@ -12545,7 +13929,7 @@ ${add}` : add;
     const WVL_MUTATION = buildFollowUpMutation(fields.followUp);
     const COUNTERPART_QUERY = counterpartOut ? buildCounterpartOutQuery(counterpartOut.status, counterpartOut.feedback) : "";
     const COUNTERPART_OPTION = counterpartOut ? { value: COUNTERPART_OUT_VALUE, label: `Grund wie ${counterpartOut.team} (je Match)` } : null;
-    const sleep2 = (ms) => new Promise((resolve) => runtime.setTimeout(resolve, ms));
+    const sleep2 = (ms2) => new Promise((resolve) => runtime.setTimeout(resolve, ms2));
     async function waitFor(find, timeoutMs = 3e3, intervalMs = 50) {
       const started = Date.now();
       while (Date.now() - started < timeoutMs) {
@@ -12577,12 +13961,12 @@ ${add}` : add;
       return row2.querySelector(MATCH_LINK_SELECTOR6) && !row2.querySelector("tr") && !row2.hasAttribute(FILTERED_OUT_ATTRIBUTE);
     }
     function activeScope() {
-      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR4)].some(isMatchRow));
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((dialog) => dialog.isConnected && !dialog.closest("[hidden]") && [...dialog.querySelectorAll(ROW_SELECTOR6)].some(isMatchRow));
       return dialogs.at(-1) || null;
     }
     function getRows() {
       const scope = activeScope();
-      return [...(scope || document).querySelectorAll(ROW_SELECTOR4)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
+      return [...(scope || document).querySelectorAll(ROW_SELECTOR6)].filter((row2) => isMatchRow(row2) && (scope || !row2.closest('[role="dialog"]')));
     }
     function shownOnPage(element5) {
       if (!element5.isConnected || element5.closest("[hidden]")) return false;
@@ -12789,7 +14173,7 @@ ${add}` : add;
       });
     }
     async function updateMatchStatus(matchId, targetStatus, feedback) {
-      const request = getRequest();
+      const request = getRequest2();
       const value = statusMutationValue(targetStatus.value);
       const mutation = feedback ? STATUS_WITH_FEEDBACK_MUTATION : STATUS_MUTATION;
       const variables = feedback ? { id: matchId, [fields.status]: value, [fields.feedback]: feedback } : { id: matchId, [fields.status]: value };
@@ -12800,7 +14184,7 @@ ${add}` : add;
       }
     }
     async function updateMatchFollowUpDate(matchId, isoDateOrNull) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(WVL_MUTATION, { id: matchId, [fields.followUp]: isoDateOrNull });
       const match = result?.data;
       if (match?.id !== matchId || match[fields.followUp] !== isoDateOrNull) {
@@ -12808,7 +14192,7 @@ ${add}` : add;
       }
     }
     async function openInterviewIdsForMatch(matchId) {
-      const request = getRequest();
+      const request = getRequest2();
       const perPage = 100;
       const interviewIds = [];
       let page = 0;
@@ -12838,7 +14222,7 @@ ${add}` : add;
       }));
     }
     async function declineInterview(matchId, interviewId) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(UPDATE_INTERVIEW_MUTATION, { id: interviewId, status: "declined" });
       const interview = result?.data;
       if (interview?.id !== interviewId || interview.status !== "declined" || interview.matchId !== matchId) {
@@ -12846,7 +14230,7 @@ ${add}` : add;
       }
     }
     async function interviewsForMatch(matchId, statuses) {
-      const request = getRequest();
+      const request = getRequest2();
       const perPage = 100;
       const interviews = [];
       let page = 0;
@@ -12873,7 +14257,7 @@ ${add}` : add;
       getRows().filter((row2) => matchIdFromRow2(row2) === matchId).forEach((row2) => markCell(row2.querySelector(INTERVIEW_CELL_SELECTOR2)));
     }
     async function forwardInterview(matchId, interview) {
-      const request = getRequest();
+      const request = getRequest2();
       const result = await request(FORWARD_INTERVIEW_MUTATION, { id: interview.id, status: "forwarded", dates: interview.dates });
       const updated = result?.data;
       if (updated?.id !== interview.id || updated.status !== "forwarded" || updated.matchId !== matchId) {
@@ -12989,7 +14373,7 @@ ${add}` : add;
       if (isOut && outFeedback === COUNTERPART_OPTION) {
         setStatus(`Lese ${counterpartOut.team}-Out-Gründe …`, "busy");
         const read = await runParallel(selection, async (match) => {
-          const data = await getRequest()(COUNTERPART_QUERY, { id: match.matchId });
+          const data = await getRequest2()(COUNTERPART_QUERY, { id: match.matchId });
           const feedback2 = counterpartOutFeedback(data?.data?.[counterpartOut.status], data?.data?.[counterpartOut.feedback]);
           if (feedback2) counterpartFeedback.set(match.matchId, feedback2);
         });
@@ -13114,6 +14498,15 @@ ${add}` : add;
     scheduleInstall();
   }
 
+  // ../../shared/js/out-gruende/cem-text-gruende.js
+  var CEM_TEXT_OUT_REASONS = Object.freeze([
+    "Reisebereitschaft",
+    "Qualifikation",
+    "Stelle besetzt",
+    "Konditionen",
+    "Erfahrung"
+  ]);
+
   // src/features/bulk-match-actions.js
   var IDS4 = {
     button: "werkia-cem-wvl-bulk-button",
@@ -13137,7 +14530,14 @@ ${add}` : add;
     { value: "hired", label: "Hired" },
     { value: "interview_conducted", label: "Termin Stattgefunden" }
   ];
+  var CEM_OUT_FEEDBACK_TEMPLATE_OPTIONS = CEM_TEXT_OUT_REASONS.map((text) => ({
+    value: `text:${text}`,
+    label: text,
+    nativeValue: "others",
+    customFeedback: text
+  }));
   var CEM_OUT_FEEDBACK_OPTIONS = [
+    ...CEM_OUT_FEEDBACK_TEMPLATE_OPTIONS,
     { value: "candidate_not_responsive", label: "BEW nicht responsive" },
     { value: "candidate_not_interested_in_employer", label: "BEW hat kein Interesse am AG" },
     { value: "employer_not_interested_in_candidate", label: "AG hat kein Interesse am BEW" },
@@ -13155,6 +14555,7 @@ ${add}` : add;
   }
   function resolveCemOutFeedback(reason, freeText) {
     if (!reason) return "";
+    if (reason.customFeedback) return reason.customFeedback;
     return reason.freeText ? String(freeText || "").trim() : reason.value;
   }
   function executeBulkMatchActions2(runtime) {
@@ -13169,12 +14570,13 @@ ${add}` : add;
       outFeedbackOptions: CEM_OUT_FEEDBACK_OPTIONS,
       resolveOutFeedback: resolveCemOutFeedback,
       declineInterviewsOnOut: true,
-      nativeOutFeedbackTemplates: null,
+      nativeOutFeedbackTemplates: CEM_OUT_FEEDBACK_TEMPLATE_OPTIONS,
       helpTip: {
         wvl: () => cemHelp.tipHtml("bulk-wvl", { tone: "dark" }),
         status: () => cemHelp.tipHtml("bulk-status", { tone: "dark" }),
         forward: () => cemHelp.tipHtml("bulk-forward", { tone: "dark" }),
-        declinePast: () => cemHelp.tipHtml("bulk-decline-past", { tone: "dark" })
+        declinePast: () => cemHelp.tipHtml("bulk-decline-past", { tone: "dark" }),
+        outFeedback: () => cemHelp.tipHtml("out-feedback")
       }
     });
   }
@@ -13187,7 +14589,7 @@ ${add}` : add;
     style: "werkia-cem-candidate-bulk-style",
     status: "werkia-cem-candidate-bulk-status"
   };
-  var ROW_SELECTOR5 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR7 = "tbody tr.RaDataTable-row";
   var CANDIDATE_LINK_SELECTOR3 = 'a[href*="#/Candidate/"]';
   var CANDIDATE_STATUS_OPTIONS = [
     { value: "onboarding", label: "Onboarding" },
@@ -13235,7 +14637,7 @@ ${add}` : add;
     const normalize7 = (value) => String(value || "").replace(/\s+/g, " ").trim();
     function getCandidates() {
       const seen = /* @__PURE__ */ new Set();
-      return [...document.querySelectorAll(ROW_SELECTOR5)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
+      return [...document.querySelectorAll(ROW_SELECTOR7)].filter((row2) => row2.querySelector(":scope > td.column-status") && row2.querySelector(":scope > td.column-followUpDate")).map((row2) => {
         const link = row2.querySelector(`:scope > td ${CANDIDATE_LINK_SELECTOR3}`);
         const id = candidateIdFromHref(link?.getAttribute("href") || link?.href);
         return id ? { id, name: normalize7(link.textContent) || id } : null;
@@ -13400,7 +14802,7 @@ ${add}` : add;
   function hasStaleEmployerIds(filter) {
     return Array.isArray(filter?.employerIds) && filter.employerIds.length > STALE_EMPLOYER_IDS;
   }
-  function hashHasFilter(hash = "") {
+  function hashHasFilter2(hash = "") {
     return new URLSearchParams(String(hash).split("?").slice(1).join("?")).has("filter");
   }
   function contactEmployerIds(employers, { contacts = GOOD_EMPLOYER_CONTACTS, filter = {} } = {}) {
@@ -13431,9 +14833,9 @@ ${add}` : add;
       if (hasRole2 && me?.id) scope[defaults.employeeKey] = [me.id];
       return scope;
     }
-    function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter)) {
+    function applyModeToState(mode, currentState, scope = pickScope(currentState?.filter), setFilter = {}) {
       let filter;
-      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...mode.filter };
+      if (mode.keepFilter) filter = { ...scope, ...currentState?.filter || {}, ...setFilter, ...mode.filter };
       else if (mode.builtIn) filter = { ...scope, ...mode.filter };
       else filter = { ...mode.filter || {} };
       return {
@@ -13444,9 +14846,9 @@ ${add}` : add;
         perPage: mode.perPage || currentState?.perPage || 0
       };
     }
-    function modeHash(mode, hash, scope) {
+    function modeHash(mode, hash, scope, setFilter = {}) {
       const state = parseListState(hash);
-      return buildListHash(applyModeToState(mode, state, scope));
+      return buildListHash(applyModeToState(mode, state, scope, setFilter));
     }
     function modeMatchesState(mode, state) {
       if (!mode || !state) return false;
@@ -13457,10 +14859,10 @@ ${add}` : add;
       if (mode.builtIn) return filterKey(withoutScope(state.filter)) === filterKey(mode.filter);
       return filterKey(state.filter) === filterKey(mode.filter);
     }
-    function leaveHash(previousHash, currentHash, mode = null) {
+    function leaveHash(previousHash, currentHash, mode = null, setFilter = {}) {
       const state = parseListState(currentHash);
       if (mode?.keepFilter && isRoute(state.route)) {
-        const filter = { ...state.filter };
+        const filter = withoutSetFilter(state.filter, setFilter);
         Object.keys(mode.filter).forEach((key) => {
           delete filter[key];
         });
@@ -13470,6 +14872,18 @@ ${add}` : add;
       return buildListHash({ ...state, route: isRoute(state.route) ? state.route : routes[0], filter: pickScope(state.filter) });
     }
     return { routes, isRoute, pickScope, withoutScope, defaultScope, applyModeToState, modeHash, modeMatchesState, leaveHash };
+  }
+  function withoutSetFilter(filter, setFilter = {}) {
+    const rest = { ...filter || {} };
+    Object.keys(setFilter || {}).forEach((key) => {
+      if (JSON.stringify(rest[key]) === JSON.stringify(setFilter[key])) delete rest[key];
+    });
+    return rest;
+  }
+  function modeSetFilter(mode) {
+    if (!mode?.keepFilter || typeof mode.setOnEnter !== "function") return {};
+    const value = mode.setOnEnter();
+    return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
   }
   function cleanColumn(value) {
     return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(String(value || "")) ? String(value) : "";
@@ -13527,7 +14941,11 @@ ${add}` : add;
   function parseActive(raw) {
     try {
       const parsed = JSON.parse(raw || "null");
-      return parsed && typeof parsed.id === "string" ? { id: parsed.id, previousHash: String(parsed.previousHash || "") } : null;
+      if (!parsed || typeof parsed.id !== "string") return null;
+      const active = { id: parsed.id, previousHash: String(parsed.previousHash || "") };
+      const set = parsed.setFilter;
+      if (set && typeof set === "object" && !Array.isArray(set) && Object.keys(set).length) active.setFilter = set;
+      return active;
     } catch {
       return null;
     }
@@ -13865,9 +15283,13 @@ ${add}` : add;
       document.head.appendChild(style);
     }
     async function activate(mode) {
-      const before = location.hash;
+      const previous = readActive();
+      const before = previous?.setFilter && previous.id !== mode.id ? (() => {
+        const state = parseListState(location.hash);
+        return buildListHash({ ...state, filter: withoutSetFilter(state.filter, previous.setFilter) });
+      })() : location.hash;
       let scope;
-      if (hashHasFilter(before)) {
+      if (hashHasFilter2(before)) {
         scope = pickScope(parseListState(before).filter);
       } else {
         try {
@@ -13878,9 +15300,9 @@ ${add}` : add;
           return;
         }
       }
-      const previous = readActive();
-      writeActive({ id: mode.id, previousHash: previous?.previousHash || before });
-      location.hash = modeHash(mode, before, scope);
+      const setFilter = modeSetFilter(mode);
+      writeActive({ id: mode.id, previousHash: previous?.previousHash || before, ...Object.keys(setFilter).length ? { setFilter } : {} });
+      location.hash = modeHash(mode, before, scope, setFilter);
       render();
     }
     function leave() {
@@ -13888,7 +15310,7 @@ ${add}` : add;
       const mode = active ? allModes().find((entry) => entry.id === active.id) : null;
       writeActive(null);
       clearColumnFocus(document);
-      location.hash = leaveHash(active?.previousHash, location.hash, mode);
+      location.hash = leaveHash(active?.previousHash, location.hash, mode, active?.setFilter);
       render();
     }
     function removeOwn(mode) {
@@ -14175,7 +15597,7 @@ ${add}` : add;
   // src/features/focus-candidates.js
   var ROUTE = "CEM/MyCandidates";
   var HIDDEN_ATTRIBUTE2 = "data-werkia-focus-hidden";
-  var STYLE_ID10 = "werkia-cem-focus-candidates-style";
+  var STYLE_ID12 = "werkia-cem-focus-candidates-style";
   var INFO_ID = "werkia-cem-focus-candidates-info";
   var CANDIDATE_LINK_SELECTOR4 = 'a[href*="#/Candidate/"]';
   var CACHE_TTL_MS3 = 5 * 60 * 1e3;
@@ -14222,9 +15644,9 @@ ${add}` : add;
     let loading = null;
     const isTargetPage3 = () => parseListState(location.hash).route.toLowerCase() === ROUTE.toLowerCase();
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID10)) return;
+      if (document.getElementById(STYLE_ID12)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID10;
+      style.id = STYLE_ID12;
       style.textContent = `
       tr[${HIDDEN_ATTRIBUTE2}] { display:none !important; }
       #${INFO_ID} { margin:0 0 8px; color:#52525b; font:400 12px/1.3 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
@@ -14392,15 +15814,15 @@ ${add}` : add;
   var CURRENT_EMPLOYEE_QUERY4 = `query WerkiaCemAmpelMe {
   me: currentEmployee { id __typename }
 }`;
-  var T2 = tokensFor("light");
+  var T3 = tokensFor("light");
   var FARBEN = {
-    gruen: { label: "Grün", fill: T2.good, ring: T2.goodInk },
-    gelb: { label: "Gelb", fill: "#f2c200", ring: T2.warnInk },
-    rot: { label: "Rot", fill: T2.bad, ring: T2.badInk }
+    gruen: { label: "Grün", fill: T3.good, ring: T3.goodInk },
+    gelb: { label: "Gelb", fill: "#f2c200", ring: T3.warnInk },
+    rot: { label: "Rot", fill: T3.bad, ring: T3.badInk }
   };
   var FARB_IDS = Object.keys(FARBEN);
-  var THEME = T2;
-  var UUID_RE3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var THEME = T3;
+  var UUID_RE4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function parseResponse4(status2, text) {
     let data = null;
     try {
@@ -14434,7 +15856,7 @@ ${add}` : add;
   }
   function candidateIdFromHref3(href) {
     const id = String(href || "").match(/#\/Candidate\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE3.test(id) ? id.toLowerCase() : "";
+    return UUID_RE4.test(id) ? id.toLowerCase() : "";
   }
   function chunks2(ids, size = MAX_IDS) {
     const out = [];
@@ -14455,7 +15877,7 @@ ${add}` : add;
     return list.map(String).find((farbe) => [...FARB_IDS, "neu"].includes(farbe)) || "";
   }
   function listScope(filter = {}) {
-    const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE3.test(id)).map((id) => id.toLowerCase()) : [];
+    const ids = Array.isArray(filter.cemEmployeeIds) ? filter.cemEmployeeIds.map(String).filter((id) => UUID_RE4.test(id)).map((id) => id.toLowerCase()) : [];
     const statuses = Array.isArray(filter.statuses) ? filter.statuses.map(String) : [];
     return { cemEmployeeIds: [...new Set(ids)].sort(), statuses: [...new Set(statuses)].sort() };
   }
@@ -14476,11 +15898,14 @@ ${add}` : add;
     // (Owner, 2026-10-19), siehe shared/js/focus-modes/index.js.
     side: { box: "Ampel", label: FARBEN[farbe].label, fill: FARBEN[farbe].fill, ring: FARBEN[farbe].ring }
   }));
+  var berlinToday = (date = /* @__PURE__ */ new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(date);
+  var WVL_TO_KEY = "followUpDateTo";
   var NEW_MODE = {
     id: "ampel-neu",
     name: "Nur NEW",
-    description: "Nur Kandidaten ohne Kontakt des aktuellen CEM seit der Zuteilung, über alle Seiten",
+    description: "Nur Kandidaten ohne Kontakt des aktuellen CEM seit der Zuteilung, über alle Seiten; setzt „WVL bis“ auf heute",
     filter: { [AMPEL_MARKER]: ["neu"] },
+    setOnEnter: () => ({ [WVL_TO_KEY]: berlinToday() }),
     keepFilter: true,
     sort: "",
     order: "",
@@ -14488,7 +15913,7 @@ ${add}` : add;
     column: "",
     front: false,
     builtIn: true,
-    side: { box: "Ampel", label: "Nur NEW", fill: T2.accent, ring: T2.accent }
+    side: { box: "Ampel", label: "Nur NEW", fill: T3.accent, ring: T3.accent }
   };
 
   // src/features/focus-modes.js
@@ -14579,8 +16004,8 @@ ${add}` : add;
   }
   function withStatuses(filter, field, statuses) {
     const next = { ...filter || {} };
-    const clean4 = [...new Set(statuses)].filter(Boolean);
-    if (clean4.length) next[field] = clean4;
+    const clean6 = [...new Set(statuses)].filter(Boolean);
+    if (clean6.length) next[field] = clean6;
     else delete next[field];
     return next;
   }
@@ -14593,8 +16018,8 @@ ${add}` : add;
   }
 
   // ../../shared/js/match-status-filter/index.js
-  var STYLE_ID11 = "werkia-match-status-filter-style";
-  var BAR_CLASS = "werkia-match-status-filter";
+  var STYLE_ID13 = "werkia-match-status-filter-style";
+  var BAR_CLASS2 = "werkia-match-status-filter";
   function executeMatchStatusFilter(runtime, {
     sourcePath,
     // RegExp auf location.hash
@@ -14611,19 +16036,19 @@ ${add}` : add;
     const barId = `werkia-match-status-filter-${field}`;
     const isTargetPage3 = () => route.test(location.hash);
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID11)) return;
+      if (document.getElementById(STYLE_ID13)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID11;
+      style.id = STYLE_ID13;
       style.textContent = `
-      .${BAR_CLASS} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
-      .${BAR_CLASS} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
-      .${BAR_CLASS} button { min-height:26px; padding:4px 10px; border:1px solid #c8ccdd; border-radius:13px; background:#fff; color:#1f2933; cursor:pointer; font:400 12px/1 Arial,sans-serif; }
-      .${BAR_CLASS} button:hover { border-color:#4956df; }
-      .${BAR_CLASS} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
-      .${BAR_CLASS} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
-      .${BAR_CLASS} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
-      .${BAR_CLASS} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
-      .${BAR_CLASS} button.${BAR_CLASS}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
+      .${BAR_CLASS2} { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 10px; padding:8px 10px; border:1px solid #d7dae6; border-radius:8px; background:#f7f8fc; font:400 13px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS2} > strong { margin-right:2px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:#5a6178; }
+      .${BAR_CLASS2} button { min-height:26px; padding:4px 10px; border:1px solid #c8ccdd; border-radius:13px; background:#fff; color:#1f2933; cursor:pointer; font:400 12px/1 Arial,sans-serif; }
+      .${BAR_CLASS2} button:hover { border-color:#4956df; }
+      .${BAR_CLASS2} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
+      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
+      .${BAR_CLASS2} button.${BAR_CLASS2}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
     `;
       document.head.appendChild(style);
     }
@@ -14634,7 +16059,7 @@ ${add}` : add;
     function buildBar() {
       const bar = document.createElement("div");
       bar.id = barId;
-      bar.className = BAR_CLASS;
+      bar.className = BAR_CLASS2;
       const title = document.createElement("strong");
       title.textContent = label2;
       const chips = options.map((option) => {
@@ -14649,7 +16074,7 @@ ${add}` : add;
       });
       const reset = document.createElement("button");
       reset.type = "button";
-      reset.className = `${BAR_CLASS}-reset`;
+      reset.className = `${BAR_CLASS2}-reset`;
       reset.textContent = "alle";
       reset.title = `${label2}-Filter entfernen, die übrigen Filter bleiben`;
       reset.addEventListener("click", () => applyFilter(withStatuses(currentFilter(), field, [])));
@@ -14662,7 +16087,7 @@ ${add}` : add;
         const pressed = String(selected.includes(button2.dataset.value));
         if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
       });
-      const reset = bar.querySelector(`.${BAR_CLASS}-reset`);
+      const reset = bar.querySelector(`.${BAR_CLASS2}-reset`);
       if (reset && reset.hidden !== !selected.length) reset.hidden = !selected.length;
     }
     function render() {
@@ -14707,8 +16132,8 @@ ${add}` : add;
   }
 
   // src/features/kam-status-filter-expanded.js
-  var BAR_CLASS2 = "werkia-cem-expanded-kam-filter";
-  var STYLE_ID12 = "werkia-cem-expanded-kam-filter-style";
+  var BAR_CLASS3 = "werkia-cem-expanded-kam-filter";
+  var STYLE_ID14 = "werkia-cem-expanded-kam-filter-style";
   var MATCH_ROW_SELECTOR = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR7 = 'a[href*="#/Match/"]';
   var CANDIDATE_LINK_SELECTOR5 = 'a[href*="#/Candidate/"]';
@@ -14722,7 +16147,7 @@ ${add}` : add;
     __typename
   }
 }`;
-  function matchIdFromHref5(href) {
+  function matchIdFromHref6(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function isMatchShown(kamStatus, selected) {
@@ -14740,26 +16165,26 @@ ${add}` : add;
     let loading = null;
     const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID12)) return;
+      if (document.getElementById(STYLE_ID14)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID12;
+      style.id = STYLE_ID14;
       style.textContent = `
       /* pointer-events/z-index: in der Filterzeile kam live kein Klick an
          (Text-Cursor, Text markierbar), 2026-10-12. pointer-events wird
          vererbt, ein Vorfahr mit "none" schaltet sonst die Knoepfe ab. */
-      .${BAR_CLASS2} { position:relative; z-index:2; pointer-events:auto; display:flex; flex-direction:column; gap:4px; margin:4px 0 6px; font:400 12px/1.3 Arial,sans-serif; }
-      .${BAR_CLASS2} * { pointer-events:auto; }
-      .${BAR_CLASS2}[data-placement="filter-form"] { align-self:flex-end; flex:1 1 320px; margin:0 0 4px 16px; }
-      .${BAR_CLASS2}-head { display:flex; align-items:center; gap:4px; font-size:0.75rem; color:rgba(0,0,0,.6); }
-      .${BAR_CLASS2}-chips { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
-      .${BAR_CLASS2} button { min-height:22px; padding:2px 8px; border:1px solid #c8ccdd; border-radius:11px; background:#fff; color:#1f2933; cursor:pointer !important; user-select:none; font:400 11px/1 Arial,sans-serif; }
-      .${BAR_CLASS2} button:hover { border-color:#4956df; }
-      .${BAR_CLASS2} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
-      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
-      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
-      .${BAR_CLASS2} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
-      .${BAR_CLASS2} button.${BAR_CLASS2}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
-      .${BAR_CLASS2}-info { margin-left:4px; color:#6b7280; font-size:11px; }
+      .${BAR_CLASS3} { position:relative; z-index:2; pointer-events:auto; display:flex; flex-direction:column; gap:4px; margin:4px 0 6px; font:400 12px/1.3 Arial,sans-serif; }
+      .${BAR_CLASS3} * { pointer-events:auto; }
+      .${BAR_CLASS3}[data-placement="filter-form"] { align-self:flex-end; flex:1 1 320px; margin:0 0 4px 16px; }
+      .${BAR_CLASS3}-head { display:flex; align-items:center; gap:4px; font-size:0.75rem; color:rgba(0,0,0,.6); }
+      .${BAR_CLASS3}-chips { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+      .${BAR_CLASS3} button { min-height:22px; padding:2px 8px; border:1px solid #c8ccdd; border-radius:11px; background:#fff; color:#1f2933; cursor:pointer !important; user-select:none; font:400 11px/1 Arial,sans-serif; }
+      .${BAR_CLASS3} button:hover { border-color:#4956df; }
+      .${BAR_CLASS3} button[aria-pressed="true"] { border-color:#4956df; background:#4956df; color:#fff; font-weight:700; }
+      .${BAR_CLASS3} button[aria-pressed="true"][data-tone="error"] { border-color:#d32f2f; background:#d32f2f; }
+      .${BAR_CLASS3} button[aria-pressed="true"][data-tone="success"] { border-color:#2e7d32; background:#2e7d32; }
+      .${BAR_CLASS3} button[aria-pressed="true"][data-tone="warning"] { border-color:#b45309; background:#b45309; }
+      .${BAR_CLASS3} button.${BAR_CLASS3}-reset { border:0; background:transparent; color:#3643c7; text-decoration:underline; }
+      .${BAR_CLASS3}-info { margin-left:4px; color:#6b7280; font-size:11px; }
       tr[${FILTERED_OUT_ATTRIBUTE}] { display:none !important; }
     `;
       document.head.appendChild(style);
@@ -14781,7 +16206,7 @@ ${add}` : add;
       return forms.find((form) => form.classList.contains("RaFilterForm-root")) || forms[0] || null;
     }
     const tableByBar = /* @__PURE__ */ new WeakMap();
-    const rowMatchId = (row2) => matchIdFromHref5(row2.querySelector(MATCH_LINK_SELECTOR7)?.getAttribute("href"));
+    const rowMatchId2 = (row2) => matchIdFromHref6(row2.querySelector(MATCH_LINK_SELECTOR7)?.getAttribute("href"));
     function freshStatus(matchId) {
       const entry = statusCache.get(matchId);
       return entry && Date.now() - entry.at < CACHE_TTL_MS4 ? entry : null;
@@ -14820,10 +16245,10 @@ ${add}` : add;
     }
     function buildBar(key) {
       const bar = document.createElement("div");
-      bar.className = BAR_CLASS2;
+      bar.className = BAR_CLASS3;
       bar.dataset.candidateKey = key;
       const head = document.createElement("div");
-      head.className = `${BAR_CLASS2}-head`;
+      head.className = `${BAR_CLASS3}-head`;
       const title = document.createElement("span");
       title.textContent = "KAM Status";
       const chips = OPTIONS.map((option) => {
@@ -14840,13 +16265,13 @@ ${add}` : add;
           selections.set(bar.dataset.candidateKey, selected);
           render();
           const table = tableByBar.get(bar);
-          if (table?.isConnected) loadStatuses(matchRows(table).map(rowMatchId), { force: true });
+          if (table?.isConnected) loadStatuses(matchRows(table).map(rowMatchId2), { force: true });
         });
         return button2;
       });
       const reset = document.createElement("button");
       reset.type = "button";
-      reset.className = `${BAR_CLASS2}-reset`;
+      reset.className = `${BAR_CLASS3}-reset`;
       reset.textContent = "alle";
       reset.title = "Alle Matches dieses Kandidaten wieder zeigen";
       reset.addEventListener("click", () => {
@@ -14854,10 +16279,10 @@ ${add}` : add;
         render();
       });
       const info = document.createElement("span");
-      info.className = `${BAR_CLASS2}-info`;
+      info.className = `${BAR_CLASS3}-info`;
       head.append(...[title, cemHelp.tip("kam-status-filter-expanded"), info].filter(Boolean));
       const chipRow = document.createElement("div");
-      chipRow.className = `${BAR_CLASS2}-chips`;
+      chipRow.className = `${BAR_CLASS3}-chips`;
       chipRow.append(...chips, reset);
       bar.append(head, chipRow);
       return bar;
@@ -14868,7 +16293,7 @@ ${add}` : add;
     function syncTable(table) {
       const key = candidateKey(table);
       const expandRow = table.closest("tr");
-      let bar = expandRow?.querySelector(`.${BAR_CLASS2}`);
+      let bar = expandRow?.querySelector(`.${BAR_CLASS3}`);
       if (!bar) {
         bar = buildBar(key);
         const form = filterFormFor(table);
@@ -14886,10 +16311,10 @@ ${add}` : add;
         const pressed = String(selected.has(button2.dataset.value));
         if (button2.getAttribute("aria-pressed") !== pressed) button2.setAttribute("aria-pressed", pressed);
       });
-      const reset = bar.querySelector(`.${BAR_CLASS2}-reset`);
+      const reset = bar.querySelector(`.${BAR_CLASS3}-reset`);
       if (reset.hidden !== !selected.size) reset.hidden = !selected.size;
       const rows = matchRows(table);
-      const ids = rows.map(rowMatchId);
+      const ids = rows.map(rowMatchId2);
       const missing = ids.filter((id) => id && !freshStatus(id) && !failed.has(id));
       const unknown = ids.filter((id) => !statusCache.has(id));
       const canFilter = selected.size && !unknown.length;
@@ -14899,7 +16324,7 @@ ${add}` : add;
         if (row2.hasAttribute(FILTERED_OUT_ATTRIBUTE) === show) row2.toggleAttribute(FILTERED_OUT_ATTRIBUTE, !show);
         if (show) shown += 1;
       });
-      const info = bar.querySelector(`.${BAR_CLASS2}-info`);
+      const info = bar.querySelector(`.${BAR_CLASS3}-info`);
       if (!selected.size) setText(info, "");
       else if (unknown.some((id) => failed.has(id))) setText(info, "KAM-Status nicht ladbar");
       else if (unknown.length) setText(info, "lädt …");
@@ -14926,6 +16351,33 @@ ${add}` : add;
     scheduleRender();
   }
 
+  // src/features/kam-filter.js
+  function executeKamFilter(runtime) {
+    const request = (...args) => getCemGraphqlAdapter().request(...args);
+    executeMatchEmployeeFilter(runtime, {
+      sourcePath: "cem/toolbox/src/features/kam-filter.js",
+      route: ROUTES.cemMyMatches,
+      field: "kamEmployeeIds",
+      label: "KAM",
+      loadPeople: () => loadPeople(request, "kam"),
+      // Ohne Filter im Hash gelten die Standardwerte der Liste (eigene
+      // CEM-Matches); die gehen beim ersten Setzen mit hinein.
+      defaultFilter: async () => CEM_FOCUS_CORE.defaultScope((await request(ME_QUERY, {}))?.me || null),
+      after: "#werkia-match-status-filter-kamStatuses",
+      helpTip: () => cemHelp.tip("kam-filter")
+    });
+  }
+
+  // src/features/tags-dialog.js
+  var SOURCE_PATH2 = "cem/toolbox/src/features/tags-dialog.js";
+  var getRequest = () => getCemGraphqlAdapter().request;
+  function executeCemTagsUnread(runtime) {
+    executeTagsUnread(runtime, { sourcePath: SOURCE_PATH2, getRequest, helpTip: () => cemHelp.tip("tags-unread") });
+  }
+  function executeCemTagsSearch(runtime) {
+    executeTagsSearch(runtime, { sourcePath: SOURCE_PATH2, getRequest, helpTip: () => cemHelp.tip("tags-search") });
+  }
+
   // src/features/vertretungen.js
   var CEM_VERTRETUNGEN_ROUTES = [ROUTES.cemMyCandidates, ROUTES.cemMyMatches];
   function executeVertretungen2(runtime) {
@@ -14946,7 +16398,7 @@ ${add}` : add;
   var CURRENT_EMPLOYEE_QUERY5 = `query WerkiaCemVtaSperreMe {
   me: currentEmployee { id __typename }
 }`;
-  var UUID_RE4 = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  var UUID_RE5 = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
   function parseResponse5(status2, text) {
     let data = null;
     try {
@@ -14983,7 +16435,7 @@ ${add}` : add;
   }
   function employerIdFromHref3(href) {
     const match = String(href || "").match(/#\/Employer\/([0-9a-f-]{36})/i);
-    return match && UUID_RE4.test(match[1]) ? match[1].toLowerCase() : "";
+    return match && UUID_RE5.test(match[1]) ? match[1].toLowerCase() : "";
   }
   function createLookup2(entries = []) {
     const byId2 = /* @__PURE__ */ new Map();
@@ -15021,7 +16473,7 @@ ${add}` : add;
   }
 
   // ../../shared/js/cem-vta-sperre/index.js
-  var POTENTIAL_MATCHES_ROUTE6 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+  var POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
   var IDS6 = {
     button: "werkia-cem-vta-sperre-button",
     dialog: "werkia-cem-vta-sperre-dialog",
@@ -15034,7 +16486,7 @@ ${add}` : add;
   var CACHE_MS9 = 10 * 60 * 1e3;
   var RETRY_MS4 = 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
-  var T3 = {
+  var T4 = {
     surface: "#ffffff",
     sunken: "#f4f4f5",
     ink: "#09090b",
@@ -15080,7 +16532,7 @@ ${add}` : add;
       const element5 = document.getElementById(id);
       return element5?.dataset.werkiaCemVtaSperreOwner === sourcePath ? element5 : null;
     };
-    const isPotentialMatches = () => POTENTIAL_MATCHES_ROUTE6.test(location.hash || "");
+    const isPotentialMatches = () => POTENTIAL_MATCHES_ROUTE7.test(location.hash || "");
     const isButtonPage = () => buttonRoutes.some((route) => route.test(location.hash || ""));
     const isListPage = () => listRoutes.some((route) => route.test(location.hash || ""));
     const matchEmployers = /* @__PURE__ */ new Map();
@@ -15090,45 +16542,45 @@ ${add}` : add;
       style.id = IDS6.style;
       const d = `#${IDS6.dialog}`;
       style.textContent = `
-      .${ROW_CLASS2} { outline:2px solid ${T3.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T3.bad} !important; }
-      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T3.badSoft} !important; }
-      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T3.badHover} !important; }
-      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T3.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
-      .${LABEL_CLASS}:hover { background:${T3.badInk}; }
+      .${ROW_CLASS2} { outline:2px solid ${T4.bad} !important; outline-offset:-2px; box-shadow:inset 6px 0 0 ${T4.bad} !important; }
+      .${ROW_CLASS2} > td, .${ROW_CLASS2} > th { background:${T4.badSoft} !important; }
+      .${ROW_CLASS2}:hover > td, .${ROW_CLASS2}:hover > th { background:${T4.badHover} !important; }
+      .${LABEL_CLASS} { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:6px 0 2px 8px; padding:4px 10px; border:0; border-radius:999px; background:${T4.bad}; color:#fff; cursor:pointer; font:700 12px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; letter-spacing:.2px; white-space:nowrap; vertical-align:middle; }
+      .${LABEL_CLASS}:hover { background:${T4.badInk}; }
       td.column-matchInterview .${LABEL_CLASS}, td.column-interview .${LABEL_CLASS} { display:flex; margin:6px 0 2px; }
       .${LABEL_CLASS} svg { width:14px; height:14px; fill:currentColor; }
       #${IDS6.button}.wcs-native { display:inline-flex; flex:none; box-sizing:border-box; width:auto; max-width:max-content; align-items:center; border:0; background:transparent; cursor:pointer; white-space:nowrap; }
       #${IDS6.button}.wcs-native:hover { background:rgba(0,0,0,.04); }
       #${IDS6.button}.wcs-native svg { flex:none; fill:currentColor; }
-      #${IDS6.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T3.line}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      #${IDS6.button}.wcs-own { min-height:30px; margin:0 0 10px; padding:5px 10px; border:1px solid ${T4.line}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
       ${d} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); }
-      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T3.line}; border-radius:12px; background:${T3.surface}; color:${T3.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
-      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T3.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
-      ${d} .wcs-close:hover { background:${T3.sunken}; }
+      ${d} .wcs-card { position:relative; width:min(640px,94vw); max-height:86vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid ${T4.line}; border-radius:12px; background:${T4.surface}; color:${T4.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+      ${d} .wcs-close { position:absolute; top:12px; right:12px; width:30px; height:30px; min-height:0; padding:0; border-radius:50%; background:transparent; color:${T4.ink2}; font:400 22px/30px system-ui,Arial,sans-serif; }
+      ${d} .wcs-close:hover { background:${T4.sunken}; }
       ${d} h2 { margin:0 0 6px; font-size:16px; font-weight:650; }
-      ${d} h3 { margin:18px 0 8px; color:${T3.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
-      ${d} p { margin:0 0 10px; color:${T3.ink2}; font-size:12px; }
-      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T3.line}; }
-      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T3.line}; }
+      ${d} h3 { margin:18px 0 8px; color:${T4.ink2}; font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; }
+      ${d} p { margin:0 0 10px; color:${T4.ink2}; font-size:12px; }
+      ${d} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T4.line}; }
+      ${d} li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid ${T4.line}; }
       ${d} .wcs-who { flex:1; min-width:0; }
       ${d} .wcs-name { font-weight:600; }
       ${d} .wcs-name a { color:inherit; text-decoration:none; }
       ${d} .wcs-name a:hover { text-decoration:underline; }
-      ${d} .wcs-meta { color:${T3.muted}; font-size:11px; }
-      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T3.badSoft}; color:${T3.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
+      ${d} .wcs-meta { color:${T4.muted}; font-size:11px; }
+      ${d} .wcs-chip { padding:2px 8px; border-radius:999px; background:${T4.badSoft}; color:${T4.badInk}; font-size:11px; font-weight:650; white-space:nowrap; }
       ${d} .wcs-row { display:flex; gap:8px; align-items:center; }
       ${d} .wcs-reason { margin:10px 0 8px; }
-      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T3.lineStrong}; border-radius:8px; background:${T3.surface}; color:${T3.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
-      ${d} input:focus { outline:2px solid ${T3.accent}; outline-offset:-1px; }
-      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T3.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
+      ${d} input { flex:1; min-width:0; height:32px; box-sizing:border-box; padding:4px 10px; border:1px solid ${T4.lineStrong}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; font-family:inherit; font-size:13px; line-height:1.3; }
+      ${d} input:focus { outline:2px solid ${T4.accent}; outline-offset:-1px; }
+      ${d} button { min-height:30px; padding:5px 12px; border:0; border-radius:8px; background:${T4.accent}; color:#fff; cursor:pointer; font:600 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; white-space:nowrap; }
       ${d} button:disabled { cursor:default; opacity:.6; }
-      ${d} button.wcs-secondary { border:1px solid ${T3.line}; background:${T3.surface}; color:${T3.ink}; }
-      ${d} button.wcs-secondary:hover { background:${T3.sunken}; }
-      ${d} button.wcs-danger { background:${T3.badSoft}; color:${T3.badInk}; }
-      ${d} button.wcs-danger:hover { background:${T3.badHover}; }
+      ${d} button.wcs-secondary { border:1px solid ${T4.line}; background:${T4.surface}; color:${T4.ink}; }
+      ${d} button.wcs-secondary:hover { background:${T4.sunken}; }
+      ${d} button.wcs-danger { background:${T4.badSoft}; color:${T4.badInk}; }
+      ${d} button.wcs-danger:hover { background:${T4.badHover}; }
       ${d} .wcs-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T3.ink2}; font-size:12px; }
-      ${d} .wcs-status.wcs-error { color:${T3.badInk}; }
+      ${d} .wcs-status { min-height:18px; margin-top:10px; color:${T4.ink2}; font-size:12px; }
+      ${d} .wcs-status.wcs-error { color:${T4.badInk}; }
     `;
       document.head.appendChild(style);
     }
@@ -15612,7 +17064,7 @@ ${add}` : add;
   }
 
   // src/features/cem-ampel/index.js
-  var SOURCE_PATH2 = "cem/toolbox/src/features/cem-ampel/index.js";
+  var SOURCE_PATH3 = "cem/toolbox/src/features/cem-ampel/index.js";
   var ROUTE_RE = /^#\/CEM\/MyCandidates(?:[/?]|$)/i;
   var IDS7 = { style: "werkia-cem-ampel-style", menu: "werkia-cem-ampel-menu", info: "werkia-cem-ampel-info" };
   var DOT_CLASS = "werkia-cem-ampel-dot";
@@ -15630,7 +17082,7 @@ ${add}` : add;
     request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
     pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow
   } = {}) {
-    runtime.registerSource(SOURCE_PATH2);
+    runtime.registerSource(SOURCE_PATH3);
     const post = createAmpelClient({
       request: request || (() => {
         throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
@@ -15795,7 +17247,7 @@ ${add}` : add;
         }),
         status2
       ]);
-      menu.setAttribute(OWNER_ATTR2, SOURCE_PATH2);
+      menu.setAttribute(OWNER_ATTR2, SOURCE_PATH3);
       menu.dataset.candidateId = id;
       menu.addEventListener("click", (event) => event.stopPropagation());
       document.body.appendChild(menu);
@@ -16017,20 +17469,20 @@ ${add}` : add;
   }
 
   // ../../shared/js/no-go-check/index.js
-  var POTENTIAL_MATCHES_ROUTE7 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
-  var ROW_SELECTOR6 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var POTENTIAL_MATCHES_ROUTE8 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
+  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var LEVEL_STYLES2 = {
     direct: { badge: "border:2px solid #450a0a;background:#7f1d1d;color:#fff;", accent: "#7f1d1d", tint: "#f7dcdc" },
     group: { badge: "border:2px solid #7f1d1d;background:#b91c1c;color:#fff;", accent: "#b91c1c", tint: "#fae3e3" },
     name: { badge: "border:2px solid #b45309;background:#f59e0b;color:#231400;", accent: "#b45309", tint: "#fdf0d5" }
   };
-  function getCandidateIdFromRoute3(hash = location.hash || "") {
-    return String(hash).match(POTENTIAL_MATCHES_ROUTE7)?.[1] || "";
+  function getCandidateIdFromRoute4(hash = location.hash || "") {
+    return String(hash).match(POTENTIAL_MATCHES_ROUTE8)?.[1] || "";
   }
   function isPotentialMatchesRoute(hash = location.hash || "") {
-    return POTENTIAL_MATCHES_ROUTE7.test(String(hash));
+    return POTENTIAL_MATCHES_ROUTE8.test(String(hash));
   }
-  function getEmployerIdFromRow(row2) {
+  function getEmployerIdFromRow2(row2) {
     const link = row2?.querySelector('a[href*="#/Employer/"][href*="/show"]') || row2?.querySelector('a[href*="#/Employer/"]');
     return link?.getAttribute("href")?.match(/\/Employer\/([a-f0-9-]{36})/i)?.[1] || "";
   }
@@ -16044,7 +17496,7 @@ ${add}` : add;
     const BADGE_CLASS2 = `werkia-${namespace}-no-go-badge`;
     const ROW_CLASS3 = `werkia-${namespace}-no-go-row`;
     const CHECK_ROW_CLASS = `werkia-${namespace}-no-go-check-row`;
-    const STYLE_ID16 = `werkia-${namespace}-no-go-style`;
+    const STYLE_ID19 = `werkia-${namespace}-no-go-style`;
     const noGosByCandidate = /* @__PURE__ */ new Map();
     const employersById = /* @__PURE__ */ new Map();
     const pendingEmployerLookups = /* @__PURE__ */ new Set();
@@ -16052,9 +17504,9 @@ ${add}` : add;
     let employerLoadInFlight = false;
     let renderTimer = null;
     function ensureStyles2() {
-      if (document.getElementById(STYLE_ID16)) return;
+      if (document.getElementById(STYLE_ID19)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID16;
+      style.id = STYLE_ID19;
       style.textContent = `
       .${ROW_CLASS3} > td, .${ROW_CLASS3} > th { background:${LEVEL_STYLES2.direct.tint} !important; }
       .${ROW_CLASS3} > :first-child { box-shadow:inset 9px 0 0 ${LEVEL_STYLES2.direct.accent} !important; }
@@ -16095,7 +17547,7 @@ ${add}` : add;
       candidateLoadInFlight = candidateId;
       Promise.resolve().then(() => getProvider().loadCandidateNoGos(candidateId)).then((entries) => {
         noGosByCandidate.set(candidateId, entries);
-        if (getCandidateIdFromRoute3() === candidateId) scheduleRender();
+        if (getCandidateIdFromRoute4() === candidateId) scheduleRender();
       }).catch((error) => console.warn(`[${namespace.toUpperCase()} No-Go] No-Go-Arbeitgeber konnten nicht geladen werden:`, error)).finally(() => {
         if (candidateLoadInFlight === candidateId) candidateLoadInFlight = "";
       });
@@ -16114,26 +17566,26 @@ ${add}` : add;
       });
     }
     function renderRows() {
-      const candidateId = getCandidateIdFromRoute3();
+      const candidateId = getCandidateIdFromRoute4();
       if (!candidateId) return;
       const noGos = noGosByCandidate.get(candidateId);
       if (noGos === void 0) {
         loadCandidateNoGos(candidateId);
         return;
       }
-      const rows = [...document.querySelectorAll(ROW_SELECTOR6)];
+      const rows = [...document.querySelectorAll(ROW_SELECTOR8)];
       if (!noGos.employers.length && !noGos.groups.length) {
         rows.forEach(clearRow);
         return;
       }
       const rowEmployerIds = [];
       for (const row2 of rows) {
-        const employerId = getEmployerIdFromRow(row2);
+        const employerId = getEmployerIdFromRow2(row2);
         if (employerId) rowEmployerIds.push(employerId);
       }
       loadEmployers([...new Set(rowEmployerIds)]);
       for (const row2 of rows) {
-        const employerId = getEmployerIdFromRow(row2);
+        const employerId = getEmployerIdFromRow2(row2);
         if (!employerId) {
           clearRow(row2);
           continue;
@@ -16319,17 +17771,17 @@ ${add}` : add;
   }
 
   // ../../shared/js/cem-vta-sperre/termin-warnung.js
-  var UUID_RE5 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  var OWNER_KEY3 = "werkiaVtaSperreWarnungOwner";
-  var BOX_CLASS2 = "werkia-vta-sperre-warnung";
-  var STYLE_ID13 = "werkia-vta-sperre-warnung-style";
-  var ROW_SELECTOR7 = "tr, .MuiTableRow-root";
+  var UUID_RE6 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var OWNER_KEY4 = "werkiaVtaSperreWarnungOwner";
+  var BOX_CLASS3 = "werkia-vta-sperre-warnung";
+  var STYLE_ID15 = "werkia-vta-sperre-warnung-style";
+  var ROW_SELECTOR9 = "tr, .MuiTableRow-root";
   var CACHE_MS10 = 10 * 60 * 1e3;
   var RETRY_MS6 = 60 * 1e3;
-  var CLICK_MAX_AGE_MS2 = 10 * 60 * 1e3;
+  var CLICK_MAX_AGE_MS3 = 10 * 60 * 1e3;
   var SNOOZE_KEY = "werkia-vta-sperre-warnung-snooze";
   var SNOOZE_MS2 = 5 * 60 * 1e3;
-  var T4 = {
+  var T5 = {
     ink: "#09090b",
     ink2: "#52525b",
     line: "#e4e4e7",
@@ -16338,10 +17790,10 @@ ${add}` : add;
     badInk: "#b52f2f",
     badSoft: "#fdecec"
   };
-  var FONT7 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
-  function matchIdFromHash(hash) {
+  var FONT9 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  function matchIdFromHash2(hash) {
     const id = String(hash || "").match(/^#\/(?:Match|Chat)\/([^/?#]+)/i)?.[1] || "";
-    return UUID_RE5.test(id) ? id.toLowerCase() : "";
+    return UUID_RE6.test(id) ? id.toLowerCase() : "";
   }
   function isSaveButton(button2) {
     if (!button2 || button2.tagName !== "BUTTON") return false;
@@ -16390,22 +17842,22 @@ ${add}` : add;
     let snoozedUntil = readSnooze();
     let guard = null;
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID13)) return;
+      if (document.getElementById(STYLE_ID15)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID13;
-      const b = `.${BOX_CLASS2}`;
+      style.id = STYLE_ID15;
+      const b = `.${BOX_CLASS3}`;
       style.textContent = `
-      ${b} { box-sizing:border-box; margin:0 0 12px; padding:10px 12px; border:1px solid ${T4.bad}; border-left-width:6px; border-radius:8px; background:${T4.badSoft}; color:${T4.ink}; font:400 13px/1.45 ${FONT7}; }
-      ${b}[data-state="loading"] { border-color:${T4.line}; background:#fafafa; color:${T4.ink2}; font-size:12px; }
-      ${b} .wvsw-title { font-weight:700; color:${T4.badInk}; }
+      ${b} { box-sizing:border-box; margin:0 0 12px; padding:10px 12px; border:1px solid ${T5.bad}; border-left-width:6px; border-radius:8px; background:${T5.badSoft}; color:${T5.ink}; font:400 13px/1.45 ${FONT9}; }
+      ${b}[data-state="loading"] { border-color:${T5.line}; background:#fafafa; color:${T5.ink2}; font-size:12px; }
+      ${b} .wvsw-title { font-weight:700; color:${T5.badInk}; }
       ${b} .wvsw-text { margin-top:4px; white-space:pre-wrap; overflow-wrap:anywhere; }
       ${b} label { display:flex; align-items:flex-start; gap:8px; margin-top:8px; font-weight:600; cursor:pointer; }
-      ${b} input[type="checkbox"] { margin:2px 0 0; accent-color:${T4.bad}; }
+      ${b} input[type="checkbox"] { margin:2px 0 0; accent-color:${T5.bad}; }
       ${b} .wvsw-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
-      ${b} button { min-height:26px; padding:3px 10px; border:1px solid ${T4.line}; border-radius:8px; background:${T4.surface}; color:${T4.ink}; cursor:pointer; font:600 12px/1 ${FONT7}; }
+      ${b} button { min-height:26px; padding:3px 10px; border:1px solid ${T5.line}; border-radius:8px; background:${T5.surface}; color:${T5.ink}; cursor:pointer; font:600 12px/1 ${FONT9}; }
       ${b}.wvsw-flash { animation:wvsw-flash .5s ease-out 2; }
       @keyframes wvsw-flash { 50% { box-shadow:0 0 0 4px rgba(208,59,59,.35); } }
-      @media (prefers-reduced-motion: reduce) { ${b}.wvsw-flash { animation:none; outline:3px solid ${T4.bad}; } }
+      @media (prefers-reduced-motion: reduce) { ${b}.wvsw-flash { animation:none; outline:3px solid ${T5.bad}; } }
     `;
       document.head.appendChild(style);
     }
@@ -16446,9 +17898,9 @@ ${add}` : add;
       return loading;
     }
     function currentTarget() {
-      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS2 && (clicked.matchId || clicked.employerId)) return clicked;
+      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS3 && (clicked.matchId || clicked.employerId)) return clicked;
       const hash = location.hash || "";
-      return { matchId: matchIdFromHash(hash), employerId: employerIdFromHref3(hash) };
+      return { matchId: matchIdFromHash2(hash), employerId: employerIdFromHref3(hash) };
     }
     async function resolveEmployer(target) {
       if (target.employerId) return target.employerId;
@@ -16524,7 +17976,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     function teardown() {
       if (!guard) return;
       guard.element.remove();
-      if (guard.dialog.dataset[OWNER_KEY3] === sourcePath) delete guard.dialog.dataset[OWNER_KEY3];
+      if (guard.dialog.dataset[OWNER_KEY4] === sourcePath) delete guard.dialog.dataset[OWNER_KEY4];
       guard = null;
     }
     function sync() {
@@ -16536,7 +17988,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         }
         return;
       }
-      const claimedBy = dialog.dataset[OWNER_KEY3];
+      const claimedBy = dialog.dataset[OWNER_KEY4];
       if (claimedBy && claimedBy !== sourcePath) return;
       if (guard && guard.dialog !== dialog) teardown();
       if (guard) {
@@ -16545,9 +17997,9 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
       }
       if (isExistingAppointment(dialog)) return;
       ensureStyle5();
-      dialog.dataset[OWNER_KEY3] = sourcePath;
-      const element5 = el4("div", { className: BOX_CLASS2 });
-      element5.dataset[OWNER_KEY3] = sourcePath;
+      dialog.dataset[OWNER_KEY4] = sourcePath;
+      const element5 = el4("div", { className: BOX_CLASS3 });
+      element5.dataset[OWNER_KEY4] = sourcePath;
       guard = { dialog, element: element5, target: currentTarget(), state: "loading", entry: null, error: null, confirmed: false };
       place(guard);
       render(guard);
@@ -16573,14 +18025,14 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         block(event);
         return;
       }
-      const row2 = event.target?.closest?.(ROW_SELECTOR7);
+      const row2 = event.target?.closest?.(ROW_SELECTOR9);
       if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
       const target = targetFromRow(row2);
       if (target.matchId || target.employerId) clicked = { ...target, at: now() };
     }, true);
     runtime.addDocumentListener("submit", block, true);
     let scheduled = false;
-    function schedule() {
+    function schedule2() {
       if (scheduled) return;
       scheduled = true;
       runtime.setTimeout(() => {
@@ -16588,10 +18040,10 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         sync();
       }, 150);
     }
-    runtime.createMutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    runtime.addWindowListener("hashchange", schedule);
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
     runtime.addCleanup?.(teardown);
-    schedule();
+    schedule2();
   }
 
   // src/features/vta-sperre-warnung.js
@@ -16599,6 +18051,826 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     executeVtaSperreWarnung(runtime, {
       getGraphqlAdapter: getCemGraphqlAdapter,
       sourcePath: "cem/toolbox/src/features/vta-sperre-warnung.js"
+    });
+  }
+
+  // src/features/cem-vta-daten.js
+  var SOURCE_PATH4 = "cem/toolbox/src/features/cem-vta-daten.js";
+  var APPOINTMENT_INPUT_SELECTOR2 = ".RaArrayInput-root input.MuiPickersInputBase-input";
+  var APPOINTMENT_PICKER_SELECTOR = ".MuiPickersInputBase-root";
+  var DONE_KEY = "werkiaCemVtaDaten";
+  var OFFSETS = [2, 3, 7];
+  var SETTLE_MS = 250;
+  var berlinToday2 = (date = /* @__PURE__ */ new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(date);
+  function shift(day, n) {
+    const [y, m, d] = day.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  }
+  var weekday = (day) => (/* @__PURE__ */ new Date(`${day}T12:00:00Z`)).getUTCDay();
+  var isWeekend = (day) => [0, 6].includes(weekday(day));
+  function workdayFrom(day) {
+    let out = day;
+    while (isWeekend(out)) out = shift(out, 1);
+    return out;
+  }
+  function cemVtaDays(today = berlinToday2()) {
+    const days = [];
+    OFFSETS.forEach((offset) => {
+      let day = workdayFrom(shift(today, offset));
+      const last = days.at(-1);
+      if (last && day <= last) day = workdayFrom(shift(last, 1));
+      days.push(day);
+    });
+    return days;
+  }
+  var VALUE_RE = /^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$/;
+  function withDay(value, day) {
+    const parts = String(value || "").trim().match(VALUE_RE);
+    if (!parts || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+    const [y, m, d] = day.split("-");
+    return `${d}.${m}.${y} ${parts[4].padStart(2, "0")}:${parts[5]}`;
+  }
+  function looksLikeDefault(values, today = berlinToday2()) {
+    if (!Array.isArray(values) || values.length !== 3) return false;
+    const days = values.map((value) => {
+      const parts = String(value || "").trim().match(VALUE_RE);
+      return parts ? `${parts[3]}-${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}` : "";
+    });
+    if (days.some((day) => !day || day <= today)) return false;
+    return new Set(days).size === 3;
+  }
+  function fieldText(dialog, labelText) {
+    const label2 = [...dialog.querySelectorAll("label")].find((element5) => element5.textContent.replace(/\*/g, "").trim() === labelText);
+    const control = label2?.closest(".MuiFormControl-root");
+    return {
+      text: (control?.querySelector(".MuiSelect-select")?.textContent || "").trim(),
+      value: control?.querySelector("input")?.value || ""
+    };
+  }
+  function isCemVtaDialog(dialog) {
+    if (!dialog || isExistingAppointment(dialog)) return false;
+    const von = fieldText(dialog, "Von");
+    const status2 = fieldText(dialog, "Status");
+    const fromCandidate = von.value === "candidate" || von.text === "Kandidat";
+    const suggestion = status2.value === "suggestion" || status2.text === "Vorschlag";
+    return fromCandidate && suggestion;
+  }
+  function executeCemVtaDaten(runtime) {
+    runtime.registerSource(SOURCE_PATH4);
+    function setValue(el4, value) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      el4.focus();
+      setter?.call(el4, value);
+      el4.dispatchEvent(new Event("input", { bubbles: true }));
+      el4.dispatchEvent(new Event("change", { bubbles: true }));
+      el4.dispatchEvent(new Event("blur", { bubbles: true }));
+      el4.blur();
+    }
+    function setPicker(root, value) {
+      const parts = value.match(VALUE_RE);
+      if (!parts) return;
+      const values = [parts[1], parts[2], parts[3], parts[4], parts[5]];
+      const sections = [...root.querySelectorAll(".MuiPickersSectionList-sectionContent")];
+      values.forEach((v, i) => {
+        if (!sections[i]) return;
+        sections[i].focus();
+        sections[i].textContent = v;
+        sections[i].dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: v }));
+        sections[i].dispatchEvent(new Event("change", { bubbles: true }));
+        sections[i].dispatchEvent(new Event("blur", { bubbles: true }));
+      });
+      const input = root.querySelector("input.MuiPickersInputBase-input");
+      if (input) setValue(input, value);
+    }
+    function pickers(dialog) {
+      const array = [...dialog.querySelectorAll(".RaArrayInput-root")].find((root) => root.querySelector(APPOINTMENT_INPUT_SELECTOR2));
+      return [...array?.querySelectorAll(APPOINTMENT_PICKER_SELECTOR) || []];
+    }
+    function apply(dialog) {
+      if (!dialog.isConnected || !isCemVtaDialog(dialog)) return;
+      const roots = pickers(dialog);
+      const values = roots.map((root) => root.querySelector("input.MuiPickersInputBase-input")?.value || "");
+      const today = berlinToday2();
+      if (!looksLikeDefault(values, today)) return;
+      const days = cemVtaDays(today);
+      const active = document.activeElement;
+      roots.forEach((root, index) => {
+        const next = withDay(values[index], days[index]);
+        if (next && next !== values[index].trim()) setPicker(root, next);
+      });
+      if (active && typeof active.focus === "function" && active.isConnected) active.focus();
+    }
+    function check() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog || dialog.dataset[DONE_KEY]) return;
+      dialog.dataset[DONE_KEY] = "1";
+      runtime.setTimeout(() => apply(dialog), SETTLE_MS);
+    }
+    runtime.createMutationObserver(check).observe(document.body, { childList: true, subtree: true });
+    check();
+  }
+
+  // ../../shared/js/admin-interface/features/interview-create.js
+  var VTA_CACHE_MS = 10 * 60 * 1e3;
+  var OVERLAP_PATTERNS = [
+    "widersprüchlichen Termin",
+    "bereits einen Termin bestätigt",
+    "Überschneidung",
+    "overlapping_dates"
+  ];
+  function isOverlapError(message) {
+    const text = String(message || "");
+    return OVERLAP_PATTERNS.some((p) => text.includes(p));
+  }
+  function overlapText(message) {
+    return String(message || "").split(";")[0].replace(/\s+\?$/, "?").trim();
+  }
+  var BERLIN_PARTS = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  });
+  var DAY_FMT = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" });
+
+  // ../../shared/js/admin-interface/ui/online-match-status.js
+  var ONLINE_MATCH_STATUS_LABELS = {
+    process: "Senden",
+    dont_send: "Nicht senden",
+    wait_for_cv: "Warten auf CV",
+    wait_for_documents: "Warten auf Unterlagen",
+    wait_for_document_review: "Warten auf Dokumentenprüfung",
+    follow_up: "WVL",
+    too_many_matches: "Zu viele Matches",
+    no_data: "Keine Daten",
+    kam_request: "Anfrage KAM",
+    doublecheck: "Doublecheck",
+    rejected_by_candidate: "Vom Kandidaten abgelehnt",
+    unsolicited_send: "Initiativ Senden",
+    in_queue: "Warten auf Auto-Verarbeitung",
+    reverse_match_send: "Reverse Match senden",
+    portal_uploaded: "Portal Uploaded"
+  };
+  var ONLINE_MATCH_STATUSES = Object.keys(ONLINE_MATCH_STATUS_LABELS);
+  var OM_LIST_DEFAULT_STATUSES = ONLINE_MATCH_STATUSES.filter((s) => s !== "reverse_match_send");
+  function onlineMatchStatusLabel(value) {
+    return ONLINE_MATCH_STATUS_LABELS[value] || value || "–";
+  }
+  var OM_FEEDBACK_MAIN = [
+    ["too_far", "Distanz / zu weiter Arbeitsweg"],
+    ["willingness_to_travel", "Montagebereitschaft"],
+    ["no_driver_license", "Kein Führerschein"],
+    ["other_focus", "Anderer Fachbereich / Schwerpunkt"],
+    ["no_qualification", "Fehlende Qualifikation"],
+    ["no_experience", "Fehlende Erfahrung"],
+    ["no_recognition", "Fehlende Anerkennung"],
+    ["german_language_skills", "Unzureichende Deutschkenntnisse"],
+    ["salary_or_conditions", "Gehalt / Konditionen"],
+    ["working_hours", "Arbeitszeiten / Schicht / Rufbereitschaft"],
+    ["job_fit", "Tätigkeit passt nicht"],
+    ["start_date", "Starttermin zu spät / zu früh"],
+    ["no_longer_available", "Stelle besetzt / kein Bedarf mehr"],
+    ["bew_known", "BEW bereits bekannt"],
+    ["too_many_job_changes", "Zu viele Wechsel / instabiler Lebenslauf"],
+    ["incomplete_profile", "Fehlende Unterlagen / unvollständiges Profil"],
+    ["bew_not_interested", "BEW kein Interesse"],
+    ["bew_unresponsive", "BEW nicht responsive"],
+    ["bew_found_external", "BEW hat privat etwas gefunden"],
+    ["team_fit", "Persönlicher Eindruck / Teamfit"]
+  ];
+  var OM_FEEDBACK_MORE = [
+    ["profile_deleted", "Profil gelöscht"],
+    ["only_part_time", "Nur Minijob/Geringfügig"],
+    ["no_visa_or_permit", "Arbeitserlaubnis/Visum fehlt"],
+    ["accepted_by_accident", "Match versehentlich angenommen"],
+    ["offline_application", "Direktbewerbung beim Arbeitgeber (offline)"],
+    ["partnership_ended", "Partnerschaft mit Unternehmen beendet/pausiert"],
+    ["job_scope", "Stellenumfang passt nicht"],
+    ["duplicate", "Doppelt"],
+    ["no_school_certificate", "Kein Schulabschluss"]
+  ];
+  var OM_FEEDBACK_LABELS2 = Object.fromEntries([...OM_FEEDBACK_MAIN, ...OM_FEEDBACK_MORE]);
+
+  // src/features/vta-mehrfach/core.js
+  var ME_QUERY2 = `query WerkiaCemVtaMehrfachMe {
+  me: currentEmployee { id roles { name } }
+}`;
+  var SOURCE_MATCH_QUERY = `query WerkiaCemVtaMehrfachMatch($id: UUID!) {
+  data: Match(id: $id) { id candidateId }
+}`;
+  var CANDIDATE_MATCHES_QUERY2 = `query WerkiaCemVtaMehrfachMatches($filter: MatchFilter, $perPage: Int) {
+  items: allMatches(filter: $filter, perPage: $perPage) {
+    id candidateId cemStatus kamStatus onlineMatchStatus connectionType
+    jobPosition { id mainTitle employer { id name } }
+    interviews { id dates status dateSuggestedBy }
+  }
+}`;
+  var INTERVIEWS_QUERY = `query WerkiaCemVtaMehrfachInterviews($matchId: UUID) {
+  items: allInterviews(filter: { matchId: $matchId }, sortField: "createdAt", sortOrder: "DESC", perPage: 10) { id status type location instructions dates dateSuggestedBy notes createdAt }
+}`;
+  var CREATE_INTERVIEW_MUTATION = `mutation WerkiaCemVtaMehrfachCreateInterview($matchId: UUID!, $status: String!, $dates: [DateTime!]!, $type: String!, $dateSuggestedBy: String!, $location: String, $instructions: String, $notes: String, $kamTagged: Boolean, $ignoreValidation: Boolean!) {
+  data: createInterview(matchId: $matchId, status: $status, dates: $dates, type: $type, dateSuggestedBy: $dateSuggestedBy, location: $location, instructions: $instructions, notes: $notes, kamTagged: $kamTagged, ignoreValidation: $ignoreValidation) { id matchId status dates }
+}`;
+  var KAM_ROLE = "Key Account Management";
+  var OPEN_VTA_STATUSES = ["suggestion", "not_reconfirmed", "forwarded"];
+  var COPY_STATUSES = ["suggestion", "forwarded"];
+  var MAX_MATCHES = 200;
+  function candidateMatchesFilter(candidateId) {
+    return {
+      candidateIds: [candidateId],
+      matched: true,
+      isInActiveCemOmStatuses: true,
+      candidateStatuses: ["cem", "active", "hired"]
+    };
+  }
+  function kamTaggedFor(me) {
+    return !(me?.roles || []).some((role) => (role?.name ?? role) === KAM_ROLE);
+  }
+  var isOpenVta = (iv) => OPEN_VTA_STATUSES.includes(iv?.status);
+  function openVtaInfo(interviews = []) {
+    const open = (interviews || []).filter(isOpenVta);
+    return {
+      cem: open.filter((iv) => iv.dateSuggestedBy === "candidate").length,
+      kam: open.filter((iv) => iv.dateSuggestedBy === "employer").length,
+      total: open.length
+    };
+  }
+  function openVtaText(info) {
+    if (!info?.total) return "";
+    const parts = [];
+    if (info.cem) parts.push(info.cem === 1 ? "offenen CEM-VTA" : `${info.cem} offene CEM-VTAs`);
+    if (info.kam) parts.push(info.kam === 1 ? "offenen KAM-VTA" : `${info.kam} offene KAM-VTAs`);
+    const rest = info.total - info.cem - info.kam;
+    if (rest > 0) parts.push(rest === 1 ? "offenen VTA" : `${rest} offene VTAs`);
+    return `hat ${parts.join(" und ")}`;
+  }
+  function targetRows({ matches = [], sourceMatchId = "", sperre = () => null }) {
+    const source = String(sourceMatchId || "").toLowerCase();
+    const rows = [];
+    for (const m of matches || []) {
+      if (!m?.id || String(m.id).toLowerCase() === source) continue;
+      if (m.cemStatus === "out" || m.cemStatus === "hired") continue;
+      const employerId = String(m.jobPosition?.employer?.id || "").toLowerCase();
+      const vta = openVtaInfo(m.interviews);
+      const blockEntry = employerId ? sperre(employerId) : null;
+      rows.push({
+        id: m.id,
+        employerId,
+        employer: m.jobPosition?.employer?.name || "Arbeitgeber unbekannt",
+        position: m.jobPosition?.mainTitle || "",
+        cemStatus: m.cemStatus ? CEM_STATUS_LABELS[m.cemStatus] || m.cemStatus : "Kein CEM-Status",
+        omStatus: m.onlineMatchStatus ? onlineMatchStatusLabel(m.onlineMatchStatus) : "",
+        reverse: m.connectionType === "reverse",
+        vta,
+        vtaText: openVtaText(vta),
+        blocked: Boolean(blockEntry),
+        blockEntry: blockEntry || null
+      });
+    }
+    return rows.sort((a, b) => Number(a.blocked) - Number(b.blocked) || a.employer.localeCompare(b.employer, "de"));
+  }
+  function findNewInterview(interviews = [], knownIds = []) {
+    const known = new Set((knownIds || []).map((id) => String(id)));
+    return (interviews || []).filter((iv) => iv?.id && !known.has(String(iv.id))).sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0))[0] || null;
+  }
+  function withoutNote(notes, notiz) {
+    const text = String(notes || "");
+    const needle = String(notiz || "").trim();
+    if (!needle || !text.includes(needle)) return text;
+    return text.replace(needle, "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function notesFor({ notes, sourceEmployerId, targetEmployerId, notiz = () => "" }) {
+    const text = String(notes || "");
+    if (!targetEmployerId || targetEmployerId === sourceEmployerId) return text;
+    const sourceNote = sourceEmployerId ? notiz(sourceEmployerId) : "";
+    const base = sourceNote && hasNote(text, sourceNote) ? withoutNote(text, sourceNote) : text;
+    return withNote(base, notiz(targetEmployerId));
+  }
+  function upcomingDates(interview, now = Date.now()) {
+    return (interview?.dates || []).filter((d) => Date.parse(d) > now).sort((a, b) => Date.parse(a) - Date.parse(b));
+  }
+  function copyProblem(interview, now = Date.now()) {
+    if (!interview) return "Kein neuer Terminvorschlag gefunden. Nichts übernommen.";
+    if (!COPY_STATUSES.includes(interview.status)) return "Angelegt wurde kein Terminvorschlag, sondern ein Termin mit festem Status. Übernommen werden nur Terminvorschläge.";
+    if (!upcomingDates(interview, now).length) return "Der Vorschlag hat keine kommenden Termine. Nichts übernommen.";
+    return "";
+  }
+  var orNull = (value) => value === void 0 || value === "" ? null : value;
+  function createVariables({ interview, target, sourceEmployerId = "", notiz = () => "", kamTagged = true, ignoreValidation = false, now = Date.now() }) {
+    return {
+      matchId: target.id,
+      status: COPY_STATUSES.includes(interview.status) ? interview.status : "suggestion",
+      dates: upcomingDates(interview, now),
+      type: interview.type || "interview",
+      dateSuggestedBy: interview.dateSuggestedBy || "candidate",
+      location: orNull(interview.location),
+      instructions: orNull(interview.instructions),
+      notes: orNull(notesFor({ notes: interview.notes, sourceEmployerId, targetEmployerId: target.employerId, notiz })),
+      kamTagged,
+      ignoreValidation
+    };
+  }
+  function summaryText2(results = []) {
+    const ok = results.filter((r) => r.state === "ok").length;
+    const total = results.length;
+    if (!total) return "";
+    if (ok === total) return `${ok === 1 ? "Terminvorschlag" : `${ok} Terminvorschläge`} angelegt.`;
+    return `${ok} von ${total} angelegt.`;
+  }
+  function rowLabel(row2) {
+    return [row2.employer, row2.position].filter(Boolean).join(" · ");
+  }
+
+  // src/features/vta-mehrfach/index.js
+  var SOURCE_PATH5 = "cem/toolbox/src/features/vta-mehrfach/index.js";
+  var OWNER_KEY5 = "werkiaVtaMehrfachOwner";
+  var BOX_CLASS4 = "werkia-vta-mehrfach";
+  var PANEL_ID2 = "werkia-vta-mehrfach-panel";
+  var STYLE_ID16 = "werkia-vta-mehrfach-style";
+  var ROW_SELECTOR10 = "tr, .MuiTableRow-root";
+  var CLICK_MAX_AGE_MS4 = 10 * 60 * 1e3;
+  var PENDING_MAX_AGE_MS = 5 * 60 * 1e3;
+  var POLL_DELAYS_MS = [800, 1500, 2500, 4e3, 6e3];
+  var LIST_CACHE_MS = 5 * 60 * 1e3;
+  var T6 = {
+    surface: "#ffffff",
+    sunken: "#f4f4f5",
+    ink: "#09090b",
+    ink2: "#52525b",
+    muted: "#8b8b94",
+    line: "#e4e4e7",
+    lineStrong: "#d4d4d8",
+    accent: "#ef6c00",
+    accentInk: "#b85400",
+    accentSoft: "#fff3e8",
+    good: "#1f9a6b",
+    goodSoft: "#e8f6ef",
+    bad: "#d03b3b",
+    badInk: "#b52f2f",
+    badSoft: "#fdecec"
+  };
+  var FONT10 = 'system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+  function executeVtaMehrfach(runtime, {
+    getGraphqlAdapter = getCemGraphqlAdapter,
+    helpTip = () => cemHelp.tip("vta-mehrfach"),
+    request = typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null,
+    now = () => Date.now()
+  } = {}) {
+    runtime.registerSource(SOURCE_PATH5);
+    const gm = request || (() => {
+      throw new Error("GM_xmlhttpRequest ist nicht verfügbar.");
+    });
+    const getAuth = () => getGraphqlAdapter().getAuth?.();
+    const notizenPost = createNotizenClient({ request: gm, getAuth });
+    const sperrePost = createSperreClient({ request: gm, getAuth });
+    const gql = (query, variables) => getGraphqlAdapter().request(query, variables);
+    let me = null;
+    let notizen = null;
+    let sperre = null;
+    let clicked = { matchId: "", at: 0 };
+    let box = null;
+    let pending = null;
+    async function loadMe2() {
+      if (me) return me;
+      const data = await gql(ME_QUERY2, {});
+      if (!data?.me?.id) throw new Error("Eigene Mitarbeiter-ID nicht gefunden. Bitte das Adminpanel neu laden.");
+      me = data.me;
+      return me;
+    }
+    async function loadSperre() {
+      if (sperre && now() - sperre.at < LIST_CACHE_MS) return sperre.lookup;
+      try {
+        const { id } = await loadMe2();
+        const data = await sperrePost({ action: "liste", employeeId: id });
+        sperre = { at: now(), lookup: createLookup2(data.eintraege || []) };
+        return sperre.lookup;
+      } catch (error) {
+        console.warn("[VTA mehrfach] Sperrliste nicht geladen:", error?.message || error);
+        return sperre?.lookup || null;
+      }
+    }
+    async function loadNotizen() {
+      if (notizen && now() - notizen.at < LIST_CACHE_MS) return notizen.lookup;
+      try {
+        const { id } = await loadMe2();
+        const data = await notizenPost({ action: "liste", employeeId: id });
+        notizen = { at: now(), lookup: createLookup(data.eintraege || []) };
+        return notizen.lookup;
+      } catch (error) {
+        console.warn("[VTA mehrfach] VTA-Notizen nicht geladen:", error?.message || error);
+        return notizen?.lookup || null;
+      }
+    }
+    async function loadTargets(sourceMatchId) {
+      const source = await gql(SOURCE_MATCH_QUERY, { id: sourceMatchId });
+      const candidateId = source?.data?.candidateId;
+      if (!candidateId) throw new Error("Kandidat des Matches nicht gefunden.");
+      const [matchesData, sperreLookup] = await Promise.all([
+        gql(CANDIDATE_MATCHES_QUERY2, { filter: candidateMatchesFilter(candidateId), perPage: MAX_MATCHES }),
+        loadSperre()
+      ]);
+      const matches = matchesData?.items || [];
+      const sourceMatch = matches.find((m) => String(m.id).toLowerCase() === sourceMatchId);
+      const interviews = await gql(INTERVIEWS_QUERY, { matchId: sourceMatchId });
+      return {
+        rows: targetRows({
+          matches,
+          sourceMatchId,
+          sperre: (employerId) => sperreLookup ? sperreLookup({ id: employerId }) : null
+        }),
+        sperreUnknown: !sperreLookup,
+        knownIds: (interviews?.items || []).map((iv) => iv.id),
+        sourceEmployerId: String(sourceMatch?.jobPosition?.employer?.id || "").toLowerCase()
+      };
+    }
+    function ensureStyle5() {
+      if (document.getElementById(STYLE_ID16)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID16;
+      const b = `.${BOX_CLASS4}`;
+      const p = `#${PANEL_ID2}`;
+      style.textContent = `
+      ${b} { box-sizing:border-box; width:100%; margin:12px 0 4px; border:1px solid ${T6.line}; border-radius:8px; background:#fafafa; color:${T6.ink}; font:400 13px/1.45 ${FONT10}; }
+      ${b} .wvm-head { display:flex; align-items:center; gap:8px; padding:4px 11px 4px 4px; }
+      ${b} .wvm-toggle { display:flex; align-items:center; gap:8px; min-height:30px; padding:4px 7px; border:0; border-radius:6px; background:transparent; color:inherit; cursor:pointer; font:inherit; text-align:left; }
+      ${b} .wvm-toggle:hover { background:${T6.sunken}; }
+      ${b} .wvm-chev { cursor:pointer; }
+      ${b} .wvm-title { font-weight:650; font-size:12px; color:${T6.ink2}; }
+      ${b} .wvm-count { padding:1px 8px; border-radius:999px; background:${T6.accentSoft}; color:${T6.accentInk}; font-size:11px; font-weight:650; }
+      ${b} .wvm-chev { margin-left:auto; color:${T6.muted}; transition:transform .15s ease-out; }
+      ${b}[data-open="true"] .wvm-chev { transform:rotate(180deg); }
+      ${b} .wvm-body { padding:0 11px 10px; }
+      ${b} .wvm-note { color:${T6.muted}; font-size:12px; padding:2px 0 6px; }
+      ${b} .wvm-note.wvm-warn { color:${T6.badInk}; }
+      ${b} ul { margin:0; padding:0; list-style:none; border-top:1px solid ${T6.line}; max-height:260px; overflow:auto; }
+      ${b} li { display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px solid ${T6.line}; }
+      ${b} li[data-blocked="true"] { opacity:.75; }
+      ${b} li label { display:flex; align-items:flex-start; gap:8px; flex:1; min-width:0; cursor:pointer; }
+      ${b} li[data-blocked="true"] label { cursor:not-allowed; }
+      ${b} input[type="checkbox"] { margin:2px 0 0; accent-color:${T6.accent}; }
+      ${b} .wvm-who { flex:1; min-width:0; }
+      ${b} .wvm-name { font-weight:600; overflow-wrap:anywhere; }
+      ${b} .wvm-meta { color:${T6.ink2}; font-size:12px; }
+      ${b} .wvm-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+      ${b} .wvm-chip { padding:1px 7px; border-radius:999px; background:${T6.sunken}; color:${T6.ink2}; font-size:11px; font-weight:600; white-space:nowrap; }
+      ${b} .wvm-chip.wvm-vta { background:${T6.accentSoft}; color:${T6.accentInk}; }
+      ${b} .wvm-chip.wvm-block { background:${T6.badSoft}; color:${T6.badInk}; }
+      ${b} .wvm-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding-top:8px; }
+      ${b} .wvm-link, ${p} .wvm-link { min-height:0; padding:2px 4px; border:0; background:transparent; color:${T6.accentInk}; cursor:pointer; font:600 12px/1.2 ${FONT10}; }
+      ${b} .wvm-link:hover, ${p} .wvm-link:hover { text-decoration:underline; }
+      ${p} { position:fixed; right:16px; bottom:16px; z-index:2147483000; width:min(420px, calc(100vw - 32px)); max-height:70vh; overflow:auto; box-sizing:border-box; padding:14px 16px; border:1px solid ${T6.line}; border-radius:12px; background:${T6.surface}; color:${T6.ink}; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); font:400 13px/1.45 ${FONT10}; }
+      ${p} .wvm-ptitle { display:flex; align-items:center; gap:8px; font-weight:650; font-size:14px; margin-bottom:6px; }
+      ${p} .wvm-close { margin-left:auto; width:26px; height:26px; padding:0; border:0; border-radius:50%; background:transparent; color:${T6.ink2}; cursor:pointer; font:400 20px/26px ${FONT10}; }
+      ${p} .wvm-close:hover { background:${T6.sunken}; }
+      ${p} ul { margin:0; padding:0; list-style:none; }
+      ${p} li { padding:6px 0; border-top:1px solid ${T6.line}; }
+      ${p} .wvm-state { font-size:12px; font-weight:600; }
+      ${p} [data-state="ok"] .wvm-state { color:${T6.good}; }
+      ${p} [data-state="error"] .wvm-state { color:${T6.badInk}; }
+      ${p} [data-state="busy"] .wvm-state, ${p} [data-state="wait"] .wvm-state { color:${T6.muted}; }
+      ${p} .wvm-sum { margin-top:8px; color:${T6.ink2}; font-size:12px; }
+      ${p} .wvm-sum.wvm-warn { color:${T6.badInk}; }
+      @media (prefers-reduced-motion: reduce) { ${b} .wvm-chev { transition:none; } }
+    `;
+      document.head.appendChild(style);
+    }
+    function el4(tag2, props = {}, children = []) {
+      const element5 = document.createElement(tag2);
+      Object.assign(element5, props);
+      element5.append(...children.filter((child) => child !== null && child !== void 0 && child !== false && child !== ""));
+      return element5;
+    }
+    function linkButton(text, onClick) {
+      return el4("button", {
+        type: "button",
+        className: "wvm-link",
+        textContent: text,
+        onclick: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClick();
+        }
+      });
+    }
+    function selectable(current) {
+      return current.rows.filter((row2) => !row2.blocked);
+    }
+    function renderBox(current) {
+      if (box !== current) return;
+      const { element: element5 } = current;
+      element5.replaceChildren();
+      element5.dataset.open = String(current.open);
+      const count = current.selected.size;
+      const toggle = el4("button", { type: "button", className: "wvm-toggle" }, [
+        el4("span", { className: "wvm-title", textContent: "Auch für weitere Matches dieses Kandidaten anlegen" }),
+        count ? el4("span", { className: "wvm-count", textContent: `${count} gewählt` }) : null
+      ]);
+      toggle.setAttribute("aria-expanded", String(current.open));
+      toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        current.open = !current.open;
+        renderBox(current);
+      });
+      const chev = el4("span", { className: "wvm-chev", textContent: "▾" });
+      chev.setAttribute("aria-hidden", "true");
+      chev.addEventListener("click", () => toggle.click());
+      const head = el4("div", { className: "wvm-head" }, [toggle, helpTip?.(), chev]);
+      element5.append(head);
+      if (!current.open) return;
+      const body = el4("div", { className: "wvm-body" });
+      element5.append(body);
+      if (current.state === "loading") {
+        body.append(el4("div", { className: "wvm-note", textContent: "Lädt die offenen Matches des Kandidaten …" }));
+        return;
+      }
+      if (current.state === "error") {
+        body.append(el4("div", { className: "wvm-note wvm-warn", textContent: current.message }));
+        return;
+      }
+      if (!current.rows.length) {
+        body.append(el4("div", { className: "wvm-note", textContent: "Keine weiteren offenen Matches bei diesem Kandidaten." }));
+        return;
+      }
+      if (current.sperreUnknown) {
+        body.append(el4("div", { className: "wvm-note wvm-warn", textContent: "VTA-Sperrliste nicht erreichbar: Gesperrte Arbeitgeber sind nicht markiert." }));
+      }
+      const list = el4("ul");
+      for (const row2 of current.rows) {
+        const checkbox = el4("input", { type: "checkbox", checked: current.selected.has(row2.id), disabled: row2.blocked });
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) current.selected.add(row2.id);
+          else current.selected.delete(row2.id);
+          renderBox(current);
+        });
+        const chips = el4("div", { className: "wvm-chips" }, [
+          el4("span", { className: "wvm-chip", textContent: `CEM: ${row2.cemStatus}` }),
+          row2.omStatus ? el4("span", { className: "wvm-chip", textContent: `OM: ${row2.omStatus}` }) : null,
+          row2.reverse ? el4("span", { className: "wvm-chip", textContent: "Reverse Match" }) : null,
+          row2.vtaText ? el4("span", { className: "wvm-chip wvm-vta", textContent: row2.vtaText }) : null,
+          row2.blocked ? el4("span", { className: "wvm-chip wvm-block", textContent: "Keine CEM-VTA (Sperrliste)", title: row2.blockEntry?.grund ? `Grund: ${row2.blockEntry.grund}` : "" }) : null
+        ]);
+        const li = el4("li", {}, [
+          el4("label", {}, [checkbox, el4("div", { className: "wvm-who" }, [
+            el4("div", { className: "wvm-name", textContent: row2.employer }),
+            row2.position ? el4("div", { className: "wvm-meta", textContent: row2.position }) : null,
+            chips
+          ])])
+        ]);
+        li.dataset.blocked = String(row2.blocked);
+        list.append(li);
+      }
+      body.append(list);
+      const free = selectable(current);
+      const allSelected = free.length > 0 && free.every((row2) => current.selected.has(row2.id));
+      body.append(el4("div", { className: "wvm-actions" }, [
+        free.length ? linkButton(allSelected ? "Keins wählen" : "Alle wählbaren wählen", () => {
+          if (allSelected) current.selected.clear();
+          else free.forEach((row2) => current.selected.add(row2.id));
+          renderBox(current);
+        }) : null,
+        el4("span", {
+          className: "wvm-note",
+          textContent: count ? `Nach dem Speichern legt die Toolbox denselben Vorschlag für ${count} ${count === 1 ? "weiteres Match" : "weitere Matches"} an. Die VTA-Notiz wird je Arbeitgeber getauscht.` : "Nichts gewählt: Der Vorschlag gilt nur für dieses Match."
+        })
+      ]));
+    }
+    async function startBox(current) {
+      try {
+        const data = await loadTargets(current.sourceMatchId);
+        if (box !== current) return;
+        Object.assign(current, data, { state: "ready" });
+      } catch (error) {
+        if (box !== current) return;
+        current.state = "error";
+        current.message = `Weitere Matches nicht geladen: ${error?.message || error}`;
+      }
+      renderBox(current);
+    }
+    function place(current) {
+      const content = current.dialog.querySelector(".MuiDialogContent-root") || current.dialog;
+      if (current.element.parentElement !== content || content.lastElementChild !== current.element) content.append(current.element);
+    }
+    function teardownBox() {
+      if (!box) return;
+      box.element.remove();
+      if (box.dialog.dataset[OWNER_KEY5] === SOURCE_PATH5) delete box.dialog.dataset[OWNER_KEY5];
+      box = null;
+    }
+    function currentSourceMatchId() {
+      if (clicked.at && now() - clicked.at < CLICK_MAX_AGE_MS4 && clicked.matchId) return clicked.matchId;
+      return matchIdFromHash2(location.hash || "");
+    }
+    function sync() {
+      const dialog = findAppointmentDialog(document);
+      if (!dialog) {
+        if (box) {
+          teardownBox();
+          clicked = { matchId: "", at: 0 };
+          if (pending && now() - pending.at < PENDING_MAX_AGE_MS) {
+            const job = pending;
+            pending = null;
+            runCopy(job);
+          }
+          pending = null;
+        }
+        return;
+      }
+      if (box && box.dialog !== dialog) teardownBox();
+      if (box) {
+        place(box);
+        return;
+      }
+      const claimedBy = dialog.dataset[OWNER_KEY5];
+      if (claimedBy && claimedBy !== SOURCE_PATH5) return;
+      if (isExistingAppointment(dialog)) return;
+      const sourceMatchId = currentSourceMatchId();
+      if (!sourceMatchId) return;
+      ensureStyle5();
+      dialog.dataset[OWNER_KEY5] = SOURCE_PATH5;
+      const element5 = el4("div", { className: BOX_CLASS4 });
+      element5.dataset[OWNER_KEY5] = SOURCE_PATH5;
+      element5.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") event.stopPropagation();
+      });
+      box = {
+        dialog,
+        element: element5,
+        sourceMatchId,
+        state: "loading",
+        rows: [],
+        selected: /* @__PURE__ */ new Set(),
+        knownIds: [],
+        sourceEmployerId: "",
+        sperreUnknown: false,
+        message: "",
+        open: false
+      };
+      place(box);
+      renderBox(box);
+      startBox(box);
+    }
+    function closePanel() {
+      document.getElementById(PANEL_ID2)?.remove();
+    }
+    function renderPanel(job) {
+      ensureStyle5();
+      let panel = document.getElementById(PANEL_ID2);
+      if (!panel) {
+        panel = el4("div", { id: PANEL_ID2, role: "status" });
+        panel.setAttribute("aria-live", "polite");
+        document.body.appendChild(panel);
+      }
+      panel.replaceChildren();
+      const close = el4("button", { type: "button", className: "wvm-close", textContent: "×", title: "Schließen", onclick: closePanel });
+      close.setAttribute("aria-label", "Schließen");
+      panel.append(el4("div", { className: "wvm-ptitle" }, [
+        document.createTextNode("Terminvorschlag für weitere Matches"),
+        helpTip?.(),
+        close
+      ]));
+      if (job.problem) {
+        panel.append(el4("div", { className: "wvm-sum wvm-warn", textContent: job.problem }));
+        return;
+      }
+      if (!job.results) {
+        panel.append(el4("div", { className: "wvm-sum", textContent: "Sucht den eben angelegten Vorschlag …" }));
+        return;
+      }
+      const list = el4("ul");
+      for (const result of job.results) {
+        const stateText = {
+          wait: "wartet",
+          busy: "legt an …",
+          ok: "angelegt",
+          error: result.error || "Fehler"
+        }[result.state];
+        const li = el4("li", {}, [
+          el4("div", { className: "wvm-name", textContent: rowLabel(result.target) }),
+          el4("div", { className: "wvm-state", textContent: stateText }),
+          result.state === "error" && result.overlap ? linkButton("Trotz Überschneidung anlegen", () => createOne(job, result, true)) : null
+        ]);
+        li.dataset.state = result.state;
+        list.append(li);
+      }
+      panel.append(list);
+      const done = job.results.every((r) => r.state === "ok" || r.state === "error");
+      if (done) {
+        const failed = job.results.some((r) => r.state === "error");
+        const sum = el4("div", { className: `wvm-sum${failed ? " wvm-warn" : ""}`, textContent: summaryText2(job.results) });
+        panel.append(sum);
+        if (job.notizWarnung) panel.append(el4("div", { className: "wvm-sum wvm-warn", textContent: job.notizWarnung }));
+      }
+    }
+    async function createOne(job, result, ignoreValidation = false) {
+      result.state = "busy";
+      result.error = "";
+      result.overlap = false;
+      renderPanel(job);
+      try {
+        const variables = createVariables({
+          interview: job.interview,
+          target: result.target,
+          sourceEmployerId: job.sourceEmployerId,
+          notiz: (employerId) => job.notizLookup?.(employerId)?.notiz || "",
+          kamTagged: job.kamTagged,
+          ignoreValidation,
+          now: now()
+        });
+        if (!variables.dates.length) throw new Error("Keine kommenden Termine mehr.");
+        await gql(CREATE_INTERVIEW_MUTATION, variables);
+        result.state = "ok";
+      } catch (error) {
+        const text = String(error?.message || error);
+        result.state = "error";
+        result.overlap = isOverlapError(text);
+        result.error = result.overlap ? overlapText(text) : text;
+      }
+      renderPanel(job);
+    }
+    async function findCreated(job) {
+      for (const delay of POLL_DELAYS_MS) {
+        await new Promise((resolve) => runtime.setTimeout(resolve, delay));
+        const data = await gql(INTERVIEWS_QUERY, { matchId: job.sourceMatchId });
+        const found = findNewInterview(data?.items || [], job.knownIds);
+        if (found) return found;
+      }
+      return null;
+    }
+    async function runCopy(job) {
+      renderPanel(job);
+      try {
+        const [interview, meData, notizLookup] = await Promise.all([findCreated(job), loadMe2(), loadNotizen()]);
+        job.interview = interview;
+        job.kamTagged = kamTaggedFor(meData);
+        job.notizLookup = notizLookup;
+        job.problem = copyProblem(interview, now());
+        if (job.problem) {
+          renderPanel(job);
+          return;
+        }
+        if (!notizLookup && job.targets.some((t) => t.employerId !== job.sourceEmployerId)) {
+          job.notizWarnung = "VTA-Notizen nicht geladen: Das Notizfeld wurde unverändert übernommen. Bitte Buchungslinks anderer Arbeitgeber prüfen.";
+        }
+        job.results = job.targets.map((target) => ({ target, state: "wait", error: "", overlap: false }));
+        renderPanel(job);
+        for (const result of job.results) await createOne(job, result);
+      } catch (error) {
+        job.problem = `Nichts übernommen: ${error?.message || error}`;
+        renderPanel(job);
+      }
+    }
+    function notePending() {
+      const targets = box.rows.filter((row2) => box.selected.has(row2.id) && !row2.blocked);
+      pending = targets.length && box.state === "ready" ? { sourceMatchId: box.sourceMatchId, sourceEmployerId: box.sourceEmployerId, knownIds: box.knownIds, targets, at: now() } : null;
+    }
+    runtime.addDocumentListener("click", (event) => {
+      const buttonEl = event.target?.closest?.("button");
+      if (buttonEl && box?.dialog.contains(buttonEl) && !box.element.contains(buttonEl)) {
+        if (isSaveButton(buttonEl)) {
+          notePending();
+        } else if (/^abbrechen$/i.test((buttonEl.textContent || "").trim())) {
+          pending = null;
+        }
+        return;
+      }
+      const row2 = event.target?.closest?.(ROW_SELECTOR10);
+      if (!row2 || row2.closest('.MuiDialog-paper, [role="dialog"]')) return;
+      const { matchId } = targetFromRow(row2);
+      if (matchId) clicked = { matchId, at: now() };
+    }, true);
+    runtime.addDocumentListener("submit", (event) => {
+      if (box?.dialog.contains(event.target)) notePending();
+    }, true);
+    runtime.addWindowListener("keydown", (event) => {
+      if (event.key === "Escape" && box) pending = null;
+    }, true);
+    let scheduled = false;
+    function schedule2() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        sync();
+      }, 150);
+    }
+    runtime.createMutationObserver(schedule2).observe(document.documentElement, { childList: true, subtree: true });
+    runtime.addWindowListener("hashchange", schedule2);
+    runtime.addCleanup?.(() => {
+      teardownBox();
+      closePanel();
+    });
+    schedule2();
+  }
+
+  // src/features/vtv-hot-warnung.js
+  function executeVtvHotWarnung2(runtime) {
+    executeVtvHotWarnung(runtime, {
+      getGraphqlAdapter: getCemGraphqlAdapter,
+      sourcePath: "cem/toolbox/src/features/vtv-hot-warnung.js"
     });
   }
 
@@ -16749,19 +19021,32 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     { id: "te", scope: "match", label: "VT Erinnerung", needs: ["mode", "contact"], interview: "confirmed" },
     { id: "fbvt", scope: "match", label: "VT Feedback", needs: [], interview: "confirmed" },
     { id: "kdap", scope: "match", label: "KD AP an Bew", needs: ["contact"] },
+    { id: "apnicht", scope: "match", label: "Bew erreicht AP nicht", needs: ["contact"] },
     { id: "mailvt1", scope: "match", label: "Emailvorlage 1. VT Bew x AP", needs: ["contact"] },
     { id: "mailvt2", scope: "match", label: "Emailvorlage 2. VT Bew x AP", needs: ["contact"] },
     { id: "ul", scope: "candidate", label: "1. WA Unterlagen (UL)", needs: [] },
+    { id: "kd", scope: "candidate", label: "1. WA erreicht + KD", needs: [] },
+    { id: "onhold", scope: "candidate", label: "On Hold - hab dich nicht vergessen", needs: [] },
     { id: "krm", scope: "candidate", label: "OUT - krm Bew", needs: [] },
     { id: "out", scope: "candidate", label: "Hat selbst neue Stelle", needs: [] },
+    // Einstellungsbestaetigung (EB): Arbeitgeber und Ansprechpartner kommen aus
+    // dem Match, wenn die Vorlage an einer Matchzeile geoeffnet wird; am
+    // Kandidaten allein bleiben sie Luecken.
+    { id: "eb", scope: "candidate", label: "EB an Bew", needs: [] },
+    { id: "ebanfragen", scope: "candidate", label: "Bew soll EB anfragen", needs: ["contact"] },
+    { id: "maileb", scope: "candidate", label: "Email-Vorlage EB für Bew", needs: ["contact"] },
     { id: "google", scope: "candidate", label: "Google-Bewertung", needs: [] }
   ];
   var GOOGLE_REVIEW_LINK = "https://maps.app.goo.gl/LxBtymnTfbt6BP3F7?g_st=iw";
-  function introLines(ctx, slot) {
+  function cemForms(ctx, slot) {
     const cemGender = genderOf(ctx.cem);
-    const obcGender = genderOf(ctx.obc);
     const emoji = cemGender === "f" ? "👩🏼‍🔧" : cemGender === "m" ? "👨🏼‍🔧" : "🧑🏼‍🔧";
     const partner = cemGender === "f" ? "Deine persönliche Ansprechpartnerin" : cemGender === "m" ? "Dein persönlicher Ansprechpartner" : slot("Deine persönliche Ansprechpartnerin/Dein persönlicher Ansprechpartner", "");
+    return { emoji, partner };
+  }
+  function introLines(ctx, slot) {
+    const obcGender = genderOf(ctx.obc);
+    const { emoji, partner } = cemForms(ctx, slot);
     const colleague = obcGender === "f" ? "meiner Kollegin" : obcGender === "m" ? "meinem Kollegen" : slot("meinem Kollegen/meiner Kollegin", "");
     return [
       `Hallo ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
@@ -16784,13 +19069,111 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
   }
   var MAIL_DATE_LINES = ["[Datum] um [Uhrzeit]", "[Datum] um [Uhrzeit]", "[Datum] um [Uhrzeit]"];
   function candidateSignature(ctx, slot) {
-    const name = [ctx.candidateFirstName, ctx.candidateLastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
     return [
-      slot("Vorname Nachname Kandidat", ctx.candidateLastName ? name : ""),
+      slot("Vorname Nachname Kandidat", candidateFullName(ctx)),
       slot("Telefon Kandidat", ctx.candidatePhone)
     ];
   }
+  function candidateFullName(ctx) {
+    return ctx.candidateLastName ? [ctx.candidateFirstName, ctx.candidateLastName].map((part) => String(part || "").trim()).filter(Boolean).join(" ") : "";
+  }
+  function ebIntro(ctx, slot) {
+    return [
+      `Hey ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
+      "",
+      `es freut mich, dass Du Dich mit Fa. ${slot("Arbeitgeber", ctx.employerName)} einigen konntest. 🥳`,
+      "",
+      "Die Vertragserstellung wurde in die Wege geleitet, kann unter Umständen aber eine Weile dauern."
+    ];
+  }
   var BUILDERS = {
+    // Texte von CEM: kd 2026-10-30, apnicht 2026-11-02, onhold/eb/ebanfragen/
+    // maileb 2026-11-13 (Slack #interface-cem).
+    kd: (ctx, slot) => {
+      const { emoji, partner } = cemForms(ctx, slot);
+      return [
+        `Hallo ${slot("Vorname Kandidat", ctx.candidateFirstName)},`,
+        "",
+        `ich bin ${slot("Vorname CEM", ctx.cem?.firstName)} von werkia.de ${emoji} wir haben eben telefoniert.`,
+        "",
+        `Ab heute bin ich ${partner} für die Jobsuche und versorge Dich mit neuen Stellen und Terminvorschlägen. 😊`,
+        "",
+        "Ich melde mich zeitnah mit Stellenangeboten und Terminanfragen bei Dir.",
+        "",
+        "Beste Grüße",
+        slot("Vorname CEM", ctx.cem?.firstName)
+      ];
+    },
+    onhold: (ctx, slot) => [
+      `Hey ${slot("Vorname Kandidat", ctx.candidateFirstName)} 😊`,
+      "",
+      "ich wollte Dir nur kurz ein Update geben, dass ich Dich natürlich nicht vergessen habe und weiterhin nach passenden Jobs für Dich suche!",
+      "",
+      "Aktuell bin ich dabei, Terminvorschläge bei interessanten Unternehmen anzufragen und melde mich bei Dir, sobald ich da eine Rückmeldung habe. 👍🏻",
+      "",
+      "Parallel dazu halte ich natürlich weiterhin die Augen nach neuen Stellen offen, die zu Deinen Vorstellungen und Deinem Profil passen.",
+      "",
+      "Liebe Grüße",
+      `${slot("Vorname CEM", ctx.cem?.firstName)} von Werkia`
+    ],
+    eb: (ctx, slot) => [
+      ...ebIntro(ctx, slot),
+      "",
+      "In der Zwischenzeit habe ich deswegen bereits eine Einstellungsbestätigung des Betriebs für Dich erhalten.",
+      "Diese dient als offizieller Nachweis und als Sicherheit für Dich, damit Du andere Bewerbungsprozesse beenden oder bei Deiner aktuellen Stelle fristgerecht kündigen kannst.",
+      "",
+      "Schau Dir das Dokument gerne an und melde Dich bei mir, falls Du Fragen hast. 🙂",
+      "",
+      `LG ${slot("Vorname CEM", ctx.cem?.firstName)}`
+    ],
+    ebanfragen: (ctx, slot) => {
+      const pronoun = { female: "sie", male: "ihn" }[ctx.contact?.gender];
+      return [
+        ...ebIntro(ctx, slot),
+        "",
+        `Ich würde Dir empfehlen, dass Du Dich nochmal bei ${slot("Ansprechpartner", formalName(ctx.contact))} meldest und ${slot("sie/ihn", pronoun)} um eine Einstellungsbestätigung bittest.`,
+        "",
+        "Diese Bestätigung dient als offizieller Nachweis und als Sicherheit für Dich, damit Du andere Bewerbungsprozesse beenden oder bei Deiner aktuellen Stelle fristgerecht kündigen kannst.",
+        "",
+        "Gerne übersende ich Dir hier im Anschluss auch nochmal eine Email/WhatsApp Vorlage, die Du an Deinen Ansprechpartner weiterleiten kannst. 🙂",
+        "",
+        "Meld Dich gern, falls Du noch Fragen hast.",
+        "",
+        `LG ${slot("Vorname CEM", ctx.cem?.firstName)}`
+      ];
+    },
+    maileb: (ctx, slot) => [
+      `Guten Tag ${slot("Herr/Frau Ansprechpartner", addressName(ctx.contact))},`,
+      "",
+      "vielen Dank nochmals für den angenehmen Bewerbungsprozess und die mündliche Einigung bezüglich meiner Einstellung.",
+      "",
+      "Ich wollte freundlich nachfragen, ob Sie mir die Einstellungsbestätigung bzw. eine kurze schriftliche Bestätigung unserer Vereinbarung zukommen lassen könnten.",
+      "",
+      "Vielen Dank im Voraus!",
+      "",
+      "Ich freue mich auf die Zusammenarbeit.",
+      "",
+      "Mit freundlichen Grüßen",
+      slot("Vorname Nachname Kandidat", candidateFullName(ctx))
+    ],
+    // Schickt der Bewerber selbst an den AP; die Termine traegt er ein
+    // (wie MAIL_DATE_LINES, keine Luecke).
+    apnicht: (ctx, slot) => [
+      `Hallo ${slot("Herr/Frau Ansprechpartner", addressName(ctx.contact))},`,
+      "",
+      `ich bin über werkia.de auf Ihre Stellenanzeige für die Position als ${slot("Jobtitel", ctx.jobTitle)} aufmerksam geworden und habe Interesse an der Stelle.`,
+      "Bisher habe ich Sie leider telefonisch nicht erreichen können.",
+      "",
+      "Gerne würde ich Sie in einem kurzen Gespräch kennenlernen. Dafür würden mir folgende Termine passen:",
+      "",
+      ...MAIL_DATE_LINES.map((line) => `• ${line}`),
+      "Das Gespräch kann gerne persönlich oder telefonisch stattfinden.",
+      "",
+      "Ich freue mich auf Ihre Rückmeldung!",
+      "",
+      "Viele Grüße",
+      slot("Vorname Nachname Kandidat", candidateFullName(ctx))
+    ],
     ul: (ctx, slot) => [
       ...introLines(ctx, slot),
       "",
@@ -17233,12 +19616,12 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     return { version: STORE_VERSION3, templates: list.map(normalize6).filter(Boolean) };
   }
   function upsertTemplate(store, template) {
-    const clean4 = normalize6(template);
-    if (!clean4) throw new Error("Name und Text dürfen nicht leer sein.");
+    const clean6 = normalize6(template);
+    if (!clean6) throw new Error("Name und Text dürfen nicht leer sein.");
     const templates = [...store?.templates || []];
-    const index = templates.findIndex((entry) => entry.id === clean4.id);
-    if (index >= 0) templates[index] = clean4;
-    else templates.push(clean4);
+    const index = templates.findIndex((entry) => entry.id === clean6.id);
+    if (index >= 0) templates[index] = clean6;
+    else templates.push(clean6);
     return { version: STORE_VERSION3, templates };
   }
   function moveTemplate(store, id, delta) {
@@ -17282,9 +19665,9 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
   }
 
   // src/features/wa-templates/index.js
-  var SOURCE_PATH3 = "cem/toolbox/src/features/wa-templates/index.js";
+  var SOURCE_PATH6 = "cem/toolbox/src/features/wa-templates/index.js";
   var ROUTE_RE2 = /#\/CEM\/(?:My(?:Cem)?Matches|MyCandidates)(?:[/?]|$)/i;
-  var ROW_SELECTOR8 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
   var MATCH_ID_RE = /#\/Match\/([0-9a-f-]{36})/i;
   var CANDIDATE_ID_RE = /#\/Candidate\/([0-9a-f-]{36})/i;
   var BUTTON_CLASS = "werkia-wa-button";
@@ -17363,7 +19746,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
   #${IDS8.toast} .wa-preview { margin-top:4px; color:#cfcad9; font-size:12px; white-space:pre-line; }
 `;
   function executeWaTemplates(runtime) {
-    runtime.registerSource(SOURCE_PATH3);
+    runtime.registerSource(SOURCE_PATH6);
     const cache = /* @__PURE__ */ new Map();
     let syncTimer = null;
     let toastTimer = null;
@@ -17468,7 +19851,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         return;
       }
       ensureStyle5();
-      document.querySelectorAll(ROW_SELECTOR8).forEach(addButton);
+      document.querySelectorAll(ROW_SELECTOR11).forEach(addButton);
       widenExpandedPanels();
     }
     function scheduleSync() {
@@ -17700,7 +20083,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         controls.append(element5("label", { textContent: "Gesprächsart" }, [modeSelect]));
       }
       let contactSelect = null;
-      if (template.needs.includes("contact")) {
+      if (template.needs.includes("contact") && context.contacts) {
         contactSelect = element5("select");
         contactSelect.append(element5("option", { value: "", textContent: context.contacts.length ? "– wählen –" : "kein Ansprechpartner im AP" }));
         context.contacts.forEach((contact) => contactSelect.append(element5("option", {
@@ -18134,11 +20517,11 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/cem-todo/index.js
-  var STYLE_ID14 = "werkia-cem-todo-style";
+  var STYLE_ID17 = "werkia-cem-todo-style";
   var BADGE_CLASS = "werkia-cem-todo-badge";
-  var BAR_CLASS3 = "werkia-cem-todo-bar";
+  var BAR_CLASS4 = "werkia-cem-todo-bar";
   var MARK_ATTRIBUTE = "data-werkia-cem-todo";
-  var ROW_SELECTOR9 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR12 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR8 = 'a[href*="#/Match/"]';
   var COMMENTS_BUTTON_SELECTOR4 = 'button[data-testid="match-comments-button"], button[aria-label="Matchkommentare"]';
   var EDITOR_SELECTOR5 = '.ProseMirror[contenteditable="true"]';
@@ -18156,7 +20539,7 @@ Trotzdem speichern?`)) return void 0;
     { kind: RESPONSES.angefragt, tone: "plain" },
     { kind: RESPONSES.erledigt, tone: "link", label: "Abhaken" }
   ];
-  function matchIdFromHref6(href) {
+  function matchIdFromHref7(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function executeCemTodo(runtime) {
@@ -18169,24 +20552,24 @@ Trotzdem speichern?`)) return void 0;
     let dialogSeen = false;
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash) || ROUTES.cemMyCandidates.test(location.hash);
     function ensureStyle5() {
-      if (document.getElementById(STYLE_ID14)) return;
+      if (document.getElementById(STYLE_ID17)) return;
       const style = document.createElement("style");
-      style.id = STYLE_ID14;
+      style.id = STYLE_ID17;
       style.textContent = `
       .${BADGE_CLASS} { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:9px; background:#d32f2f; color:#fff; font:700 11px/1.2 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
       [${MARK_ATTRIBUTE}] { outline:2px solid #d32f2f !important; outline-offset:2px; border-radius:6px; background:#fff1f0 !important; }
-      .${BAR_CLASS3} { display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:8px 10px; border:2px solid #d32f2f; border-radius:8px; background:#fff1f0; font:400 12px/1.35 Arial,sans-serif; color:#1f2933; }
-      .${BAR_CLASS3}-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#b71c1c; }
-      .${BAR_CLASS3}-todo { color:#374151; white-space:pre-wrap; }
-      .${BAR_CLASS3}-buttons { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-      .${BAR_CLASS3} button { min-height:24px; padding:3px 10px; border:1px solid #c8ccdd; border-radius:12px; background:#fff; color:#1f2933; cursor:pointer; font:600 12px/1.2 Arial,sans-serif; }
-      .${BAR_CLASS3} button:hover { border-color:#4956df; }
-      .${BAR_CLASS3} button[data-tone="primary"] { border-color:#2e7d32; background:#2e7d32; color:#fff; }
-      .${BAR_CLASS3} button[data-tone="link"] { border:0; background:transparent; color:#3643c7; text-decoration:underline; font-weight:400; }
+      .${BAR_CLASS4} { display:flex; flex-direction:column; gap:6px; margin:6px 0; padding:8px 10px; border:2px solid #d32f2f; border-radius:8px; background:#fff1f0; font:400 12px/1.35 Arial,sans-serif; color:#1f2933; }
+      .${BAR_CLASS4}-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#b71c1c; }
+      .${BAR_CLASS4}-todo { color:#374151; white-space:pre-wrap; }
+      .${BAR_CLASS4}-buttons { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+      .${BAR_CLASS4} button { min-height:24px; padding:3px 10px; border:1px solid #c8ccdd; border-radius:12px; background:#fff; color:#1f2933; cursor:pointer; font:600 12px/1.2 Arial,sans-serif; }
+      .${BAR_CLASS4} button:hover { border-color:#4956df; }
+      .${BAR_CLASS4} button[data-tone="primary"] { border-color:#2e7d32; background:#2e7d32; color:#fff; }
+      .${BAR_CLASS4} button[data-tone="link"] { border:0; background:transparent; color:#3643c7; text-decoration:underline; font-weight:400; }
     `;
       document.head.appendChild(style);
     }
-    const rowMatchId = (row2) => matchIdFromHref6(row2.querySelector(MATCH_LINK_SELECTOR8)?.getAttribute("href"));
+    const rowMatchId2 = (row2) => matchIdFromHref7(row2.querySelector(MATCH_LINK_SELECTOR8)?.getAttribute("href"));
     function commentsButtonCount(button2) {
       const text = button2?.querySelector('.MuiBadge-badge, [class*="MuiBadge-badge"]')?.textContent || "";
       return text.replace(/\D/g, "");
@@ -18226,7 +20609,7 @@ Trotzdem speichern?`)) return void 0;
     }
     const openTodosFor = (matchId) => openCemTodos(cache.get(matchId)?.comments || []);
     function syncRow(row2, wanted) {
-      const matchId = rowMatchId(row2);
+      const matchId = rowMatchId2(row2);
       const button2 = row2.querySelector(COMMENTS_BUTTON_SELECTOR4);
       if (!matchId || !button2) return;
       const count = commentsButtonCount(button2);
@@ -18266,7 +20649,7 @@ Trotzdem speichern?`)) return void 0;
       const keys = [...new Set(comments.map((comment) => normalizeDomText(commentKey2(comment.text))).filter((key) => key.length >= 3))];
       const hits = [];
       for (const element5 of dialog.querySelectorAll("p, span, div, li")) {
-        if (editorBox.contains(element5) || element5.closest(`.${BAR_CLASS3}`)) continue;
+        if (editorBox.contains(element5) || element5.closest(`.${BAR_CLASS4}`)) continue;
         const text = normalizeDomText(element5.textContent);
         const key = keys.find((candidate) => text.includes(candidate));
         if (!key) continue;
@@ -18328,15 +20711,15 @@ Trotzdem speichern?`)) return void 0;
     }
     function buildBar() {
       const bar = document.createElement("div");
-      bar.className = BAR_CLASS3;
+      bar.className = BAR_CLASS4;
       const head = document.createElement("div");
-      head.className = `${BAR_CLASS3}-head`;
+      head.className = `${BAR_CLASS4}-head`;
       const title = document.createElement("span");
       head.append(...[title, cemHelp.tip("cem-todo")].filter(Boolean));
       const todo = document.createElement("div");
-      todo.className = `${BAR_CLASS3}-todo`;
+      todo.className = `${BAR_CLASS4}-todo`;
       const buttons = document.createElement("div");
-      buttons.className = `${BAR_CLASS3}-buttons`;
+      buttons.className = `${BAR_CLASS4}-buttons`;
       for (const { kind, tone } of BUTTONS) {
         const button2 = document.createElement("button");
         button2.type = "button";
@@ -18372,7 +20755,7 @@ Trotzdem speichern?`)) return void 0;
       const comments = cache.get(dialogMatchId)?.comments || [];
       const open = openTodosFor(dialogMatchId);
       markTodos(dialog, editorBox, comments, open);
-      let bar = dialog.querySelector(`.${BAR_CLASS3}`);
+      let bar = dialog.querySelector(`.${BAR_CLASS4}`);
       if (!open.length) {
         bar?.remove();
         return fresh(dialogMatchId) || failed.has(dialogMatchId) ? [] : [dialogMatchId];
@@ -18381,13 +20764,13 @@ Trotzdem speichern?`)) return void 0;
       if (bar.nextElementSibling !== editorBox) editorBox.parentElement?.insertBefore(bar, editorBox);
       const codes = todoCodes(open);
       const title = open.length > 1 ? `${open.length} offene CEM To Dos` : "Offenes CEM To Do";
-      const titleElement = bar.querySelector(`.${BAR_CLASS3}-head span`);
+      const titleElement = bar.querySelector(`.${BAR_CLASS4}-head span`);
       if (titleElement.textContent !== title) titleElement.textContent = title;
       const todoText = open.map((todo) => {
         const who = [todo.employee?.firstName, todo.employee?.lastName].filter(Boolean).join(" ");
         return `${who ? `${who}: ` : ""}${commentPlainText(todo.text)}`;
       }).join("\n");
-      const todoElement = bar.querySelector(`.${BAR_CLASS3}-todo`);
+      const todoElement = bar.querySelector(`.${BAR_CLASS4}-todo`);
       if (todoElement.textContent !== todoText) todoElement.textContent = todoText;
       bar.querySelectorAll("button[data-kind]").forEach((button2) => {
         const entry = BUTTONS.find((item) => item.kind === button2.dataset.kind);
@@ -18400,7 +20783,7 @@ Trotzdem speichern?`)) return void 0;
       if (!isTargetPage3()) return;
       ensureStyle5();
       const wanted = [];
-      document.querySelectorAll(ROW_SELECTOR9).forEach((row2) => syncRow(row2, wanted));
+      document.querySelectorAll(ROW_SELECTOR12).forEach((row2) => syncRow(row2, wanted));
       wanted.push(...syncDialog());
       if (wanted.length && !loading) load2(wanted);
     }
@@ -18415,8 +20798,8 @@ Trotzdem speichern?`)) return void 0;
     };
     runtime.addDocumentListener("click", (event) => {
       const button2 = event.target?.closest?.(COMMENTS_BUTTON_SELECTOR4);
-      const row2 = button2?.closest(ROW_SELECTOR9);
-      const matchId = row2 ? rowMatchId(row2) : "";
+      const row2 = button2?.closest(ROW_SELECTOR12);
+      const matchId = row2 ? rowMatchId2(row2) : "";
       if (!matchId) return;
       dialogMatchId = matchId;
       dialogSeen = false;
@@ -18454,10 +20837,10 @@ Trotzdem speichern?`)) return void 0;
     if (!slackId) return false;
     return (senders[direction] || []).some((entry) => entry.slackId === slackId);
   }
-  var UUID_RE6 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  function matchIdFromHref7(href) {
+  var UUID_RE7 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function matchIdFromHref8(href) {
     const id = String(href || "").match(/#\/Match\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1] || "";
-    return UUID_RE6.test(id) ? id : "";
+    return UUID_RE7.test(id) ? id : "";
   }
   function buildPayload({ action, direction, matchId, comment = "", auth, team = "", testChannel = "" }) {
     if (!DIRECTIONS[direction]) throw new Error(`Unbekannte Richtung: ${direction}`);
@@ -18537,21 +20920,21 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // ../../shared/js/slack-dm/index.js
-  var ROW_SELECTOR10 = "tbody tr.RaDataTable-row";
+  var ROW_SELECTOR13 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR9 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS2 = "werkia-slack-dm-button";
   var IDS9 = { style: "werkia-slack-dm-style", dialog: "werkia-slack-dm-dialog" };
   var CLOSE_AFTER_SENT_MS = 1600;
-  var FONT8 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT11 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var CSS2 = `
-  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT8}; white-space:nowrap; vertical-align:middle; }
+  .${BUTTON_CLASS2} { display:inline-flex; align-items:center; margin:4px 0 0 6px; height:26px; padding:0 10px; border:1px solid #d4d4d8; border-radius:6px; background:#fff; color:#09090b; cursor:pointer; font:550 12px/1 ${FONT11}; white-space:nowrap; vertical-align:middle; }
   .${BUTTON_CLASS2}:hover { border-color:#ef6c00; color:#b85400; background:#fff3e8; }
   .${BUTTON_CLASS2}:focus-visible { outline:2px solid #ef6c00; outline-offset:2px; }
-  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT8}; color:#09090b; -webkit-font-smoothing:antialiased; }
+  #${IDS9.dialog} { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(9,9,11,.45); font:400 13px/1.5 ${FONT11}; color:#09090b; -webkit-font-smoothing:antialiased; }
   #${IDS9.dialog} .sd-card { position:relative; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:18px 20px 16px; border:1px solid #e4e4e7; border-radius:14px; background:#fff; box-shadow:0 16px 48px -16px rgba(9,9,11,.28); }
   #${IDS9.dialog} .sd-head { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding-right:32px; }
   #${IDS9.dialog} h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-  #${IDS9.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT8}; }
+  #${IDS9.dialog} .sd-close { position:absolute; top:12px; right:12px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT11}; }
   #${IDS9.dialog} .sd-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS9.dialog} dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 14px; }
   #${IDS9.dialog} dt { color:#8b8b94; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:20px; }
@@ -18561,14 +20944,14 @@ Trotzdem speichern?`)) return void 0;
   #${IDS9.dialog} .sd-muted { color:#8b8b94; }
   #${IDS9.dialog} .sd-warn { color:#8a6700; }
   #${IDS9.dialog} label { display:block; margin:0 0 6px; color:#52525b; font-size:12px; font-weight:550; }
-  #${IDS9.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT8}; resize:vertical; }
+  #${IDS9.dialog} textarea { display:block; width:100%; min-height:96px; box-sizing:border-box; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; color:#09090b; font:400 13px/1.5 ${FONT11}; resize:vertical; }
   #${IDS9.dialog} textarea:focus { outline:2px solid #ef6c00; outline-offset:0; border-color:transparent; }
   #${IDS9.dialog} .sd-count { margin-top:4px; color:#8b8b94; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
   #${IDS9.dialog} .sd-status { min-height:20px; margin:10px 0 0; font-size:12px; color:#52525b; }
   #${IDS9.dialog} .sd-status.sd-error { color:#b52f2f; }
   #${IDS9.dialog} .sd-status.sd-ok { color:#0a7c0a; }
   #${IDS9.dialog} .sd-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
-  #${IDS9.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT8}; }
+  #${IDS9.dialog} .sd-foot button { height:32px; padding:0 14px; border-radius:8px; cursor:pointer; font:550 13px/1 ${FONT11}; }
   #${IDS9.dialog} .sd-secondary { border:1px solid #d4d4d8; background:#fff; color:#09090b; }
   #${IDS9.dialog} .sd-secondary:hover { background:#f4f4f5; }
   #${IDS9.dialog} .sd-primary { border:1px solid #ef6c00; background:#ef6c00; color:#fff; }
@@ -18622,7 +21005,7 @@ Trotzdem speichern?`)) return void 0;
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
       const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR9)).find(Boolean);
-      const matchId = matchIdFromHref7(link?.getAttribute("href"));
+      const matchId = matchIdFromHref8(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function addButtons(row2) {
@@ -18751,7 +21134,7 @@ Trotzdem speichern?`)) return void 0;
         return;
       }
       ensureStyle5();
-      document.querySelectorAll(ROW_SELECTOR10).forEach(addButtons);
+      document.querySelectorAll(ROW_SELECTOR13).forEach(addButtons);
     }
     async function unlockOwnTeam() {
       if (!ownTeamDirection || !graphqlRequest) return;
@@ -18804,8 +21187,8 @@ Trotzdem speichern?`)) return void 0;
   }
 
   // src/features/match-commute.js
-  var SOURCE_PATH4 = "cem/toolbox/src/features/match-commute.js";
-  var ROW_SELECTOR11 = "tbody tr.RaDataTable-row";
+  var SOURCE_PATH7 = "cem/toolbox/src/features/match-commute.js";
+  var ROW_SELECTOR14 = "tbody tr.RaDataTable-row";
   var MATCH_LINK_SELECTOR10 = 'a[href*="#/Match/"]';
   var BUTTON_CLASS3 = "werkia-cem-match-commute-button";
   var IDS10 = { style: "werkia-cem-match-commute-style", popover: "werkia-cem-match-commute-popover" };
@@ -18818,11 +21201,11 @@ Trotzdem speichern?`)) return void 0;
   var MATCH_BATCH_SIZE = 50;
   var WORKERS = 4;
   var RETRY_MS7 = 60 * 1e3;
-  var FONT9 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  var FONT12 = '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   var MATCH_QUERY3 = `query WerkiaCemMatchCommute($filter: MatchFilter, $perPage: Int) {
   items: allMatches(filter: $filter, perPage: $perPage) { id candidateId jobPositionId }
 }`;
-  function matchIdFromHref8(href) {
+  function matchIdFromHref9(href) {
     return String(href || "").match(/#\/Match\/([^/?]+)(?:[/?]|$)/i)?.[1] || "";
   }
   function commuteLabel(commute, entry) {
@@ -18889,7 +21272,7 @@ Trotzdem speichern?`)) return void 0;
     };
   }
   var CSS3 = `
-  .${BUTTON_CLASS3} { display:inline-flex; align-items:stretch; margin:4px 0 0 6px; height:32px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; overflow:hidden; vertical-align:middle; font:600 13px/1 ${FONT9}; white-space:nowrap; }
+  .${BUTTON_CLASS3} { display:inline-flex; align-items:stretch; margin:4px 0 0 6px; height:32px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; overflow:hidden; vertical-align:middle; font:600 13px/1 ${FONT12}; white-space:nowrap; }
   .${BUTTON_CLASS3} > * { display:inline-flex; align-items:center; margin:0; padding:0 10px; border:0; background:transparent; color:#09090b; font:inherit; text-decoration:none; cursor:pointer; }
   .${BUTTON_CLASS3} > .mc-main { font-variant-numeric:tabular-nums; }
   .${BUTTON_CLASS3} > .mc-maps { border-left:1px solid #d4d4d8; color:#1971c2; font-weight:600; }
@@ -18904,10 +21287,10 @@ Trotzdem speichern?`)) return void 0;
   .${BUTTON_CLASS3}[data-level="pending"] > .mc-main { color:#868e96; }
   .${BUTTON_CLASS3}[data-level="unknown"] { border-style:dashed; }
   .${BUTTON_CLASS3}[data-level="unknown"] > .mc-main { color:#868e96; }
-  #${IDS10.popover} { position:fixed; z-index:2147483000; display:flex; flex-direction:column; width:${MAP_WIDTH + POPOVER_PADDING_X}px; min-width:${MIN_POPOVER.width}px; min-height:${MIN_POPOVER.height}px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); box-sizing:border-box; padding:18px 20px; overflow:hidden; resize:both; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 14px/1.5 ${FONT9}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
+  #${IDS10.popover} { position:fixed; z-index:2147483000; display:flex; flex-direction:column; width:${MAP_WIDTH + POPOVER_PADDING_X}px; min-width:${MIN_POPOVER.width}px; min-height:${MIN_POPOVER.height}px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); box-sizing:border-box; padding:18px 20px; overflow:hidden; resize:both; border:1px solid #e4e4e7; border-radius:12px; background:#fff; color:#09090b; font:400 14px/1.5 ${FONT12}; box-shadow:0 16px 48px -16px rgba(9,9,11,.32); -webkit-font-smoothing:antialiased; }
   #${IDS10.popover} .mc-head { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding-right:28px; }
   #${IDS10.popover} h2 { margin:0; font-size:16px; font-weight:600; }
-  #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT9}; }
+  #${IDS10.popover} .mc-close { position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:#52525b; cursor:pointer; font:400 20px/28px ${FONT12}; }
   #${IDS10.popover} .mc-close:hover { background:#f4f4f5; color:#09090b; }
   #${IDS10.popover} .mc-value { font-size:20px; font-weight:700; }
   #${IDS10.popover} .mc-value.mc-skull { color:#c92a2a; }
@@ -18925,13 +21308,13 @@ Trotzdem speichern?`)) return void 0;
   #${IDS10.popover} dt { color:#8b8b94; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:24px; }
   #${IDS10.popover} dd { margin:0; font-size:14px; line-height:24px; overflow-wrap:anywhere; }
   #${IDS10.popover} .mc-dot { display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; vertical-align:1px; }
-  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:38px; padding:0 18px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:600 14px/1 ${FONT9}; text-decoration:none; }
+  #${IDS10.popover} .mc-google { display:inline-flex; align-items:center; height:38px; padding:0 18px; border:1px solid #ef6c00; border-radius:8px; background:#ef6c00; color:#fff; font:600 14px/1 ${FONT12}; text-decoration:none; }
   #${IDS10.popover} .mc-google:hover { background:#b85400; border-color:#b85400; }
   #${IDS10.popover} .mc-muted { color:#8b8b94; }
 `;
   function executeMatchCommute(runtime, options = {}) {
-    runtime.registerSource(SOURCE_PATH4);
-    const getRequest = options.request ? () => options.request : () => getCemGraphqlAdapter().request;
+    runtime.registerSource(SOURCE_PATH7);
+    const getRequest2 = options.request ? () => options.request : () => getCemGraphqlAdapter().request;
     const getProvider = options.provider ? () => options.provider : () => getCemGraphqlAdapter().commuteProvider;
     const cachedRoute = options.getCachedRoute || getCachedRoute;
     const routesFromCandidate = options.getRoutesFromCandidate || getRoutesFromCandidate;
@@ -18947,7 +21330,7 @@ Trotzdem speichern?`)) return void 0;
     let syncTimer = null;
     let openMatchId = "";
     let resizeObserver = null;
-    const waitForAdminpanel = options.skipLoadingGate ? () => false : createLoadingGate({ schedule: (fn, ms) => runtime.setTimeout(fn, ms), onRetry: () => scheduleSync() });
+    const waitForAdminpanel = options.skipLoadingGate ? () => false : createLoadingGate({ schedule: (fn, ms2) => runtime.setTimeout(fn, ms2), onRetry: () => scheduleSync() });
     const isTargetPage3 = () => ROUTES.cemMyMatches.test(location.hash || "") || ROUTES.cemMyCandidates.test(location.hash || "");
     function el4(tag2, props = {}, children = []) {
       const element5 = document.createElement(tag2);
@@ -18967,7 +21350,7 @@ Trotzdem speichern?`)) return void 0;
     function load2(matchId) {
       if (results.has(matchId)) return Promise.resolve(results.get(matchId));
       if (!loading.has(matchId)) {
-        const promise = loadMatchCommute(matchId, { request: getRequest(), provider: getProvider(), route }).then((result) => {
+        const promise = loadMatchCommute(matchId, { request: getRequest2(), provider: getProvider(), route }).then((result) => {
           results.set(matchId, result);
           return result;
         }).catch((error) => {
@@ -18983,7 +21366,7 @@ Trotzdem speichern?`)) return void 0;
       for (let index = 0; index < missing.length; index += MATCH_BATCH_SIZE) {
         const batch = missing.slice(index, index + MATCH_BATCH_SIZE);
         batch.forEach((id) => matchInFlight.add(id));
-        getRequest()(MATCH_QUERY3, { filter: { ids: batch }, perPage: batch.length }).then((result) => {
+        getRequest2()(MATCH_QUERY3, { filter: { ids: batch }, perPage: batch.length }).then((result) => {
           const found = new Map((result?.items || []).filter((item) => item?.id).map((item) => [String(item.id), item]));
           for (const id of batch) {
             const item = found.get(id);
@@ -19006,7 +21389,7 @@ Trotzdem speichern?`)) return void 0;
     }
     function currentItems() {
       const items = [];
-      for (const row2 of document.querySelectorAll(ROW_SELECTOR11)) {
+      for (const row2 of document.querySelectorAll(ROW_SELECTOR14)) {
         const target = matchCellOf(row2);
         if (target?.cell) items.push(target);
       }
@@ -19057,7 +21440,7 @@ Trotzdem speichern?`)) return void 0;
     function matchCellOf(row2) {
       if (row2.querySelector("tr")) return null;
       const link = [...row2.querySelectorAll(":scope > td")].map((cell) => cell.querySelector(MATCH_LINK_SELECTOR10)).find(Boolean);
-      const matchId = matchIdFromHref8(link?.getAttribute("href"));
+      const matchId = matchIdFromHref9(link?.getAttribute("href"));
       return matchId ? { matchId, cell: link.closest("td") } : null;
     }
     function createButton(matchId) {
@@ -19308,152 +21691,10 @@ Trotzdem speichern?`)) return void 0;
     scheduleSync();
   }
 
-  // ../../shared/js/comment-shortcuts/core.js
-  var TARGETS = { AG: "AG", M: "M", AG_M: "AG/M" };
-  var TNE_OPTIONS = ["AP tne", "tne", "AP tne, Mail raus", "AP tne, schicke SA raus", "tne, SM raus", "erneut tne"];
-  var MAIL_OPTIONS = ["SA raus", "SM raus", "TB raus", "Statusmail raus"];
-  var RAW = [
-    // Kontakt und Erreichbarkeit
-    ["kontakt", "tne", "AP telefonisch nicht erreicht", "AG", { einfuegen: "AP tne, SA raus", optionen: TNE_OPTIONS }],
-    ["kontakt", "te", "AP telefonisch erreicht", "AG"],
-    ["kontakt", "erneut tne", "AP erneut telefonisch nicht erreicht", "AG"],
-    ["kontakt", "SA", "nach tne verschickt, Bedeutung offen", "AG", { label: "SA raus", unbestaetigt: true, optionen: ["AP tne, SA raus", "SA"] }],
-    ["kontakt", "SM", "Sammelmail", "AG", { label: "SM raus", unbestaetigt: true }],
-    ["kontakt", "Mail raus", "Mail verschickt", "AG", { optionen: MAIL_OPTIONS }],
-    ["kontakt", "WA", "WhatsApp", "AG/M"],
-    ["kontakt", "VC", "Videocall", "AG/M"],
-    ["kontakt", "RR", "Rückruf (erbeten)", "AG"],
-    ["kontakt", "RM", "Rückmeldung", "AG/M"],
-    ["kontakt", "FB", "Feedback", "M"],
-    ["kontakt", "JF", "Jour fixe", "AG"],
-    ["kontakt", "FYI", "zur Info", "AG/M", { varianten: ["FMI"] }],
-    ["kontakt", "Sek", "Sekretariat", "AG"],
-    // Termine und Prozess
-    ["termine", "VT", "Vorstellungstermin", "M"],
-    ["termine", "VTA", "VT-Anfrage (Anfrage Vorstellungstermin)", "M"],
-    ["termine", "VTV", "Vorstellungstermin vereinbart", "M", { unbestaetigt: true }],
-    ["termine", "VTS", "Vorstellungstermin stattgefunden", "M", { unbestaetigt: true, hinweis: "auch Mehrzahl von VT" }],
-    ["termine", "VG", "Vorstellungsgespräch", "M", { varianten: ["VSG"] }],
-    ["termine", "HT", "Hospitation/Probetag", "M", { unbestaetigt: true }],
-    ["termine", "TI", "Telefoninterview", "M", { unbestaetigt: true }],
-    ["termine", "NH", "Nachholtermin nach No-Show", "M", { varianten: ["NHT"] }],
-    ["termine", "TV", "Terminvorschläge", "M", { varianten: ["TVs"] }],
-    ["termine", "TB", "Terminbestätigung", "M", { optionen: ["TB raus", "TB raus händisch"] }],
-    // Eindeutig: klein "te" ist "telefonisch erreicht" (oben).
-    ["termine", "TE", "Terminerinnerung", "M", { unbestaetigt: true }],
-    ["termine", "digi", "digitaler Termin", "M"],
-    ["termine", "HC", "Hot Case", "M"],
-    ["termine", "HHC", "Hot Hot Case", "M"],
-    ["termine", "out", "Absage", "M"],
-    ["termine", "on hold", "pausiert", "AG/M"],
-    ["termine", "ABS", "Absage", "M"],
-    ["termine", "WVL", "Wiedervorlage", "M"],
-    // Unterlagen und Vertrag
-    ["unterlagen", "UL", "Unterlagen", "M"],
-    ["unterlagen", "CV", "Lebenslauf", "M"],
-    ["unterlagen", "GB", "Gesellenbrief", "M"],
-    ["unterlagen", "AZ", "Arbeitszeugnis", "M"],
-    ["unterlagen", "PFB", "Personalfragebogen", "M"],
-    ["unterlagen", "AV", "Arbeitsvertrag", "M"],
-    ["unterlagen", "AVU", "Unterschrift Arbeitsvertrag", "M"],
-    ["unterlagen", "SD", "Startdatum", "M"],
-    ["unterlagen", "PZ", "Probezeit", "M"],
-    // Eindeutig: "KD-Dienst" (Kundendienst) bleibt unberührt, ein Bindestrich
-    // gilt beim Vorschlag als Teil des Wortes.
-    ["unterlagen", "KD", "Kontaktdaten", "AG/M", { hinweis: "nicht in „KD-Dienst“ (Kundendienst)" }],
-    // Personen und Profil: kein Ziel, keine Knöpfe, nur Tooltip.
-    ["profil", "AP", "Ansprechpartner", null],
-    ["profil", "BEW", "Bewerber", null],
-    ["profil", "AG", "Arbeitgeber", null],
-    ["profil", "GF", "Geschäftsführung", null],
-    ["profil", "FA", "Fachabteilung", null],
-    ["profil", "SV", "Stellvertreter des AP", null, { unbestaetigt: true }],
-    ["profil", "BE", "Berufserfahrung", null],
-    ["profil", "FS", "Führerschein", null],
-    ["profil", "RB", "Reisebereitschaft", null],
-    ["profil", "MB", "Montagebereitschaft", null, { unbestaetigt: true }],
-    ["profil", "TZ", "Teilzeit", null],
-    ["profil", "VZ", "Vollzeit", null],
-    ["profil", "FW", "Firmenwagen", null],
-    ["profil", "HO", "Homeoffice", null],
-    ["profil", "PV", "Photovoltaik", null, { unbestaetigt: true }],
-    ["profil", "WP", "Wärmepumpe", null, { unbestaetigt: true }],
-    ["profil", "SHK", "Sanitär-Heizung-Klima", null, { unbestaetigt: true }],
-    ["profil", "ZS", "Zählerschrank", null, { unbestaetigt: true }],
-    ["profil", "PL", "Projektleiter", null]
-  ];
-  var SHORTCUTS = Object.freeze(RAW.map(([gruppe, kuerzel, text, ziel, extra = {}]) => Object.freeze({
-    id: `${gruppe}:${kuerzel}`,
-    gruppe,
-    kuerzel,
-    text,
-    ziel,
-    label: extra.label || kuerzel,
-    einfuegen: extra.einfuegen || extra.label || kuerzel,
-    optionen: Object.freeze([...extra.optionen || []]),
-    varianten: Object.freeze([...extra.varianten || []]),
-    unbestaetigt: Boolean(extra.unbestaetigt),
-    hinweis: extra.hinweis || ""
-  })));
-  var PHRASE_RAW = [
-    ["AP tne, SA raus", TNE_OPTIONS],
-    ["Mail raus", MAIL_OPTIONS],
-    ["Bitte UL anfordern 🙂", ["Bitte weiter Dokumente wie CV und Zeugnisse bei BEW anfragen", "[CV] im AGC angefragt", "[CV, GB] im AGC angefragt", "[CV, GB, AZ] im AGC angefragt", "[MB] i.O.?"]],
-    ["AG hat leider kein Interesse", ["Kein Interesse", "Entfernung", "Passt nicht", "Stelle besetzt", "Region nicht mehr relevant"]],
-    ["Informationen an AP weitergeleitet", ["Informationen angefragt", "RM folgt", "Prüfung intern", "per Mail im Kontakt"]],
-    ["FB angefragt (Mail)", ["FB angefragt", "FB Mail"]],
-    ["Bei ernsthaftem Interesse können Bewerber immer gerne anrufen", []]
-  ];
-  var PHRASES = Object.freeze(PHRASE_RAW.map(([text, optionen]) => Object.freeze({
-    id: `haeufig:${text}`,
-    gruppe: "haeufig",
-    kuerzel: text,
-    text,
-    ziel: TARGETS.M,
-    label: text,
-    einfuegen: text,
-    optionen: Object.freeze([...optionen]),
-    varianten: Object.freeze([]),
-    unbestaetigt: false,
-    hinweis: "",
-    satz: true
-  })));
-  function explainTitle(item, token = item.kuerzel) {
-    const parts = [`${token}: ${item.text}`];
-    if (item.hinweis) parts.push(item.hinweis);
-    if (item.unbestaetigt) parts.push("Bedeutung noch nicht bestätigt");
-    return parts.join(" · ");
-  }
-  var WORD_CHAR = /[\p{L}\p{N}_-]/u;
-  function explainTokens(shortcuts = SHORTCUTS) {
-    const tokens = [];
-    for (const item of shortcuts) {
-      for (const token of /* @__PURE__ */ new Set([item.kuerzel, ...item.varianten])) tokens.push({ token, item });
-    }
-    return tokens.sort((a, b) => b.token.length - a.token.length);
-  }
-  var DEFAULT_TOKENS = explainTokens();
-  function shortcutAtOffset(text, offset, tokens = DEFAULT_TOKENS) {
-    const value = String(text || "");
-    const at = Number(offset);
-    if (!Number.isInteger(at) || at < 0 || at > value.length) return null;
-    for (const { token, item } of tokens) {
-      let start = value.lastIndexOf(token, at);
-      while (start >= 0 && start + token.length >= at) {
-        const end = start + token.length;
-        const prev = value.charAt(start - 1);
-        const next = value.charAt(end);
-        if (at < end && (!prev || !WORD_CHAR.test(prev)) && (!next || !WORD_CHAR.test(next))) return { item, token, start, end };
-        start = start > 0 ? value.lastIndexOf(token, start - 1) : -1;
-      }
-    }
-    return null;
-  }
-
   // ../../shared/js/comment-shortcuts/explain.js
   var EXPLAIN_ID = "werkia-shortcuts-explain";
   var OWNER_ATTR3 = "data-werkia-shortcut-explain";
-  var STYLE_ID15 = `${EXPLAIN_ID}-style`;
+  var STYLE_ID18 = `${EXPLAIN_ID}-style`;
   var SCOPE_SELECTOR = '.MuiDialog-container, div[role="dialog"]';
   var NOTES_SELECTOR = '[class*="werkia-agn"]';
   var MOVE_THROTTLE_MS = 60;
@@ -19489,9 +21730,9 @@ Trotzdem speichern?`)) return void 0;
     }
   }
   function ensureStyle4(doc) {
-    if (doc.getElementById(STYLE_ID15)) return;
+    if (doc.getElementById(STYLE_ID18)) return;
     const style = doc.createElement("style");
-    style.id = STYLE_ID15;
+    style.id = STYLE_ID18;
     style.textContent = `
     #${EXPLAIN_ID} { position:fixed; z-index:2147483000; max-width:360px; padding:4px 8px; border:1px solid #d4d4d8; border-radius:6px;
       background:#ffffff; color:#09090b; box-shadow:0 8px 24px -12px rgba(9,9,11,.35); pointer-events:none;
@@ -19762,7 +22003,7 @@ Trotzdem speichern?`)) return void 0;
           }).catch(() => {
             entry.text = "Letzte Änderung derzeit nicht verfügbar";
             entry.expires = Date.now() + 15e3;
-          }).finally(schedule);
+          }).finally(schedule2);
         }
         setText(note, entry.text);
       }
@@ -19777,18 +22018,18 @@ Trotzdem speichern?`)) return void 0;
         if (!banner.closest('[role="dialog"], .MuiDialog-paper, form')?.querySelector(`.${FIELD_CLASS}`)) banner.remove();
       });
     }
-    function schedule() {
+    function schedule2() {
       if (stopped || timer !== null) return;
       timer = runtime.setTimeout(() => {
         timer = null;
         scan();
       }, 150);
     }
-    runtime.createMutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true });
-    runtime.addDocumentListener("input", schedule, true);
-    runtime.addDocumentListener("change", schedule, true);
-    runtime.addWindowListener("hashchange", schedule);
-    runtime.setInterval(schedule, 15e3);
+    runtime.createMutationObserver(schedule2).observe(document.body, { childList: true, subtree: true, characterData: true });
+    runtime.addDocumentListener("input", schedule2, true);
+    runtime.addDocumentListener("change", schedule2, true);
+    runtime.addWindowListener("hashchange", schedule2);
+    runtime.setInterval(schedule2, 15e3);
     runtime.addCleanup(() => {
       stopped = true;
       style.remove();
@@ -19817,6 +22058,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "cem-ofm-questionnaire-evaluation", execute: executeQuestionnaireEvaluation },
     { id: "cem-ofm-route-calculation", execute: executeRouteCalculation },
     { id: "commute-badges", execute: executeCommuteBadges2 },
+    { id: "employer-groups", execute: executeEmployerGroups2 },
     { id: "cem-vta-pills", execute: executeCemVtaPills },
     { id: "vacancy-candidate-info", execute: executeVacancyCandidateInfo },
     { id: "offline-match-bulk", execute: executeOfflineMatchBulk },
@@ -19824,6 +22066,9 @@ Trotzdem speichern?`)) return void 0;
     { id: "focus-modes", execute: executeFocusModes2 },
     { id: "kam-status-filter", execute: executeKamStatusFilter },
     { id: "kam-status-filter-expanded", execute: executeKamStatusFilterExpanded },
+    { id: "kam-filter", execute: executeKamFilter },
+    { id: "tags-unread", execute: executeCemTagsUnread },
+    { id: "tags-search", execute: executeCemTagsSearch },
     { id: "vertretungen", execute: executeVertretungen2 },
     { id: "cem-vta-sperre", execute: executeCemVtaSperre2 },
     { id: "cem-ampel", execute: executeCemAmpel },
@@ -19837,6 +22082,11 @@ Trotzdem speichern?`)) return void 0;
     { id: "appointment-prio", execute: executeAppointmentPrio2 },
     { id: "vta-notizen", execute: executeVtaNotizen2 },
     { id: "vta-sperre-warnung", execute: executeVtaSperreWarnung2 },
+    { id: "cem-vta-daten", execute: executeCemVtaDaten },
+    // Nach der Sperre-Warnung: hält die das Speichern auf, merkt sich dieses
+    // Feature keine Auswahl (Klick kommt nicht an).
+    { id: "vta-mehrfach", execute: (runtime) => executeVtaMehrfach(runtime) },
+    { id: "vtv-hot-warnung", execute: executeVtvHotWarnung2 },
     { id: "wa-templates", execute: executeWaTemplates },
     { id: "cem-todo", execute: executeCemTodo },
     { id: "slack-dm", execute: executeSlackDm2 },

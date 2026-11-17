@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.18.534
+// @version      1.19.574
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2549,6 +2549,7 @@
       notes: [
         "Grün: Nichts spricht dagegen. Gelb: Mindestens ein Punkt ist unklar, bitte selbst prüfen. Rot: Mindestens eine Anforderung ist nicht erfüllt.",
         "Verglichen werden Montagebereitschaft, Sprachkenntnisse, Berufserfahrung, Anerkennung, Führerschein, Gehalt und Position. Die betroffenen Felder im Fragebogen werden mit derselben Farbe markiert, die Gründe stehen im Banner.",
+        "Der Score in der Liste rechnet das Adminpanel selbst aus, nach eigenen Regeln. Ein hoher Score und ein rotes Banner schließen sich deshalb nicht aus; der Grund steht immer im Banner.",
         "Das Banner ist nur eine Empfehlung. Es sendet nichts und ändert keinen Status."
       ]
     };
@@ -2618,6 +2619,22 @@
         "„ca.“ heißt: Eine Adresse wurde nur ungefähr gefunden. „Luftlinie“ heißt: Der Routenservice hat nicht geantwortet. Dann gibt es keinen 💀.",
         "Die Liste kommt seitenweise vom Server, der die Fahrzeit nicht kennt. Eine Seite zeigt deshalb weniger Zeilen, wenn welche ausgeblendet sind. Umsortiert wird nichts.",
         "Konnte nicht geprüft werden, ob die Vakanz landes- oder bundesweit ist, bleibt die Zeile mit 💀 ausgegraut sichtbar."
+      ]
+    };
+  }
+  function employerGroupsTopic() {
+    return {
+      id: "employer-groups",
+      title: "Mehrere Stellen eines Arbeitgebers zusammengeklappt",
+      page: PAGES.potentialMatches,
+      routes: [ROUTES.potentialMatches],
+      kind: "view",
+      summary: "Hat ein Arbeitgeber mehrere Vorschläge auf der Seite, bleibt nur der erste (höchster Score) sichtbar. Der Knopf „+n weitere Stellen bei …“ klappt die übrigen auf und wieder zu.",
+      notes: [
+        "Aufgeklappte Zeilen stehen an ihrem Platz in der Liste und haben links einen blauen Rand. Umsortiert wird nichts.",
+        "Standard ist zugeklappt. Auf- und Zuklappen gilt bis zum Wechsel auf einen anderen Kandidaten oder bis zum Neuladen.",
+        "Zeilen, die schon die Fahrzeit (💀) oder ein Filter ausgeblendet hat, zählen nicht mit. Holt „Anzeigen“ solche Zeilen zurück, stehen sie einzeln da und werden nicht zugeklappt.",
+        "Gezählt wird nur, was auf der aktuellen Seite der Liste steht."
       ]
     };
   }
@@ -2829,6 +2846,7 @@
     vacancyNotesBoxTopic({ routes: onPotentialMatches }),
     routeCalculationTopic({ routes: onPotentialMatches, commute: true }),
     commuteBadgesTopic(),
+    employerGroupsTopic(),
     {
       id: "obc-duplicate-matches",
       title: "Doppelte Matches",
@@ -8642,6 +8660,192 @@
     });
   }
 
+  // ../../shared/js/employer-groups/core.js
+  function planEmployerGroups(items, expanded = /* @__PURE__ */ new Set()) {
+    const groups = /* @__PURE__ */ new Map();
+    items.forEach((item, index) => {
+      const id = String(item?.employerId || "").toLowerCase();
+      if (!id || !item.visible || item.groupable === false) return;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(index);
+    });
+    const plan = items.map((item) => ({ role: "none", employerId: String(item?.employerId || "").toLowerCase(), count: 0, hidden: false, expanded: false }));
+    for (const [id, indexes] of groups) {
+      if (indexes.length < 2) continue;
+      const isOpen = expanded.has(id);
+      indexes.forEach((index, position) => {
+        plan[index].expanded = isOpen;
+        if (position === 0) {
+          plan[index].role = "head";
+          plan[index].count = indexes.length - 1;
+        } else {
+          plan[index].role = "member";
+          plan[index].hidden = !isOpen;
+        }
+      });
+    }
+    return plan;
+  }
+  function groupToggleText(count, employerName, expanded) {
+    const name = String(employerName || "").trim() || "diesem Arbeitgeber";
+    const stellen = count === 1 ? "1 weitere Stelle" : `${count} weitere Stellen`;
+    return expanded ? `▾ ${stellen} bei ${name} zuklappen` : `▸ +${stellen} bei ${name}`;
+  }
+
+  // ../../shared/js/employer-groups/index.js
+  var POTENTIAL_MATCHES_ROUTE3 = /^#\/Candidate\/([a-f0-9-]{36})\/show\/7(?:[/?]|$)/i;
+  var ROW_SELECTOR3 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var REVEALED_SELECTOR = [
+    "tr[data-werkia-cem-commute-skull]",
+    "tr[data-werkia-obc-commute-skull]",
+    "tr[data-werkia-cem-commute-hidden]",
+    "tr[data-werkia-obc-commute-hidden]",
+    "tr[data-werkia-om-exclusion]"
+  ].join(", ");
+  var WATCHED_ATTRIBUTES = [
+    "class",
+    "style",
+    "data-werkia-cem-commute-hidden",
+    "data-werkia-obc-commute-hidden",
+    "data-werkia-cem-commute-skull",
+    "data-werkia-obc-commute-skull",
+    "data-werkia-om-exclusion"
+  ];
+  function getCandidateIdFromRoute5(hash = location.hash || "") {
+    return String(hash).match(POTENTIAL_MATCHES_ROUTE3)?.[1]?.toLowerCase() || "";
+  }
+  function employerLinkOf(row) {
+    const link = row?.querySelector('td.column-jobPositionId a[href*="#/Employer/"]') || row?.querySelector('a[href*="#/Employer/"]');
+    return link && link.closest("tr") === row ? link : null;
+  }
+  function getEmployerIdFromRow2(row) {
+    return employerLinkOf(row)?.getAttribute("href")?.match(/\/Employer\/([a-f0-9-]{36})/i)?.[1]?.toLowerCase() || "";
+  }
+  function executeEmployerGroups(runtime, options = {}) {
+    const namespace = options.namespace || "werkia";
+    if (options.sourcePath) runtime.registerSource(options.sourcePath);
+    const HIDDEN_ATTR = `data-werkia-${namespace}-employer-group-hidden`;
+    const MEMBER_ATTR = `data-werkia-${namespace}-employer-group-member`;
+    const TOGGLE_CLASS = `werkia-${namespace}-employer-group-toggle`;
+    const STYLE_ID4 = `werkia-${namespace}-employer-group-style`;
+    let candidateId = "";
+    let expanded = /* @__PURE__ */ new Set();
+    let scheduled = false;
+    function ensureStyles2() {
+      if (document.getElementById(STYLE_ID4)) return;
+      const style = document.createElement("style");
+      style.id = STYLE_ID4;
+      style.textContent = `
+      tr[${HIDDEN_ATTR}] { display:none !important; }
+      tr[${MEMBER_ATTR}] > td:first-child { box-shadow:inset 4px 0 #74c0fc; }
+      .${TOGGLE_CLASS} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:4px 10px;border:1px solid #74c0fc;border-radius:999px;background:transparent;color:inherit;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap;vertical-align:middle; }
+      .${TOGGLE_CLASS}:hover { background:rgba(116,192,252,.18); }
+      .${TOGGLE_CLASS}:focus-visible { outline:2px solid #339af0;outline-offset:1px; }
+    `;
+      document.head.appendChild(style);
+    }
+    function clearAll() {
+      document.querySelectorAll(`.${TOGGLE_CLASS}`).forEach((button2) => button2.remove());
+      document.querySelectorAll(`tr[${HIDDEN_ATTR}]`).forEach((row) => row.removeAttribute(HIDDEN_ATTR));
+      document.querySelectorAll(`tr[${MEMBER_ATTR}]`).forEach((row) => row.removeAttribute(MEMBER_ATTR));
+    }
+    function renderToggle(row, link, view) {
+      let button2 = row.querySelector(`.${TOGGLE_CLASS}`);
+      if (!button2) {
+        button2 = document.createElement("button");
+        button2.type = "button";
+        button2.className = TOGGLE_CLASS;
+        button2.dataset.werkiaOwned = "true";
+        button2.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const id = button2.dataset.employerId;
+          if (!id) return;
+          if (expanded.has(id)) expanded.delete(id);
+          else expanded.add(id);
+          render();
+        });
+        (link.closest("td") || row).appendChild(button2);
+      }
+      if (button2.dataset.employerId !== view.employerId) button2.dataset.employerId = view.employerId;
+      if (button2.textContent !== view.text) button2.textContent = view.text;
+      const expandedText = String(view.expanded);
+      if (button2.getAttribute("aria-expanded") !== expandedText) button2.setAttribute("aria-expanded", expandedText);
+    }
+    function render() {
+      const nextCandidateId = getCandidateIdFromRoute5();
+      if (!nextCandidateId || !claimPage("employer-groups-potentialMatches", namespace)) {
+        clearAll();
+        return;
+      }
+      if (nextCandidateId !== candidateId) {
+        candidateId = nextCandidateId;
+        expanded = /* @__PURE__ */ new Set();
+      }
+      ensureStyles2();
+      const rows = [...document.querySelectorAll(ROW_SELECTOR3)];
+      rows.forEach((row) => row.removeAttribute(HIDDEN_ATTR));
+      const items = rows.map((row) => {
+        const link = employerLinkOf(row);
+        return {
+          row,
+          link,
+          employerId: getEmployerIdFromRow2(row),
+          employerName: link?.textContent?.trim() || "",
+          visible: row.isConnected && row.getClientRects().length > 0,
+          groupable: !row.matches(REVEALED_SELECTOR)
+        };
+      });
+      const plan = planEmployerGroups(items, expanded);
+      items.forEach((item, index) => {
+        const view = plan[index];
+        if (view.hidden) item.row.setAttribute(HIDDEN_ATTR, "");
+        const member = view.role === "member" && view.expanded;
+        if (member !== item.row.hasAttribute(MEMBER_ATTR)) item.row.toggleAttribute(MEMBER_ATTR, member);
+        if (view.role === "head" && item.link) {
+          renderToggle(item.row, item.link, {
+            employerId: view.employerId,
+            expanded: view.expanded,
+            text: groupToggleText(view.count, item.employerName, view.expanded)
+          });
+        } else {
+          item.row.querySelector(`.${TOGGLE_CLASS}`)?.remove();
+        }
+      });
+      document.querySelectorAll(`.${TOGGLE_CLASS}`).forEach((button2) => {
+        if (!rows.includes(button2.closest("tr"))) button2.remove();
+      });
+    }
+    function scheduleRender() {
+      if (scheduled) return;
+      scheduled = true;
+      runtime.setTimeout(() => {
+        scheduled = false;
+        render();
+      }, 250);
+    }
+    const ownSelector = `.${TOGGLE_CLASS}`;
+    runtime.createMutationObserver((mutations) => {
+      if (!POTENTIAL_MATCHES_ROUTE3.test(location.hash || "") && !document.querySelector(`.${TOGGLE_CLASS}, tr[${HIDDEN_ATTR}], tr[${MEMBER_ATTR}]`)) return;
+      const relevant = mutations.some((mutation) => {
+        if (mutation.type === "attributes") return mutation.target?.matches?.("tr");
+        if (mutation.target?.closest?.(ownSelector)) return false;
+        return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(ownSelector));
+      });
+      if (relevant) scheduleRender();
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: WATCHED_ATTRIBUTES });
+    runtime.addWindowListener("hashchange", scheduleRender);
+    scheduleRender();
+  }
+
+  // src/features/employer-groups.js
+  function executeEmployerGroups2(runtime) {
+    executeEmployerGroups(runtime, {
+      namespace: "obc",
+      sourcePath: "obc/toolbox/src/features/employer-groups.js"
+    });
+  }
+
   // ../../shared/js/appointment-prio/index.js
   var PRIO_MARKER = "#prio";
   var NOTES_MARKER = "#notes";
@@ -9105,7 +9309,7 @@ ${aliases.join("\n")}
       const ROW_CLASS2 = "werkia-urgent-vacancy-row";
       const BADGE_CLASS2 = "werkia-urgent-vacancy-badge";
       const MATCH_PRESENT_ROW_SELECTOR = '.werkia-cem-match-present-row, .werkia-cem-old-match-present-row, [data-werkia-match-present="true"]';
-      const POTENTIAL_MATCHES_ROUTE3 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+      const POTENTIAL_MATCHES_ROUTE4 = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
       const BEARER_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_bearer_v1";
       const FINGERPRINT_STORAGE_KEY2 = "werkia_urgent_vacancy_graphql_fingerprint_v1";
       const urgentIndex = /* @__PURE__ */ new Map();
@@ -9118,7 +9322,7 @@ ${aliases.join("\n")}
       let blockedBearer = "";
       const capturedAuth = { bearer: "", fingerprint: "" };
       function isPotentialMatchesPage() {
-        return POTENTIAL_MATCHES_ROUTE3.test(location.hash || "");
+        return POTENTIAL_MATCHES_ROUTE4.test(location.hash || "");
       }
       function getHeaderValue2(headers, name) {
         if (!headers) return "";
@@ -9374,6 +9578,7 @@ ${aliases.join("\n")}
     { id: "om-match-flags", execute: executeOmMatchFlags },
     // After om-match-flags: rows that filter hides are not routed.
     { id: "commute-badges", execute: executeCommuteBadges2 },
+    { id: "employer-groups", execute: executeEmployerGroups2 },
     // See cem/toolbox/src/main.js: last so the No-Go tint is not
     // overpainted by another row highlight on the same route.
     { id: "no-go-check", execute: executeNoGoCheck2 },

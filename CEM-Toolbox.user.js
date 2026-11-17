@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.35.574
+// @version      1.35.576
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -18888,14 +18888,17 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
     "25544016-ecbe-4736-abf5-c8c69e209753": "f",
     "c9149b79-5a96-4265-b5ca-477a56bdd1b5": "m",
     "2a6af863-1c13-4cac-aa49-0ef41b371585": "m",
-    // OBC (Stand 2026-10-09)
+    "78a02ac2-b340-4e9a-994c-4cb130af2d9a": "f",
+    // Nachtrag 2026-11-17
+    // OBC (Stand 2026-10-09, Nachtrag 2026-11-17)
     "d90dec0c-bfcf-4d68-8b3f-b92045d4bdb0": "f",
     "1f01b45a-73a7-48c9-8ec3-7c2c6b189b55": "f",
     "f9eda588-e0a3-419f-917d-8823b3ef4e3a": "m",
     "b6c81c15-60ba-4380-99f3-d70261b6e7ba": "m",
     "83ac48c8-b582-4995-9cf6-d12c774bf058": "m",
     "76edb298-3be5-42c2-8cad-902dcace82a2": "m",
-    "f910ea81-7e8d-405d-b95d-250eb2e92799": "f"
+    "f910ea81-7e8d-405d-b95d-250eb2e92799": "f",
+    "88a69aa4-541f-4585-86a4-8ea08b73775a": "m"
   };
 
   // ../../shared/js/wa-templates/core.js

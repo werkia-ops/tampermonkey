@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.19.574
+// @version      1.20.588
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -2800,6 +2800,21 @@
         "Welche drei bleiben, entscheidet die Score-Reihenfolge des Adminpanels über alle Seiten der Liste, nicht nur über die aktuelle Seite.",
         "Beispiel: Arbeitgeber X hat Vorschläge auf Platz 2, 7, 15, 40 und 41. Platz 40 und 41 werden ausgeblendet, auch wenn sie erst auf Seite 2 stehen.",
         "Blendet ein anderer Filter einen der ersten drei aus, rückt kein vierter Vorschlag nach.",
+        "Standardmäßig eingeschaltet."
+      ]
+    },
+    {
+      id: "om-filter-hide-travel",
+      title: "Stellen mit zu hoher Montagebereitschaft ausblenden",
+      page: FILTER_PAGE,
+      routes: onPotentialMatches,
+      kind: "local",
+      summary: "Blendet eine Stelle aus, wenn ihre Montagebereitschaft zwei oder mehr Stufen über der des Kandidaten liegt.",
+      notes: [
+        "Verglichen wird die Montagebereitschaft der Vakanz mit der im Kandidatenprofil, in den Stufen keine, gering (1 bis 4 Tage), regelmäßig (5 bis 15 Tage) und uneingeschränkt.",
+        "Beispiel: Die Vakanz verlangt regelmäßig, der Kandidat hat keine: ausgeblendet. Hat er gering, bleibt die Stelle sichtbar.",
+        "Fehlt eine der beiden Angaben, bleibt die Stelle sichtbar.",
+        "Wie beim Fahrzeit-Filter steht über der Liste eine Leiste mit der Zahl und „Anzeigen“. Das Einblenden gilt bis zum Neuladen; dauerhaft abschalten geht hier unter „Filter nach“.",
         "Standardmäßig eingeschaltet."
       ]
     },
@@ -7756,6 +7771,12 @@
   }
 
   // ../../shared/js/werkia-graphql/questionnaire-ranks.js
+  var TRAVEL_RANKS = {
+    none: 0,
+    low: 1,
+    regular: 2,
+    unrestricted: 3
+  };
   var EXPERIENCE_RANKS = {
     none: 0,
     one_to_two: 1,
@@ -7772,6 +7793,8 @@
   var BADGE_CLASS = "werkia-obc-om-must-badge";
   var EXCLUSION_BADGE_CLASS = "werkia-obc-om-exclusion-badge";
   var STYLE_ID2 = "werkia-obc-om-must-style";
+  var TRAVEL_BAR_CLASS = "werkia-obc-travel-hidden-bar";
+  var COMMUTE_BAR_CLASS = "werkia-obc-commute-hidden-bar";
   var CONTROL_ID = "werkia-obc-om-must-control";
   var SETTINGS_KEY = "werkia_obc_om_match_flags_v1";
   var CACHE_MS2 = 5 * 60 * 1e3;
@@ -7784,14 +7807,17 @@
     { key: "experience", label: "Stellen bei zu wenig Berufserfahrung ausblenden", hint: "Nur bei [Muss: BE] und zwei bekannten Erfahrungsstufen.", helpTopic: "om-filter-hide-experience" },
     { key: "area", label: "Stellen mit abweichendem Fachbereich ausblenden", hint: "Nur bei [Muss: Fachbereich] und zwei ausgefüllten Fachbereichslisten.", helpTopic: "om-filter-hide-area" },
     { key: "sentEmployer", label: "Stellen von Arbeitgebern mit bereits gesendetem Match ausblenden", hint: "Gilt nur für diesen Kandidaten.", helpTopic: "om-filter-hide-sent-employer" },
-    { key: "employerLimit", label: "Ab der vierten Stelle je Arbeitgeber ausblenden", hint: "Behält die ersten drei Stellen in AP-Reihenfolge, auch über Seitenwechsel hinweg.", helpTopic: "om-filter-hide-employer-limit" }
+    { key: "employerLimit", label: "Ab der vierten Stelle je Arbeitgeber ausblenden", hint: "Behält die ersten drei Stellen in AP-Reihenfolge, auch über Seitenwechsel hinweg.", helpTopic: "om-filter-hide-employer-limit" },
+    { key: "travel", label: "Stellen mit zu hoher Montagebereitschaft ausblenden", hint: "Wenn die Stelle zwei oder mehr Stufen mehr Montage verlangt, als der Kandidat angibt.", helpTopic: "om-filter-hide-travel" }
   ];
+  var TRAVEL_LABELS = { none: "keine", low: "gering", regular: "regelmäßig", unrestricted: "uneingeschränkt" };
   var JOBS_QUERY = `query allJobPositions($filter: JobPositionFilter) {
   items: allJobPositions(filter: $filter) {
     id
     additionalInformation
     jobAreas
     requiredYearsOfExperience
+    frequencyOfTravel
     employer { id omNotes __typename }
     __typename
   }
@@ -7801,6 +7827,7 @@
     id
     jobAreas
     yearsOfExperience
+    desiredTravel
     __typename
   }
 }`;
@@ -7891,6 +7918,12 @@
     }
     return reasons;
   }
+  function travelGapExclusion(candidate, job) {
+    const required = TRAVEL_RANKS[job?.frequencyOfTravel];
+    const actual = TRAVEL_RANKS[candidate?.desiredTravel];
+    if (!Number.isInteger(required) || !Number.isInteger(actual) || required - actual < 2) return "";
+    return `Montagebereitschaft: Stelle ${TRAVEL_LABELS[job.frequencyOfTravel]}, Kandidat ${TRAVEL_LABELS[candidate.desiredTravel]}`;
+  }
   function pageTheme() {
     for (const element of [document.body, document.documentElement]) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(element).backgroundColor);
@@ -7918,12 +7951,13 @@
     } catch {
       enabled = Object.fromEntries(FLAG_TYPES.map((type) => [type.key, true]));
     }
-    let hiddenEnabled = { experience: true, area: false, sentEmployer: false, employerLimit: true };
+    let hiddenEnabled = { experience: true, area: false, sentEmployer: false, employerLimit: true, travel: true };
     try {
       hiddenEnabled = { ...hiddenEnabled, ...JSON.parse(localStorage.getItem(`${SETTINGS_KEY}_hide`) || "{}") };
     } catch {
     }
     let showExcluded = false;
+    let showTravel = false;
     let openWindow = "";
     let draft = null;
     const collapsedSections = /* @__PURE__ */ new Set();
@@ -7942,6 +7976,8 @@
       .${BADGE_CLASS}[data-source="vacancy"] { border-color:#b8d5fa;background:#e7f0ff;color:#245a9b; }
       .${EXCLUSION_BADGE_CLASS} { display:inline-flex;align-items:center;margin:6px 0 2px 8px;padding:5px 10px;border:1px solid #f4c2c2;border-radius:999px;background:#fbe6e6;color:#8f2b2b;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle; }
       .${HIDDEN_CLASS} { display:none !important; }
+      .${TRAVEL_BAR_CLASS} { display:flex;align-items:center;gap:10px;margin:6px 0;padding:6px 12px;border:1px solid #e8590c;border-radius:8px;background:#fff4e6;color:#8a3a06;font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      .${TRAVEL_BAR_CLASS} button { margin-left:auto;padding:3px 10px;border:1px solid #d9480f;border-radius:6px;background:#fff;color:#8a3a06;font:inherit;cursor:pointer; }
       #${CONTROL_ID}{--obc-bg:#fff;--obc-surface:#f8f9fa;--obc-text:#111;--obc-muted:#57606a;--obc-border:rgba(0,0,0,.2);--obc-line:#dee2e6;--obc-row-line:#f1f3f5;--obc-count:#e9ecef;--obc-link:#1864ab;--obc-accent:#1c7ed6;--obc-accent-soft:#e7f5ff;--obc-active-text:#fff;--obc-shadow:0 3px 16px rgba(0,0,0,.28);position:fixed;right:160px;top:72px;z-index:1200;display:flex;flex-direction:column;align-items:flex-end;gap:8px;font:14px/1.45 Arial,sans-serif;color:var(--obc-text);color-scheme:light}
       #${CONTROL_ID}[data-theme="dark"]{--obc-bg:#1c2027;--obc-surface:#292f38;--obc-text:#f2f4f7;--obc-muted:#aeb8c4;--obc-border:#505965;--obc-line:#49515c;--obc-row-line:#353d47;--obc-count:#39414c;--obc-link:#91caff;--obc-accent:#4dabf7;--obc-accent-soft:#203b52;--obc-active-text:#0c1924;--obc-shadow:0 3px 16px rgba(0,0,0,.6);color-scheme:dark}
       @media(max-width:700px){#${CONTROL_ID}{right:18px;top:122px}}
@@ -8172,7 +8208,8 @@
     function render() {
       renderControl();
       if (!ROUTE.test(location.hash || "")) {
-        document.querySelectorAll(`.${ROW_CLASS}, .${HIDDEN_CLASS}, .${BADGE_CLASS}, .${EXCLUSION_BADGE_CLASS}`).forEach((el3) => el3.matches("tr") ? clearRow(el3) : el3.remove());
+        document.querySelectorAll(`.${ROW_CLASS}, .${HIDDEN_CLASS}, .${BADGE_CLASS}, .${EXCLUSION_BADGE_CLASS}, .${TRAVEL_BAR_CLASS}`).forEach((el3) => el3.matches("tr") ? clearRow(el3) : el3.remove());
+        showTravel = false;
         return;
       }
       const candidateId = location.hash.match(ROUTE)?.[0]?.match(/Candidate\/([a-f0-9-]{36})/i)?.[1]?.toLowerCase();
@@ -8196,10 +8233,11 @@
         if (shouldHideSentEmployerMatch(row.dataset.werkiaMatchPresent === "true", hiddenEnabled.sentEmployer)) {
           reasons.push("Kandidat hat bei diesem Arbeitgeber bereits einen gesendeten Match");
         }
-        prepared.push({ row, entry, reasons });
+        const travelReason = travelGapExclusion(candidateEntry?.candidate, entry?.job);
+        prepared.push({ row, entry, reasons, travelReason });
       });
-      filterHits = { experience: 0, area: 0, sentEmployer: 0, employerLimit: 0, total: 0 };
-      prepared.forEach(({ row, entry }) => {
+      filterHits = { experience: 0, area: 0, sentEmployer: 0, employerLimit: 0, travel: 0, total: 0 };
+      prepared.forEach(({ row, entry, travelReason }) => {
         const experience = certainOmMatchExclusions(entry?.flags || [], candidateEntry?.candidate, entry?.job, { experience: true, area: false }).length > 0;
         const area = certainOmMatchExclusions(entry?.flags || [], candidateEntry?.candidate, entry?.job, { experience: false, area: true }).length > 0;
         const sentEmployer = row.dataset.werkiaMatchPresent === "true";
@@ -8208,19 +8246,56 @@
         if (area) filterHits.area++;
         if (sentEmployer) filterHits.sentEmployer++;
         if (employerLimit) filterHits.employerLimit++;
-        if (experience || area || sentEmployer || employerLimit) filterHits.total++;
+        if (travelReason) filterHits.travel++;
+        if (experience || area || sentEmployer || employerLimit || travelReason) filterHits.total++;
       });
       const overflow = hiddenEnabled.employerLimit && ranking?.overflowJobIds ? new Set(prepared.flatMap((item, index) => ranking.overflowJobIds.has(item.row.dataset.werkiaOmJobId) ? [index] : [])) : /* @__PURE__ */ new Set();
-      prepared.forEach(({ row, entry, reasons }, index) => {
+      let travelHidden = 0;
+      prepared.forEach(({ row, entry, reasons, travelReason }, index) => {
         if (entry) renderRow(row, visibleOmMatchFlagsBySource(entry.flags, enabled));
         if (overflow.has(index)) reasons.push("Mehr als drei Vorschläge bei diesem Arbeitgeber");
-        renderExclusion(row, reasons);
-        row.classList.toggle(HIDDEN_CLASS, !showExcluded && reasons.length > 0);
-        if (reasons.length) row.dataset.werkiaOmExclusion = reasons.join("; ");
+        const travel = Boolean(hiddenEnabled.travel && travelReason);
+        const allReasons = travel ? [...reasons, travelReason] : reasons;
+        renderExclusion(row, allReasons);
+        const hide = !showExcluded && (reasons.length > 0 || travel && !showTravel);
+        row.classList.toggle(HIDDEN_CLASS, hide);
+        if (travel && !reasons.length) travelHidden++;
+        if (allReasons.length) row.dataset.werkiaOmExclusion = allReasons.join("; ");
         else delete row.dataset.werkiaOmExclusion;
       });
+      renderTravelBar(prepared[0]?.row?.closest("table") || null, travelHidden);
       renderControl();
       load2([...new Set(missing)]);
+    }
+    function renderTravelBar(table, count) {
+      let bar = document.querySelector(`.${TRAVEL_BAR_CLASS}`);
+      if (!table || !count || showExcluded || !hiddenEnabled.travel) {
+        bar?.remove();
+        return;
+      }
+      ensureStyles2();
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.className = TRAVEL_BAR_CLASS;
+        bar.dataset.werkiaOwned = "true";
+        bar.innerHTML = '<span></span><button type="button"></button>';
+        bar.querySelector("button").addEventListener("click", () => {
+          showTravel = !showTravel;
+          scheduleRender();
+        });
+      }
+      const next = bar.nextElementSibling;
+      if (next !== table && !(next?.classList.contains(COMMUTE_BAR_CLASS) && next.nextElementSibling === table)) {
+        const commuteBar = table.previousElementSibling?.classList.contains(COMMUTE_BAR_CLASS) ? table.previousElementSibling : null;
+        (commuteBar || table).insertAdjacentElement("beforebegin", bar);
+      }
+      const label = count === 1 ? "1 Match" : `${count} Matches`;
+      const text = `🧳 ${label} mit zu hoher Montagebereitschaft (Stelle 2+ Stufen über Kandidat) ${showTravel ? "eingeblendet" : "ausgeblendet"}`;
+      const buttonText = showTravel ? "Wieder ausblenden" : "Anzeigen";
+      const span = bar.querySelector("span");
+      const button2 = bar.querySelector("button");
+      if (span.textContent !== text) span.textContent = text;
+      if (button2.textContent !== buttonText) button2.textContent = buttonText;
     }
     async function loadCandidate(id) {
       if (candidatePending.has(id)) return;

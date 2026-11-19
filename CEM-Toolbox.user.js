@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.35.576
+// @version      1.36.584
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -996,6 +996,16 @@
     match_mail_sent: "MM gesendet",
     interview_feedback: "VT Feedback"
   };
+  var CONNECTION_TYPE_LABELS = {
+    reverse: "RVM",
+    "Offline Match": "OFM",
+    application: "Bewerbung",
+    invitation: "Einladung"
+  };
+  function connectionTypeLabel(rawValue) {
+    if (!rawValue) return "";
+    return CONNECTION_TYPE_LABELS[rawValue] || String(rawValue);
+  }
   var MATCH_QUERY = `query Match($id: UUID!) {
   data: Match(id: $id) {
     id
@@ -8344,6 +8354,22 @@ ${add}` : add;
       ]
     };
   }
+  function candidateEmployeeFilterTopic({ id, team, page, routes }) {
+    return {
+      id,
+      title: `Kandidaten nach ${team} filtern`,
+      page,
+      routes,
+      kind: "view",
+      summary: `Über der Liste steht das Auswahlfeld „${team}“. Wer dort eine Person wählt, sieht nur noch Kandidaten mit mindestens einem offenen Match, das diese Person als ${team} betreut. Aufgeklappt zeigt jeder Kandidat dann nur diese Matches.`,
+      notes: [
+        `Der Filter gilt für die ganze Liste, nicht nur für die sichtbare Seite. Der Filter „CEM Status“ der Liste wirkt dabei auf dieselben Matches: ${team} wählen und „Hot Case“ zeigt Kandidaten mit einem Hot Case bei dieser Person.`,
+        "Gezählt werden offene Matches wie in der aufgeklappten Tabelle, ohne Reverse Matches.",
+        `Ohne CEM-Person im Filter „CEM“ kann die Liste zu groß werden; dann steht neben der Auswahl ein Hinweis und die Liste bleibt leer.`,
+        `„alle“ nimmt den ${team}-Filter wieder heraus. Die festen Focus-Modes setzen den Filter neu, danach die ${team}-Auswahl bei Bedarf wieder wählen.`
+      ]
+    };
+  }
   function executeMatchEmployeeFilter(runtime, {
     sourcePath,
     // RegExp auf location.hash
@@ -8357,7 +8383,9 @@ ${add}` : add;
     defaultFilter = async () => ({}),
     // CSS-Selektor einer Leiste, hinter die die Auswahl soll (sonst ueber die Liste)
     after = "",
-    helpTip
+    helpTip,
+    // () => Hinweis neben der Auswahl (z. B. Fehler der Kandidaten-IDs) oder ''
+    message = () => ""
   } = {}) {
     runtime.registerSource(sourcePath);
     const barId = `werkia-match-employee-filter-${field}`;
@@ -8428,9 +8456,10 @@ ${add}` : add;
       const active = String(Boolean(selected.length));
       if (bar.dataset.active !== active) bar.dataset.active = active;
       const status2 = bar.querySelector("[data-status]");
-      const text = loadError || (people === null ? "Lädt …" : "");
+      const hint = selected.length ? message() : "";
+      const text = loadError || hint || (people === null ? "Lädt …" : "");
       if (status2.textContent !== text) status2.textContent = text;
-      const state = loadError ? "error" : "";
+      const state = loadError || hint ? "error" : "";
       if (status2.dataset.state !== state) status2.dataset.state = state;
     }
     async function ensurePeople() {
@@ -8484,6 +8513,7 @@ ${add}` : add;
     runtime.createMutationObserver(scheduleRender).observe(document.documentElement, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleRender);
     scheduleRender();
+    return { refresh: scheduleRender };
   }
 
   // src/help.js
@@ -8629,7 +8659,7 @@ ${add}` : add;
       summary: "Legt denselben Terminvorschlag zusätzlich für weitere offene Matches des Kandidaten an, z. B. für vier OFMs oder Bewerbungen. So muss nicht jedes Match einzeln einen VTA bekommen.",
       steps: [
         "Den Terminvorschlag wie immer aus der Zeile des Matches öffnen und ausfüllen.",
-        "Unten im Dialog „Auch für weitere Matches dieses Kandidaten anlegen“ aufklappen und die Matches anhaken. Jede Zeile zeigt Arbeitgeber, Position, CEM- und OM-Status.",
+        "Unten im Dialog „Auch für weitere Matches dieses Kandidaten anlegen“ aufklappen und die Matches anhaken. Jede Zeile zeigt Arbeitgeber, Position, den Matchtyp (RVM, OFM, Bewerbung oder Einladung), CEM- und OM-Status.",
         "Speichern. Danach legt die Toolbox denselben Vorschlag für jedes gewählte Match an. Unten rechts steht je Match „angelegt“ oder der Fehler."
       ],
       notes: [
@@ -8654,6 +8684,7 @@ ${add}` : add;
     filterPresetsTopic({ page: "CEM › Meine Matches", routes: [ROUTES.cemMyMatches] }),
     matchStatusFilterTopic({ id: "kam-status-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
     matchEmployeeFilterTopic({ id: "kam-filter", team: "KAM", page: MY_MATCHES, routes: onMyMatches }),
+    candidateEmployeeFilterTopic({ id: "kam-filter-kandidaten", team: "KAM", page: "CEM › Meine Kandidaten", routes: [ROUTES.cemMyCandidates] }),
     tagsUnreadTopic({ page: "CEM › Meine Kandidaten › TAGS", routes: [ROUTES.cemMyCandidates] }),
     tagsSearchTopic({ page: "CEM › Meine Kandidaten › TAGS", routes: [ROUTES.cemMyCandidates] }),
     {
@@ -16351,7 +16382,182 @@ ${add}` : add;
     scheduleRender();
   }
 
+  // ../../shared/js/match-employee-filter/candidate-rewrite.js
+  var NO_MATCH_ID2 = "00000000-0000-0000-0000-000000000000";
+  var MAX_CANDIDATE_IDS = 2e3;
+  var PAGE_SIZE2 = 2e3;
+  var MAX_PAGES = 15;
+  var CACHE_MS9 = 60 * 1e3;
+  var CANDIDATE_STATUSES = ["cem", "active", "hired"];
+  var CANDIDATE_IDS_QUERY = `query WerkiaCandidateEmployeeFilterMatches($filter: MatchFilter, $page: Int, $perPage: Int) {
+  items: allMatches(filter: $filter, page: $page, perPage: $perPage) {
+    candidateId
+    connectionType
+    __typename
+  }
+}`;
+  function tooManyMessage(count) {
+    return `Zu viele Kandidaten für diesen Filter (${count}). Bitte im Filter „CEM“ eine Person wählen oder weiter eingrenzen.`;
+  }
+  var hasOwn = (node, key) => Object.prototype.hasOwnProperty.call(node, key);
+  var nonEmpty = (value) => Array.isArray(value) && value.length ? value : null;
+  function matchFilterFor(candidateFilter, { marker, matchField, defaultCemStatuses = [] }) {
+    const filter = {
+      [matchField]: selectedEmployeeIds(candidateFilter, marker),
+      matched: true,
+      isInActiveCemOmStatuses: true,
+      candidateStatuses: CANDIDATE_STATUSES
+    };
+    const cems = nonEmpty(candidateFilter?.cemEmployeeIds);
+    if (cems) filter.cemEmployeeIds = cems;
+    const cemStatuses = nonEmpty(candidateFilter?.cemStatuses) || nonEmpty(defaultCemStatuses);
+    if (cemStatuses) filter.cemStatuses = cemStatuses;
+    return filter;
+  }
+  function candidateIdsFromMatches(items) {
+    const ids = /* @__PURE__ */ new Set();
+    for (const item of items || []) {
+      if (item?.candidateId && item.connectionType !== "reverse") ids.add(String(item.candidateId).toLowerCase());
+    }
+    return [...ids];
+  }
+  async function loadCandidateIds(request, matchFilter) {
+    const items = [];
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const data = await request(CANDIDATE_IDS_QUERY, { filter: matchFilter, page, perPage: PAGE_SIZE2 });
+      const batch = data?.items || [];
+      items.push(...batch);
+      if (batch.length < PAGE_SIZE2) return candidateIdsFromMatches(items);
+    }
+    throw new Error(tooManyMessage(`mehr als ${MAX_PAGES * PAGE_SIZE2} Matches`));
+  }
+  function bodyHasMarker2(body, marker) {
+    return typeof body === "string" && body.includes(`"${marker}"`);
+  }
+  function markerFromHash2(hash, marker) {
+    const ids = selectedEmployeeIds(parseListState(hash).filter, marker);
+    return ids.length ? ids : null;
+  }
+  var usesType = (operation, type) => typeof operation?.query === "string" && new RegExp(`:\\s*${type}\\b`).test(operation.query);
+  function markedFilters(node, marker, found = []) {
+    if (Array.isArray(node)) node.forEach((item) => markedFilters(item, marker, found));
+    else if (node && typeof node === "object") {
+      if (hasOwn(node, marker)) found.push(node);
+      Object.keys(node).forEach((key) => {
+        if (key !== marker) markedFilters(node[key], marker, found);
+      });
+    }
+    return found;
+  }
+  function rewriteCandidateVariables(node, marker, idsFor) {
+    if (Array.isArray(node)) return node.map((item) => rewriteCandidateVariables(item, marker, idsFor));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== marker) out[key] = rewriteCandidateVariables(node[key], marker, idsFor);
+    });
+    if (!hasOwn(node, marker)) return out;
+    if (!selectedEmployeeIds(node, marker).length) return out;
+    let ids = idsFor(node) || [];
+    if (Array.isArray(out.ids) && out.ids.length) {
+      const within = new Set(out.ids.map((id) => String(id).toLowerCase()));
+      ids = ids.filter((id) => within.has(String(id).toLowerCase()));
+    }
+    out.ids = ids.length ? ids : [NO_MATCH_ID2];
+    return out;
+  }
+  function stripMarker2(node, marker) {
+    if (Array.isArray(node)) return node.map((item) => stripMarker2(item, marker));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    Object.keys(node).forEach((key) => {
+      if (key !== marker) out[key] = stripMarker2(node[key], marker);
+    });
+    return out;
+  }
+  function isCandidateMatchFilter(filter) {
+    return Boolean(filter && typeof filter === "object" && (filter.candidateId || nonEmpty(filter.candidateIds)));
+  }
+  function rewriteBody2(body, { marker, matchField, idsFor, pageEmployees = null }) {
+    const payload = JSON.parse(body);
+    const rewrite = (operation) => {
+      if (!operation || typeof operation !== "object") return operation;
+      if (usesType(operation, "CandidateFilter")) {
+        return { ...operation, variables: rewriteCandidateVariables(operation.variables, marker, idsFor) };
+      }
+      let variables = stripMarker2(operation.variables, marker);
+      const filter = variables?.filter;
+      if (pageEmployees && usesType(operation, "MatchFilter") && isCandidateMatchFilter(filter) && !nonEmpty(filter[matchField])) {
+        variables = { ...variables, filter: { ...filter, [matchField]: pageEmployees } };
+      }
+      return { ...operation, variables };
+    };
+    return JSON.stringify(Array.isArray(payload) ? payload.map(rewrite) : rewrite(payload));
+  }
+  function installCandidateEmployeeRewrite({
+    pageWindow,
+    marker,
+    matchField,
+    defaultCemStatuses = [],
+    loadIds,
+    onResult = () => {
+    },
+    isTargetPage: isTargetPage3 = () => true,
+    now = () => Date.now()
+  }) {
+    const flag = `__werkiaCandidateEmployeeRewrite_${marker}`;
+    if (!pageWindow || pageWindow[flag] || typeof pageWindow.fetch !== "function") return false;
+    pageWindow[flag] = true;
+    const cache = /* @__PURE__ */ new Map();
+    const scopeOf = (filter) => matchFilterFor(filter, { marker, matchField, defaultCemStatuses });
+    function idsPromise(matchFilter) {
+      const key = JSON.stringify(matchFilter);
+      const hit = cache.get(key);
+      if (hit && now() - hit.at < CACHE_MS9) return hit.promise;
+      const promise = Promise.resolve().then(() => loadIds(matchFilter)).then((ids) => {
+        if (ids.length > MAX_CANDIDATE_IDS) throw new Error(tooManyMessage(ids.length));
+        return ids;
+      });
+      promise.catch(() => cache.delete(key));
+      cache.set(key, { at: now(), promise });
+      return promise;
+    }
+    const originalFetch = pageWindow.fetch;
+    pageWindow.fetch = function werkiaCandidateEmployeeFetch(input, init) {
+      const body = init?.body;
+      const url = typeof input === "string" ? input : input?.url;
+      let pageEmployees = null;
+      try {
+        pageEmployees = isTargetPage3() ? markerFromHash2(pageWindow.location?.hash || "", marker) : null;
+      } catch {
+      }
+      const relevant = typeof body === "string" && (bodyHasMarker2(body, marker) || pageEmployees && body.includes("MatchFilter"));
+      if (!relevant || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      let filters = [];
+      try {
+        const payload = JSON.parse(body);
+        const operations = Array.isArray(payload) ? payload : [payload];
+        filters = operations.filter((operation) => usesType(operation, "CandidateFilter")).flatMap((operation) => markedFilters(operation.variables, marker)).filter((filter) => selectedEmployeeIds(filter, marker).length);
+      } catch {
+        return originalFetch.call(pageWindow, input, init);
+      }
+      return Promise.all(filters.map((filter) => idsPromise(scopeOf(filter)).then((ids) => {
+        onResult({ error: "" });
+        return ids;
+      }).catch((error) => {
+        onResult({ error: error?.message || String(error) });
+        return null;
+      }))).then((results) => {
+        const byScope = new Map(filters.map((filter, index) => [JSON.stringify(scopeOf(filter)), results[index]]));
+        const idsFor = (filter) => byScope.get(JSON.stringify(scopeOf(filter))) || null;
+        return originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody2(body, { marker, matchField, idsFor, pageEmployees }) }));
+      });
+    };
+    return true;
+  }
+
   // src/features/kam-filter.js
+  var KAM_CANDIDATE_MARKER = "werkiaKamEmployeeIds";
   function executeKamFilter(runtime) {
     const request = (...args) => getCemGraphqlAdapter().request(...args);
     executeMatchEmployeeFilter(runtime, {
@@ -16365,6 +16571,39 @@ ${add}` : add;
       defaultFilter: async () => CEM_FOCUS_CORE.defaultScope((await request(ME_QUERY, {}))?.me || null),
       after: "#werkia-match-status-filter-kamStatuses",
       helpTip: () => cemHelp.tip("kam-filter")
+    });
+  }
+  function executeKamFilterCandidates(runtime, {
+    pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow
+  } = {}) {
+    const request = (...args) => getCemGraphqlAdapter().request(...args);
+    const isTargetPage3 = () => ROUTES.cemMyCandidates.test(location.hash || "");
+    let error = "";
+    let filterApi = null;
+    installCandidateEmployeeRewrite({
+      pageWindow,
+      marker: KAM_CANDIDATE_MARKER,
+      matchField: "kamEmployeeIds",
+      defaultCemStatuses: OPEN_CEM_STATUSES,
+      loadIds: (matchFilter) => loadCandidateIds(request, matchFilter),
+      isTargetPage: isTargetPage3,
+      onResult: (result) => {
+        const next = result?.error ? `KAM-Filter: ${result.error}` : "";
+        if (next === error) return;
+        error = next;
+        filterApi?.refresh();
+      }
+    });
+    filterApi = executeMatchEmployeeFilter(runtime, {
+      sourcePath: "cem/toolbox/src/features/kam-filter.js",
+      route: ROUTES.cemMyCandidates,
+      field: KAM_CANDIDATE_MARKER,
+      label: "KAM",
+      loadPeople: () => loadPeople(request, "kam"),
+      // Ohne Filter im Hash gelten die Standardwerte von Meine Kandidaten.
+      defaultFilter: async () => candidatesDefaultScope((await request(ME_QUERY, {}))?.me || null),
+      message: () => error,
+      helpTip: () => cemHelp.tip("kam-filter-kandidaten")
     });
   }
 
@@ -16483,7 +16722,7 @@ ${add}` : add;
   var LABEL_CLASS = "werkia-cem-vta-sperre-label";
   var INTERVIEW_CELL_SELECTOR = "td.column-matchInterview, td.column-interview";
   var VERTRETUNGEN_BUTTON_ID = "werkia-vertretungen-button";
-  var CACHE_MS9 = 10 * 60 * 1e3;
+  var CACHE_MS10 = 10 * 60 * 1e3;
   var RETRY_MS4 = 60 * 1e3;
   var CONFIRM_MS3 = 4e3;
   var T4 = {
@@ -16654,7 +16893,7 @@ ${add}` : add;
       return loading;
     }
     function loadList() {
-      if (cache && Date.now() - cache.at < CACHE_MS9) return Promise.resolve(cache);
+      if (cache && Date.now() - cache.at < CACHE_MS10) return Promise.resolve(cache);
       if (failedAt && Date.now() - failedAt < RETRY_MS4) return Promise.resolve(cache);
       return fetchList().catch((error) => {
         console.warn("[CEM-VTA-Sperre] Liste nicht geladen:", error?.message || error);
@@ -16986,20 +17225,20 @@ ${add}` : add;
   // src/features/cem-ampel/rewrite.js
   var NO_CEM_MESSAGE = "Der Ampel-Filter braucht mindestens eine CEM-Person im Filter „CEM“. Bitte dort auswählen.";
   var NEW_MISSING_MESSAGE = "Der NEW-Filter ist gerade nicht verfügbar. Bitte später noch einmal versuchen.";
-  var NO_MATCH_ID2 = "00000000-0000-0000-0000-000000000000";
+  var NO_MATCH_ID3 = "00000000-0000-0000-0000-000000000000";
   var INSTALLED_FLAG3 = "__werkiaCemAmpelRewrite";
-  function bodyHasMarker2(body) {
+  function bodyHasMarker3(body) {
     return typeof body === "string" && body.includes(`"${AMPEL_MARKER}"`);
   }
   function usesCandidateFilter(operation) {
     return typeof operation?.query === "string" && /:\s*CandidateFilter\b/.test(operation.query);
   }
-  function markedFilters(node, found = []) {
-    if (Array.isArray(node)) node.forEach((item) => markedFilters(item, found));
+  function markedFilters2(node, found = []) {
+    if (Array.isArray(node)) node.forEach((item) => markedFilters2(item, found));
     else if (node && typeof node === "object") {
       if (Object.prototype.hasOwnProperty.call(node, AMPEL_MARKER)) found.push(node);
       Object.keys(node).forEach((key) => {
-        if (key !== AMPEL_MARKER) markedFilters(node[key], found);
+        if (key !== AMPEL_MARKER) markedFilters2(node[key], found);
       });
     }
     return found;
@@ -17019,10 +17258,10 @@ ${add}` : add;
       const within = new Set(out.ids.map((id) => String(id).toLowerCase()));
       ids = ids.filter((id) => within.has(id));
     }
-    out.ids = ids.length ? ids : [NO_MATCH_ID2];
+    out.ids = ids.length ? ids : [NO_MATCH_ID3];
     return out;
   }
-  function rewriteBody2(body, farbenFor) {
+  function rewriteBody3(body, farbenFor) {
     const payload = JSON.parse(body);
     const rewrite = (operation) => {
       if (!operation || typeof operation !== "object") return operation;
@@ -17038,10 +17277,10 @@ ${add}` : add;
     pageWindow.fetch = function werkiaCemAmpelFetch(input, init) {
       const body = init?.body;
       const url = typeof input === "string" ? input : input?.url;
-      if (!bodyHasMarker2(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
+      if (!bodyHasMarker3(body) || !isGraphqlUrl(url)) return originalFetch.call(pageWindow, input, init);
       let filters = [];
       try {
-        filters = markedFilters(JSON.parse(body));
+        filters = markedFilters2(JSON.parse(body));
       } catch {
         return originalFetch.call(pageWindow, input, init);
       }
@@ -17057,7 +17296,7 @@ ${add}` : add;
       }))).then((results) => {
         const byFilter = new Map(filters.map((filter, index) => [JSON.stringify(listScope(filter)), results[index]]));
         const farbenFor = (filter) => byFilter.get(JSON.stringify(listScope(filter))) || null;
-        return originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody2(body, farbenFor) }));
+        return originalFetch.call(pageWindow, input, Object.assign({}, init, { body: rewriteBody3(body, farbenFor) }));
       });
     };
     return true;
@@ -17776,7 +18015,7 @@ ${add}` : add;
   var BOX_CLASS3 = "werkia-vta-sperre-warnung";
   var STYLE_ID15 = "werkia-vta-sperre-warnung-style";
   var ROW_SELECTOR9 = "tr, .MuiTableRow-root";
-  var CACHE_MS10 = 10 * 60 * 1e3;
+  var CACHE_MS11 = 10 * 60 * 1e3;
   var RETRY_MS6 = 60 * 1e3;
   var CLICK_MAX_AGE_MS3 = 10 * 60 * 1e3;
   var SNOOZE_KEY = "werkia-vta-sperre-warnung-snooze";
@@ -17875,7 +18114,7 @@ ${add}` : add;
       return myId;
     }
     function loadLookup() {
-      if (cache && now() - cache.at < CACHE_MS10) return Promise.resolve(cache.lookup);
+      if (cache && now() - cache.at < CACHE_MS11) return Promise.resolve(cache.lookup);
       if (failedAt && now() - failedAt < RETRY_MS6) {
         return cache ? Promise.resolve(cache.lookup) : Promise.reject(lastError || new Error("VTA-Sperrliste nicht erreichbar."));
       }
@@ -18323,6 +18562,8 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
         position: m.jobPosition?.mainTitle || "",
         cemStatus: m.cemStatus ? CEM_STATUS_LABELS[m.cemStatus] || m.cemStatus : "Kein CEM-Status",
         omStatus: m.onlineMatchStatus ? onlineMatchStatusLabel(m.onlineMatchStatus) : "",
+        // Matchtyp als Marke: RVM, OFM, Bewerbung, Einladung (Bella 2026-11-18).
+        type: connectionTypeLabel(m.connectionType),
         reverse: m.connectionType === "reverse",
         vta,
         vtaText: openVtaText(vta),
@@ -18516,6 +18757,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
       ${b} .wvm-meta { color:${T6.ink2}; font-size:12px; }
       ${b} .wvm-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
       ${b} .wvm-chip { padding:1px 7px; border-radius:999px; background:${T6.sunken}; color:${T6.ink2}; font-size:11px; font-weight:600; white-space:nowrap; }
+      ${b} .wvm-chip.wvm-type { background:transparent; box-shadow:inset 0 0 0 1px ${T6.line}; color:${T6.ink}; }
       ${b} .wvm-chip.wvm-vta { background:${T6.accentSoft}; color:${T6.accentInk}; }
       ${b} .wvm-chip.wvm-block { background:${T6.badSoft}; color:${T6.badInk}; }
       ${b} .wvm-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding-top:8px; }
@@ -18607,9 +18849,9 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
           renderBox(current);
         });
         const chips = el4("div", { className: "wvm-chips" }, [
+          row2.type ? el4("span", { className: "wvm-chip wvm-type", textContent: row2.type, title: "Matchtyp" }) : null,
           el4("span", { className: "wvm-chip", textContent: `CEM: ${row2.cemStatus}` }),
           row2.omStatus ? el4("span", { className: "wvm-chip", textContent: `OM: ${row2.omStatus}` }) : null,
-          row2.reverse ? el4("span", { className: "wvm-chip", textContent: "Reverse Match" }) : null,
           row2.vtaText ? el4("span", { className: "wvm-chip wvm-vta", textContent: row2.vtaText }) : null,
           row2.blocked ? el4("span", { className: "wvm-chip wvm-block", textContent: "Keine CEM-VTA (Sperrliste)", title: row2.blockEntry?.grund ? `Grund: ${row2.blockEntry.grund}` : "" }) : null
         ]);
@@ -19677,7 +19919,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
   var CELL_CLASS = "werkia-wa-cell";
   var PANEL_WIDENED_ATTR = "data-werkia-wa-widened";
   var IDS8 = { style: "werkia-wa-style", menu: "werkia-wa-menu", context: "werkia-wa-context", dialog: "werkia-wa-dialog", confirm: "werkia-wa-confirm", toast: "werkia-wa-toast" };
-  var CACHE_MS11 = 2 * 60 * 1e3;
+  var CACHE_MS12 = 2 * 60 * 1e3;
   var CSS = `
   .${BUTTON_CLASS} { margin:4px 0 0 6px; min-height:30px; padding:5px 14px; border:1px solid #1f9a6b; border-radius:999px; background:#e6f7f0; color:#1f9a6b; cursor:pointer; font:700 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif; vertical-align:middle; }
   .${CELL_CLASS} .${BUTTON_CLASS} { margin:0; }
@@ -19764,7 +20006,7 @@ Ob dieser Arbeitgeber für CEM-VTA gesperrt ist, ist unbekannt.` }),
       const entry = cache.get(key);
       if (entry && entry.expiresAt > Date.now()) return entry.promise;
       const promise = load2();
-      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS11 });
+      cache.set(key, { promise, expiresAt: Date.now() + CACHE_MS12 });
       promise.catch(() => cache.delete(key));
       return promise;
     }
@@ -22070,6 +22312,7 @@ Trotzdem speichern?`)) return void 0;
     { id: "kam-status-filter", execute: executeKamStatusFilter },
     { id: "kam-status-filter-expanded", execute: executeKamStatusFilterExpanded },
     { id: "kam-filter", execute: executeKamFilter },
+    { id: "kam-filter-kandidaten", execute: (runtime) => executeKamFilterCandidates(runtime) },
     { id: "tags-unread", execute: executeCemTagsUnread },
     { id: "tags-search", execute: executeCemTagsSearch },
     { id: "vertretungen", execute: executeVertretungen2 },

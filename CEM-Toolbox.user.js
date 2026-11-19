@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CEM Toolbox
 // @namespace    https://werkia.de/cem-toolbox
-// @version      1.36.584
+// @version      1.36.608
 // @description  Vereint CEM-OFM, Vakanz-Kandidateninfos und dringende Vakanzen fuer CEM.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/CEM.svg
 // @match        https://admin.werkia.de/*
@@ -11767,9 +11767,13 @@ ${add}` : add;
   var CANDIDATE_LINK_SELECTOR = 'a[href*="#/Candidate/"]';
   var ROW_SELECTOR4 = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
   var EXPAND_ROW_SELECTOR = 'tr[id^="Candidate-"][id$="-expand"]';
-  function isInViewport(row2) {
+  function rowPlace(row2) {
+    if (!row2?.isConnected || !row2.getClientRects().length) return "hidden";
     const rect = row2.getBoundingClientRect();
-    return rect.bottom > 0 && rect.top < (window.innerHeight || document.documentElement.clientHeight || 0);
+    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (rect.bottom > 0 && rect.top < h) return "view";
+    if (rect.bottom > -h && rect.top < 2 * h) return "near";
+    return "far";
   }
   var LEVEL_STYLES = {
     skull: "border-color:#e03131;background:#ffe3e3;color:#8f1d1d;font-weight:800;",
@@ -11854,6 +11858,8 @@ ${add}` : add;
     const namespace = options.namespace || "werkia";
     const getProvider = options.getProvider;
     const pageKeys = options.pages || ["potentialMatches"];
+    const nearViewportOnly = options.nearViewportOnly === true;
+    const isPaused = typeof options.isPaused === "function" ? options.isPaused : () => false;
     if (options.sourcePath) runtime.registerSource(options.sourcePath);
     const BADGE_CLASS2 = `werkia-${namespace}-commute-badge`;
     const STYLE_ID19 = `werkia-${namespace}-commute-style`;
@@ -11986,6 +11992,7 @@ ${add}` : add;
       scheduleRender();
     }
     function work() {
+      if (queue.length && isPaused()) return;
       while (workers < WORKERS2 && queue.length) {
         const candidateId = queue.shift();
         workers += 1;
@@ -12009,6 +12016,7 @@ ${add}` : add;
         return;
       }
       if (waitForAdminpanel()) return;
+      if (isPaused()) return;
       let provider;
       try {
         provider = getProvider();
@@ -12017,6 +12025,8 @@ ${add}` : add;
       }
       ensureStyles2();
       const items = currentItems();
+      for (const item of items) item.place = rowPlace(item.row);
+      const lazy = nearViewportOnly && page.skullMode !== "hide";
       const missingJobs = items.filter((item) => !provider.getCachedJob(item.jobId)).map((item) => item.jobId);
       if (missingJobs.length) {
         provider.loadJobs(missingJobs).then(scheduleRender, () => {
@@ -12056,11 +12066,13 @@ ${add}` : add;
         if (view.hide) hiddenCount += 1;
         renderBadge(item, view);
         const lastAttempt = attempts.get(`${item.candidateId}|${item.jobId}`) || 0;
-        if (job && !noAddress && !entry && isRowVisible(item.row) && Date.now() - lastAttempt >= RETRY_MS8) {
-          toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || isInViewport(item.row));
+        const wanted = lazy ? item.place === "view" || item.place === "near" : item.place !== "hidden";
+        if (job && !noAddress && !entry && wanted && Date.now() - lastAttempt >= RETRY_MS8) {
+          toEnqueue.set(item.candidateId, toEnqueue.get(item.candidateId) || item.place === "view");
         }
       }
       [...toEnqueue].sort((a, b) => Number(b[1]) - Number(a[1])).forEach(([candidateId]) => enqueue(candidateId));
+      work();
       if (page.skullMode === "hide") renderHiddenBar(items, hiddenCount);
     }
     function scheduleRender() {
@@ -12072,6 +12084,7 @@ ${add}` : add;
       }, 250);
     }
     runtime.createMutationObserver((mutations) => {
+      if (scheduled) return;
       const foreign = mutations.some((mutation) => {
         if (mutation.target?.closest?.(OWNED_SELECTOR2)) return false;
         return ![...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.matches?.(OWNED_SELECTOR2));
@@ -12079,6 +12092,7 @@ ${add}` : add;
       if (foreign) scheduleRender();
     }).observe(document.body, { childList: true, subtree: true });
     runtime.addWindowListener("hashchange", scheduleRender);
+    if (nearViewportOnly) runtime.addDocumentListener("scroll", scheduleRender, { capture: true, passive: true });
     scheduleRender();
   }
 

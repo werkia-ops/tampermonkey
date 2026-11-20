@@ -36,6 +36,7 @@ Enthaltene Funktionen:
 - Liest den Betreff einer geoeffneten Outlook-Bewerbungsmail, findet den passenden Match per GraphQL und setzt KAM Status auf "Out" inkl. Pflichtgrund - offene Terminvorschlaege werden ebenfalls abgelehnt.
 - Ueberdeckt in der Vakanzliste die Statusspalte mit einem Dropdown, das den Vakanz-Status direkt speichert. "Alle ändern" im Spaltenkopf setzt den Status fuer die angehakten sichtbaren Vakanzen gemeinsam. Nach dem Pausieren fragt die Toolbox, ob die offenen Matches der Vakanz auf KAM-Out „Stelle besetzt“ sollen.
 - Kleine Marke „Gecrawlt“ hinter dem Vakanztitel in der Vakanzliste und in Meine Matches, wenn die Stelle aus dem Auto-Crawling kommt; Tooltip „Gecrawlt am …“. Andere Vakanzen bekommen keine Marke. Erkannt am Tag „[Crawling]“ in den Vakanz-Notizen, den jede gecrawlte Stelle beim Anlegen bekommt; gelesen per GraphQL.
+- Kein RVM je Stelle (W109): rote Marke „Kein RVM“ hinter dem Vakanztitel in Meine Matches und in der Vakanzliste, wenn [KEIN RVM] in den Vakanz-Notizen steht; Klick nimmt es heraus. Sonst beim Zeigen auf die Zeile „+ Kein RVM“ zum Setzen, danach kurz „Rückgängig“.
 - Fuegt im Arbeitgeberprofil OM-Flag-Vorlagen direkt am Feld OM Notes ein.
 - Markiert dringend zu besetzende Vakanzen bei potenziellen Kandidaten-Matches farblich in der Liste.
 - Knopf "Vertretungen" neben den Filter-Knöpfen von Meine Matches und im Tampermonkey-Menü: trägt Vertretungen ein, die VT Automatik, VT Bot und VT-Status-Hinweis zusätzlich taggen. Gespeichert im n8n-Workflow Vertretungen.

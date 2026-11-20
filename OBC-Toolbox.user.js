@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.21.627
+// @version      1.21.634
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -7795,61 +7795,8 @@
     ten_plus: 4
   };
 
-  // src/features/om-match-flags.js
-  var ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
-  var ROWS = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
-  var ROW_CLASS = "werkia-obc-om-must-row";
-  var HIDDEN_CLASS = "werkia-obc-om-must-hidden";
-  var BADGE_CLASS = "werkia-obc-om-must-badge";
-  var EXCLUSION_BADGE_CLASS = "werkia-obc-om-exclusion-badge";
-  var STYLE_ID2 = "werkia-obc-om-must-style";
-  var TRAVEL_BAR_CLASS = "werkia-obc-travel-hidden-bar";
-  var COMMUTE_BAR_CLASS = "werkia-obc-commute-hidden-bar";
-  var CONTROL_ID = "werkia-obc-om-must-control";
-  var SETTINGS_KEY = "werkia_obc_om_match_flags_v1";
-  var CACHE_MS2 = 5 * 60 * 1e3;
-  var FLAG_TYPES = [
-    { key: "experience", label: "BE-Anforderungen markieren", hint: "Zeigt Hinweise zur geforderten Berufserfahrung.", helpTopic: "om-filter-mark-experience" },
-    { key: "area", label: "Fachbereiche markieren", hint: "Zeigt Muss- und Plus-Hinweise zum Fachbereich.", helpTopic: "om-filter-mark-area" },
-    { key: "qualification", label: "Qualifikationen markieren", hint: "Zeigt geforderte Scheine und Zertifikate.", helpTopic: "om-filter-mark-qualification" }
-  ];
-  var HIDE_TYPES = [
-    { key: "experience", label: "Stellen bei zu wenig Berufserfahrung ausblenden", hint: "Nur bei [Muss: BE] und zwei bekannten Erfahrungsstufen.", helpTopic: "om-filter-hide-experience" },
-    { key: "area", label: "Stellen mit abweichendem Fachbereich ausblenden", hint: "Nur bei [Muss: Fachbereich] und zwei ausgefüllten Fachbereichslisten.", helpTopic: "om-filter-hide-area" },
-    { key: "sentEmployer", label: "Stellen von Arbeitgebern mit bereits gesendetem Match ausblenden", hint: "Gilt nur für diesen Kandidaten.", helpTopic: "om-filter-hide-sent-employer" },
-    { key: "employerLimit", label: "Ab der vierten Stelle je Arbeitgeber ausblenden", hint: "Behält die ersten drei Stellen in AP-Reihenfolge, auch über Seitenwechsel hinweg.", helpTopic: "om-filter-hide-employer-limit" },
-    { key: "travel", label: "Stellen mit zu hoher Montagebereitschaft ausblenden", hint: "Wenn die Stelle zwei oder mehr Stufen mehr Montage verlangt, als der Kandidat angibt.", helpTopic: "om-filter-hide-travel" }
-  ];
+  // ../../shared/js/om-match-flags/core.js
   var TRAVEL_LABELS = { none: "keine", low: "gering", regular: "regelmäßig", unrestricted: "uneingeschränkt" };
-  var JOBS_QUERY = `query allJobPositions($filter: JobPositionFilter) {
-  items: allJobPositions(filter: $filter) {
-    id
-    additionalInformation
-    jobAreas
-    requiredYearsOfExperience
-    frequencyOfTravel
-    employer { id omNotes __typename }
-    __typename
-  }
-}`;
-  var CANDIDATE_QUERY = `query Candidate($id: UUID!) {
-  data: Candidate(id: $id) {
-    id
-    jobAreas
-    yearsOfExperience
-    desiredTravel
-    __typename
-  }
-}`;
-  var MATCHES_QUERY = `query allPotentialMatches($filter: PotentialMatchFilter!, $sortField: String, $sortOrder: String, $page: Int, $perPage: Int) {
-  items: allPotentialMatches(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
-    jobPositionId
-  }
-  total: _allPotentialMatchesMeta(filter: $filter, page: $page, perPage: $perPage) { count }
-}`;
-  var RANKING_JOBS_QUERY = `query allJobPositions($filter: JobPositionFilter) {
-  items: allJobPositions(filter: $filter) { id employer { id } }
-}`;
   function collectOmMatchFlags(...notes) {
     const entries = /* @__PURE__ */ new Map();
     for (const [index, note] of notes.entries()) {
@@ -7934,6 +7881,61 @@
     if (!Number.isInteger(required) || !Number.isInteger(actual) || required - actual < 2) return "";
     return `Montagebereitschaft: Stelle ${TRAVEL_LABELS[job.frequencyOfTravel]}, Kandidat ${TRAVEL_LABELS[candidate.desiredTravel]}`;
   }
+
+  // src/features/om-match-flags.js
+  var ROUTE = /^#\/Candidate\/[a-f0-9-]{36}\/show\/7(?:[/?]|$)/i;
+  var ROWS = "tbody tr.RaDataTable-row, tbody tr.MuiTableRow-root";
+  var ROW_CLASS = "werkia-obc-om-must-row";
+  var HIDDEN_CLASS = "werkia-obc-om-must-hidden";
+  var BADGE_CLASS = "werkia-obc-om-must-badge";
+  var EXCLUSION_BADGE_CLASS = "werkia-obc-om-exclusion-badge";
+  var STYLE_ID2 = "werkia-obc-om-must-style";
+  var TRAVEL_BAR_CLASS = "werkia-obc-travel-hidden-bar";
+  var COMMUTE_BAR_CLASS = "werkia-obc-commute-hidden-bar";
+  var CONTROL_ID = "werkia-obc-om-must-control";
+  var SETTINGS_KEY = "werkia_obc_om_match_flags_v1";
+  var CACHE_MS2 = 5 * 60 * 1e3;
+  var FLAG_TYPES = [
+    { key: "experience", label: "BE-Anforderungen markieren", hint: "Zeigt Hinweise zur geforderten Berufserfahrung.", helpTopic: "om-filter-mark-experience" },
+    { key: "area", label: "Fachbereiche markieren", hint: "Zeigt Muss- und Plus-Hinweise zum Fachbereich.", helpTopic: "om-filter-mark-area" },
+    { key: "qualification", label: "Qualifikationen markieren", hint: "Zeigt geforderte Scheine und Zertifikate.", helpTopic: "om-filter-mark-qualification" }
+  ];
+  var HIDE_TYPES = [
+    { key: "experience", label: "Stellen bei zu wenig Berufserfahrung ausblenden", hint: "Nur bei [Muss: BE] und zwei bekannten Erfahrungsstufen.", helpTopic: "om-filter-hide-experience" },
+    { key: "area", label: "Stellen mit abweichendem Fachbereich ausblenden", hint: "Nur bei [Muss: Fachbereich] und zwei ausgefüllten Fachbereichslisten.", helpTopic: "om-filter-hide-area" },
+    { key: "sentEmployer", label: "Stellen von Arbeitgebern mit bereits gesendetem Match ausblenden", hint: "Gilt nur für diesen Kandidaten.", helpTopic: "om-filter-hide-sent-employer" },
+    { key: "employerLimit", label: "Ab der vierten Stelle je Arbeitgeber ausblenden", hint: "Behält die ersten drei Stellen in AP-Reihenfolge, auch über Seitenwechsel hinweg.", helpTopic: "om-filter-hide-employer-limit" },
+    { key: "travel", label: "Stellen mit zu hoher Montagebereitschaft ausblenden", hint: "Wenn die Stelle zwei oder mehr Stufen mehr Montage verlangt, als der Kandidat angibt.", helpTopic: "om-filter-hide-travel" }
+  ];
+  var JOBS_QUERY = `query allJobPositions($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) {
+    id
+    additionalInformation
+    jobAreas
+    requiredYearsOfExperience
+    frequencyOfTravel
+    employer { id omNotes __typename }
+    __typename
+  }
+}`;
+  var CANDIDATE_QUERY = `query Candidate($id: UUID!) {
+  data: Candidate(id: $id) {
+    id
+    jobAreas
+    yearsOfExperience
+    desiredTravel
+    __typename
+  }
+}`;
+  var MATCHES_QUERY = `query allPotentialMatches($filter: PotentialMatchFilter!, $sortField: String, $sortOrder: String, $page: Int, $perPage: Int) {
+  items: allPotentialMatches(filter: $filter, sortField: $sortField, sortOrder: $sortOrder, page: $page, perPage: $perPage) {
+    jobPositionId
+  }
+  total: _allPotentialMatchesMeta(filter: $filter, page: $page, perPage: $perPage) { count }
+}`;
+  var RANKING_JOBS_QUERY = `query allJobPositions($filter: JobPositionFilter) {
+  items: allJobPositions(filter: $filter) { id employer { id } }
+}`;
   function pageTheme() {
     for (const element of [document.body, document.documentElement]) {
       const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(getComputedStyle(element).backgroundColor);

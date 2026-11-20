@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KAM Toolbox
 // @namespace    https://werkia.de/kam-toolbox
-// @version      1.36.590
+// @version      1.36.615
 // @description  Vereint die KAM Suite und dringende Vakanzen fuer KAM.
 // @match        https://admin.werkia.de/*
 // @match        https://staging-admin.werkia.de/*
@@ -235,6 +235,125 @@
         omFeedbackLabel: omFeedbackLabel2,
         omOutReason: omOutReason2,
         outReason: outReason2
+      };
+    }
+  });
+
+  // ../../shared/js/termin-plan/plan.cjs
+  var require_plan = __commonJS({
+    "../../shared/js/termin-plan/plan.cjs"(exports, module) {
+      var OFFENE_STATUS2 = Object.freeze(["suggestion", "forwarded", "not_reconfirmed"]);
+      var GESUCHTE_STATUS2 = Object.freeze([...OFFENE_STATUS2, "confirmed"]);
+      var MAX_TERMINE2 = 6;
+      var KEIN_TERMIN2 = "Kein Termin mit Uhrzeit in der Mail, bitte unter „Ändern“ eintragen.";
+      var SCHON_BESTAETIGT2 = "Termin ist im Adminpanel schon bestätigt.";
+      var SCHON_VORGESCHLAGEN2 = "Diesen Vorschlag gibt es im Adminpanel schon.";
+      var BERLIN_FMT = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Berlin",
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      function berlinToEpoch2(local) {
+        const hit = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(local || ""));
+        if (!hit) return NaN;
+        const asUtc = Date.UTC(+hit[1], +hit[2] - 1, +hit[3], +hit[4], +hit[5]);
+        const parts = Object.fromEntries(BERLIN_FMT.formatToParts(new Date(asUtc)).map((part) => [part.type, part.value]));
+        const shown = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+        return asUtc - (shown - asUtc);
+      }
+      function zeitpunkt2(value) {
+        if (value instanceof Date) return value.getTime();
+        if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+        const text = String(value || "").trim();
+        const lokal = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(text);
+        if (lokal) return berlinToEpoch2(lokal[1]);
+        if (!/T\d{2}:\d{2}/.test(text) || !/(Z|[+-]\d{2}:?\d{2})$/i.test(text)) return NaN;
+        const t = Date.parse(text);
+        return Number.isFinite(t) ? t : NaN;
+      }
+      var minuteVon = (value) => {
+        const t = zeitpunkt2(value);
+        return Number.isFinite(t) ? Math.floor(t / 6e4) : NaN;
+      };
+      function gleicheMinute2(a, b) {
+        const x = minuteVon(a);
+        return Number.isFinite(x) && x === minuteVon(b);
+      }
+      function datumIm2(interview, value) {
+        return (interview && interview.dates || []).find((d) => gleicheMinute2(d, value)) || "";
+      }
+      function isoListe2(values) {
+        const ms2 = [...new Set((values || []).map(zeitpunkt2).filter(Number.isFinite))].sort((a, b) => a - b);
+        return ms2.map((t) => new Date(t).toISOString());
+      }
+      function termineAusMail2(entry) {
+        const lokal = [...entry && entry.termine || [], ...entry && entry.termin ? [entry.termin] : []];
+        const epochs = [...new Set(lokal.map(berlinToEpoch2).filter((value) => !Number.isNaN(value)))].sort((a, b) => a - b);
+        return epochs.slice(0, MAX_TERMINE2).map((value) => new Date(value).toISOString());
+      }
+      var istOffen2 = (interview) => OFFENE_STATUS2.includes(interview && interview.status);
+      var istBestaetigt = (interview) => Boolean(interview) && interview.status === "confirmed";
+      function interviewMitDatum2(interviews, value) {
+        const liste = (interviews || []).filter((iv) => istBestaetigt(iv) || istOffen2(iv));
+        const hit = liste.find((iv) => istBestaetigt(iv) && datumIm2(iv, value)) || liste.find((iv) => datumIm2(iv, value));
+        return hit ? { interview: hit, datum: datumIm2(hit, value) } : null;
+      }
+      function terminPlan2({ termine = [], form = "vtv", interviews = [], art = "" } = {}) {
+        const alle = isoListe2(termine);
+        const dates = form === "vtv" ? alle.slice(0, 1) : alle.slice(0, MAX_TERMINE2);
+        if (!dates.length) return { aktion: "nichts", grund: KEIN_TERMIN2 };
+        const liste = interviews || [];
+        const bestaetigt = liste.find((iv) => istBestaetigt(iv) && dates.some((d) => datumIm2(iv, d)));
+        if (bestaetigt) {
+          const datum = dates.find((d) => datumIm2(bestaetigt, d));
+          return { aktion: "vorhanden", interviewId: bestaetigt.id, interview: bestaetigt, datum, grund: SCHON_BESTAETIGT2 };
+        }
+        const offen = liste.filter(istOffen2);
+        if (form === "vtv") {
+          const treffer = offen.find((iv) => datumIm2(iv, dates[0]));
+          if (treffer) {
+            return { aktion: "bestaetigen", interviewId: treffer.id, interview: treffer, datum: new Date(zeitpunkt2(datumIm2(treffer, dates[0]))).toISOString() };
+          }
+          return { aktion: "anlegen", status: "confirmed", datum: dates[0], dates, art };
+        }
+        const gleich = offen.find((iv) => dates.every((d) => datumIm2(iv, d)));
+        if (gleich) return { aktion: "vorhanden", interviewId: gleich.id, interview: gleich, grund: SCHON_VORGESCHLAGEN2 };
+        return { aktion: "anlegen", status: "suggestion", datum: dates[0], dates, art };
+      }
+      function mutationVariablen2(plan2, { matchId = "", typ = "", ort = "", hinweise = "" } = {}) {
+        if (!plan2) return null;
+        if (plan2.aktion === "bestaetigen") {
+          const variables = { id: plan2.interviewId, status: "confirmed", dates: [plan2.datum], confirmedByEmployer: true, confirmedByCandidate: true };
+          if (typ) variables.type = typ;
+          return variables;
+        }
+        if (plan2.aktion === "anlegen") {
+          const type = typ || plan2.art || "";
+          if (!type || !matchId) return null;
+          return { matchId, status: plan2.status, dates: plan2.dates, type, dateSuggestedBy: "employer", location: ort || null, instructions: hinweise || null, kamTagged: false, ignoreValidation: false };
+        }
+        return null;
+      }
+      module.exports = {
+        OFFENE_STATUS: OFFENE_STATUS2,
+        GESUCHTE_STATUS: GESUCHTE_STATUS2,
+        MAX_TERMINE: MAX_TERMINE2,
+        KEIN_TERMIN: KEIN_TERMIN2,
+        SCHON_BESTAETIGT: SCHON_BESTAETIGT2,
+        SCHON_VORGESCHLAGEN: SCHON_VORGESCHLAGEN2,
+        berlinToEpoch: berlinToEpoch2,
+        zeitpunkt: zeitpunkt2,
+        gleicheMinute: gleicheMinute2,
+        datumIm: datumIm2,
+        isoListe: isoListe2,
+        termineAusMail: termineAusMail2,
+        interviewMitDatum: interviewMitDatum2,
+        terminPlan: terminPlan2,
+        mutationVariablen: mutationVariablen2
       };
     }
   });
@@ -17569,6 +17688,26 @@ ${buildCbreBody(current)}`;
   }
   var DAY_FMT = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" });
 
+  // ../../shared/js/termin-plan/index.js
+  var import_plan = __toESM(require_plan(), 1);
+  var {
+    OFFENE_STATUS,
+    GESUCHTE_STATUS,
+    MAX_TERMINE,
+    KEIN_TERMIN,
+    SCHON_BESTAETIGT,
+    SCHON_VORGESCHLAGEN,
+    berlinToEpoch,
+    zeitpunkt,
+    gleicheMinute,
+    datumIm,
+    isoListe,
+    termineAusMail,
+    interviewMitDatum,
+    terminPlan,
+    mutationVariablen
+  } = import_plan.default;
+
   // src/features/outlook-assistent/core.js
   var WEBHOOK_URL7 = "https://hooks.werkia-ops.de/webhook/kam-mail/3b8e5f27-9c14-4d6a-b2e0-7f41a9c3d856";
   var REQUEST_TIMEOUT_MS7 = 2e4;
@@ -17696,18 +17835,17 @@ ${buildCbreBody(current)}`;
   var matchOf = (vorschlag, index) => (vorschlag?.matches || [])[index] || null;
   var preselect = (entry) => Boolean(entry?.matchId) && (Number(entry?.sicherheit) || 0) >= PRESELECT_FROM;
   var AUS = /* @__PURE__ */ new Set(["out", "hired"]);
-  var isoListe = (values) => [...new Set((values || []).map((v) => new Date(v)).filter((d) => !Number.isNaN(d.getTime())).map((d) => d.toISOString()))].sort();
   function terminChoice(vorschlag, entry, index, known, current) {
-    const plan = entry.terminPlan || (entry.terminVorschlag?.interviewId ? {
+    const plan2 = entry.terminPlan || (entry.terminVorschlag?.interviewId ? {
       termine: [entry.terminVorschlag.datum],
       typ: "",
       ort: "",
       hinweise: "",
       vorhanden: [{ id: entry.terminVorschlag.interviewId, status: entry.terminVorschlag.bestaetigt ? "confirmed" : "suggestion", typ: "", dates: entry.terminVorschlag.dates || [entry.terminVorschlag.datum] }]
     } : null);
-    if (!plan) return null;
-    const termine = isoListe(plan.termine);
-    const vorhanden = (plan.vorhanden || []).map((iv) => ({ ...iv, dates: isoListe(iv.dates) }));
+    if (!plan2) return null;
+    const termine = isoListe(plan2.termine);
+    const vorhanden = (plan2.vorhanden || []).map((iv) => ({ ...iv, dates: isoListe(iv.dates) }));
     const treffer = vorhanden.find((iv) => termine.some((t) => iv.dates.includes(t)));
     const optionen = isoListe([...termine, ...treffer && treffer.status !== "confirmed" ? treffer.dates : []]);
     const vtv = Boolean(treffer) || vorschlag?.mailart === "termin_zusage" || entry.kam_status === "interview_feedback";
@@ -17717,13 +17855,13 @@ ${buildCbreBody(current)}`;
       match: index,
       form: vtv ? "vtv" : "vta",
       // Die Art am bestehenden Termin hat ein Mensch gesetzt, sie geht vor.
-      typ: treffer?.typ || plan.typ || "",
+      typ: treffer?.typ || plan2.typ || "",
       optionen,
       datum: termine[0] || optionen[0] || "",
       auswahl: termine.length ? termine : optionen,
       vorhanden,
-      ort: plan.ort || "",
-      hinweise: plan.hinweise || "",
+      ort: plan2.ort || "",
+      hinweise: plan2.hinweise || "",
       moeglich: known,
       hinweis: ""
     };
@@ -17731,27 +17869,19 @@ ${buildCbreBody(current)}`;
     choice.aktiv = preselect(entry) && !AUS.has(current) && (Boolean(choice.typ) || aktion.op === "bestaetigen") && aktion.op !== "nichts";
     return choice;
   }
-  var enthaelt = (interview, iso) => (interview.dates || []).some((d) => Date.parse(d) === Date.parse(iso));
   function terminAktion(choice) {
-    const vorhanden = choice.vorhanden || [];
-    if (choice.form === "vtv") {
-      if (!choice.datum) return { op: "nichts", grund: "Kein Termin mit Uhrzeit in der Mail, bitte unter „Ändern“ eintragen." };
-      const bestaetigt = vorhanden.find((iv) => iv.status === "confirmed" && enthaelt(iv, choice.datum));
-      if (bestaetigt) {
-        if (choice.typ && bestaetigt.typ && choice.typ !== bestaetigt.typ) return { op: "art", interview: bestaetigt };
-        return { op: "nichts", grund: "Termin ist im Adminpanel schon bestätigt." };
-      }
-      const offen2 = vorhanden.find((iv) => iv.status !== "confirmed" && enthaelt(iv, choice.datum));
-      return offen2 ? { op: "bestaetigen", interview: offen2, dates: [choice.datum] } : { op: "anlegen", status: "confirmed", dates: [choice.datum] };
-    }
-    const dates = [...new Set(choice.auswahl || [])].sort((a, b) => Date.parse(a) - Date.parse(b));
-    if (!dates.length) return { op: "nichts", grund: "Kein Termin mit Uhrzeit in der Mail, bitte unter „Ändern“ eintragen." };
-    const offen = vorhanden.find((iv) => iv.status !== "confirmed" && dates.every((d) => enthaelt(iv, d)));
-    if (offen) {
-      if (choice.typ && offen.typ && choice.typ !== offen.typ) return { op: "art", interview: offen };
-      return { op: "nichts", grund: "Diesen Vorschlag gibt es im Adminpanel schon." };
-    }
-    return { op: "anlegen", status: "suggestion", dates: dates.slice(0, 6) };
+    const vtv = choice.form === "vtv";
+    const plan2 = terminPlan({
+      form: vtv ? "vtv" : "vta",
+      termine: vtv ? [choice.datum].filter(Boolean) : choice.auswahl || [],
+      interviews: choice.vorhanden || []
+    });
+    if (plan2.aktion === "nichts") return { op: "nichts", grund: plan2.grund };
+    if (plan2.aktion === "bestaetigen") return { op: "bestaetigen", interview: plan2.interview, dates: [plan2.datum], plan: plan2 };
+    if (plan2.aktion === "anlegen") return { op: "anlegen", status: plan2.status, dates: plan2.dates, plan: plan2 };
+    const typ = plan2.interview.typ ?? plan2.interview.type;
+    if (choice.typ && typ && choice.typ !== typ) return { op: "art", interview: plan2.interview };
+    return { op: "nichts", grund: plan2.grund };
   }
   function setTerminForm(choices, choice, form, entry = null) {
     choice.form = form;
@@ -17862,8 +17992,7 @@ ${buildCbreBody(current)}`;
         const aktion = terminAktion(choice);
         const art = terminArtLabel(choice.typ);
         if (aktion.op === "bestaetigen") {
-          const variables = { id: aktion.interview.id, status: "confirmed", dates: aktion.dates, confirmedByEmployer: true, confirmedByCandidate: true };
-          if (choice.typ) variables.type = choice.typ;
+          const variables = mutationVariablen(aktion.plan, { typ: choice.typ });
           operations.push({ key: choice.key, beschreibung: `${who}: VTV ${[art, formatTermin(choice.datum)].filter(Boolean).join(" ")} bestätigt`, query: CONFIRM_INTERVIEW_MUTATION, variables });
         } else if (!choice.typ) {
           continue;
@@ -17872,7 +18001,7 @@ ${buildCbreBody(current)}`;
             key: choice.key,
             beschreibung: `${who}: ${aktion.status === "confirmed" ? "VTV" : "VTA"} ${art} ${aktion.dates.map(formatTermin).join(", ")} angelegt`,
             query: CREATE_INTERVIEW_MUTATION,
-            variables: { matchId: entry.matchId, status: aktion.status, dates: aktion.dates, type: choice.typ, dateSuggestedBy: "employer", location: choice.ort || null, instructions: choice.hinweise || null, kamTagged: false, ignoreValidation: false }
+            variables: mutationVariablen(aktion.plan, { matchId: entry.matchId, typ: choice.typ, ort: choice.ort, hinweise: choice.hinweise })
           });
         } else if (aktion.op === "art") {
           operations.push({ key: choice.key, beschreibung: `${who}: Terminart → ${art}`, query: UPDATE_INTERVIEW_TYPE_MUTATION, variables: { id: aktion.interview.id, type: choice.typ } });

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OBC Toolbox
 // @namespace    https://werkia.de/obc-toolbox
-// @version      1.20.608
+// @version      1.21.627
 // @description  Vereint OBC-OFM-Script und dringende Vakanzen fuer OBC.
 // @icon64       https://raw.githubusercontent.com/willywerkia/werkiaFavicons/main/OBC.svg
 // @match        https://admin.werkia.de/*
@@ -5306,6 +5306,10 @@
     attachQuestionnaireObserver(runtime, runOmNotesBox);
   }
 
+  // ../../shared/js/vakanz-bulk/kein-rvm.js
+  var KEIN_RVM_TAG_RE = /\[\s*kein\s+rvm\s*\]/i;
+  var istKeinRvm = (text) => KEIN_RVM_TAG_RE.test(String(text ?? ""));
+
   // src/features/obc-fragebogen/vacancy-notes-box.js
   var VACANCY_NOTES_BOX_ID = "werkia-obc-vacancy-notes-box";
   var OM_NOTES_ID2 = "werkia-om-notes-box";
@@ -5378,6 +5382,12 @@
         header.style.cssText = "font-weight:800;font-size:14px;margin-bottom:8px;color:#d9480f;border-bottom:1px solid #fd7e14;padding-bottom:6px;";
         header.textContent = "📋 Vakanz-Notizen";
         box.appendChild(header);
+        if (istKeinRvm(notes)) {
+          const tagInfo = document.createElement("div");
+          tagInfo.textContent = "[KEIN RVM] Diese Stelle nicht als Reverse Match senden.";
+          tagInfo.style.cssText = "margin:0 0 8px 0;padding:6px 10px;border:2px solid #1971c2;border-radius:8px;background:#d0ebff;color:#0b4a86;font-size:13px;font-weight:700;";
+          box.appendChild(tagInfo);
+        }
         const text = document.createElement("div");
         text.style.cssText = "white-space:pre-wrap;font-weight:600;";
         text.textContent = notes;
